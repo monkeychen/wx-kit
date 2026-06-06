@@ -113,7 +113,7 @@ CLI 与 GUI 是**同一个 Electron 二进制的两种启动模式**：检测到
 |------|------|---------|
 | `wx-kit login` | 打开扫码登录窗口，持久化 session | — |
 | `wx-kit auth-status` | 查询登录态是否有效 | `--json` |
-| `wx-kit search <name>` | 搜索公众号，返回候选（含 fakeid） | `--json` |
+| `wx-kit search <name>` | 搜索公众号，返回**候选列表**（每项含名称、头像、简介、fakeid），由调用方决定选用哪个 | `--json` |
 | `wx-kit download` | 下载一个或多个文章 URL | `--url <u>`（可重复）/ `--urls-file <f>`、`--formats cover,md,html,pdf,meta`、`--out <dir>` |
 | `wx-kit crawl <name>` | 批量爬取某公众号 | `--count N` 或 `--from YYYY-MM-DD --to YYYY-MM-DD`、`--formats ...`、`--out <dir>` |
 | `wx-kit library list` | 列出已下载文章 | `--account <name>`、`--json` |
@@ -130,7 +130,7 @@ CLI 与 GUI 是**同一个 Electron 二进制的两种启动模式**：检测到
 - 默认下载目录、默认勾选格式。
 - 批量爬取的抓取节流参数（延迟区间、单次步长）——给高级用户，提供合理默认值。
 - 登录态管理（查看登录状态、退出登录/清除 session）。
-- 文章库根目录位置。
+- 文章库根目录位置（**可配置**；默认在用户文档目录下，用户可改到任意目录）。
 
 ---
 
@@ -169,6 +169,7 @@ CLI 与 GUI 是**同一个 Electron 二进制的两种启动模式**：检测到
       └─ meta.json              # 元数据
 ```
 
+- **文章库根目录默认在用户文档目录下**（如 `~/Documents/wx-kit/` 或同级），且**可在设置中配置**到任意目录。
 - session、设置等应用数据存于 Electron `userData` 目录，与文章库分离。
 - 文件夹/文件命名做非法字符清洗与去重处理。
 
@@ -271,9 +272,9 @@ CLI 与 GUI 是**同一个 Electron 二进制的两种启动模式**：检测到
 | 文章页结构差异 | 不同文章 HTML 结构不一，清洗可能漏内容 | fetcher 做容错；保留原始 HTML 兜底 |
 | PDF 渲染保真 | printToPDF 对复杂排版可能有偏差 | 第一阶段以"可读、完整"为准，不追求像素级还原 |
 
-**开放问题（实现前需确认或调研）：**
-- `search` 是否需要返回多候选供 CLI agent 选择，还是默认取最匹配项？（倾向返回候选列表，由调用方决定）
-- 文章库根目录默认位置（`userData` 下 vs 用户文档目录下）。
+**已决议（原开放问题）：**
+- `search` 返回候选列表，由调用方决定选用哪个（不自动取最匹配项）。
+- 文章库根目录默认在用户文档目录下，且可配置到任意目录。
 
 ---
 
