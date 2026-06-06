@@ -8,6 +8,16 @@
 
 后续是可扩展的"百宝箱"，但**当前不预造空模块**（YAGNI）。
 
+本项目脱胎于技术探索原型 `../trae/x-downloader`（PyQt→Electron 迁移的遗留物），产品化时做了几个**已定的不可回退决策**。
+
+---
+
+## 已定关键决策（勿回退，2026-06 安哥确认）
+- **弃用代理模式**：原型用 AnyProxy 做全局 HTTPS MITM 拦截 PC 微信流量，装根证书、改系统代理，脆弱且有还原风险。**不要重新引入代理抓取。**
+- **纯 Node/Electron，无 Python 边车**：原型的 FastAPI + Playwright + PyInstaller 是 PyQt 时代遗留。**不要重新引入 Python / 独立 chromium / 数据库**——单一语言、单进程、单二进制。
+- **双启动模式服务于 AI agent**：CLI 输出纯 JSON 就是为了让 agent 通过 skill 调用，这是产品定位的一部分。
+- **第一阶段不做授权/激活系统**：开箱即用，不加付费门槛。后续要商业化再单独议（`electron/main.ts` 当前无 license 校验）。
+
 ---
 
 ## 项目状态与路线图（续接看这里）
