@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build && electron-builder",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "vite build && node tests/e2e/gui.e2e.mjs",
     "lint": "eslint .",
     "cli": "electron . "
   },
@@ -33,6 +34,7 @@
     "autoprefixer": "^10.5.0",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
+    "playwright": "^1.60.0",
     "postcss": "^8.5.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
