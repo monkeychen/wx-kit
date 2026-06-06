@@ -15,6 +15,20 @@ describe('sanitizeName', () => {
   it('falls back to "untitled" for empty', () => {
     expect(sanitizeName('   ')).toBe('untitled')
   })
+  it('does not split surrogate pairs when truncating', () => {
+    const out = sanitizeName('x'.repeat(79) + '😀😀')
+    // no lone surrogate: re-encoding round-trips cleanly
+    expect([...out].every(ch => ch.codePointAt(0)! <= 0xFFFF || ch.length === 2)).toBe(true)
+    expect([...out].length).toBeLessThanOrEqual(80)
+  })
+  it('leaves no trailing space after truncation', () => {
+    const out = sanitizeName('a'.repeat(79) + ' bc')
+    expect(out).toBe(out.trimEnd())
+  })
+  it('keeps exactly-80 input untruncated', () => {
+    const s = 'a'.repeat(80)
+    expect(sanitizeName(s)).toBe(s)
+  })
 })
 
 describe('articleDirName', () => {

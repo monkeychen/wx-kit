@@ -16,4 +16,7 @@ describe('articleId', () => {
     const id = articleId('https://mp.weixin.qq.com/s/AbCdEfGhIjK')
     expect(id).toMatch(/^h_[0-9a-f]{16}$/)
   })
+  it('falls back to hash when only some of mid/idx/sn present', () => {
+    expect(articleId('https://mp.weixin.qq.com/s?mid=1&idx=1')).toMatch(/^h_[0-9a-f]{16}$/)
+  })
 })

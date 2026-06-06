@@ -1,7 +1,7 @@
 // src/core/types.ts
 export type DownloadFormat = 'cover' | 'md' | 'html' | 'pdf' | 'meta'
 
-export const ALL_FORMATS: DownloadFormat[] = ['cover', 'md', 'html', 'pdf', 'meta']
+export const ALL_FORMATS: readonly DownloadFormat[] = ['cover', 'md', 'html', 'pdf', 'meta']
 
 /** 解析微信文章页得到的结构（纯解析产物，未落盘） */
 export interface ParsedArticle {

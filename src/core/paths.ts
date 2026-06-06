@@ -4,8 +4,8 @@ const ILLEGAL = /[/\\:*?"<>|]/g
 export function sanitizeName(raw: string): string {
   let s = (raw ?? '').replace(ILLEGAL, '_').replace(/\s+/g, ' ').trim()
   if (!s) return 'untitled'
-  if (s.length > 80) s = s.slice(0, 80)
-  return s
+  if ([...s].length > 80) s = [...s].slice(0, 80).join('')
+  return s.trim()
 }
 
 export function articleDirName(publishDate: string, title: string): string {
