@@ -86,4 +86,5 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - `docs/PRD.md` — 产品需求（第一阶段全貌、F1–F5、架构、风控、验收）。
 - `docs/plans/2026-06-06-m1-core-and-url-download.md` — M1 实现计划。
 - `docs/plans/2026-06-06-m2-gui.md` — M2 实现计划。
+- `docs/devlog/2026-06-06-wx-kit-m1-m2-vibe-coding.md` — M1+M2 全程 vibe-coding 复盘（流程/决策/踩坑/方法论）。
 - 进度真相以本文件"项目状态"表 + git 历史为准。
