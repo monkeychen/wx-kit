@@ -19,8 +19,10 @@ export async function readArticleContent(dir: string, kind: ReadableKind): Promi
     throw err
   }
   if (kind === 'md') {
-    const m = text.match(/^---\n[\s\S]*?\n---\n/)
-    if (m) text = text.slice(m[0].length)
+    const normalised = text.replace(/\r\n/g, '\n')
+    const m = normalised.match(/^---\n[\s\S]*?\n---\n/)
+    if (m) text = normalised.slice(m[0].length)
+    else text = normalised
   }
   return text
 }

@@ -27,4 +27,11 @@ describe('readArticleContent', () => {
     const empty = mkdtempSync(join(tmpdir(), 'wxk-empty-'))
     await expect(readArticleContent(empty, 'md')).rejects.toThrow(/not found/i)
   })
+  it('strips frontmatter from CRLF (windows) markdown', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'wxk-crlf-'))
+    writeFileSync(join(d, 'content.md'), '---\r\ntitle: "T"\r\n---\r\n# T\r\n\r\n正文\r\n')
+    const out = await readArticleContent(d, 'md')
+    expect(out.startsWith('---')).toBe(false)
+    expect(out).toContain('# T')
+  })
 })

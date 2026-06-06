@@ -6,8 +6,25 @@ export const WXFILE_SCHEME = 'wxfile'
 
 /** 把 wxfile://local/<relpath> 解析为 root 内的绝对路径；越界返回 null。 */
 export function resolveWxfilePath(url: string, root: string): string | null {
-  // Reject raw path traversal attempts before URL normalization absorbs them
+  // Fast-path: reject obviously unencoded traversal. Encoded variants (%2E%2E etc.)
+  // are caught by the per-segment decode + resolve containment check below.
   if (/(?:^|\/)\.\.(\/|$)/.test(url)) return null
+
+  // Extract the raw path before URL normalization so %2E%2E isn't silently resolved.
+  // URL normalization collapses /%2E%2E/ into a parent path before we can inspect it.
+  const schemeEnd = url.indexOf('://')
+  if (schemeEnd === -1) return null
+  const pathStart = url.indexOf('/', schemeEnd + 3)
+  if (pathStart === -1) return null
+  const rawPath = url.slice(pathStart)
+
+  // Check each raw segment for dotdot after percent-decoding to catch %2E%2E variants.
+  for (const seg of rawPath.split('/')) {
+    if (!seg) continue
+    let decoded: string
+    try { decoded = decodeURIComponent(seg) } catch { return null }
+    if (decoded === '..' || decoded === '.') return null
+  }
 
   let u: URL
   try { u = new URL(url) } catch { return null }
@@ -45,6 +62,9 @@ export function handleWxfileProtocol(getRoot: () => string | Promise<string>): v
     const root = await getRoot()
     const target = resolveWxfilePath(req.url, root)
     if (!target) return new Response('forbidden', { status: 403 })
-    return net.fetch(pathToFileURL(target).toString())
+    return net.fetch(pathToFileURL(target).toString()).catch((e) => {
+      console.error('[wxfile] fetch error:', e)
+      return new Response('error', { status: 500 })
+    })
   })
 }

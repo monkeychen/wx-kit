@@ -21,4 +21,7 @@ describe('resolveWxfilePath', () => {
     expect(out).not.toBeNull()
     expect(out!.startsWith('/lib/root')).toBe(true)
   })
+  it('rejects percent-encoded dotdot traversal', () => {
+    expect(resolveWxfilePath('wxfile://local/%2E%2E/%2E%2E/etc/passwd', ROOT)).toBeNull()
+  })
 })
