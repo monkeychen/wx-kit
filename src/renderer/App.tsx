@@ -1,3 +1,19 @@
+import { Routes, Route } from 'react-router-dom'
+import MainLayout from './layouts/MainLayout'
+import UrlDownload from './pages/UrlDownload'
+import Library from './pages/Library'
+import Reader from './pages/Reader'
+import Settings from './pages/Settings'
+
 export default function App() {
-  return <div style={{ padding: 24, fontFamily: 'system-ui' }}>wx-kit · 微信百宝箱（M1 占位界面）</div>
+  return (
+    <Routes>
+      <Route element={<MainLayout />}>
+        <Route index element={<UrlDownload />} />
+        <Route path="library" element={<Library />} />
+        <Route path="reader/:id" element={<Reader />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
+    </Routes>
+  )
 }
