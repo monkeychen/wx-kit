@@ -17,10 +17,11 @@ export class DownloadQueue {
       try {
         const r = await this.downloadOne(url)
         items.push(r)
+        this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'save' })
       } catch (err) {
         items.push({ url, ok: false, error: { code: 'DOWNLOAD_FAILED', message: (err as Error).message } })
+        this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'failed' })
       }
-      this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'save' })
     }
 
     const succeeded = items.filter(i => i.ok && !i.skipped).length

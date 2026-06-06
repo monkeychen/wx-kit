@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { exportArticle, type ExportDeps, type ExportInput } from '../../src/core/exporter/index'
 import type { ParsedArticle } from '../../src/core/types'
 
@@ -56,5 +56,8 @@ describe('exportArticle: failed-image data-src strip', () => {
 
     // No remote URL from the failed image
     expect(htmlContent).not.toContain(failUrl)
+
+    // Image file actually written to disk
+    expect(existsSync(join(tmpDir, 'article', 'images', 'img-1.jpg'))).toBe(true)
   })
 })

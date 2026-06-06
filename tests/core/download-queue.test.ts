@@ -39,4 +39,21 @@ describe('DownloadQueue', () => {
     const summary = await q.run(['new', 'dup'])
     expect(summary).toMatchObject({ succeeded: 1, skipped: 1, failed: 0, ok: true })
   })
+
+  it('emits failed phase for failures and save for successes', async () => {
+    const events: ProgressEvent[] = []
+    const downloadOne: DownloadOne = async (url) => {
+      if (url === 'bad') throw new Error('x')
+      return { url, ok: true, id: url }
+    }
+    const q = new DownloadQueue(downloadOne, e => events.push(e))
+    await q.run(['ok1', 'bad'])
+    expect(events.some(e => e.currentUrl === 'bad' && e.phase === 'failed')).toBe(true)
+    expect(events.some(e => e.currentUrl === 'ok1' && e.phase === 'save')).toBe(true)
+  })
+
+  it('handles empty url list', async () => {
+    const q = new DownloadQueue(async (u) => ({ url: u, ok: true }), () => {})
+    expect(await q.run([])).toMatchObject({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0 })
+  })
 })

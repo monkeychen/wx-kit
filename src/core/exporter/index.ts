@@ -1,6 +1,5 @@
 // src/core/exporter/index.ts
-import { mkdir } from 'node:fs/promises'
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ArticleMeta, DownloadFormat, ParsedArticle } from '../types'
 import { buildMeta, writeMeta } from './export-meta'
@@ -31,19 +30,21 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
   const { parsed, id, sourceUrl, dir, formats } = input
   await mkdir(dir, { recursive: true })
 
-  const needImages = formats.includes('md') || formats.includes('html')
+  const needImages = formats.includes('md') || formats.includes('html') || formats.includes('pdf')
   let contentHtml = parsed.contentHtml
 
-  // 图片本地化（md/html 需要）
+  // 图片本地化（md/html/pdf 需要）
   if (needImages && parsed.imageUrls.length) {
-    await mkdir(join(dir, 'images'), { recursive: true })
     const downloaded = new Map<string, { data: Buffer; contentType: string }>()
     for (const url of parsed.imageUrls) {
       try { downloaded.set(url, await deps.fetchBinary(url)) } catch { /* 跳过坏图 */ }
     }
-    const map = buildImageMap([...downloaded.keys()], u => downloaded.get(u)!.contentType)
-    for (const [url, rel] of map) await writeFile(join(dir, rel), downloaded.get(url)!.data)
-    contentHtml = rewriteImageRefs(parsed.contentHtml, map)
+    if (downloaded.size) {
+      await mkdir(join(dir, 'images'), { recursive: true })
+      const map = buildImageMap([...downloaded.keys()], u => downloaded.get(u)!.contentType)
+      for (const [url, rel] of map) await writeFile(join(dir, rel), downloaded.get(url)!.data)
+      contentHtml = rewriteImageRefs(parsed.contentHtml, map)
+    }
     // Strip any remaining data-src attributes (failed downloads leave remote URLs)
     contentHtml = contentHtml.replace(/ data-src="[^"]*"/g, '')
   }
