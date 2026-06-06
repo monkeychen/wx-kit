@@ -7,7 +7,20 @@ export default defineConfig({
   plugins: [
     react(),
     electron([
-      { entry: 'electron/main.ts' },
+      {
+        entry: 'electron/main.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+              // cheerio pulls in undici, whose sqlite-cache-store statically
+              // requires node:sqlite — a builtin Electron's Node runtime lacks.
+              // We only use cheerio.load (static parsing), never fromURL/fetch,
+              // so undici is never needed at runtime; keep it external & lazy.
+              external: ['undici'],
+            },
+          },
+        },
+      },
       { entry: 'electron/preload.ts', onstart(o) { o.reload() } },
     ]),
     renderer(),
