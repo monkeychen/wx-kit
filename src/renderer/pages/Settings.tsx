@@ -17,7 +17,12 @@ export default function Settings() {
   }
   const save = async () => {
     if (!s) return
-    await api.saveSettings(s); message.success('已保存')
+    try {
+      await api.saveSettings(s)
+      message.success('已保存')
+    } catch (e) {
+      message.error('保存失败：' + (e as Error).message)
+    }
   }
 
   if (!s) return <div className="p-6">加载中…</div>

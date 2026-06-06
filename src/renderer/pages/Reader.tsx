@@ -12,7 +12,8 @@ type ImgProps = ClassAttributes<HTMLImageElement> & ImgHTMLAttributes<HTMLImageE
 
 function toWxfileBase(libraryRoot: string, dir: string): string {
   // dir 在 libraryRoot 之下；取相对子路径，按 / 编码每段
-  let rel = dir.startsWith(libraryRoot) ? dir.slice(libraryRoot.length) : dir
+  const rootPrefix = libraryRoot.replace(/[/\\]+$/, '') + '/'
+  let rel = dir.startsWith(rootPrefix) ? dir.slice(rootPrefix.length) : dir
   rel = rel.replace(/^[/\\]+/, '').split(/[/\\]/).map(encodeURIComponent).join('/')
   return `wxfile://local/${rel}`
 }
@@ -43,7 +44,7 @@ export default function Reader() {
   const base = useMemo(() => (meta && root ? toWxfileBase(root, meta.dir) : ''), [meta, root])
 
   useEffect(() => {
-    if (meta && kind === 'md') api.readContent(meta.dir, 'md').then(setMd).catch(() => setMd(''))
+    if (meta && kind === 'md') api.readContent(meta.dir, 'md').then(setMd).catch(() => setMd('*(内容读取失败)*'))
   }, [meta, kind])
 
   if (loading) return <div className="p-6"><Spin /></div>
