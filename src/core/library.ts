@@ -1,7 +1,6 @@
 // src/core/library.ts
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import type { ArticleMeta } from './types'
 
 interface LibraryFile { version: number; articles: ArticleMeta[] }
@@ -13,8 +12,12 @@ export class Library {
   }
 
   private async read(): Promise<LibraryFile> {
-    if (!existsSync(this.indexPath)) return { version: 1, articles: [] }
-    return JSON.parse(await readFile(this.indexPath, 'utf-8')) as LibraryFile
+    try {
+      return JSON.parse(await readFile(this.indexPath, 'utf-8')) as LibraryFile
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { version: 1, articles: [] }
+      throw new Error(`library index is corrupt at ${this.indexPath} — delete it to reset`)
+    }
   }
 
   private async write(data: LibraryFile): Promise<void> {
@@ -49,7 +52,14 @@ export class Library {
   async remove(id: string): Promise<void> {
     const data = await this.read()
     const entry = data.articles.find(a => a.id === id)
-    if (entry?.dir && existsSync(entry.dir)) await rm(entry.dir, { recursive: true, force: true })
+    if (entry?.dir) {
+      const resolvedDir = resolve(entry.dir)
+      const resolvedRoot = resolve(this.root)
+      if (resolvedDir !== resolvedRoot && resolvedDir.startsWith(resolvedRoot + sep)) {
+        await rm(resolvedDir, { recursive: true, force: true })
+      }
+      // dir outside root (corrupt/hand-edited index): skip fs deletion, still remove the index entry
+    }
     data.articles = data.articles.filter(a => a.id !== id)
     await this.write(data)
   }

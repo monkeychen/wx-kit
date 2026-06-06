@@ -49,4 +49,25 @@ describe('Library', () => {
     expect(await lib.has('1')).toBe(false)
     expect(existsSync(dir)).toBe(false)
   })
+
+  it('throws a clear error on corrupt index', async () => {
+    writeFileSync(join(root, 'library.json'), '{ not json')
+    await expect(lib.list()).rejects.toThrow(/corrupt/)
+  })
+
+  it('remove with empty dir does not throw and clears entry', async () => {
+    await lib.add(meta('2', '无目录')) // dir: ''
+    await lib.remove('2')
+    expect(await lib.has('2')).toBe(false)
+  })
+
+  it('remove refuses to delete a dir outside the library root', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'wxk-outside-'))
+    writeFileSync(join(outside, 'keep.txt'), 'x')
+    const m = meta('3', '越界'); m.dir = outside
+    await lib.add(m)
+    await lib.remove('3')
+    expect(existsSync(join(outside, 'keep.txt'))).toBe(true) // NOT deleted
+    expect(await lib.has('3')).toBe(false)                    // index entry still removed
+  })
 })
