@@ -13,18 +13,22 @@ export default function Library() {
   const load = async (keyword = '') => {
     setLoading(true)
     try { setRows(keyword ? await api.librarySearch(keyword) : await api.libraryList()) }
+    catch (e) { message.error('加载失败：' + (e as Error).message) }
     finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
   const del = async (id: string) => {
-    await api.libraryRemove(id); message.success('已删除'); load(kw)
+    try { await api.libraryRemove(id); message.success('已删除'); load(kw) }
+    catch (e) { message.error('删除失败：' + (e as Error).message) }
   }
 
   const columns = [
     { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
     { title: '公众号', dataIndex: 'account', key: 'account', width: 140 },
     { title: '发布', dataIndex: 'publishTime', key: 'publishTime', width: 160 },
+    { title: '下载', dataIndex: 'downloadTime', key: 'downloadTime', width: 180,
+      render: (t: string) => (t ? new Date(t).toLocaleString() : '') },
     { title: '格式', dataIndex: 'formats', key: 'formats', width: 200,
       render: (fs: string[]) => fs.map(f => <Tag key={f}>{f}</Tag>) },
     { title: '操作', key: 'op', width: 240, render: (_: unknown, r: ArticleMeta) => (

@@ -11,6 +11,9 @@ import type { ArticleMeta } from '../../core/types'
 type ImgProps = ClassAttributes<HTMLImageElement> & ImgHTMLAttributes<HTMLImageElement> & ExtraProps
 
 function toWxfileBase(libraryRoot: string, dir: string): string {
+  // If dir isn't under the current libraryRoot (e.g. user changed the root in
+  // settings after this article was downloaded), we fall back to the raw dir;
+  // the wxfile protocol will then 403 and images won't load for that article.
   // dir 在 libraryRoot 之下；取相对子路径，按 / 编码每段
   const rootPrefix = libraryRoot.replace(/[/\\]+$/, '') + '/'
   let rel = dir.startsWith(rootPrefix) ? dir.slice(rootPrefix.length) : dir
