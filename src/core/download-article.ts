@@ -25,6 +25,10 @@ export async function downloadArticle(
   const html = await deps.fetchHtml(url)
   const parsed = parseArticle(html, url)
 
+  if (!parsed.title.trim()) {
+    throw new Error(`invalid or unavailable article (no title parsed): ${url}`)
+  }
+
   const accountDir = join(deps.libraryRoot, sanitizeName(parsed.account || 'unknown'))
   const datePrefix = parsed.publishTime.slice(0, 10)
   const base = articleDirName(datePrefix, parsed.title)
