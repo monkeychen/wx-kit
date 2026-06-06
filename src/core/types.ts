@@ -30,6 +30,8 @@ export interface ArticleMeta {
   dir: string                 // 文章文件夹绝对路径
 }
 
+// M1's DownloadQueue emits only fetch/save/done/failed (queue-level granularity).
+// 'images' and 'export' are reserved for M2's finer per-article progress (PRD §8.4).
 export type ProgressPhase = 'fetch' | 'images' | 'export' | 'save' | 'done' | 'failed'
 
 export interface ProgressEvent {

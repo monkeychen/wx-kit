@@ -55,6 +55,8 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
     try { const { data, contentType } = await deps.fetchBinary(parsed.coverUrl); await writeCover(dir, data, contentType) } catch { /* 封面失败不致命 */ }
   }
   if (formats.includes('md')) await writeMarkdown(dir, meta, contentHtml)
+  // pdf renders from index.html, so html is written when pdf is requested even
+  // if 'html' wasn't selected; index.html then remains as an intermediate file.
   if (formats.includes('html') || formats.includes('pdf')) await writeHtml(dir, meta, contentHtml)
   if (formats.includes('pdf')) await writePdfFromHtml(dir, deps.BrowserWindowCtor)
   if (formats.includes('meta')) await writeMeta(dir, meta)

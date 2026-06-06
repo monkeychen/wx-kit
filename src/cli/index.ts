@@ -45,7 +45,7 @@ export async function runCli(argv: string[]): Promise<number> {
     .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
     .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
     .action(async (opts) => {
-      const urls: string[] = [...(opts.url ?? [])]
+      const urls: string[] = [...(opts.url ?? [])].map((s: string) => s.trim()).filter(Boolean)
       if (opts.urlsFile) {
         urls.push(...readFileSync(opts.urlsFile, 'utf-8').split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean))
       }
