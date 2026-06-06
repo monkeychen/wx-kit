@@ -35,7 +35,7 @@ export function registerIpc(settings: SettingsService): void {
     }
     const queue = new DownloadQueue(
       (url) => downloadArticle(url, formats, deps),
-      (ev) => event.sender.send('download:progress', ev),
+      (ev) => { if (!event.sender.isDestroyed()) event.sender.send('download:progress', ev) },
     )
     return queue.run(urls)
   })

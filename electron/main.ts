@@ -1,13 +1,13 @@
 // electron/main.ts
 import { app, BrowserWindow } from 'electron'
-import path from 'node:path'
-import { join } from 'node:path'
+import path, { join } from 'node:path'
 import { runCli } from '../src/cli'
 import { registerWxfileScheme, handleWxfileProtocol } from './protocol'
 import { registerIpc } from './ipc'
 import { SettingsService } from './services/settings'
 
-// Must be called before app 'ready' — runs at require/module-load time
+// Must be called before app 'ready'. Safe in CLI mode — the registered
+// scheme is never exercised without a BrowserWindow.
 registerWxfileScheme()
 
 const CLI_COMMANDS = new Set(['download', 'crawl', 'search', 'login', 'auth-status', 'library'])
