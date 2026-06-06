@@ -24,4 +24,9 @@ describe('buildMarkdown', () => {
   it('keeps local image reference', () => {
     expect(md).toContain('![](images/img-1.jpg)')
   })
+  it('escapes newlines and backslashes in frontmatter', () => {
+    const md = buildMarkdown({ ...meta, title: 'Line1\nLine2', author: 'A\\B' }, '')
+    expect(md).toContain('title: "Line1\\nLine2"')
+    expect(md).toContain('author: "A\\\\B"')
+  })
 })

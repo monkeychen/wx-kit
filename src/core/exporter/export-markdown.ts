@@ -7,7 +7,8 @@ import type { ArticleMeta } from '../types'
 const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' })
 
 function frontmatter(m: ArticleMeta): string {
-  const esc = (s: string) => s.replace(/"/g, '\\"')
+  const esc = (s: string) =>
+    s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n')
   return [
     '---',
     `title: "${esc(m.title)}"`,

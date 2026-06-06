@@ -9,7 +9,7 @@ export async function writePdfFromHtml(
   dir: string,
   BrowserWindowCtor: typeof import('electron').BrowserWindow,
 ): Promise<void> {
-  const win = new BrowserWindowCtor({ show: false, webPreferences: { offscreen: true } })
+  const win = new BrowserWindowCtor({ show: false })
   try {
     await win.loadURL(pathToFileURL(join(dir, 'index.html')).toString())
     const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' })

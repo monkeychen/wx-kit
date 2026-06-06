@@ -3,7 +3,8 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const EXT_BY_TYPE: Record<string, string> = {
-  'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
+  'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+  'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
 }
 
 /** 给定封面二进制与内容类型，落盘 cover.<ext>，返回文件名 */

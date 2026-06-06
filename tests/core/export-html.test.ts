@@ -23,4 +23,8 @@ describe('buildHtml', () => {
     expect(html).toContain('公众号')
     expect(html).toContain('src="images/img-1.jpg"')
   })
+  it('escapes double-quote in href and title', () => {
+    const html = buildHtml({ ...meta, sourceUrl: 'https://x.com/s?a=1"&b=2' }, '')
+    expect(html).toContain('href="https://x.com/s?a=1&quot;&amp;b=2"')
+  })
 })
