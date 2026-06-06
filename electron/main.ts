@@ -19,6 +19,11 @@ async function main() {
   const args = userArgs()
 
   if (isCliInvocation(args)) {
+    // PDF export opens a transient offscreen BrowserWindow. Without this
+    // no-op handler, Electron's default "quit when all windows close"
+    // fires when that window is destroyed and races the process to exit
+    // before the summary/library write finish. We exit explicitly below.
+    app.on('window-all-closed', () => {})
     await app.whenReady()
     const code = await runCli(args)
     app.exit(code)
