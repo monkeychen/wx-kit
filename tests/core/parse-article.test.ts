@@ -14,8 +14,12 @@ describe('parseArticle', () => {
   it('extracts publish time', () => expect(a.publishTime).toBe('2026-02-25 08:00'))
   it('extracts digest', () => expect(a.digest).toBe('这是摘要内容'))
   it('extracts cover url', () => expect(a.coverUrl).toBe('https://mmbiz.qpic.cn/cover_123'))
+  it('extracts byline author distinct from account', () => {
+    expect(a.author).toBe('某位作者')
+    expect(a.author).not.toBe(a.account)
+  })
   it('collects unique image urls in order from data-src', () => {
-    expect(a.imageUrls).toEqual(['https://mmbiz.qpic.cn/img_a', 'https://mmbiz.qpic.cn/img_b'])
+    expect(a.imageUrls).toEqual(['https://mmbiz.qpic.cn/img_a', 'https://mmbiz.qpic.cn/img_b', 'https://mmbiz.qpic.cn/img_c'])
   })
   it('keeps content html non-empty', () => expect(a.contentHtml).toContain('第一段正文'))
 })

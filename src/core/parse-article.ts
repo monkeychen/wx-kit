@@ -9,8 +9,9 @@ function meta($: cheerio.CheerioAPI, prop: string): string {
 export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
   const $ = cheerio.load(html)
 
-  const title = ($('#activity-name').text().trim() || meta($, 'og:title')) ?? ''
+  const title = $('#activity-name').text().trim() || meta($, 'og:title')
   const account = $('#js_name').text().trim()
+  const author = $('#js_author_name').text().trim() || account
   const publishTime = $('#publish_time').text().trim()
   const digest = meta($, 'og:description')
   const coverUrl = meta($, 'og:image')
@@ -25,7 +26,7 @@ export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
 
   return {
     title,
-    author: account,
+    author,
     account,
     publishTime,
     digest,
