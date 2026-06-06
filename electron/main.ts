@@ -38,4 +38,7 @@ async function main() {
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 }
 
-main()
+main().catch((err) => {
+  process.stderr.write(`[wx-kit] fatal: ${(err as Error).message}\n`)
+  process.exit(1)
+})

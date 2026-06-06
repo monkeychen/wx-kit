@@ -30,6 +30,10 @@ function out(summary: DownloadSummary): void {
 export async function runCli(argv: string[]): Promise<number> {
   const program = new Command()
   program.name('wx-kit').description('微信百宝箱 CLI').exitOverride()
+  program.configureOutput({
+    writeOut: (s) => process.stderr.write(s),
+    writeErr: (s) => process.stderr.write(s),
+  })
 
   let exitCode = 0
 
@@ -62,8 +66,13 @@ export async function runCli(argv: string[]): Promise<number> {
   try {
     await program.parseAsync(argv, { from: 'user' })
   } catch (err) {
-    process.stdout.write(JSON.stringify({ ok: false, error: { code: 'CLI_ERROR', message: (err as Error).message } }) + '\n')
-    exitCode = 2
+    const code = (err as { code?: string }).code
+    if (code === 'commander.helpDisplayed' || code === 'commander.help' || code === 'commander.version') {
+      // help/version already printed to stderr; success, no JSON error
+    } else {
+      process.stdout.write(JSON.stringify({ ok: false, error: { code: 'CLI_ERROR', message: (err as Error).message } }) + '\n')
+      exitCode = 2
+    }
   }
   return exitCode
 }
