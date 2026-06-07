@@ -1,25 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Segmented, Button, Spin, Empty } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ClassAttributes, ImgHTMLAttributes } from 'react'
 import type { ExtraProps } from 'react-markdown'
 import { api } from '../api'
+import { toWxfileBase, wxfileJoin } from '../wxfile'
+import { relativeTime } from '../time'
 import type { ArticleMeta } from '../../core/types'
 
 type ImgProps = ClassAttributes<HTMLImageElement> & ImgHTMLAttributes<HTMLImageElement> & ExtraProps
-
-function toWxfileBase(libraryRoot: string, dir: string): string {
-  // If dir isn't under the current libraryRoot (e.g. user changed the root in
-  // settings after this article was downloaded), we fall back to the raw dir;
-  // the wxfile protocol will then 403 and images won't load for that article.
-  // dir 在 libraryRoot 之下；取相对子路径，按 / 编码每段
-  const rootPrefix = libraryRoot.replace(/[/\\]+$/, '') + '/'
-  let rel = dir.startsWith(rootPrefix) ? dir.slice(rootPrefix.length) : dir
-  rel = rel.replace(/^[/\\]+/, '').split(/[/\\]/).map(encodeURIComponent).join('/')
-  return `wxfile://local/${rel}`
-}
 
 export default function Reader() {
   const { id } = useParams()
@@ -34,12 +26,9 @@ export default function Reader() {
     (async () => {
       const [list, s] = await Promise.all([api.libraryList(), api.getSettings()])
       setRoot(s.libraryRoot)
-      const m = list.find(a => a.id === decodeURIComponent(id ?? '')) ?? null
+      const m = list.find((a) => a.id === decodeURIComponent(id ?? '')) ?? null
       setMeta(m)
-      if (m) {
-        const has = (k: 'md' | 'html') => m.formats.includes(k)
-        setKind(has('md') ? 'md' : 'html')
-      }
+      if (m) setKind(m.formats.includes('md') ? 'md' : 'html')
       setLoading(false)
     })()
   }, [id])
@@ -47,40 +36,52 @@ export default function Reader() {
   const base = useMemo(() => (meta && root ? toWxfileBase(root, meta.dir) : ''), [meta, root])
 
   useEffect(() => {
-    if (meta && kind === 'md') api.readContent(meta.dir, 'md').then(setMd).catch(() => setMd('*(内容读取失败)*'))
+    if (meta && kind === 'md') {
+      api.readContent(meta.dir, 'md').then(setMd).catch(() => setMd('*(内容读取失败)*'))
+    }
   }, [meta, kind])
 
-  if (loading) return <div className="p-6"><Spin /></div>
-  if (!meta) return <div className="p-6"><Empty description="未找到文章" /></div>
+  if (loading) return <div className="page" style={{ textAlign: 'center', paddingTop: 80 }}><Spin /></div>
+  if (!meta) return <div className="page"><Empty description="未找到文章" /></div>
 
   return (
-    <div className="p-6" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div className="mb-3" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <Button onClick={() => nav('/library')}>返回</Button>
-        <b style={{ flex: 1 }}>{meta.title}</b>
+    <>
+      <div className="reader-bar">
+        <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/library')}>返回书架</Button>
+        <span className="font-serif" style={{ flex: 1, fontWeight: 600, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.title}</span>
         <Segmented value={kind} onChange={(v) => setKind(v as 'md' | 'html')}
           options={[
             { label: 'Markdown', value: 'md', disabled: !meta.formats.includes('md') },
-            { label: 'HTML', value: 'html', disabled: !meta.formats.includes('html') },
+            { label: '网页', value: 'html', disabled: !meta.formats.includes('html') },
           ]} />
       </div>
 
       {kind === 'html' ? (
-        <iframe title="article" sandbox="allow-same-origin" style={{ flex: 1, border: '1px solid #eee' }}
-          src={`${base}/index.html`} />
+        <iframe title="article" className="reader-frame" sandbox="allow-same-origin"
+          src={wxfileJoin(base, 'index.html')} />
       ) : (
-        <div style={{ flex: 1, overflow: 'auto', maxWidth: 760 }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}
-            components={{
-              img: ({ src = '', ...rest }: ImgProps) => {
-                const resolved = src.startsWith('images/') ? `${base}/${src.split('/').map(encodeURIComponent).join('/')}` : src
-                return <img src={resolved} style={{ maxWidth: '100%' }} alt={rest.alt ?? ''} />
-              },
-            }}>
-            {md}
-          </ReactMarkdown>
+        <div className="reader-scroll">
+          <article className="reader-doc">
+            <div className="reader-kicker">{meta.account || '未知公众号'}</div>
+            <h1 className="reader-title">{meta.title}</h1>
+            <div className="reader-byline">
+              {meta.author && <span>{meta.author} · </span>}
+              {meta.publishTime ? relativeTime(meta.publishTime) : ''}
+            </div>
+            <div className="prose">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}
+                components={{
+                  img: ({ src = '', ...rest }: ImgProps) => {
+                    const resolved = src.startsWith('images/') ? wxfileJoin(base, src) : src
+                    return <img src={resolved} alt={rest.alt ?? ''} />
+                  },
+                }}>
+                {md}
+              </ReactMarkdown>
+            </div>
+          </article>
         </div>
       )}
-    </div>
+    </>
   )
 }

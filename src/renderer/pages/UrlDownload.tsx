@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Input, Checkbox, Button, Progress, List, Tag, message } from 'antd'
+import { Input, Button, message } from 'antd'
 import { api } from '../api'
+import FormatPicker from '../components/FormatPicker'
 import type { DownloadFormat, DownloadItemResult, ProgressEvent } from '../../core/types'
 
-const FORMATS: DownloadFormat[] = ['cover', 'md', 'html', 'pdf', 'meta']
+const PHASE_LABEL: Record<ProgressEvent['phase'], string> = {
+  fetch: '抓取页面',
+  images: '下载图片',
+  export: '导出格式',
+  save: '写入文章库',
+  done: '已完成',
+  failed: '处理失败',
+}
 
 export default function UrlDownload() {
   const [text, setText] = useState('')
@@ -13,20 +21,22 @@ export default function UrlDownload() {
   const [items, setItems] = useState<DownloadItemResult[]>([])
 
   useEffect(() => {
-    api.getSettings().then(s => setFormats(s.defaultFormats)).catch(() => {})
+    api.getSettings().then((s) => setFormats(s.defaultFormats)).catch(() => {})
     const off = api.onDownloadProgress(setProgress)
     return off
   }, [])
 
+  const urlCount = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).length
+
   const start = async () => {
-    const urls = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
-    if (!urls.length) { message.warning('请输入至少一个 URL'); return }
+    const urls = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+    if (!urls.length) { message.warning('请粘贴至少一个文章链接'); return }
     if (!formats.length) { message.warning('请至少选择一种格式'); return }
     setRunning(true); setItems([]); setProgress(null)
     try {
       const summary = await api.download(urls, formats)
       setItems(summary.items)
-      message.success(`完成：成功 ${summary.succeeded} · 跳过 ${summary.skipped} · 失败 ${summary.failed}`)
+      message.success(`完成 · 成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
     } catch (e) {
       message.error('下载出错：' + (e as Error).message)
     } finally {
@@ -37,34 +47,64 @@ export default function UrlDownload() {
   const pct = progress ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100) : 0
 
   return (
-    <div className="p-6" style={{ maxWidth: 820 }}>
-      <h2>URL 下载</h2>
-      <Input.TextArea value={text} onChange={e => setText(e.target.value)}
-        placeholder="每行一个微信文章链接" autoSize={{ minRows: 4, maxRows: 10 }} disabled={running} />
-      <div className="my-3">
-        <Checkbox.Group options={FORMATS.map(f => ({ label: f, value: f }))}
-          value={formats} onChange={v => setFormats(v as DownloadFormat[])} disabled={running} />
-      </div>
-      <Button type="primary" loading={running} onClick={start}>开始下载</Button>
-
-      {running && progress && (
-        <div className="mt-4">
-          <Progress percent={pct} />
-          <div style={{ color: '#888' }}>{progress.phase} · {progress.currentUrl}</div>
+    <div className="page">
+      <div className="page-narrow fade-in">
+        <div className="page-head">
+          <div className="eyebrow">Download</div>
+          <h1 className="page-title">下载文章</h1>
+          <p className="page-sub">粘贴微信公众号文章链接，下载为可永久保存的多种格式。每行一个链接，支持批量。</p>
         </div>
-      )}
 
-      {items.length > 0 && (
-        <List className="mt-4" size="small" bordered dataSource={items}
-          renderItem={(it) => (
-            <List.Item>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.url}</span>
-              {it.skipped ? <Tag color="default">已存在</Tag>
-                : it.ok ? <Tag color="success">成功</Tag>
-                : <Tag color="error">失败：{it.error?.message}</Tag>}
-            </List.Item>
-          )} />
-      )}
+        <Input.TextArea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="https://mp.weixin.qq.com/s/..."
+          autoSize={{ minRows: 4, maxRows: 12 }}
+          disabled={running}
+          style={{ fontSize: 14, background: 'var(--paper-raised)' }}
+        />
+
+        <div style={{ margin: '24px 0 10px', fontWeight: 600, fontSize: 15 }}>保存为</div>
+        <FormatPicker value={formats} onChange={setFormats} disabled={running} />
+
+        <div style={{ marginTop: 26, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Button type="primary" size="large" loading={running} onClick={start}
+            data-testid="start-download" style={{ paddingInline: 32 }}>
+            {running ? '下载中…' : '开始下载'}
+          </Button>
+          {urlCount > 0 && !running && <span className="faint">{urlCount} 个链接待处理</span>}
+        </div>
+
+        {running && progress && (
+          <div className="surface progress-card fade-in" style={{ marginTop: 28 }}>
+            <div className="progress-head">
+              <span className="progress-phase">{PHASE_LABEL[progress.phase]}</span>
+              <span className="progress-count">{progress.completed} / {progress.total}</span>
+            </div>
+            <div className="progress-track"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
+            {progress.currentUrl && <div className="progress-current">{progress.currentUrl}</div>}
+          </div>
+        )}
+
+        {items.length > 0 && (
+          <div className="surface fade-in" style={{ marginTop: 28, padding: '6px 20px' }}>
+            <div className="result-list">
+              {items.map((it, i) => (
+                <div className="result-row" key={i}>
+                  <span className="result-url">{it.url}</span>
+                  {it.skipped ? (
+                    <span className="badge badge-skip">已存在</span>
+                  ) : it.ok ? (
+                    <span className="badge badge-ok" data-testid="result-ok">已保存</span>
+                  ) : (
+                    <span className="badge badge-fail" title={it.error?.message}>失败</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

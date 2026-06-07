@@ -47,7 +47,7 @@ export function resolveWxfilePath(url: string, root: string): string | null {
 
 /** 必须在 app ready 前调用：声明协议为可加载本地资源的特权协议。 */
 export function registerWxfileScheme(): void {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { protocol } = require('electron') as typeof import('electron')
   protocol.registerSchemesAsPrivileged([
     { scheme: WXFILE_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -56,7 +56,7 @@ export function registerWxfileScheme(): void {
 
 /** app ready 后调用：用 getRoot() 动态取当前库根目录。 */
 export function handleWxfileProtocol(getRoot: () => string | Promise<string>): void {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { protocol, net } = require('electron') as typeof import('electron')
   protocol.handle(WXFILE_SCHEME, async (req) => {
     const root = await getRoot()
