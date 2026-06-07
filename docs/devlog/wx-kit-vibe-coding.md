@@ -182,6 +182,20 @@
 
 ---
 
+## 9. M4 增补：electron-builder 打包（2026-06-07）
+
+第一阶段最后一块拼图——把 wx-kit 打成可分发的 mac/win 安装包。
+
+- **签名/公证先不做**——未签名包够用且贴「开箱即用、不加门槛」的阶段定位。代价是首次打开有系统警告，靠 README 写清放行步骤（mac 右键→打开 / `xattr -cr`；win SmartScreen→仍要运行）。"反馈引导行动"原则在这里延伸到了分发环节。
+- **图标先截图签收、再定代码**——"宝盒"这个概念一开始就交给安哥过目再实现：先渲染了第一稿（拱盖像侧视、视角打架），安哥一指出，我重画成"箱体等宽的正面拱顶 + 金属带贯穿"，再渲染、确认、才提交 `build/icon.png`。**产品脸的决策权在用户手里，不在 AI 的猜测里**。
+- **打包正确性靠"真实启动"证明，不是分析**——undici external 是已知陷阱（cheerio 间接依赖 sqlite-cache-store 静态 `require('node:sqlite')` 在 Electron 31 不存在）。静态 grep 看 `require("undici")` 在不在 main.js 里没意义—— vite 把它 external 掉后，main.js 顶层确实有 `require("undici")`，但运行时会不会触发是另一回事。**唯一可靠的判据是：打出包 → 真实启动 .app → 不崩。** M3 计划里写过这一点，M4 落实了——playwright 启打包后的 `wx-kit.app`，断言 `[data-testid="app-shell"]` 渲染、无 console/page 错误，ALL PASSED。
+- **win-from-mac 在本机一次跑通**——之前担心 wine 翻车要退 CI 兜底，结果 electron-builder 在 mac 上出 win32 nsis 顺利下完了 wine 4.0.1、winCodeSign、nsis 三个依赖（一次性下载约 25 MB），构建成功。CI workflow 不建——计划里说"翻车才退"，没翻就不建，避免无谓的 CI 维护。
+- **教训：产物可复现、但脚本别留**——图标用 `scripts/make-icon.mjs` + playwright 临时渲染。脚本在第一次提交后删掉，只留 `build/icon.png`（commit 时一并提交），这样图标永远是源代码级别可复现的（要改直接改 SVG 字符串重跑），不依赖任何外部工具链在另一台机器上重装。这和 M1 把 `library.json` 形状定死在测试 fixture 里是同一种思路——**可复现性靠源码，不靠配置。**
+
+> 一句话：**未签名路线 + 真实启动验证 + 图标先签收再定稿**——M4 几乎没写新业务代码，但每个决策都指向"让真用户能装上、跑起来、看到那张脸"。
+
+---
+
 ## 附：提交结构速览
 
 - 文档类：PRD（初稿 + 2 次迭代）、M1 计划、M2 计划、AGENTS.md（×2）、本复盘。
