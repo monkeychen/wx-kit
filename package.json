@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "description": "微信百宝箱 - 第一阶段：文章下载器",
+  "license": "Apache-2.0",
+  "author": "monkeychen",
+  "homepage": "https://github.com/monkeychen/wx-kit",
   "main": "dist-electron/main.js",
   "type": "commonjs",
   "scripts": {
