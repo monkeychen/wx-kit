@@ -7,6 +7,12 @@ import { Library } from '../src/core/library'
 import { DownloadQueue } from '../src/core/download-queue'
 import { downloadArticle } from '../src/core/download-article'
 import { readArticleContent, type ReadableKind } from '../src/core/read-article'
+import { login, getSession } from './services/mp-auth'
+import { makeMpFetch } from './services/mp-fetch'
+import { searchAccount } from '../src/core/mp-client'
+import { crawlAccount } from '../src/core/mp-crawl'
+import { MpAuthExpired } from '../src/core/mp-errors'
+import type { CrawlRange } from '../src/core/mp-types'
 import { SettingsService } from './services/settings'
 
 export function registerIpc(settings: SettingsService): void {
@@ -47,5 +53,52 @@ export function registerIpc(settings: SettingsService): void {
       (ev) => { if (!event.sender.isDestroyed()) event.sender.send('download:progress', ev) },
     )
     return queue.run(urls)
+  })
+
+  // —— M3.5 批量爬取 ——
+  ipcMain.handle('mp:login', async () => {
+    try { await login(); return { ok: true } }
+    catch (e) { return { ok: false, error: (e as Error).message } }
+  })
+
+  ipcMain.handle('mp:authStatus', async () => {
+    const session = getSession()
+    if (!session) return { valid: false }
+    try { await searchAccount(makeMpFetch(session), session.token, '腾讯'); return { valid: true } }
+    catch (e) { if (e instanceof MpAuthExpired) return { valid: false }; throw e }
+  })
+
+  ipcMain.handle('mp:search', async (_e, name: string) => {
+    const session = getSession()
+    if (!session) return { ok: false, error: { code: 'AUTH_REQUIRED', message: '请先登录公众号后台' } }
+    try { return { ok: true, list: await searchAccount(makeMpFetch(session), session.token, name) } }
+    catch (e) {
+      const code = e instanceof MpAuthExpired ? 'AUTH_REQUIRED' : 'MP_API_ERROR'
+      return { ok: false, error: { code, message: (e as Error).message } }
+    }
+  })
+
+  let cancelRequested = false
+  ipcMain.on('mp:crawl:cancel', () => { cancelRequested = true })
+  ipcMain.handle('mp:crawl', async (event, { fakeid, range, formats }: { fakeid: string; range: CrawlRange; formats: DownloadFormat[] }) => {
+    cancelRequested = false
+    const session = getSession()
+    if (!session) throw new Error('AUTH_REQUIRED')
+    const { libraryRoot } = await settings.get()
+    const library = new Library(libraryRoot)
+    const ddeps = {
+      fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
+      now: () => new Date().toISOString(), library, libraryRoot,
+    }
+    const send = (ev: unknown) => { if (!event.sender.isDestroyed()) event.sender.send('mp:crawl:progress', ev) }
+    const summary = await crawlAccount(fakeid, range, {
+      mpFetch: makeMpFetch(session), token: session.token,
+      downloadOne: (url) => downloadArticle(url, formats, ddeps),
+      onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
+      onItem: (ev) => send({ kind: 'item', ...ev }),
+      shouldContinue: () => !cancelRequested,
+    })
+    send({ kind: 'done', summary })
+    return summary
   })
 }
