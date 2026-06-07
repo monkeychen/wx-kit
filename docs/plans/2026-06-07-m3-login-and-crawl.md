@@ -142,37 +142,64 @@ export async function login(): Promise<MpSession> {
 }
 ```
 
-- [ ] **Step 4: 写一次性 spike 脚本 `scripts/m3-spike.mjs`**
+- [ ] **Step 4: 写一次性 spike 脚本 `scripts/m3-spike.cjs`（自包含，不依赖构建产物）**
+
+> electron 是单入口打包，`dist-electron/services/*.js` 不会单独产出；故 spike 内联登录 + searchbiz 逻辑，
+> 只依赖 `electron` 与 `axios`（已在依赖），直接 `electron` 运行 `.cjs`，无需 build。它验证的是「接口+登录是否还有效」，
+> 与 Steps 1–3 写的真实 `mp-auth.ts`/`mp-fetch.ts` 逻辑一致。
 
 ```js
-// scripts/m3-spike.mjs — 一次性：扫码登录 + 调一次 searchbiz，打印原始返回。验证后删除。
-import { app } from 'electron'
-import { login } from '../dist-electron/services/mp-auth.js'
-import { makeMpFetch } from '../dist-electron/services/mp-fetch.js'
+// scripts/m3-spike.cjs — 一次性：扫码登录 + 调一次 searchbiz，打印原始返回。验证后删除。
+const { app, BrowserWindow } = require('electron')
+const axios = require('axios')
+
+function login() {
+  const win = new BrowserWindow({ width: 480, height: 640, title: '扫码登录公众号后台', webPreferences: { partition: 'persist:mpweixin' } })
+  return new Promise((resolve, reject) => {
+    let done = false
+    const onNav = async () => {
+      const url = win.webContents.getURL()
+      const m = /[?&]token=(\d+)/.exec(url)
+      if (url.includes('/cgi-bin/home') && m) {
+        done = true
+        const cookies = (await win.webContents.session.cookies.get({ url: 'https://mp.weixin.qq.com' })).map((c) => ({ name: c.name, value: c.value }))
+        win.removeListener('closed', onClosed); win.destroy()
+        resolve({ token: m[1], cookies, timestamp: Date.now() })
+      }
+    }
+    const onClosed = () => { if (!done) reject(new Error('CANCELLED')) }
+    win.webContents.on('did-navigate', onNav)
+    win.webContents.on('did-navigate-in-page', onNav)
+    win.on('closed', onClosed)
+    win.loadURL('https://mp.weixin.qq.com/')
+  })
+}
 
 app.on('window-all-closed', () => {})
-await app.whenReady()
-try {
-  console.error('[spike] 请在弹出的窗口扫码登录你的公众号后台…')
-  const session = await login()
-  console.error('[spike] 登录成功 token=', session.token, 'cookies=', session.cookies.length)
-  const mpFetch = makeMpFetch(session)
-  const json = await mpFetch('https://mp.weixin.qq.com/cgi-bin/searchbiz', {
-    action: 'search_biz', token: session.token, lang: 'zh_CN', f: 'json', ajax: '1',
-    random: String(Math.random()), query: '腾讯', begin: '0', count: '5',
-  })
-  console.error('[spike] searchbiz base_resp=', JSON.stringify(json.base_resp))
-  console.error('[spike] 首个候选=', JSON.stringify(json.list?.[0] ?? null))
-} catch (e) {
-  console.error('[spike] 失败：', e.message)
-} finally {
-  app.exit(0)
-}
+app.whenReady().then(async () => {
+  try {
+    console.error('[spike] 请在弹出的窗口扫码登录你的公众号后台…')
+    const session = await login()
+    console.error('[spike] 登录成功 token=', session.token, 'cookies=', session.cookies.length)
+    const cookie = session.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+    const res = await axios.get('https://mp.weixin.qq.com/cgi-bin/searchbiz', {
+      timeout: 20000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', Referer: 'https://mp.weixin.qq.com/', Cookie: cookie },
+      params: { action: 'search_biz', token: session.token, lang: 'zh_CN', f: 'json', ajax: '1', random: String(Math.random()), query: '腾讯', begin: '0', count: '5' },
+    })
+    console.error('[spike] searchbiz base_resp=', JSON.stringify(res.data.base_resp))
+    console.error('[spike] 首个候选=', JSON.stringify(res.data.list?.[0] ?? null))
+  } catch (e) {
+    console.error('[spike] 失败：', e.message)
+  } finally {
+    app.exit(0)
+  }
+})
 ```
 
-- [ ] **Step 5: 构建并运行 spike（安哥扫码）**
+- [ ] **Step 5: 运行 spike（安哥扫码）—— 无需 build**
 
-Run: `npx vite build && npx electron scripts/m3-spike.mjs`
+Run: `npx electron scripts/m3-spike.cjs`
 Expected（安哥扫码后）: stderr 打印 `登录成功 token=...`、`searchbiz base_resp={"ret":0,...}`、`首个候选={"fakeid":...,"nickname":"腾讯",...}`。
 
 **GATE：** 若 `base_resp.ret` 非 0 或拿不到 token/cookies → 接口或登录流程已变，**停下来分析、修正 Task 1 代码后再继续**，不要往下建。若候选字段名与 `mp-types.ts` 的 `MpAccount`（fakeid/nickname/alias）不符，记录真实字段名并在 Task 3 校正。
