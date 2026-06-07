@@ -7,11 +7,12 @@ export type OnProgress = (e: ProgressEvent) => void
 export class DownloadQueue {
   constructor(private downloadOne: DownloadOne, private onProgress: OnProgress = () => {}) {}
 
-  async run(urls: string[]): Promise<DownloadSummary> {
+  async run(urls: string[], shouldContinue?: () => boolean): Promise<DownloadSummary> {
     const items: DownloadItemResult[] = []
     const total = urls.length
 
     for (let i = 0; i < total; i++) {
+      if (shouldContinue && !shouldContinue()) break
       const url = urls[i]
       this.onProgress({ total, completed: i, currentUrl: url, phase: 'fetch' })
       try {
@@ -27,7 +28,7 @@ export class DownloadQueue {
     const succeeded = items.filter(i => i.ok && !i.skipped).length
     const skipped = items.filter(i => i.ok && i.skipped).length
     const failed = items.filter(i => !i.ok).length
-    this.onProgress({ total, completed: total, currentUrl: '', phase: 'done' })
+    this.onProgress({ total, completed: items.length, currentUrl: '', phase: 'done' })
 
     return { ok: failed === 0, total, succeeded, failed, skipped, items }
   }

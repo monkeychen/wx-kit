@@ -57,3 +57,15 @@ describe('DownloadQueue', () => {
     expect(await q.run([])).toMatchObject({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0 })
   })
 })
+
+describe('DownloadQueue cancel', () => {
+  it('stops before the next item when shouldContinue returns false', async () => {
+    const seen: string[] = []
+    const q = new DownloadQueue(async (u) => { seen.push(u); return { url: u, ok: true, id: u } })
+    let calls = 0
+    const summary = await q.run(['a', 'b', 'c'], () => { calls++; return calls <= 1 })
+    expect(seen).toEqual(['a'])
+    expect(summary.items).toHaveLength(1)
+    expect(summary.total).toBe(3)
+  })
+})
