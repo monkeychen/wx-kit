@@ -4,6 +4,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 // 也把纵向空间还给内容。
 const NAV = [
   { to: '/', label: '下载', end: true },
+  { to: '/batch', label: '批量', end: false },
   { to: '/library', label: '书架', end: false },
   { to: '/settings', label: '设置', end: false },
 ]
