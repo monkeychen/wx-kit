@@ -27,6 +27,7 @@
 3. 纯逻辑 TDD；依赖网络/Electron 的部分注入依赖 + 端到端验证。
 4. 改完跑 `npm test`、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`。
 5. **完成一个相对独立的功能即自动收尾，无需询问**：验证通过后，若开了 feature 分支，默认合回 main 并删分支；commit 一律自动执行（message 用英文、描述变更意图）。此为本项目长期授权，覆盖「commit 前先问」的默认。**唯 `git push` 仍手动，等安哥发话**（跨设备同步用）。
+6. **每完成一个里程碑，更新 `docs/devlog/wx-kit-vibe-coding.md`**：把该里程碑的流程/决策/踩坑/方法论增补进复盘，保持其为活文档。
 
 ## 结构约定
 - `src/core/`：UI 无关核心层，被 GUI（IPC）与 CLI 共享。**不得 import React/renderer/electron 运行时**（types 可以；electron 仅以注入的 BrowserWindow 构造器形式出现）。
@@ -75,6 +76,6 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - `docs/plans/2026-06-06-m1-core-and-url-download.md` — M1 实现计划。
 - `docs/plans/2026-06-06-m2-gui.md` — M2 实现计划。
 - `docs/plans/2026-06-07-m3-login-and-crawl.md` — M3 计划占位草稿（起点提示与约束，待补全）。
-- `docs/devlog/2026-06-06-wx-kit-m1-m2-vibe-coding.md` — M1+M2 全程 vibe-coding 复盘（流程/决策/踩坑/方法论）。
+- `docs/devlog/wx-kit-vibe-coding.md` — vibe-coding 全程复盘（活文档，每完成一个里程碑增补；流程/决策/踩坑/方法论）。
 
 > 进度的唯一真相是 `git log` + `ROADMAP.md` + `docs/plans/`，不是散落在指南里的散文。
