@@ -1,0 +1,47 @@
+// tests/core/mp-crawl.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { crawlAccount } from '../../src/core/mp-crawl'
+import { MpRateLimited } from '../../src/core/mp-errors'
+import type { ArticleRef } from '../../src/core/mp-types'
+import type { DownloadItemResult } from '../../src/core/types'
+
+const refs = (urls: string[]): ArticleRef[] => urls.map((u) => ({ url: u, title: u, createTime: 0 }))
+const noSleep = async () => {}
+
+describe('crawlAccount', () => {
+  it('downloads serially and rolls up a summary', async () => {
+    const order: string[] = []
+    const downloadOne = async (url: string): Promise<DownloadItemResult> => { order.push(url); return { url, ok: true, id: url } }
+    const out = await crawlAccount('FID', { count: 3 }, {
+      listFn: async () => refs(['a', 'b', 'c']),
+      mpFetch: (async () => ({})) as never, token: 'T', downloadOne, sleep: noSleep,
+    })
+    expect(order).toEqual(['a', 'b', 'c'])
+    expect(out).toMatchObject({ ok: true, fakeid: 'FID', listed: 3, total: 3, succeeded: 3, failed: 0, skipped: 0 })
+  })
+
+  it('continues past a single failure and counts skips', async () => {
+    const downloadOne = async (url: string): Promise<DownloadItemResult> => {
+      if (url === 'b') throw new Error('boom')
+      if (url === 'c') return { url, ok: true, skipped: true, id: url }
+      return { url, ok: true, id: url }
+    }
+    const out = await crawlAccount('FID', { count: 3 }, {
+      listFn: async () => refs(['a', 'b', 'c']),
+      mpFetch: (async () => ({})) as never, token: 'T', downloadOne, sleep: noSleep,
+    })
+    expect(out).toMatchObject({ succeeded: 1, failed: 1, skipped: 1 })
+  })
+
+  it('backs off and retries when listing is rate-limited', async () => {
+    const sleep = vi.fn(async () => {})
+    let calls = 0
+    const listFn = async () => { if (calls++ === 0) throw new MpRateLimited('rl'); return refs(['a']) }
+    const out = await crawlAccount('FID', { count: 1 }, {
+      listFn, mpFetch: (async () => ({})) as never, token: 'T',
+      downloadOne: async (url) => ({ url, ok: true, id: url }), sleep,
+    })
+    expect(out.succeeded).toBe(1)
+    expect(sleep).toHaveBeenCalledWith(30000) // 第一次退避 30s
+  })
+})
