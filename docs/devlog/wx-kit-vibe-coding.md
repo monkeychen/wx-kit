@@ -1,8 +1,8 @@
-# wx-kit 从原型到 M1+M2 的 Vibe-Coding 全程复盘
+# wx-kit Vibe-Coding 全程复盘
 
-> 日期：2026-06-06　|　记录人：安哥 × Claude Code（Opus 4.8）
+> 起始：2026-06-06 · 持续更新（活文档，每完成一个里程碑增补）　|　记录人：安哥 × Claude Code（Opus 4.8）
 > 用途：个人复盘 / 方法论总结 / 对外分享的原始素材
-> 范围：一次连续会话内，把 `x-downloader` 技术探索原型产品化为 `wx-kit`，并完成 M1（核心层 + CLI 下载）与 M2（GUI）两个里程碑，全部合入 main。
+> 范围：从把 `x-downloader` 技术探索原型产品化为 `wx-kit` 起，逐里程碑记录全程。当前已覆盖 M1（核心层 + CLI 下载）、M2（GUI），均合入 main。
 
 ---
 
