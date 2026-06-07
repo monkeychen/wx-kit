@@ -8,10 +8,10 @@
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
 ![Status](https://img.shields.io/badge/phase-1%20(M1--M4)-ready-success.svg)
 
-<!-- TODO: 截图区(把 GUI 三屏 + 批量页跑起来各截一张,放到 docs/screenshots/) -->
-<!-- ![Download Page](docs/screenshots/download.png) -->
-<!-- ![Library](docs/screenshots/library.png) -->
-<!-- ![Batch Crawl](docs/screenshots/batch.png) -->
+<!-- 截图:URL 下载页 / 书架 / 批量爬取 -->
+![Download Page](docs/screenshots/download.png)
+![Library](docs/screenshots/library.png)
+![Batch Crawl](docs/screenshots/batch.png)
 
 ## 这是什么
 
