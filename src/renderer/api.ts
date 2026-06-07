@@ -9,6 +9,8 @@ export interface WxApi {
   libraryList(): Promise<ArticleMeta[]>
   librarySearch(keyword: string): Promise<ArticleMeta[]>
   libraryRemove(id: string): Promise<void>
+  /** 返回文章目录内封面文件名（cover.<ext>），无则 null。用于书架缩略图。 */
+  coverName(dir: string): Promise<string | null>
   readContent(dir: string, kind: ReadableKind): Promise<string>
   getSettings(): Promise<AppSettings>
   saveSettings(patch: Partial<AppSettings>): Promise<AppSettings>

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Input, Button, Checkbox, Space, message } from 'antd'
+import { Input, Button, Space, message } from 'antd'
+import { FolderOpenOutlined } from '@ant-design/icons'
 import { api } from '../api'
+import FormatPicker from '../components/FormatPicker'
 import type { AppSettings } from '../../../electron/services/settings'
 import type { DownloadFormat } from '../../core/types'
-
-const FORMATS: DownloadFormat[] = ['cover', 'md', 'html', 'pdf', 'meta']
 
 export default function Settings() {
   const [s, setS] = useState<AppSettings | null>(null)
@@ -17,27 +17,42 @@ export default function Settings() {
   }
   const save = async () => {
     if (!s) return
-    try {
-      await api.saveSettings(s)
-      message.success('已保存')
-    } catch (e) {
-      message.error('保存失败：' + (e as Error).message)
-    }
+    try { await api.saveSettings(s); message.success('已保存') }
+    catch (e) { message.error('保存失败：' + (e as Error).message) }
   }
 
-  if (!s) return <div className="p-6">加载中…</div>
+  if (!s) return <div className="page"><div className="page-narrow faint">加载中…</div></div>
+
   return (
-    <div className="p-6" style={{ maxWidth: 640 }}>
-      <h2>设置</h2>
-      <div className="mb-2">文章库根目录</div>
-      <Space.Compact style={{ width: '100%' }}>
-        <Input value={s.libraryRoot} readOnly />
-        <Button onClick={choose}>选择目录</Button>
-      </Space.Compact>
-      <div className="mt-4 mb-2">默认下载格式</div>
-      <Checkbox.Group options={FORMATS.map(f => ({ label: f, value: f }))}
-        value={s.defaultFormats} onChange={(v) => setS({ ...s, defaultFormats: v as DownloadFormat[] })} />
-      <div className="mt-6"><Button type="primary" onClick={save}>保存</Button></div>
+    <div className="page">
+      <div className="page-narrow fade-in">
+        <div className="page-head">
+          <div className="eyebrow">Settings</div>
+          <h1 className="page-title">设置</h1>
+        </div>
+
+        <div className="surface">
+          <div className="setting-block">
+            <div className="setting-label">文章库位置</div>
+            <div className="setting-hint">下载的文章与图片都保存在这里。修改后旧文章不会自动迁移。</div>
+            <Space.Compact style={{ width: '100%' }}>
+              <Input value={s.libraryRoot} readOnly />
+              <Button icon={<FolderOpenOutlined />} onClick={choose}>选择目录</Button>
+            </Space.Compact>
+          </div>
+
+          <div className="setting-block">
+            <div className="setting-label">默认下载格式</div>
+            <div className="setting-hint">新建下载时预选这些格式，仍可临时调整。</div>
+            <FormatPicker value={s.defaultFormats}
+              onChange={(v: DownloadFormat[]) => setS({ ...s, defaultFormats: v })} />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 24 }}>
+          <Button type="primary" size="large" onClick={save} style={{ paddingInline: 32 }}>保存设置</Button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,25 +1,32 @@
-import { Layout, Menu } from 'antd'
-import { Link, Outlet, useLocation } from 'react-router-dom'
-import { DownloadOutlined, BookOutlined, SettingOutlined } from '@ant-design/icons'
+import { NavLink, Outlet } from 'react-router-dom'
 
-const items = [
-  { key: '/', icon: <DownloadOutlined />, label: <Link to="/">URL 下载</Link> },
-  { key: '/library', icon: <BookOutlined />, label: <Link to="/library">文章库</Link> },
-  { key: '/settings', icon: <SettingOutlined />, label: <Link to="/settings">设置</Link> },
+// 杂志刊头：左品牌、右横向导航。取代 antd 左侧 Sider —— 更像一本刊物的报头，
+// 也把纵向空间还给内容。
+const NAV = [
+  { to: '/', label: '下载', end: true },
+  { to: '/library', label: '书架', end: false },
+  { to: '/settings', label: '设置', end: false },
 ]
 
 export default function MainLayout() {
-  const { pathname } = useLocation()
-  const selected = pathname.startsWith('/library') ? '/library' : pathname.startsWith('/settings') ? '/settings' : '/'
   return (
-    <Layout style={{ height: '100%' }}>
-      <Layout.Sider theme="light" width={200}>
-        <div style={{ padding: 16, fontWeight: 600 }}>wx-kit · 微信百宝箱</div>
-        <Menu mode="inline" selectedKeys={[selected]} items={items} />
-      </Layout.Sider>
-      <Layout.Content style={{ overflow: 'auto', background: '#fff' }}>
-        <Outlet />
-      </Layout.Content>
-    </Layout>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }} data-testid="app-shell">
+      <header className="masthead">
+        <div className="brand">
+          <span className="brand-title">微信百宝箱</span>
+          <span className="brand-mark">wx-kit</span>
+        </div>
+        <nav className="nav">
+          {NAV.map((n) => (
+            <NavLink key={n.to} to={n.to} end={n.end}
+              className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+              data-testid={`nav-${n.label}`}>
+              {n.label}
+            </NavLink>
+          ))}
+        </nav>
+      </header>
+      <Outlet />
+    </div>
   )
 }

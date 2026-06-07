@@ -76,28 +76,26 @@ async function main() {
   proc.stdout?.on('data', (d) => process.stderr.write('[main-out] ' + String(d)))
 
   try {
-    await win.waitForSelector('.ant-menu', { timeout: 20000 })
+    await win.waitForSelector('[data-testid="app-shell"]', { timeout: 20000 })
     assert(true, 'app shell rendered')
 
     // --- URL download ---
     await win.fill('textarea', articleUrl)
-    await win.click('button:has-text("开始下载")')
-    await win.waitForSelector('.ant-tag-success', { timeout: 30000 })
+    await win.click('[data-testid="start-download"]')
+    await win.waitForSelector('[data-testid="result-ok"]', { timeout: 30000 })
     assert(true, 'download reported success')
 
-    // --- library ---
-    await win.click('.ant-menu >> text=文章库')
-    await win.waitForSelector('.ant-table-row', { timeout: 15000 })
-    const titleCell = await win.locator('.ant-table-row').first().innerText()
-    assert(titleCell.includes('端到端验证文章'), 'library lists the downloaded article')
-
-    // download-time column present
-    const headers = await win.locator('.ant-table-thead th').allInnerTexts()
-    assert(headers.some((h) => h.includes('下载')), 'library has a 下载 (downloadTime) column')
+    // --- library (card shelf) ---
+    await win.click('[data-testid="nav-书架"]')
+    await win.waitForSelector('[data-testid="article-card"]', { timeout: 15000 })
+    const card = win.locator('[data-testid="article-card"]').first()
+    const cardText = await card.innerText()
+    assert(cardText.includes('端到端验证文章'), 'shelf lists the downloaded article')
+    assert(cardText.includes('E2E公众号'), 'card shows the account name')
 
     // --- reader (md) ---
-    // NB: Antd v6 inserts a space between two Han chars ("阅 读"), so match a single char.
-    await win.click('.ant-table-row button:has-text("阅")')
+    await card.hover()
+    await win.click('[data-testid="card-read"]')
     await win.waitForSelector('img[src^="wxfile://"]', { timeout: 15000 })
     const mdImgOk = await win.evaluate(() => {
       const im = [...document.querySelectorAll('img')].find((i) => i.src.startsWith('wxfile://'))
@@ -106,22 +104,23 @@ async function main() {
     assert(mdImgOk, 'reader md view: wxfile image actually rendered (naturalWidth>0)')
 
     // --- reader (html iframe) ---
-    await win.click('.ant-segmented >> text=HTML')
+    await win.click('.ant-segmented >> text=网页')
     await win.waitForSelector('iframe', { timeout: 10000 })
     const iframeSrc = await win.getAttribute('iframe', 'src')
     assert(!!iframeSrc && iframeSrc.startsWith('wxfile://') && iframeSrc.endsWith('/index.html'),
       `reader html view: iframe src is wxfile .../index.html (${iframeSrc})`)
 
     // --- delete ---
-    await win.click('.ant-menu >> text=文章库')
-    await win.waitForSelector('.ant-table-row', { timeout: 10000 })
-    await win.click('.ant-table-row button:has-text("删")')
+    await win.click('[data-testid="nav-书架"]')
+    await win.waitForSelector('[data-testid="article-card"]', { timeout: 10000 })
+    await win.locator('[data-testid="article-card"]').first().hover()
+    await win.click('[data-testid="card-delete"]')
     await win.click('.ant-popover button:has-text("删")')
-    await win.waitForSelector('.ant-table-row', { state: 'detached', timeout: 10000 })
-    assert(true, 'delete removed the row')
+    await win.waitForSelector('[data-testid="article-card"]', { state: 'detached', timeout: 10000 })
+    assert(true, 'delete removed the card')
 
     // --- settings shows seeded library root ---
-    await win.click('.ant-menu >> text=设置')
+    await win.click('[data-testid="nav-设置"]')
     await win.waitForSelector('input[readonly]', { timeout: 10000 })
     const rootVal = await win.inputValue('input[readonly]')
     assert(rootVal === libraryRoot, `settings shows library root (${rootVal})`)

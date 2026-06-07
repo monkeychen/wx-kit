@@ -1,20 +1,31 @@
 import { useEffect, useState } from 'react'
-import { Input, Table, Tag, Space, Button, Popconfirm, message } from 'antd'
+import { Input, Spin, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import ArticleCard from '../components/ArticleCard'
 import type { ArticleMeta } from '../../core/types'
 
 export default function Library() {
   const [kw, setKw] = useState('')
   const [rows, setRows] = useState<ArticleMeta[]>([])
-  const [loading, setLoading] = useState(false)
+  const [root, setRoot] = useState('')
+  const [loading, setLoading] = useState(true)
   const nav = useNavigate()
 
   const load = async (keyword = '') => {
     setLoading(true)
-    try { setRows(keyword ? await api.librarySearch(keyword) : await api.libraryList()) }
-    catch (e) { message.error('加载失败：' + (e as Error).message) }
-    finally { setLoading(false) }
+    try {
+      const [list, s] = await Promise.all([
+        keyword ? api.librarySearch(keyword) : api.libraryList(),
+        api.getSettings(),
+      ])
+      setRows(list)
+      setRoot(s.libraryRoot)
+    } catch (e) {
+      message.error('加载失败：' + (e as Error).message)
+    } finally {
+      setLoading(false)
+    }
   }
   useEffect(() => { load() }, [])
 
@@ -23,32 +34,38 @@ export default function Library() {
     catch (e) { message.error('删除失败：' + (e as Error).message) }
   }
 
-  const columns = [
-    { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
-    { title: '公众号', dataIndex: 'account', key: 'account', width: 140 },
-    { title: '发布', dataIndex: 'publishTime', key: 'publishTime', width: 160 },
-    { title: '下载', dataIndex: 'downloadTime', key: 'downloadTime', width: 180,
-      render: (t: string) => (t ? new Date(t).toLocaleString() : '') },
-    { title: '格式', dataIndex: 'formats', key: 'formats', width: 200,
-      render: (fs: string[]) => fs.map(f => <Tag key={f}>{f}</Tag>) },
-    { title: '操作', key: 'op', width: 240, render: (_: unknown, r: ArticleMeta) => (
-      <Space>
-        <Button size="small" disabled={!r.formats.includes('md') && !r.formats.includes('html')}
-          onClick={() => nav(`/reader/${encodeURIComponent(r.id)}`)}>阅读</Button>
-        <Button size="small" onClick={() => api.reveal(r.dir)}>文件夹</Button>
-        <Popconfirm title="删除该文章？将同时删除磁盘文件" okText="删除" cancelText="取消" onConfirm={() => del(r.id)}>
-          <Button size="small" danger>删除</Button>
-        </Popconfirm>
-      </Space>
-    ) },
-  ]
-
   return (
-    <div className="p-6">
-      <h2>文章库</h2>
-      <Input.Search className="mb-3" allowClear placeholder="按标题搜索"
-        value={kw} onChange={e => setKw(e.target.value)} onSearch={(v) => load(v)} style={{ maxWidth: 360 }} />
-      <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} size="middle" pagination={{ pageSize: 20 }} />
+    <div className="page">
+      <div className="fade-in">
+        <div className="page-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+          <div>
+            <div className="eyebrow">Library</div>
+            <h1 className="page-title">书架 {rows.length > 0 && <span className="faint" style={{ fontSize: 18, fontFamily: 'var(--font-sans)', fontWeight: 400 }}>· {rows.length} 篇</span>}</h1>
+          </div>
+          <Input.Search allowClear placeholder="按标题搜索"
+            value={kw} onChange={(e) => setKw(e.target.value)} onSearch={(v) => load(v)}
+            style={{ maxWidth: 300 }} />
+        </div>
+
+        {loading ? (
+          <div style={{ padding: 80, textAlign: 'center' }}><Spin /></div>
+        ) : rows.length === 0 ? (
+          <div className="empty-state">
+            <div className="es-mark">藏</div>
+            <div className="es-title">{kw ? '没有匹配的文章' : '书架还是空的'}</div>
+            <div>{kw ? '换个关键词试试' : '到「下载」页粘贴链接，保存的文章会陈列在这里'}</div>
+          </div>
+        ) : (
+          <div className="shelf">
+            {rows.map((m, i) => (
+              <ArticleCard key={m.id} meta={m} libraryRoot={root} index={i}
+                onRead={() => nav(`/reader/${encodeURIComponent(m.id)}`)}
+                onReveal={() => api.reveal(m.dir)}
+                onDelete={() => del(m.id)} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

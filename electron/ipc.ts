@@ -1,5 +1,6 @@
 // electron/ipc.ts
 import { ipcMain, dialog, shell, BrowserWindow } from 'electron'
+import { readdir } from 'node:fs/promises'
 import type { DownloadFormat } from '../src/core/types'
 import { fetchHtml, fetchBinary } from '../src/core/fetch-html'
 import { Library } from '../src/core/library'
@@ -19,6 +20,14 @@ export function registerIpc(settings: SettingsService): void {
   ipcMain.handle('library:remove', async (_e, id: string) => { await (await libraryFor()).remove(id) })
   ipcMain.handle('library:readContent', (_e, { dir, kind }: { dir: string; kind: ReadableKind }) =>
     readArticleContent(dir, kind))
+  ipcMain.handle('library:coverName', async (_e, dir: string) => {
+    try {
+      const files = await readdir(dir)
+      return files.find((f) => /^cover\.[a-z0-9]+$/i.test(f)) ?? null
+    } catch {
+      return null
+    }
+  })
 
   ipcMain.handle('dialog:chooseDir', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
