@@ -9,9 +9,9 @@
 ![Status](https://img.shields.io/badge/phase-1%20(M1--M4)-ready-success.svg)
 
 <!-- 截图:URL 下载页 / 书架 / 批量爬取 -->
-![Download Page](docs/screenshots/download.png)
-![Library](docs/screenshots/library.png)
-![Batch Crawl](docs/screenshots/batch.png)
+![Download Page](docs/screenshots/download.jpg)
+![Library](docs/screenshots/library.jpg)
+![Batch Crawl](docs/screenshots/batch.jpg)
 
 ## 这是什么
 
