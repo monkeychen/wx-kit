@@ -7,7 +7,11 @@
   "type": "commonjs",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && electron-builder",
+    "build": "vite build && electron-builder",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "package:mac": "vite build && electron-builder --mac",
+    "package:win": "vite build && electron-builder --win",
+    "package": "vite build && electron-builder --mac --win",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vite build && node tests/e2e/gui.e2e.mjs",
@@ -54,11 +58,25 @@
     "appId": "com.wxkit.app",
     "productName": "wx-kit",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist-electron/**/*",
       "dist/**/*"
-    ]
+    ],
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
