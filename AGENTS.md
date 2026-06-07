@@ -36,9 +36,12 @@
 - `src/renderer/`：React 界面，只经 `window.api`（见 `src/renderer/api.ts`）调用能力，**绝不直接 import core**。
 - `tests/`：`tests/core`、`tests/electron` 镜像源码的 vitest 单测；`tests/fixtures` 放样本；`tests/e2e/gui.e2e.mjs` 是 Playwright Electron 端到端。
 
+## 沟通语言（强约束）
+- **与用户的所有交流一律用中文**——回答、解释、提问、进度报告、方案对比，全程中文。
+- 代码、标识符、注释、commit message、PR 描述用英文。
+
 ## 命名/格式
 - 文件 kebab-case，类型 PascalCase，函数/变量 camelCase。
-- 注释、commit message 用英文；与用户沟通用中文。
 - 密钥/token 不进代码。不为跑通而注释报错，找根因。
 
 ---

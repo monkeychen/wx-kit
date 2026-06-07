@@ -8,3 +8,6 @@ release
 
 # M3 mp backend session (token+cookies) — never commit
 mp-session.json
+
+# visual brainstorm companion workspace
+.superpowers/
