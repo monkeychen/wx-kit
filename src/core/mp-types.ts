@@ -30,3 +30,6 @@ export interface CrawlSummary {
   skipped: number
   items: import('./types').DownloadItemResult[]
 }
+
+export type CrawlItemStatus = 'downloading' | 'ok' | 'skipped' | 'failed'
+export interface CrawlItemEvent { index: number; status: CrawlItemStatus; error?: string }
