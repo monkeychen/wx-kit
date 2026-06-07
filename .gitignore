@@ -5,3 +5,6 @@ dist-tsc
 release
 *.log
 .DS_Store
+
+# M3 mp backend session (token+cookies) — never commit
+mp-session.json
