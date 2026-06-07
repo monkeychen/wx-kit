@@ -2,6 +2,13 @@
 import type { ArticleMeta, DownloadFormat, DownloadSummary, ProgressEvent } from '../core/types'
 import type { AppSettings } from '../../electron/services/settings'
 import type { ReadableKind } from '../core/read-article'
+import type { MpAccount, CrawlSummary, CrawlItemStatus } from '../core/mp-types'
+
+export interface CrawlRangeInput { count?: number; from?: string; to?: string }
+export type CrawlEvent =
+  | { kind: 'listed'; items: { title: string; url: string }[] }
+  | { kind: 'item'; index: number; status: CrawlItemStatus; error?: string }
+  | { kind: 'done'; summary: CrawlSummary }
 
 export interface WxApi {
   download(urls: string[], formats: DownloadFormat[]): Promise<DownloadSummary>
@@ -16,6 +23,13 @@ export interface WxApi {
   saveSettings(patch: Partial<AppSettings>): Promise<AppSettings>
   chooseDir(): Promise<string | null>
   reveal(path: string): Promise<void>
+  // —— M3.5 批量爬取 ——
+  mpAuthStatus(): Promise<{ valid: boolean }>
+  mpLogin(): Promise<{ ok: boolean; error?: string }>
+  mpSearch(name: string): Promise<{ ok: boolean; list?: MpAccount[]; error?: { code: string; message: string } }>
+  mpCrawl(fakeid: string, range: CrawlRangeInput, formats: DownloadFormat[]): Promise<CrawlSummary>
+  onCrawlProgress(cb: (e: CrawlEvent) => void): () => void
+  mpCancelCrawl(): void
 }
 
 declare global {

@@ -18,6 +18,16 @@ const api: WxApi = {
   saveSettings: (patch) => ipcRenderer.invoke('settings:save', patch),
   chooseDir: () => ipcRenderer.invoke('dialog:chooseDir'),
   reveal: (path) => ipcRenderer.invoke('shell:reveal', path),
+  mpAuthStatus: () => ipcRenderer.invoke('mp:authStatus'),
+  mpLogin: () => ipcRenderer.invoke('mp:login'),
+  mpSearch: (name) => ipcRenderer.invoke('mp:search', name),
+  mpCrawl: (fakeid, range, formats) => ipcRenderer.invoke('mp:crawl', { fakeid, range, formats }),
+  onCrawlProgress: (cb) => {
+    const listener = (_e: unknown, ev: Parameters<typeof cb>[0]) => cb(ev)
+    ipcRenderer.on('mp:crawl:progress', listener)
+    return () => { ipcRenderer.removeListener('mp:crawl:progress', listener) }
+  },
+  mpCancelCrawl: () => ipcRenderer.send('mp:crawl:cancel'),
 }
 
 contextBridge.exposeInMainWorld('api', api)

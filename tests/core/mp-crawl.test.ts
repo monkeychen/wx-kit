@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { crawlAccount } from '../../src/core/mp-crawl'
 import { MpRateLimited } from '../../src/core/mp-errors'
-import type { ArticleRef } from '../../src/core/mp-types'
+import type { ArticleRef, CrawlItemEvent } from '../../src/core/mp-types'
 import type { DownloadItemResult } from '../../src/core/types'
 
 const refs = (urls: string[]): ArticleRef[] => urls.map((u) => ({ url: u, title: u, createTime: 0 }))
@@ -43,5 +43,41 @@ describe('crawlAccount', () => {
     })
     expect(out.succeeded).toBe(1)
     expect(sleep).toHaveBeenCalledWith(30000) // 第一次退避 30s
+  })
+})
+
+describe('crawlAccount reporting & cancel', () => {
+  it('emits onListed once then per-item statuses in order', async () => {
+    const listedCalls: string[][] = []
+    const events: CrawlItemEvent[] = []
+    const downloadOne = async (url: string) => {
+      if (url === 'b') throw new Error('x')
+      return { url, ok: true, skipped: url === 'c', id: url }
+    }
+    await crawlAccount('FID', { count: 3 }, {
+      listFn: async () => refs(['a', 'b', 'c']),
+      mpFetch: (async () => ({})) as never, token: 'T', downloadOne, sleep: noSleep,
+      onListed: (r) => listedCalls.push(r.map((x) => x.url)),
+      onItem: (e) => events.push(e),
+    })
+    expect(listedCalls).toEqual([['a', 'b', 'c']])
+    expect(events).toEqual([
+      { index: 0, status: 'downloading' }, { index: 0, status: 'ok' },
+      { index: 1, status: 'downloading' }, { index: 1, status: 'failed', error: 'x' },
+      { index: 2, status: 'downloading' }, { index: 2, status: 'skipped' },
+    ])
+  })
+
+  it('stops remaining items when shouldContinue is false', async () => {
+    const seen: string[] = []
+    let n = 0
+    const out = await crawlAccount('FID', { count: 3 }, {
+      listFn: async () => refs(['a', 'b', 'c']),
+      mpFetch: (async () => ({})) as never, token: 'T', sleep: noSleep,
+      downloadOne: async (url) => { seen.push(url); return { url, ok: true, id: url } },
+      shouldContinue: () => { n++; return n <= 1 },
+    })
+    expect(seen).toEqual(['a'])
+    expect(out.succeeded).toBe(1)
   })
 })

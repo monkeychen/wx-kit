@@ -434,5 +434,37 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; border: 3px solid var(--paper); }
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
 
+/* ---------- 批量页 ---------- */
+.cta {
+  border: none;
+  background: var(--cinnabar);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.16s ease;
+}
+.cta:hover { background: var(--cinnabar-soft); }
+.cta:disabled { opacity: 0.6; cursor: default; }
+.candidate {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.candidate:hover { border-color: var(--cinnabar); background: var(--cinnabar-wash); }
+.candidate .c-name { font-weight: 600; font-size: 14px; }
+.candidate .c-sig { font-size: 12px; color: var(--ink-soft); }
+.range-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
 /* antd message 浮层字体跟随 */
 .ant-message, .ant-popover, .ant-tooltip { font-family: var(--font-sans); }

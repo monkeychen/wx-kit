@@ -125,6 +125,11 @@ async function main() {
     const rootVal = await win.inputValue('input[readonly]')
     assert(rootVal === libraryRoot, `settings shows library root (${rootVal})`)
 
+    // --- batch page shows login gate when no session (e2e userData has none) ---
+    await win.click('[data-testid="nav-批量"]')
+    await win.waitForSelector('[data-testid="login-gate"]', { timeout: 10000 })
+    assert(true, 'batch page shows login gate without a session')
+
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
   } catch (e) {

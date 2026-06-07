@@ -2,7 +2,7 @@
 import { DownloadQueue, type OnProgress } from './download-queue'
 import { listArticles as listArticlesImpl, sleep as sleepImpl, randMs } from './mp-client'
 import { MpRateLimited } from './mp-errors'
-import type { MpFetch, ArticleRef, CrawlRange, CrawlSummary } from './mp-types'
+import type { MpFetch, ArticleRef, CrawlRange, CrawlSummary, CrawlItemEvent } from './mp-types'
 import type { DownloadItemResult } from './types'
 
 export interface CrawlDeps {
@@ -11,6 +11,12 @@ export interface CrawlDeps {
   downloadOne: (url: string) => Promise<DownloadItemResult>
   sleep?: (ms: number) => Promise<void>
   onProgress?: OnProgress
+  /** 列表阶段拿到全部文章后整批上报（含标题，供 UI 立即铺行）。 */
+  onListed?: (refs: ArticleRef[]) => void
+  /** 每篇「下载中→结果」上报。 */
+  onItem?: (ev: CrawlItemEvent) => void
+  /** 返回 false 则停止后续（取消）；已下载的保留。 */
+  shouldContinue?: () => boolean
   /** 测试可注入假 listArticles。 */
   listFn?: (
     mpFetch: MpFetch, token: string, fakeid: string, range: CrawlRange, opts?: { sleep?: (ms: number) => Promise<void> },
@@ -33,10 +39,26 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
     }
   }
 
-  // 下载阶段：复用 DownloadQueue（串行 + 单篇失败不中断 + 汇总），逐篇前插入随机延迟
-  const delayed = async (url: string) => { await sleep(randMs(2000, 5000)); return deps.downloadOne(url) }
-  const queue = new DownloadQueue(delayed, deps.onProgress)
-  const s = await queue.run(refs.map((r) => r.url))
+  deps.onListed?.(refs)
+
+  // 下载阶段：复用 DownloadQueue（串行 + 单篇失败不中断 + 汇总）。
+  // 逐篇上报「下载中→结果」，延迟在每篇前；index 经闭包计数（串行，顺序稳定）。
+  let index = -1
+  const wrapped = async (url: string) => {
+    const i = ++index
+    deps.onItem?.({ index: i, status: 'downloading' })
+    await sleep(randMs(2000, 5000))
+    try {
+      const r = await deps.downloadOne(url)
+      deps.onItem?.({ index: i, status: r.skipped ? 'skipped' : 'ok' })
+      return r
+    } catch (e) {
+      deps.onItem?.({ index: i, status: 'failed', error: (e as Error).message })
+      throw e
+    }
+  }
+  const queue = new DownloadQueue(wrapped, deps.onProgress)
+  const s = await queue.run(refs.map((r) => r.url), deps.shouldContinue)
 
   return {
     ok: s.ok, fakeid, listed: refs.length,
