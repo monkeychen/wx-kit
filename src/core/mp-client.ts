@@ -37,7 +37,7 @@ export interface ListOpts { sleep?: (ms: number) => Promise<void> }
 
 async function fetchPage(
   mpFetch: MpFetch, token: string, fakeid: string, begin: number,
-): Promise<{ items: ArticleRef[]; total: number }> {
+): Promise<{ items: ArticleRef[]; total: number; pageLen: number }> {
   const json = await mpFetch(APPMSG, {
     action: 'list_ex', begin: String(begin), count: String(PAGE), fakeid,
     token, lang: 'zh_CN', f: 'json', ajax: '1', type: '9', query: '',
@@ -47,7 +47,8 @@ async function fetchPage(
   const items: ArticleRef[] = raw
     .filter((i) => i.link)
     .map((i) => ({ url: String(i.link), title: String(i.title ?? ''), createTime: Number(i.create_time ?? 0) }))
-  return { items, total: Number(json.app_msg_cnt ?? 0) }
+  // pageLen = 原始返回条数（含无链接项）；begin 是原始列表偏移，必须按它推进。
+  return { items, total: Number(json.app_msg_cnt ?? 0), pageLen: raw.length }
 }
 
 export async function listArticles(
@@ -58,8 +59,8 @@ export async function listArticles(
   let begin = 0
   for (;;) {
     if (begin > 0) await sleepFn(randMs(1000, 3000))
-    const { items, total } = await fetchPage(mpFetch, token, fakeid, begin)
-    if (!items.length) break
+    const { items, total, pageLen } = await fetchPage(mpFetch, token, fakeid, begin)
+    if (!pageLen) break   // 这一页原始为空 = 没有更多文章
     if ('count' in range) {
       out.push(...items)
       if (out.length >= range.count) return out.slice(0, range.count)
@@ -72,7 +73,9 @@ export async function listArticles(
         out.push(it)
       }
     }
-    begin += PAGE
+    // 微信实际每页常少于请求的 count（实测 5）；游标必须按「原始返回篇数」推进，
+    // 否则按固定步长会跳过中间文章（曾导致日期范围/最近 N 篇漏抓，见 mp-client.test）。
+    begin += pageLen
     if (begin >= total) break
   }
   return out
