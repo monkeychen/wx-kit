@@ -410,6 +410,8 @@ body {
 /* 列表视图（访达式） */
 .list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--paper-raised); }
 .lhead, .lrow { display: grid; grid-template-columns: 44px minmax(0, 1fr) 132px 100px 100px 172px; align-items: center; }
+/* 分组时按公众号已分区，去掉冗余的「公众号」列（表头与行同步变 5 列） */
+.list.grouped .lhead, .list.grouped .lrow { grid-template-columns: 44px minmax(0, 1fr) 100px 100px 172px; }
 .lhead { padding: 9px 16px; background: var(--paper-sunken); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); font-weight: 600; }
 .lgrp-head { display: flex; align-items: center; gap: 9px; padding: 10px 16px; background: var(--paper-sunken); border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; }
 .lgrp-head .gseal { width: 22px; height: 22px; font-size: 12px; }

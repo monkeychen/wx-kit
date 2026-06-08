@@ -21,7 +21,7 @@ export default function ArticleRow({ meta, selected, showAccount, onToggleSelect
       onClick={onToggleSelect} onDoubleClick={() => readable && onRead()}>
       <span className="lthumb">{(meta.title || '文').slice(0, 1)}</span>
       <span className="ltitle" title={meta.title}>{meta.title || '(无标题)'}</span>
-      <span className="lcell">{showAccount ? accountName(meta) : ''}</span>
+      {showAccount && <span className="lcell">{accountName(meta)}</span>}
       <span className="lcell">{meta.publishTime || '—'}</span>
       <span className="lcell">{meta.downloadTime ? meta.downloadTime.slice(0, 10) : '—'}</span>
       <span className="lacts" onClick={(e) => e.stopPropagation()}>
