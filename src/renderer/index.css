@@ -139,7 +139,8 @@ body {
 .page-sub { color: var(--ink-soft); margin-top: 8px; font-size: 14.5px; }
 
 /* ---------- 下载页模式页签（编辑栏目式） ---------- */
-.mode-tabs { display: inline-flex; gap: 30px; border-bottom: 1px solid var(--line); margin: 22px 0 26px; }
+/* flex + fit-content：块级独占一行（避免后续输入框挤上同一行），下划线只在标签宽度下 */
+.mode-tabs { display: flex; width: fit-content; gap: 30px; border-bottom: 1px solid var(--line); margin: 2px 0 26px; }
 .mode-tab {
   position: relative; padding: 0 2px 12px;
   font-family: var(--font-serif); font-size: 19px; font-weight: 700;
