@@ -23,6 +23,7 @@ const api: WxApi = {
   mpSearch: (name) => ipcRenderer.invoke('mp:search', name),
   mpCrawl: (fakeid, nickname, range, formats) => ipcRenderer.invoke('mp:crawl', { fakeid, nickname, range, formats }),
   historyList: (offset, limit) => ipcRenderer.invoke('history:list', { offset, limit }),
+  historyRemove: (id) => ipcRenderer.invoke('history:remove', id),
   historyClear: () => ipcRenderer.invoke('history:clear'),
   onCrawlProgress: (cb) => {
     const listener = (_e: unknown, ev: Parameters<typeof cb>[0]) => cb(ev)

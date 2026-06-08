@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { message } from 'antd'
+import { message, Popconfirm } from 'antd'
 import { api, type HistoryEvent } from '../../api'
 
 const PAGE = 10
@@ -78,6 +78,11 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
     catch (e) { message.error('重试失败：' + (e as Error).message) }
   }
 
+  const remove = async (id: string) => {
+    try { await api.historyRemove(id); await reload() }
+    catch (e) { message.error('删除失败：' + (e as Error).message) }
+  }
+
   if (events.length === 0) return null
 
   return (
@@ -104,7 +109,11 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
                 {ev.skipped > 0 && <> · {ev.skipped} 跳过</>}
                 {ev.failed > 0 && <> · <span className="fail">{ev.failed} 失败</span></>}
               </div>
-              <button className="ev-again" onClick={(e) => { e.stopPropagation(); onAgain(ev) }}>照此再下</button>
+              <button className="ev-again" onClick={(e) => { e.stopPropagation(); onAgain(ev) }}>复制下载项</button>
+              <Popconfirm title="删除这条下载记录？" description="只删记录，不删已下载的文件。"
+                okText="删除" cancelText="取消" onConfirm={() => remove(ev.id)}>
+                <button className="ev-del" data-testid="history-del" onClick={(e) => e.stopPropagation()}>删除</button>
+              </Popconfirm>
             </div>
 
             {open && (
