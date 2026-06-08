@@ -9,14 +9,16 @@ interface Props {
   meta: ArticleMeta
   libraryRoot: string
   index: number
-  onRead: () => void
+  selected: boolean
+  onToggleSelect: () => void   // 单击卡片：切换选中
+  onRead: () => void           // 双击卡片 / hover「阅读」：进入阅读
   onReveal: () => void
   onDelete: () => void
 }
 
-// 书架上的一篇文章：封面缩略图（无则朱砂首字占位）+ 衬线标题 + 公众号/时间，
-// hover 浮出操作。内容人脑子里是「封面+标题」，不是表格行。
-export default function ArticleCard({ meta, libraryRoot, index, onRead, onReveal, onDelete }: Props) {
+// 书架上的一篇文章：封面缩略图（无则朱砂首字占位）+ 衬线标题 + 公众号/时间。
+// 单击=选中（切换），双击=阅读；hover 浮出操作。内容人脑子里是「封面+标题」，不是表格行。
+export default function ArticleCard({ meta, libraryRoot, index, selected, onToggleSelect, onRead, onReveal, onDelete }: Props) {
   const [cover, setCover] = useState<string | null>(null)
   const readable = meta.formats.includes('md') || meta.formats.includes('html')
 
@@ -31,7 +33,10 @@ export default function ArticleCard({ meta, libraryRoot, index, onRead, onReveal
   }, [meta.dir, meta.formats, libraryRoot])
 
   return (
-    <div className="article-card" data-testid="article-card" style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}>
+    <div className={`article-card${selected ? ' sel' : ''}`} data-testid="article-card"
+      style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
+      onClick={onToggleSelect} onDoubleClick={() => readable && onRead()}>
+      <div className="card-chk">✓</div>
       {cover ? (
         <img className="article-cover" src={cover} alt="" loading="lazy" />
       ) : (
@@ -44,7 +49,7 @@ export default function ArticleCard({ meta, libraryRoot, index, onRead, onReveal
           {meta.publishTime ? ` · ${relativeTime(meta.publishTime)}` : ''}
         </div>
       </div>
-      <div className="card-actions">
+      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
         <button className="card-btn" data-testid="card-read" disabled={!readable}
           style={!readable ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
           onClick={() => readable && onRead()}>阅读</button>

@@ -38,6 +38,10 @@ export function registerIpc(settings: SettingsService): void {
     await (await libraryFor()).remove(id)
     await (await historyFor()).markDeleted(id)   // 联动：历史里引用该文章的项标记为已删除
   })
+  ipcMain.handle('library:removeMany', async (_e, ids: string[]) => {
+    const lib = await libraryFor(); const hist = await historyFor()
+    for (const id of ids) { await lib.remove(id); await hist.markDeleted(id) }
+  })
 
   ipcMain.handle('history:list', async (_e, { offset, limit }: { offset: number; limit: number }) =>
     (await historyFor()).list(offset, limit))
