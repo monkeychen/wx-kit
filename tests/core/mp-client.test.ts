@@ -43,6 +43,14 @@ function realPagedFetch(items: ReturnType<typeof mk>[]): MpFetch {
   }
 }
 
+// 贴近真实微信：请求 count=20，但每页只回 pageSize 篇（实测 5）。begin 是文章偏移。
+function pagedFetch(items: ReturnType<typeof mk>[], pageSize: number): MpFetch {
+  return async (_endpoint, params) => {
+    const begin = Number(params.begin)
+    return { base_resp: { ret: 0 }, app_msg_cnt: items.length, app_msg_list: items.slice(begin, begin + pageSize) } as never
+  }
+}
+
 describe('listArticles count mode', () => {
   it('truncates to count within a page', async () => {
     const refs = await listArticles(realPagedFetch([mk(0), mk(1), mk(2), mk(3)]), 'T', 'FID', { count: 3 }, noSleep)
@@ -59,6 +67,13 @@ describe('listArticles count mode', () => {
   it('stops when list is exhausted before reaching count', async () => {
     const refs = await listArticles(realPagedFetch([mk(0)]), 'T', 'FID', { count: 50 }, noSleep)
     expect(refs.map((r) => r.url)).toEqual(['u0'])
+  })
+
+  it('walks contiguously when the API returns fewer per page than requested (real WeChat)', async () => {
+    // count=20 请求，但每页只回 5 篇。游标若按固定 20 推进会跳过中间 15 篇。
+    const items = Array.from({ length: 12 }, (_, i) => mk(i))
+    const refs = await listArticles(pagedFetch(items, 5), 'T', 'FID', { count: 7 }, noSleep)
+    expect(refs.map((r) => r.url)).toEqual(['u0', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6'])
   })
 
   it('skips items without a link', async () => {
@@ -83,5 +98,15 @@ describe('listArticles date mode', () => {
     }) as never
     const refs = await listArticles(fetch, 'T', 'FID', { from: '2026-02-25', to: '2026-02-26' }, { sleep: async () => {} })
     expect(refs.map((r) => r.title)).toEqual(['2026-02-26', '2026-02-25'])
+  })
+
+  it('finds the window even when it sits in the per-page gap (real WeChat, 5/page)', async () => {
+    // 复现「猫笔刀 0 篇」：每页只回 5 篇，窗口文章落在按 20 跳页会被跳过的缺口里。
+    const days = Array.from({ length: 25 }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 5, 8) - i * 86_400_000) // 06-08 倒推
+      return item(d.toISOString().slice(0, 10))
+    })
+    const refs = await listArticles(pagedFetch(days, 5), 'T', 'FID', { from: '2026-05-24', to: '2026-05-27' }, { sleep: async () => {} })
+    expect(refs.map((r) => r.title)).toEqual(['2026-05-27', '2026-05-26', '2026-05-25', '2026-05-24'])
   })
 })
