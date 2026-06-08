@@ -82,8 +82,10 @@ async function main() {
     // --- URL download ---
     await win.fill('textarea', articleUrl)
     await win.click('[data-testid="start-download"]')
-    await win.waitForSelector('[data-testid="result-ok"]', { timeout: 30000 })
-    assert(true, 'download reported success')
+    await win.waitForSelector('[data-testid="history-article"]', { timeout: 30000 })
+    assert(true, 'download appears in history with an article row')
+    await win.waitForSelector('[data-testid="history-read"]', { timeout: 5000 })
+    assert(true, 'history article offers an in-place 阅读 entry')
 
     // --- library (card shelf) ---
     await win.click('[data-testid="nav-文库"]')
