@@ -21,6 +21,7 @@
 - **M3.5** — `docs/plans/2026-06-07-m3.5-batch-crawl-gui.md`（设计依据 `docs/superpowers/specs/2026-06-07-m3.5-batch-crawl-gui-design.md`）
 - **M4** — `docs/plans/2026-06-07-m4-packaging.md`（设计依据 `docs/superpowers/specs/2026-06-07-m4-packaging-design.md`）
 - **M5** — `docs/plans/2026-06-08-m5-ia-restructure.md`（v0.2.0 首个里程碑）
+- **M6** — `docs/plans/2026-06-08-m6-download-closure-history.md`（下载闭环 + 历史）
 
 ## 当前状态
 - M4 打包已通：未签名 mac dmg(arm64+x64) + win nsis x64 安装包，品牌「宝盒」图标。打包后真实启动 .app 验证通过（undici external 站得住）。win-from-mac 在本机也跑通，未启用 CI 兜底。
@@ -39,7 +40,7 @@
 | 里程碑 | 范围 | 状态 |
 |--------|------|------|
 | **M5** | 信息架构重构：导航三项（下载/文库/设置）+「下载」页双模式（URL/公众号）+「书架」→「文库」改名（含 e2e 选择器更新） | ✅ 已合入 main |
-| **M6** | 下载闭环 + 历史：结果区就地确认/阅读（R1）+ 下载历史 `history.json`（R2） | 规划中 |
+| **M6** | 下载闭环 + 历史：结果区就地确认/阅读（R1）+ 下载历史 `history.json`（R2） | ✅ 已合入 main |
 | **M7** | 流程可回退（R3）+ 反馈引导：频控退避可见 + 失败话术（R5） | 规划中 |
 | **M8** | 保真与打磨：PDF 图片防跨页切断（R4）+ 库根提示完善（R7），可与任意里程碑搭车 | 规划中 |
 | **M9** | 文库组织：排序 / 按公众号分组筛选 / 批量删除（R6） | 规划中 |
