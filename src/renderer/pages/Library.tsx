@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Input, Select, Segmented, Spin, Popconfirm, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -110,16 +111,16 @@ export default function Library() {
             options={[{ label: '卡片', value: 'card' }, { label: '列表', value: 'list' }]} />
         </div>
 
-        {/* 批量操作条 */}
-        {sel.size > 0 && (
-          <div className="selbar fade-in">
+        {/* 批量操作条：portal 到 body，钉在视口底（避开 .fade-in 的 transform 包含块，不随内容滚走） */}
+        {sel.size > 0 && createPortal(
+          <div className="selbar">
             <span className="n">已选 {sel.size} 篇</span>
             <a onClick={selectAll}>全选</a><a onClick={clearSel}>清除</a>
             <Popconfirm title={`删除选中的 ${sel.size} 篇？`} description="磁盘文件将一并删除，不可恢复。"
               okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={batchDelete}>
               <span className="del" data-testid="batch-delete">🗑 批量删除</span>
             </Popconfirm>
-          </div>
+          </div>, document.body,
         )}
 
         {loading ? (
