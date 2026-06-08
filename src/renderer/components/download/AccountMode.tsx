@@ -141,7 +141,7 @@ export default function AccountMode() {
             </div>
 
             <div className="cfg-foot">
-              <button className="cta" style={{ marginTop: 0 }} onClick={start} data-testid="start-crawl">开始爬取</button>
+              <button className="cta" onClick={start} data-testid="start-crawl">开始爬取</button>
               <span className="foot-note">{mode === 'count'
                 ? `共 ${count} 篇 · 为避免频控，将逐篇串行下载、间隔随机延迟`
                 : '按日期范围抓取 · 列出后逐篇下载'}</span>
