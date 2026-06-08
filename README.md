@@ -6,12 +6,12 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-31-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/phase-1%20(M1--M4)-ready-success.svg)
+![Status](https://img.shields.io/badge/v0.2.0%20(M5--M9)-ready-success.svg)
 
-<!-- 截图:URL 下载页 / 书架 / 批量爬取 -->
-![Download Page](docs/screenshots/download.jpg)
-![Library](docs/screenshots/library.jpg)
-![Batch Crawl](docs/screenshots/batch.jpg)
+<!-- 截图：v0.2.0（真实数据态） -->
+| 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
+| :---: | :---: | :---: | :---: | :---: |
+| ![按链接下载](docs/screenshots/download-url.png) | ![按公众号下载](docs/screenshots/download-account.png) | ![文库·分组卡片](docs/screenshots/library-cards.png) | ![文库·列表](docs/screenshots/library-list.png) | ![设置](docs/screenshots/settings.png) |
 
 ## 这是什么
 
