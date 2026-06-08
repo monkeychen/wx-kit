@@ -44,6 +44,23 @@ describe('crawlAccount', () => {
     expect(out.succeeded).toBe(1)
     expect(sleep).toHaveBeenCalledWith(30000) // 第一次退避 30s
   })
+
+  it('reports each backoff so the UI can show「退避中」(R5)', async () => {
+    const sleep = vi.fn(async () => {})
+    const onBackoff = vi.fn()
+    let calls = 0
+    // 头两次频控、第三次成功 → 退避两次（30s、60s）。
+    const listFn = async () => { if (calls++ < 2) throw new MpRateLimited('rl'); return refs(['a']) }
+    const out = await crawlAccount('FID', { count: 1 }, {
+      listFn, mpFetch: (async () => ({})) as never, token: 'T',
+      downloadOne: async (url) => ({ url, ok: true, id: url }), sleep, onBackoff,
+    })
+    expect(out.succeeded).toBe(1)
+    expect(onBackoff.mock.calls.map((c) => c[0])).toEqual([
+      { attempt: 1, waitMs: 30000, reason: 'rate-limit' },
+      { attempt: 2, waitMs: 60000, reason: 'rate-limit' },
+    ])
+  })
 })
 
 describe('crawlAccount reporting & cancel', () => {

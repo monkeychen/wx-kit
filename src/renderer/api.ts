@@ -11,6 +11,7 @@ export interface CrawlRangeInput { count?: number; from?: string; to?: string }
 export type CrawlEvent =
   | { kind: 'listed'; items: { title: string; url: string }[] }
   | { kind: 'item'; index: number; status: CrawlItemStatus; error?: string }
+  | { kind: 'backoff'; attempt: number; waitMs: number; reason: 'rate-limit' }
   | { kind: 'done'; summary: CrawlSummary }
 
 export interface WxApi {
