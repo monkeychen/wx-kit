@@ -20,7 +20,10 @@ export async function downloadArticle(
   deps: DownloadArticleDeps,
 ): Promise<DownloadItemResult> {
   const id = articleId(url)
-  if (await deps.library.has(id)) return { url, ok: true, id, skipped: true }
+  if (await deps.library.has(id)) {
+    const existing = await deps.library.get(id)
+    return { url, ok: true, id, skipped: true, title: existing?.title }
+  }
 
   const html = await deps.fetchHtml(url)
   const parsed = parseArticle(html, url)
@@ -38,5 +41,5 @@ export async function downloadArticle(
   const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats }, deps)
   await deps.library.add(meta)
 
-  return { url, ok: true, id, dir, formats: meta.formats }
+  return { url, ok: true, id, dir, formats: meta.formats, title: meta.title }
 }

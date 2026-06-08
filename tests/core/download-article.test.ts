@@ -48,6 +48,7 @@ describe('downloadArticle', () => {
     expect(result.id).toBeTruthy()
     expect(result.dir).toBeTruthy()
     expect(result.formats).toEqual(['md', 'meta'])
+    expect(result.title).toBe('有效标题')
 
     expect(await deps.library.has(result.id!)).toBe(true)
 
@@ -95,6 +96,7 @@ describe('downloadArticle', () => {
     const second = await downloadArticle(TEST_URL, ['md', 'meta'], deps2)
     expect(second.ok).toBe(true)
     expect(second.skipped).toBe(true)
+    expect(second.title).toBe('有效标题')
     expect(fetchCalled).toBe(false)
   })
 })
