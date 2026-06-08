@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Input, Button, message } from 'antd'
+import { Input, message } from 'antd'
 import { api } from '../../api'
 import FormatPicker from '../FormatPicker'
 import type { DownloadFormat, DownloadItemResult, ProgressEvent } from '../../../core/types'
@@ -48,27 +48,31 @@ export default function UrlMode() {
 
   return (
     <>
-      <Input.TextArea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="https://mp.weixin.qq.com/s/..."
-          autoSize={{ minRows: 4, maxRows: 12 }}
-          disabled={running}
-          style={{ fontSize: 14, background: 'var(--paper-raised)' }}
-        />
-
-        <div style={{ margin: '24px 0 10px', fontWeight: 600, fontSize: 15 }}>保存为</div>
-        <FormatPicker value={formats} onChange={setFormats} disabled={running} />
-
-        <div style={{ marginTop: 26, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Button type="primary" size="large" loading={running} onClick={start}
-            data-testid="start-download" style={{ paddingInline: 32 }}>
-            {running ? '下载中…' : '开始下载'}
-          </Button>
-          {urlCount > 0 && !running && <span className="faint">{urlCount} 个链接待处理</span>}
+      <div className="surface">
+        <div className="cfg-sec">
+          <p className="sec-label">文章链接</p>
+          <Input.TextArea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={'粘贴微信公众号文章链接，每行一个，支持批量\nhttps://mp.weixin.qq.com/s/...'}
+            autoSize={{ minRows: 4, maxRows: 12 }}
+            disabled={running}
+            style={{ fontSize: 14, background: 'var(--paper)' }}
+          />
         </div>
+        <div className="cfg-sec">
+          <p className="sec-label">保存为</p>
+          <FormatPicker value={formats} onChange={setFormats} disabled={running} />
+        </div>
+        <div className="cfg-foot">
+          <button className="cta" disabled={running} onClick={start} data-testid="start-download">
+            {running ? '下载中…' : '开始下载'}
+          </button>
+          {urlCount > 0 && !running && <span className="foot-note">{urlCount} 个链接待处理</span>}
+        </div>
+      </div>
 
-        {running && progress && (
+      {running && progress && (
           <div className="surface progress-card fade-in" style={{ marginTop: 28 }}>
             <div className="progress-head">
               <span className="progress-phase">{PHASE_LABEL[progress.phase]}</span>
