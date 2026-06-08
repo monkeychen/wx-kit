@@ -66,8 +66,15 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
   const queue = new DownloadQueue(wrapped, deps.onProgress)
   const s = await queue.run(refs.map((r) => r.url), deps.shouldContinue)
 
+  // 取消时队列在第 s.items.length 篇处停下，其后的文章未尝试下载。把它们补登记为 cancelled
+  // （列表阶段已有标题），让历史诚实列出「还有几篇没下」并支持单篇补下。串行下载保证 items 与 refs 同序。
+  const cancelled: DownloadItemResult[] = refs
+    .slice(s.items.length)
+    .map((r) => ({ url: r.url, ok: false, title: r.title, cancelled: true }))
+
   return {
     ok: s.ok, fakeid, listed: refs.length,
-    total: s.total, succeeded: s.succeeded, failed: s.failed, skipped: s.skipped, items: s.items,
+    total: s.total, succeeded: s.succeeded, failed: s.failed, skipped: s.skipped,
+    items: [...s.items, ...cancelled],
   }
 }

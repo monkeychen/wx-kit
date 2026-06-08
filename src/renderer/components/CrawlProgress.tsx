@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Popconfirm } from 'antd'
 import { explainError } from '../error-explain'
 
 export interface CrawlRow { title: string; url: string; status: 'waiting' | 'downloading' | 'ok' | 'skipped' | 'failed'; error?: string }
@@ -42,7 +43,12 @@ export default function CrawlProgress({ account, rows, eta, running, backoff, on
       <div className="progress-head">
         <span className="progress-phase">{running ? `正在爬取 · ${account}` : `已完成 · ${account}`}</span>
         {running
-          ? <button className="card-btn danger" style={{ flex: 'none', border: '1px solid var(--line-strong)', padding: '2px 14px' }} data-testid="crawl-cancel" onClick={onCancel}>取消</button>
+          ? (
+            <Popconfirm title="确认取消下载？" description="已下载的文章会保留；未下载的会列入下载历史，可稍后单独补下。"
+              okText="取消下载" cancelText="继续下载" okButtonProps={{ danger: true }} onConfirm={onCancel}>
+              <button className="card-btn danger" style={{ flex: 'none', border: '1px solid var(--line-strong)', padding: '2px 14px' }} data-testid="crawl-cancel">取消</button>
+            </Popconfirm>
+          )
           : <span className="progress-count">{done}/{rows.length}</span>}
       </div>
       {backoff && <BackoffBanner attempt={backoff.attempt} until={backoff.until} />}

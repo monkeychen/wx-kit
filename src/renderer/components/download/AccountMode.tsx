@@ -96,7 +96,10 @@ export default function AccountMode({ onDone, prefill }: Props) {
     setRunning(true); setRows([]); setEta(''); setBackoff(null)
     try {
       const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats)
-      message.success(`完成 · 成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
+      const cancelled = summary.total - summary.succeeded - summary.skipped - summary.failed
+      const tail = `成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`
+      if (cancelled > 0) message.info(`已取消 · ${tail}，未下载 ${cancelled}（见下方历史，可单独补下）`)
+      else message.success(`完成 · ${tail}`)
       setRows([]); setEta('')   // 结果折叠进下方下载历史
       onDone()
     } catch (e) {

@@ -247,6 +247,8 @@ body {
 .badge-skip::before { background: var(--amber); }
 .badge-fail { color: var(--cinnabar); background: var(--cinnabar-wash); }
 .badge-fail::before { background: var(--cinnabar); }
+.badge-cancel { color: var(--ink-soft); background: var(--paper-sunken); }
+.badge-cancel::before { background: var(--ink-faint); }
 
 /* 失败行的人话指引（标题·下一步），原始报错放 title 属性折叠备查 */
 .fail-hint {
@@ -623,6 +625,7 @@ body {
 .ev-stat { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; flex: 0 0 auto; }
 .ev-stat .ok { color: var(--jade); }
 .ev-stat .fail { color: var(--cinnabar); }
+.ev-stat .cancel { color: var(--ink-soft); }
 .ev-again {
   flex: 0 0 auto;
   border: 1px solid var(--line-strong); background: transparent;

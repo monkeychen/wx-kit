@@ -96,5 +96,12 @@ describe('crawlAccount reporting & cancel', () => {
     })
     expect(seen).toEqual(['a'])
     expect(out.succeeded).toBe(1)
+    // 取消后未下载的 b、c 仍登记进 items（标记 cancelled），供历史列出 + 单篇补下。
+    expect(out.items).toHaveLength(3)
+    expect(out.items.slice(1)).toEqual([
+      { url: 'b', ok: false, title: 'b', cancelled: true },
+      { url: 'c', ok: false, title: 'c', cancelled: true },
+    ])
+    expect(out.items.filter((i) => i.cancelled)).toHaveLength(2)
   })
 })

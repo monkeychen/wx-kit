@@ -25,20 +25,22 @@ describe('pruneEvents', () => {
 })
 
 describe('eventFromSummary', () => {
-  it('maps statuses (ok/skipped/failed) and falls back title to url', () => {
+  it('maps statuses (ok/skipped/failed/cancelled) and falls back title to url', () => {
     const s: DownloadSummary = {
-      ok: false, total: 3, succeeded: 1, skipped: 1, failed: 1,
+      ok: false, total: 4, succeeded: 1, skipped: 1, failed: 1,
       items: [
         { url: 'u1', ok: true, id: 'i1', title: '标题1', formats: ['md'] },
         { url: 'u2', ok: true, id: 'i2', skipped: true, title: '标题2' },
         { url: 'u3', ok: false, error: { code: 'X', message: '登录已过期' } },
+        { url: 'u4', ok: false, title: '标题4', cancelled: true },
       ],
     }
-    const e = eventFromSummary('e1', 123, { kind: 'url', count: 3 }, ['md'], s)
-    expect(e.items.map((i) => i.status)).toEqual(['ok', 'skipped', 'failed'])
+    const e = eventFromSummary('e1', 123, { kind: 'url', count: 4 }, ['md'], s)
+    expect(e.items.map((i) => i.status)).toEqual(['ok', 'skipped', 'failed', 'cancelled'])
     expect(e.items[2].title).toBe('u3')          // 失败无 title → 回退 url
     expect(e.items[2].error).toBe('登录已过期')
-    expect(e).toMatchObject({ total: 3, succeeded: 1, skipped: 1, failed: 1 })
+    expect(e.items[3].title).toBe('标题4')        // 取消项保留列表阶段标题
+    expect(e).toMatchObject({ total: 4, succeeded: 1, skipped: 1, failed: 1 })
   })
 })
 

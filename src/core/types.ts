@@ -51,6 +51,7 @@ export interface DownloadItemResult {
   dir?: string
   formats?: DownloadFormat[]
   skipped?: boolean           // 命中去重被跳过
+  cancelled?: boolean         // 因取消而未尝试下载（列表已知标题，可后续单篇补下）
   error?: { code: string; message: string }
 }
 
