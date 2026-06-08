@@ -22,7 +22,11 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**第一阶段**聚焦在下载/爬取/阅读/CLI 这条主线,后续会扩展为更通用的「百宝箱」。
+**v0.2.0 已落地**(主题「下得放心、找得到、看得见」):
+
+- **下得放心** —— 下载结果就地确认/阅读/复制下载项;失败归一为人话话术+下一步,频控退避有朱砂横幅+倒数;**取消要二次确认**,未下载的文章进历史可单篇补下。
+- **找得到** —— 文库可按下载/发布时间排序、按公众号筛选与分组折叠,批量选择+批量删除(只删记录不删文件)。
+- **看得见** —— 卡片⇄列表(访达式)两视图随切,分组时列头只一次;PDF 导出不跨页切图。
 
 ## 特性
 
@@ -46,12 +50,12 @@ npm run dev
 npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html,meta
 ```
 
-输出在 `~/Documents/wx-kit/`(可在设置改)。
+输出在 `~/Documents/wx-kit/`(**默认**库根,可在「设置」改)。
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选 `wx-kit-0.1.0-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.1.0.dmg`(Intel) / `wx-kit Setup 0.1.0.exe`(Windows)。当前**未签名**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(当前可用的 v0.1.0:`wx-kit-0.1.0-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.1.0.dmg`(Intel) / `wx-kit Setup 0.1.0.exe`(Windows);v0.2.0 包待发布)。当前**未签名**,首次打开需手动放行:
 
 - **macOS** —— 右键应用 →「打开」→ 再次「打开」;或 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -114,13 +118,21 @@ npx electron . library list                            # 列已下文章
 
 ## 项目状态
 
-**第一阶段(URL 下载 + 批量爬取 + 库内阅读 + 分发)已交付**,各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 已发布、v0.2.0 功能完成待打 0.2.0 安装包**。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
+**v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
 - ✅ M2 — GUI:下载页 / 书架 / 阅读器 / 设置
 - ✅ M3 — 扫码登录 + 批量爬取(CLI)
 - ✅ M3.5 — 批量爬取 GUI 页(单页渐进:登录引导 → 搜号 → 实时逐篇)
 - ✅ M4 — electron-builder 打包:未签名 mac(dmg arm64+x64)+ win(nsis x64)
+
+**v0.2.0 · 下得放心、找得到、看得见**
+- ✅ M5 — 信息架构重构:导航三项(下载/文库/设置)+「下载」页双模式(URL/公众号)+「书架」→「文库」改名
+- ✅ M6 — 下载闭环 + 历史:结果区就地确认/阅读(R1)+ 下载历史 `history.json`(R2)
+- ✅ M7 — 反馈引导:频控退避可见 + 失败话术归一(R5);取消需二次确认,未下载文章进历史可单篇补下
+- ✅ M8 — PDF 保真:导出 PDF 不跨页切图(R4)
+- ✅ M9 — 文库组织:排序 / 按公众号筛选+分组 / 批量删除(R6)+ 卡片⇄列表(访达式)视图切换
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 
