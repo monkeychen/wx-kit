@@ -75,7 +75,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 
 ## 文档索引
 - `ROADMAP.md` — **里程碑状态与路线图（续接看这里）**。状态/进度只在这里维护；各里程碑的详细实现计划放在 `docs/plans/`，其逐里程碑索引也在 ROADMAP 维护。
-- `docs/PRD.md` — 产品需求（第一阶段全貌、F1–F5、架构、风控、验收）。
+- `docs/PRD.md` — 第一阶段（v0.1.0）产品需求（全貌、F1–F5、架构、风控、验收）。
+- `docs/PRD-v0.2.0.md` — **v0.2.0 迭代需求**（信息架构重构、下载闭环/历史、流程可回退、保真与反馈、文库组织；里程碑 M5–M9）。
 - `docs/devlog/wx-kit-vibe-coding.md` — vibe-coding 全程复盘（活文档，每完成一个里程碑增补；流程/决策/踩坑/方法论）。
 
 > 进度的唯一真相是 `git log` + `ROADMAP.md` + `docs/plans/`，不是散落在指南里的散文。
