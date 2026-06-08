@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Input, Button, Space, message } from 'antd'
+import { Input, Button, Space, InputNumber, Popconfirm, message } from 'antd'
 import { FolderOpenOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
@@ -20,6 +20,10 @@ export default function Settings() {
     try { await api.saveSettings(s); message.success('已保存') }
     catch (e) { message.error('保存失败：' + (e as Error).message) }
   }
+  const clearHistory = async () => {
+    try { await api.historyClear(); message.success('已清空下载历史') }
+    catch (e) { message.error('清空失败：' + (e as Error).message) }
+  }
 
   if (!s) return <div className="page"><div className="page-narrow faint">加载中…</div></div>
 
@@ -34,7 +38,7 @@ export default function Settings() {
         <div className="surface">
           <div className="setting-block">
             <div className="setting-label">文章库位置</div>
-            <div className="setting-hint">下载的文章与图片都保存在这里。修改后旧文章不会自动迁移。</div>
+            <div className="setting-hint">下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。</div>
             <Space.Compact style={{ width: '100%' }}>
               <Input value={s.libraryRoot} readOnly />
               <Button icon={<FolderOpenOutlined />} onClick={choose}>选择目录</Button>
@@ -46,6 +50,20 @@ export default function Settings() {
             <div className="setting-hint">新建下载时预选这些格式，仍可临时调整。</div>
             <FormatPicker value={s.defaultFormats}
               onChange={(v: DownloadFormat[]) => setS({ ...s, defaultFormats: v })} />
+          </div>
+
+          <div className="setting-block">
+            <div className="setting-label">下载历史</div>
+            <div className="setting-hint">仅保留下载「动作」的记录，超期自动清理。清空或超期<b>只删记录，不会删除已下载的文件</b>。</div>
+            <Space align="center" wrap>
+              <span>保留最近</span>
+              <InputNumber min={1} max={3650} value={s.historyRetentionDays}
+                onChange={(v) => setS({ ...s, historyRetentionDays: v ?? 365 })} addonAfter="天" />
+              <Popconfirm title="清空下载历史？" description="只清记录，不删已下载的文件。"
+                okText="清空" cancelText="取消" onConfirm={clearHistory}>
+                <Button danger>清空下载历史</Button>
+              </Popconfirm>
+            </Space>
           </div>
         </div>
 

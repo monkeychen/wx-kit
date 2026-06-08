@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Input, message } from 'antd'
 import { api } from '../../api'
 import FormatPicker from '../FormatPicker'
-import type { DownloadFormat, DownloadItemResult, ProgressEvent } from '../../../core/types'
+import type { DownloadFormat, ProgressEvent } from '../../../core/types'
+import type { UrlPrefill } from '../../pages/Download'
 
 const PHASE_LABEL: Record<ProgressEvent['phase'], string> = {
   fetch: '抓取页面',
@@ -13,12 +14,16 @@ const PHASE_LABEL: Record<ProgressEvent['phase'], string> = {
   failed: '处理失败',
 }
 
-export default function UrlMode() {
+interface Props {
+  onDone: () => void
+  prefill?: UrlPrefill
+}
+
+export default function UrlMode({ onDone, prefill }: Props) {
   const [text, setText] = useState('')
   const [formats, setFormats] = useState<DownloadFormat[]>(['md', 'html', 'meta'])
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<ProgressEvent | null>(null)
-  const [items, setItems] = useState<DownloadItemResult[]>([])
 
   useEffect(() => {
     api.getSettings().then((s) => setFormats(s.defaultFormats)).catch(() => {})
@@ -26,17 +31,23 @@ export default function UrlMode() {
     return off
   }, [])
 
+  // 「照此再下」回填
+  useEffect(() => {
+    if (prefill) { setText(prefill.text); setFormats(prefill.formats) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.nonce])
+
   const urlCount = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).length
 
   const start = async () => {
     const urls = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
     if (!urls.length) { message.warning('请粘贴至少一个文章链接'); return }
     if (!formats.length) { message.warning('请至少选择一种格式'); return }
-    setRunning(true); setItems([]); setProgress(null)
+    setRunning(true); setProgress(null)
     try {
       const summary = await api.download(urls, formats)
-      setItems(summary.items)
       message.success(`完成 · 成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
+      onDone()   // 结果进入下方下载历史
     } catch (e) {
       message.error('下载出错：' + (e as Error).message)
     } finally {
@@ -80,25 +91,6 @@ export default function UrlMode() {
             </div>
             <div className="progress-track"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
             {progress.currentUrl && <div className="progress-current">{progress.currentUrl}</div>}
-          </div>
-        )}
-
-        {items.length > 0 && (
-          <div className="surface fade-in" style={{ marginTop: 28, padding: '6px 20px' }}>
-            <div className="result-list">
-              {items.map((it, i) => (
-                <div className="result-row" key={i}>
-                  <span className="result-url">{it.url}</span>
-                  {it.skipped ? (
-                    <span className="badge badge-skip">已存在</span>
-                  ) : it.ok ? (
-                    <span className="badge badge-ok" data-testid="result-ok">已保存</span>
-                  ) : (
-                    <span className="badge badge-fail" title={it.error?.message}>失败</span>
-                  )}
-                </div>
-              ))}
-            </div>
           </div>
         )}
     </>

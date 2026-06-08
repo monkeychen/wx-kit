@@ -567,5 +567,65 @@ body {
 .cfg-foot .foot-note { font-size: 13px; color: var(--ink-faint); }
 .cfg-foot .cta { margin-top: 0; }
 
+/* ---------- 下载历史（M6） ---------- */
+.hist { margin-top: 34px; }
+.hist-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 14px; }
+.hist-title { font-family: var(--font-serif); font-weight: 700; font-size: 19px; }
+.hist-sub { font-size: 12.5px; color: var(--ink-faint); }
+.event {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--paper-raised);
+  margin-bottom: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+.ev-bar { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; user-select: none; }
+.ev-caret { color: var(--ink-faint); font-size: 11px; width: 12px; flex: 0 0 auto; transition: transform 0.15s ease; }
+.ev-open .ev-caret { transform: rotate(90deg); color: var(--cinnabar); }
+.ev-icon {
+  width: 30px; height: 30px; border-radius: 8px;
+  display: grid; place-items: center; flex: 0 0 auto; font-size: 14px;
+}
+.ev-icon.url { background: var(--cinnabar-wash); color: var(--cinnabar); font-family: var(--font-serif); font-weight: 700; }
+.ev-icon.acc { background: var(--cinnabar); color: #fff; font-family: var(--font-serif); font-weight: 700; }
+.ev-main { flex: 1; min-width: 0; }
+.ev-line1 { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-line2 { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.ev-stat { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; flex: 0 0 auto; }
+.ev-stat .ok { color: var(--jade); }
+.ev-stat .fail { color: var(--cinnabar); }
+.ev-again {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong); background: transparent;
+  color: var(--ink-soft); font-family: inherit; font-size: 12.5px;
+  cursor: pointer; padding: 5px 12px; border-radius: 7px; transition: 0.16s ease;
+}
+.ev-again:hover { border-color: var(--cinnabar); color: var(--cinnabar); background: var(--cinnabar-wash); }
+.ev-body { border-top: 1px solid var(--line); padding: 2px 18px 4px; }
+.art { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.art:last-child { border-bottom: none; }
+.art-title { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art-title.del { color: var(--ink-faint); text-decoration: line-through; }
+.art-del-note { font-size: 12px; color: var(--ink-faint); flex: 0 0 auto; }
+.fmts { display: flex; gap: 4px; flex: 0 0 auto; }
+.fmt { font-size: 11px; color: var(--ink-soft); background: var(--paper-sunken); border-radius: 4px; padding: 1px 7px; }
+.fail-reason { font-size: 12px; color: var(--cinnabar); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art .act { display: flex; gap: 2px; flex: 0 0 auto; }
+.art .act button {
+  border: none; background: none; color: var(--ink-soft);
+  font-family: inherit; font-size: 12.5px; cursor: pointer;
+  padding: 4px 9px; border-radius: 6px; transition: 0.14s ease;
+}
+.art .act button:hover { background: var(--paper-sunken); color: var(--ink); }
+.art .act button.retry { color: var(--cinnabar); }
+.hist-more {
+  display: block; width: 100%;
+  border: 1px dashed var(--line-strong); background: transparent;
+  color: var(--ink-soft); font-family: inherit; font-size: 13px;
+  cursor: pointer; padding: 10px; border-radius: 9px; margin-top: 2px; transition: 0.16s ease;
+}
+.hist-more:hover { border-color: var(--cinnabar); color: var(--cinnabar); }
+
 /* antd message 浮层字体跟随 */
 .ant-message, .ant-popover, .ant-tooltip { font-family: var(--font-sans); }

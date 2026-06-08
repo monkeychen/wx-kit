@@ -47,6 +47,7 @@ export interface DownloadItemResult {
   url: string
   ok: boolean
   id?: string
+  title?: string              // 文章标题（成功/跳过时已知；失败时缺省）
   dir?: string
   formats?: DownloadFormat[]
   skipped?: boolean           // 命中去重被跳过

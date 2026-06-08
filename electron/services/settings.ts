@@ -6,6 +6,7 @@ import type { DownloadFormat } from '../../src/core/types'
 export interface AppSettings {
   libraryRoot: string
   defaultFormats: DownloadFormat[]
+  historyRetentionDays: number
 }
 
 export class SettingsService {
@@ -15,7 +16,7 @@ export class SettingsService {
   }
 
   private defaults(): AppSettings {
-    return { libraryRoot: this.defaultLibraryRoot, defaultFormats: ['md', 'html', 'meta'] }
+    return { libraryRoot: this.defaultLibraryRoot, defaultFormats: ['md', 'html', 'meta'], historyRetentionDays: 365 }
   }
 
   async get(): Promise<AppSettings> {

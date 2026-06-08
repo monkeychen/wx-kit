@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Input, Segmented, InputNumber, DatePicker, Spin, message } from 'antd'
-import type { Dayjs } from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../../api'
 import type { CrawlEvent, CrawlRangeInput } from '../../api'
 import LoginGate from '../LoginGate'
@@ -9,8 +9,14 @@ import FormatPicker from '../FormatPicker'
 import { estimateRemaining } from '../../eta'
 import type { DownloadFormat } from '../../../core/types'
 import type { MpAccount } from '../../../core/mp-types'
+import type { AccountPrefill } from '../../pages/Download'
 
-export default function AccountMode() {
+interface Props {
+  onDone: () => void
+  prefill?: AccountPrefill
+}
+
+export default function AccountMode({ onDone, prefill }: Props) {
   const [authValid, setAuthValid] = useState<boolean | null>(null)
   const [name, setName] = useState('')
   const [searching, setSearching] = useState(false)
@@ -29,6 +35,18 @@ export default function AccountMode() {
     api.getSettings().then((s) => setFormats(s.defaultFormats)).catch(() => {})
     api.mpAuthStatus().then((r) => setAuthValid(r.valid)).catch(() => setAuthValid(false))
   }, [])
+
+  // 「照此再下」回填：直接进入「已选号 + 配置」态
+  useEffect(() => {
+    if (!prefill) return
+    setSelected(prefill.account); setAccounts(null); setRows([])
+    setFormats(prefill.formats)
+    if (prefill.range.count != null) { setMode('count'); setCount(prefill.range.count) }
+    else if (prefill.range.from && prefill.range.to) {
+      setMode('date'); setDates([dayjs(prefill.range.from), dayjs(prefill.range.to)])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.nonce])
 
   useEffect(() => {
     const off = api.onCrawlProgress((ev: CrawlEvent) => {
@@ -72,8 +90,10 @@ export default function AccountMode() {
       : { from: dates![0].format('YYYY-MM-DD'), to: dates![1].format('YYYY-MM-DD') }
     setRunning(true); setRows([]); setEta('')
     try {
-      const summary = await api.mpCrawl(selected.fakeid, range, formats)
+      const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats)
       message.success(`完成 · 成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
+      setRows([]); setEta('')   // 结果折叠进下方下载历史
+      onDone()
     } catch (e) {
       const msg = (e as Error).message
       setRunning(false)

@@ -33,6 +33,10 @@ export class Library {
     return (await this.read()).articles.some(a => a.id === id)
   }
 
+  async get(id: string): Promise<ArticleMeta | undefined> {
+    return (await this.read()).articles.find(a => a.id === id)
+  }
+
   async add(meta: ArticleMeta): Promise<void> {
     const data = await this.read()
     const i = data.articles.findIndex(a => a.id === meta.id)
