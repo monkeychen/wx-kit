@@ -17,6 +17,8 @@ export interface CrawlDeps {
   onItem?: (ev: CrawlItemEvent) => void
   /** 返回 false 则停止后续（取消）；已下载的保留。 */
   shouldContinue?: () => boolean
+  /** 列表阶段命中频控、进入退避等待前上报，供 UI 显示「退避中 · N 秒后重试」。 */
+  onBackoff?: (ev: { attempt: number; waitMs: number; reason: 'rate-limit' }) => void
   /** 测试可注入假 listArticles。 */
   listFn?: (
     mpFetch: MpFetch, token: string, fakeid: string, range: CrawlRange, opts?: { sleep?: (ms: number) => Promise<void> },
@@ -34,7 +36,11 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
       refs = await listFn(deps.mpFetch, deps.token, fakeid, range, { sleep })
       break
     } catch (e) {
-      if (e instanceof MpRateLimited && attempt < 3) { await sleep(30000 * (attempt + 1)); continue }
+      if (e instanceof MpRateLimited && attempt < 3) {
+        const waitMs = 30000 * (attempt + 1)
+        deps.onBackoff?.({ attempt: attempt + 1, waitMs, reason: 'rate-limit' })
+        await sleep(waitMs); continue
+      }
       throw e
     }
   }

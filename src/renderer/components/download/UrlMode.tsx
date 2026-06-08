@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Input, message } from 'antd'
 import { api } from '../../api'
 import FormatPicker from '../FormatPicker'
+import { explainError } from '../../error-explain'
 import type { DownloadFormat, ProgressEvent } from '../../../core/types'
 import type { UrlPrefill } from '../../pages/Download'
 
@@ -49,7 +50,8 @@ export default function UrlMode({ onDone, prefill }: Props) {
       message.success(`完成 · 成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
       onDone()   // 结果进入下方下载历史
     } catch (e) {
-      message.error('下载出错：' + (e as Error).message)
+      const ex = explainError(e)
+      message.error(`${ex.title}：${ex.hint}`)
     } finally {
       setRunning(false); setProgress(null)
     }

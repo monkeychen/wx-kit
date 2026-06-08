@@ -4,9 +4,10 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../../api'
 import type { CrawlEvent, CrawlRangeInput } from '../../api'
 import LoginGate from '../LoginGate'
-import CrawlProgress, { type CrawlRow } from '../CrawlProgress'
+import CrawlProgress, { type CrawlRow, type BackoffState } from '../CrawlProgress'
 import FormatPicker from '../FormatPicker'
 import { estimateRemaining } from '../../eta'
+import { explainError } from '../../error-explain'
 import type { DownloadFormat } from '../../../core/types'
 import type { MpAccount } from '../../../core/mp-types'
 import type { AccountPrefill } from '../../pages/Download'
@@ -29,6 +30,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
   const [running, setRunning] = useState(false)
   const [rows, setRows] = useState<CrawlRow[]>([])
   const [eta, setEta] = useState('')
+  const [backoff, setBackoff] = useState<BackoffState | null>(null)
   const startRef = useRef(0)
 
   useEffect(() => {
@@ -51,8 +53,11 @@ export default function AccountMode({ onDone, prefill }: Props) {
   useEffect(() => {
     const off = api.onCrawlProgress((ev: CrawlEvent) => {
       if (ev.kind === 'listed') {
+        setBackoff(null)
         startRef.current = Date.now()
         setRows(ev.items.map((it) => ({ title: it.title, url: it.url, status: 'waiting' })))
+      } else if (ev.kind === 'backoff') {
+        setBackoff({ attempt: ev.attempt, until: Date.now() + ev.waitMs })
       } else if (ev.kind === 'item') {
         setRows((prev) => {
           const next = prev.slice()
@@ -62,7 +67,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
           return next
         })
       } else if (ev.kind === 'done') {
-        setRunning(false); setEta('')
+        setRunning(false); setEta(''); setBackoff(null)
       }
     })
     return off
@@ -88,19 +93,21 @@ export default function AccountMode({ onDone, prefill }: Props) {
     const range: CrawlRangeInput = mode === 'count'
       ? { count }
       : { from: dates![0].format('YYYY-MM-DD'), to: dates![1].format('YYYY-MM-DD') }
-    setRunning(true); setRows([]); setEta('')
+    setRunning(true); setRows([]); setEta(''); setBackoff(null)
     try {
       const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats)
       message.success(`完成 · 成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
       setRows([]); setEta('')   // 结果折叠进下方下载历史
       onDone()
     } catch (e) {
-      const msg = (e as Error).message
-      setRunning(false)
-      if (msg.includes('AUTH_REQUIRED')) setAuthValid(false)
-      else message.error('爬取出错：' + msg)
+      const ex = explainError(e)
+      setRunning(false); setBackoff(null)
+      if (ex.title === '登录已过期') setAuthValid(false)
+      else message.error(`${ex.title}：${ex.hint}`)
     }
   }
+  // 注：R3「完成/取消后回到配置」无需额外按钮——start() 的 await mpCrawl 完成即
+  // setRows([])，配置卡自动重现且 selected/范围/格式不丢（已端到端验证）。
 
   const retry = async (i: number) => {
     const row = rows[i]
@@ -171,7 +178,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
 
         {(running || rows.length > 0) && (
           <CrawlProgress account={selected?.nickname ?? ''} rows={rows} eta={eta} running={running}
-            onCancel={() => api.mpCancelCrawl()} onRetry={retry} />
+            backoff={backoff} onCancel={() => api.mpCancelCrawl()} onRetry={retry} />
         )}
     </>
   )

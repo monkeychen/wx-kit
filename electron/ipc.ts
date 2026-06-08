@@ -117,6 +117,7 @@ export function registerIpc(settings: SettingsService): void {
       downloadOne: (url) => downloadArticle(url, formats, ddeps),
       onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
       onItem: (ev) => send({ kind: 'item', ...ev }),
+      onBackoff: (ev) => send({ kind: 'backoff', ...ev }),
       shouldContinue: () => !cancelRequested,
     })
     send({ kind: 'done', summary })

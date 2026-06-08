@@ -248,6 +248,34 @@ body {
 .badge-fail { color: var(--cinnabar); background: var(--cinnabar-wash); }
 .badge-fail::before { background: var(--cinnabar); }
 
+/* 失败行的人话指引（标题·下一步），原始报错放 title 属性折叠备查 */
+.fail-hint {
+  font-size: 12.5px;
+  color: var(--cinnabar);
+  cursor: help;
+}
+
+/* 频控退避横幅：朱砂描边 + 极浅底，强调「在等而非出错」，非报错红 */
+.backoff-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 9px 14px;
+  border: 1px solid var(--cinnabar-soft);
+  background: var(--cinnabar-wash);
+  border-radius: 8px;
+  color: var(--cinnabar);
+  font-size: 13px;
+}
+.backoff-banner b { font-variant-numeric: tabular-nums; }
+.backoff-banner .bk-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--cinnabar);
+  animation: bk-pulse 1.1s ease-in-out infinite;
+}
+@keyframes bk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
 /* ---------- 书架卡片 ---------- */
 .shelf {
   display: grid;
