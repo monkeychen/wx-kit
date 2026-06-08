@@ -131,10 +131,10 @@ export default function Library() {
             <div>{kw || account ? '换个条件试试' : '到「下载」页粘贴链接或按公众号抓取，保存的文章会陈列在这里'}</div>
           </div>
         ) : view === 'list' ? (
-          /* ---- 列表视图：列头只一次，分组时各组只留分隔头 ---- */
-          <div className="list">
+          /* ---- 列表视图：列头只一次，分组时各组只留分隔头（且去掉冗余的公众号列）---- */
+          <div className={`list${grouped ? ' grouped' : ''}`}>
             <div className="lhead">
-              <span></span><span>标题</span><span>公众号</span>
+              <span></span><span>标题</span>{!grouped && <span>公众号</span>}
               <span>发布时间</span><span>下载时间</span><span style={{ textAlign: 'right' }}>操作</span>
             </div>
             {grouped ? groups.map((g) => {
