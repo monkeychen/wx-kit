@@ -17,6 +17,7 @@ export interface HistoryItem {
   id?: string                 // 库内文章 id；文库删除联动后置空
   url: string
   title: string               // 下载时已知；失败时回退 url
+  dir?: string                // 文章目录（用于「在文件夹显示」）
   status: HistoryItemStatus
   formats?: DownloadFormat[]   // 该篇实际产出格式
   error?: string
@@ -55,6 +56,7 @@ export function eventFromSummary(
     id: it.id,
     url: it.url,
     title: it.title || it.url,
+    dir: it.dir,
     status: it.skipped ? 'skipped' : it.ok ? 'ok' : 'failed',
     formats: it.formats,
     error: it.error?.message,
