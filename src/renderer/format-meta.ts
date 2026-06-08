@@ -8,9 +8,9 @@ export interface FormatInfo {
 }
 
 export const FORMAT_INFOS: FormatInfo[] = [
-  { value: 'md', name: 'Markdown', desc: '纯文本，适合二次编辑' },
-  { value: 'html', name: '网页', desc: '保留原文排版样式' },
-  { value: 'pdf', name: 'PDF', desc: '便于打印与归档' },
-  { value: 'cover', name: '封面图', desc: '保存文章头图' },
-  { value: 'meta', name: '元信息', desc: '标题/作者/时间 JSON' },
+  { value: 'md', name: 'Markdown', desc: '纯文本，适合二次编辑 / 喂给 AI' },
+  { value: 'html', name: '网页', desc: '保留原文排版样式的网页' },
+  { value: 'pdf', name: 'PDF', desc: '便于打印与离线归档' },
+  { value: 'cover', name: '封面图', desc: '单独保存文章头图' },
+  { value: 'meta', name: '元信息', desc: '标题 / 作者 / 时间等 JSON' },
 ]

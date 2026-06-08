@@ -121,19 +121,38 @@ export default function BatchCrawl() {
         )}
 
         {selected && !running && rows.length === 0 && (
-          <div className="fade-in" style={{ marginTop: 20 }}>
-            <div style={{ marginBottom: 12 }}>已选：<b className="font-serif">{selected.nickname}</b>
-              <a onClick={() => setSelected(null)} style={{ color: 'var(--cinnabar)', cursor: 'pointer' }}>换一个</a></div>
-            <div className="range-row" style={{ marginBottom: 14 }}>
-              <Segmented value={mode} onChange={(v) => setMode(v as 'count' | 'date')}
-                options={[{ label: '最近 N 篇', value: 'count' }, { label: '日期范围', value: 'date' }]} />
-              {mode === 'count'
-                ? <InputNumber min={1} max={200} value={count} onChange={(v) => setCount(v ?? 1)} addonAfter="篇" />
-                : <DatePicker.RangePicker value={dates ?? undefined} onChange={(v) => setDates(v as [Dayjs, Dayjs] | null)} />}
+          <div className="surface fade-in" style={{ marginTop: 22 }}>
+            <div className="cfg-head">
+              <div className="seal">{selected.nickname.slice(0, 1)}</div>
+              <div style={{ minWidth: 0 }}>
+                <div className="nm">{selected.nickname}</div>
+                {selected.signature && <div className="sg">{selected.signature}</div>}
+              </div>
+              <button className="swap" onClick={() => setSelected(null)}>换一个</button>
             </div>
-            <div style={{ margin: '6px 0 10px', fontWeight: 600 }}>保存为</div>
-            <FormatPicker value={formats} onChange={setFormats} />
-            <button className="cta" style={{ marginTop: 20 }} onClick={start} data-testid="start-crawl">开始爬取</button>
+
+            <div className="cfg-sec">
+              <p className="sec-label">抓取范围</p>
+              <div className="range-row">
+                <Segmented value={mode} onChange={(v) => setMode(v as 'count' | 'date')}
+                  options={[{ label: '最近 N 篇', value: 'count' }, { label: '日期范围', value: 'date' }]} />
+                {mode === 'count'
+                  ? <InputNumber min={1} max={200} value={count} onChange={(v) => setCount(v ?? 1)} addonAfter="篇" />
+                  : <DatePicker.RangePicker value={dates ?? undefined} onChange={(v) => setDates(v as [Dayjs, Dayjs] | null)} />}
+              </div>
+            </div>
+
+            <div className="cfg-sec">
+              <p className="sec-label">保存为</p>
+              <FormatPicker value={formats} onChange={setFormats} />
+            </div>
+
+            <div className="cfg-foot">
+              <button className="cta" style={{ marginTop: 0 }} onClick={start} data-testid="start-crawl">开始爬取</button>
+              <span className="foot-note">{mode === 'count'
+                ? `共 ${count} 篇 · 为避免频控，将逐篇串行下载、间隔随机延迟`
+                : '按日期范围抓取 · 列出后逐篇下载'}</span>
+            </div>
           </div>
         )}
 

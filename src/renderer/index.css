@@ -146,44 +146,72 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
-/* ---------- 格式选择 pill ---------- */
-.format-grid {
+/* ---------- 格式选择 chip（等宽一行 + 联动说明条） ---------- */
+.fmt-bar {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: 10px;
-}
-.format-pill {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 12px 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: var(--paper-raised);
-  cursor: pointer;
-  user-select: none;
-  transition: border-color 0.16s ease, background 0.16s ease, transform 0.1s ease;
-}
-.format-pill:hover { border-color: var(--cinnabar-soft); }
-.format-pill:active { transform: translateY(1px); }
-.format-pill.on {
-  border-color: var(--cinnabar);
-  background: var(--cinnabar-wash);
-}
-.format-pill .fp-name {
-  font-weight: 600;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
 }
-.format-pill .fp-desc { font-size: 12px; color: var(--ink-soft); }
-.format-pill .fp-dot {
-  width: 8px; height: 8px; border-radius: 50%;
+.fmt-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--paper-raised);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease, transform 0.08s ease;
+}
+.fmt-chip:hover { border-color: var(--cinnabar-soft); }
+.fmt-chip:active { transform: translateY(1px); }
+.fmt-chip .ind {
+  width: 16px; height: 16px;
+  border-radius: 50%;
   border: 1.5px solid var(--ink-faint);
   flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  transition: 0.16s ease;
 }
-.format-pill.on .fp-dot { border-color: var(--cinnabar); background: var(--cinnabar); }
+.fmt-chip .ind svg {
+  width: 9px; height: 9px;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: 0.16s ease;
+  stroke: #fff;
+}
+.fmt-chip.on {
+  border-color: var(--cinnabar);
+  background: var(--cinnabar-wash);
+  color: var(--cinnabar);
+  font-weight: 600;
+}
+.fmt-chip.on .ind { border-color: var(--cinnabar); background: var(--cinnabar); }
+.fmt-chip.on .ind svg { opacity: 1; transform: scale(1); }
+.fmt-block.is-disabled { opacity: 0.55; pointer-events: none; }
+.fmt-hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  min-height: 19px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.fmt-hint::before {
+  content: "";
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--cinnabar);
+  opacity: 0.55;
+  flex: 0 0 auto;
+}
 
 /* ---------- 状态徽章 ---------- */
 .badge {
@@ -465,6 +493,62 @@ body {
 .candidate .c-name { font-weight: 600; font-size: 14px; }
 .candidate .c-sig { font-size: 12px; color: var(--ink-soft); }
 .range-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* ---------- 批量页：选号后一体化配置卡 ---------- */
+.cfg-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.cfg-head .seal {
+  width: 40px; height: 40px;
+  border-radius: 9px;
+  background: var(--cinnabar);
+  color: #fff;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.cfg-head .nm { font-family: var(--font-serif); font-weight: 700; font-size: 17px; line-height: 1.2; }
+.cfg-head .sg {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  max-width: 440px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cfg-head .swap {
+  margin-left: auto;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 7px;
+  transition: 0.16s ease;
+  flex: 0 0 auto;
+}
+.cfg-head .swap:hover { border-color: var(--cinnabar); color: var(--cinnabar); background: var(--cinnabar-wash); }
+.cfg-sec { padding: 20px 22px; }
+.cfg-sec + .cfg-sec { border-top: 1px solid var(--line); }
+.cfg-sec .sec-label { font-weight: 600; font-size: 15px; margin: 0 0 12px; }
+.cfg-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border-top: 1px solid var(--line);
+}
+.cfg-foot .foot-note { font-size: 13px; color: var(--ink-faint); }
 
 /* antd message 浮层字体跟随 */
 .ant-message, .ant-popover, .ant-tooltip { font-family: var(--font-sans); }
