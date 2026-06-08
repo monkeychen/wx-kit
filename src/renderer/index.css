@@ -138,6 +138,21 @@ body {
 }
 .page-sub { color: var(--ink-soft); margin-top: 8px; font-size: 14.5px; }
 
+/* ---------- 下载页模式页签（编辑栏目式） ---------- */
+.mode-tabs { display: inline-flex; gap: 30px; border-bottom: 1px solid var(--line); margin: 22px 0 26px; }
+.mode-tab {
+  position: relative; padding: 0 2px 12px;
+  font-family: var(--font-serif); font-size: 19px; font-weight: 700;
+  color: var(--ink-faint); background: none; border: none; cursor: pointer;
+  transition: color 0.16s ease;
+}
+.mode-tab:hover { color: var(--ink-soft); }
+.mode-tab.on { color: var(--ink); }
+.mode-tab.on::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 3px; background: var(--cinnabar); border-radius: 2px;
+}
+
 /* ---------- 卡片表面 ---------- */
 .surface {
   background: var(--paper-raised);

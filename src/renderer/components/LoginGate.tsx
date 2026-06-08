@@ -16,7 +16,7 @@ export default function LoginGate({ onLoggedIn }: { onLoggedIn: () => void }) {
     <div className="empty-state" data-testid="login-gate">
       <div className="es-mark">▣</div>
       <div className="es-title">先登录公众号后台</div>
-      <div style={{ maxWidth: 360 }}>批量爬取需要用你的公众号管理员身份扫码登录 mp.weixin.qq.com。登录态保存在本地，过期前无需重复扫码。</div>
+      <div style={{ maxWidth: 360 }}>按公众号下载需要用你的公众号管理员身份扫码登录 mp.weixin.qq.com。登录态保存在本地，过期前无需重复扫码。</div>
       <button className="cta" disabled={busy} onClick={doLogin} data-testid="login-scan">
         {busy ? '请在弹出窗口扫码…' : '扫码登录'}
       </button>

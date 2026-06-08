@@ -86,7 +86,7 @@ async function main() {
     assert(true, 'download reported success')
 
     // --- library (card shelf) ---
-    await win.click('[data-testid="nav-书架"]')
+    await win.click('[data-testid="nav-文库"]')
     await win.waitForSelector('[data-testid="article-card"]', { timeout: 15000 })
     const card = win.locator('[data-testid="article-card"]').first()
     const cardText = await card.innerText()
@@ -111,7 +111,7 @@ async function main() {
       `reader html view: iframe src is wxfile .../index.html (${iframeSrc})`)
 
     // --- delete ---
-    await win.click('[data-testid="nav-书架"]')
+    await win.click('[data-testid="nav-文库"]')
     await win.waitForSelector('[data-testid="article-card"]', { timeout: 10000 })
     await win.locator('[data-testid="article-card"]').first().hover()
     await win.click('[data-testid="card-delete"]')
@@ -125,10 +125,11 @@ async function main() {
     const rootVal = await win.inputValue('input[readonly]')
     assert(rootVal === libraryRoot, `settings shows library root (${rootVal})`)
 
-    // --- batch page shows login gate when no session (e2e userData has none) ---
-    await win.click('[data-testid="nav-批量"]')
+    // --- download page · account mode shows login gate when no session (e2e userData has none) ---
+    await win.click('[data-testid="nav-下载"]')
+    await win.click('[data-testid="mode-account"]')
     await win.waitForSelector('[data-testid="login-gate"]', { timeout: 10000 })
-    assert(true, 'batch page shows login gate without a session')
+    assert(true, 'download page · account mode shows login gate without a session')
 
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)

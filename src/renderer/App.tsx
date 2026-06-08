@@ -1,7 +1,6 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
-import UrlDownload from './pages/UrlDownload'
-import BatchCrawl from './pages/BatchCrawl'
+import Download from './pages/Download'
 import Library from './pages/Library'
 import Reader from './pages/Reader'
 import Settings from './pages/Settings'
@@ -10,8 +9,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<MainLayout />}>
-        <Route index element={<UrlDownload />} />
-        <Route path="batch" element={<BatchCrawl />} />
+        <Route index element={<Download />} />
+        <Route path="batch" element={<Navigate to="/" replace />} />
         <Route path="library" element={<Library />} />
         <Route path="reader/:id" element={<Reader />} />
         <Route path="settings" element={<Settings />} />

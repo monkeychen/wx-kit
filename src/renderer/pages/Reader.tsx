@@ -47,7 +47,7 @@ export default function Reader() {
   return (
     <>
       <div className="reader-bar">
-        <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/library')}>返回书架</Button>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/library')}>返回文库</Button>
         <span className="font-serif" style={{ flex: 1, fontWeight: 600, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.title}</span>
         <Segmented value={kind} onChange={(v) => setKind(v as 'md' | 'html')}
           options={[
