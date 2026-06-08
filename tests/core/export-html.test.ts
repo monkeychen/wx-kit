@@ -27,4 +27,18 @@ describe('buildHtml', () => {
     const html = buildHtml({ ...meta, sourceUrl: 'https://x.com/s?a=1"&b=2' }, '')
     expect(html).toContain('href="https://x.com/s?a=1&quot;&amp;b=2"')
   })
+
+  it('injects @media print rules so PDF never cuts an image/table/code block across pages (R4)', () => {
+    expect(html).toContain('@media print')
+    expect(html).toContain('break-inside: avoid')
+    expect(html).toContain('page-break-inside: avoid') // 旧别名兜底
+    // 命中图/表/代码块
+    expect(html).toMatch(/@media print[\s\S]*\bimg\b[\s\S]*break-inside: avoid/)
+    expect(html).toMatch(/@media print[\s\S]*\btable\b/)
+    expect(html).toMatch(/@media print[\s\S]*\bpre\b/)
+  })
+
+  it('keeps the on-screen image rule intact (no regression)', () => {
+    expect(html).toContain('img{max-width:100%;height:auto}')
+  })
 })

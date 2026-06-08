@@ -16,6 +16,14 @@ const STYLE = `
   img{max-width:100%;height:auto}
   .wxk-header{border-bottom:1px solid #eee;padding-bottom:12px;margin-bottom:24px;color:#888;font-size:14px}
   h1{font-size:22px;line-height:1.4}
+  /* R4：导出 PDF（printToPDF 用打印媒介）时，图片/表格/代码块/引用整体不被页边界切断。
+     仅作用于打印态，屏幕阅读器零影响；用户自行 Ctrl+P 打印这份 HTML 也受益。 */
+  @media print {
+    img { break-inside: avoid; page-break-inside: avoid; display: block; max-width: 100%; height: auto; margin: 0 auto }
+    figure, table, pre, blockquote { break-inside: avoid; page-break-inside: avoid }
+    h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid }
+    p { orphans: 3; widows: 3 }
+  }
 `
 
 export function buildHtml(meta: ArticleMeta, contentHtml: string): string {
