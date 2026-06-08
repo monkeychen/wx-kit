@@ -73,9 +73,10 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
     setEvents(r.events); setTotal(r.total)
   }
 
-  const retry = async (url: string, formats: HistoryEvent['formats']) => {
-    try { await api.download([url], formats); message.success('重试完成'); await reload() }
-    catch (e) { message.error('重试失败：' + (e as Error).message) }
+  // 失败重试 / 取消补下 共用：都是「就这一篇、按本次格式下一遍」。
+  const downloadOne = async (url: string, formats: HistoryEvent['formats']) => {
+    try { await api.download([url], formats); message.success('下载完成'); await reload() }
+    catch (e) { message.error('下载失败：' + (e as Error).message) }
   }
 
   const remove = async (id: string) => {
@@ -95,6 +96,7 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
       {events.map((ev) => {
         const open = expanded.has(ev.id)
         const acc = ev.source.kind === 'account'
+        const cancelled = ev.items.filter((it) => it.status === 'cancelled').length
         return (
           <div className={`event${open ? ' ev-open' : ''}`} key={ev.id} data-testid="history-event">
             <div className="ev-bar" onClick={() => toggle(ev.id)}>
@@ -108,6 +110,7 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
                 {ev.succeeded > 0 && <span className="ok">{ev.succeeded} 成功</span>}
                 {ev.skipped > 0 && <> · {ev.skipped} 跳过</>}
                 {ev.failed > 0 && <> · <span className="fail">{ev.failed} 失败</span></>}
+                {cancelled > 0 && <> · <span className="cancel">{cancelled} 未下载</span></>}
               </div>
               <button className="ev-again" onClick={(e) => { e.stopPropagation(); onAgain(ev) }}>复制下载项</button>
               <Popconfirm title="删除这条下载记录？" description="只删记录，不删已下载的文件。"
@@ -126,14 +129,16 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
                     )}
                     {it.status === 'skipped' && <span className="badge badge-skip">已存在</span>}
                     {it.status === 'failed' && <span className="fail-reason">失败：{it.error ?? '未知错误'}</span>}
+                    {it.status === 'cancelled' && <span className="badge badge-cancel">未下载</span>}
                     {it.deleted && <span className="art-del-note">已从文库删除</span>}
 
                     <div className="act">
-                      {it.status !== 'failed' && it.id && !it.deleted && (
+                      {it.status !== 'failed' && it.status !== 'cancelled' && it.id && !it.deleted && (
                         <button data-testid="history-read" onClick={() => nav(`/reader/${encodeURIComponent(it.id!)}`)}>阅读</button>
                       )}
                       {it.dir && !it.deleted && <button onClick={() => api.reveal(it.dir!)}>文件夹</button>}
-                      {it.status === 'failed' && <button className="retry" onClick={() => retry(it.url, ev.formats)}>重试</button>}
+                      {it.status === 'failed' && <button className="retry" onClick={() => downloadOne(it.url, ev.formats)}>重试</button>}
+                      {it.status === 'cancelled' && <button className="retry" data-testid="history-download" onClick={() => downloadOne(it.url, ev.formats)}>下载</button>}
                     </div>
                   </div>
                 ))}

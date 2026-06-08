@@ -11,7 +11,7 @@ export type HistorySource =
   | { kind: 'url'; count: number }
   | { kind: 'account'; nickname: string; fakeid: string; range: CrawlRange }
 
-export type HistoryItemStatus = 'ok' | 'skipped' | 'failed'
+export type HistoryItemStatus = 'ok' | 'skipped' | 'failed' | 'cancelled'
 
 export interface HistoryItem {
   id?: string                 // 库内文章 id；文库删除联动后置空
@@ -57,7 +57,7 @@ export function eventFromSummary(
     url: it.url,
     title: it.title || it.url,
     dir: it.dir,
-    status: it.skipped ? 'skipped' : it.ok ? 'ok' : 'failed',
+    status: it.cancelled ? 'cancelled' : it.skipped ? 'skipped' : it.ok ? 'ok' : 'failed',
     formats: it.formats,
     error: it.error?.message,
   }))
