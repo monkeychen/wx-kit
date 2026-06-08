@@ -106,6 +106,14 @@ async function main() {
     assert(cardText.includes('端到端验证文章'), 'shelf lists the downloaded article')
     assert(cardText.includes('E2E公众号'), 'card shows the account name')
 
+    // --- M9 list view toggle (Finder-like rows), then back to cards ---
+    await win.click('.ant-segmented label:has-text("列表")')
+    await win.waitForSelector('[data-testid="article-row"]', { timeout: 8000 })
+    const rowText = await win.locator('[data-testid="article-row"]').first().innerText()
+    assert(rowText.includes('端到端验证文章'), 'list view shows the article as a Finder-like row')
+    await win.click('.ant-segmented label:has-text("卡片")')
+    await win.waitForSelector('[data-testid="article-card"]', { timeout: 8000 })
+
     // --- reader (md) ---
     await card.hover()
     await win.click('[data-testid="card-read"]')
