@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Input, Segmented, InputNumber, DatePicker, Spin, message } from 'antd'
 import type { Dayjs } from 'dayjs'
-import { api } from '../api'
-import type { CrawlEvent, CrawlRangeInput } from '../api'
-import LoginGate from '../components/LoginGate'
-import CrawlProgress, { type CrawlRow } from '../components/CrawlProgress'
-import FormatPicker from '../components/FormatPicker'
-import { estimateRemaining } from '../eta'
-import type { DownloadFormat } from '../../core/types'
-import type { MpAccount } from '../../core/mp-types'
+import { api } from '../../api'
+import type { CrawlEvent, CrawlRangeInput } from '../../api'
+import LoginGate from '../LoginGate'
+import CrawlProgress, { type CrawlRow } from '../CrawlProgress'
+import FormatPicker from '../FormatPicker'
+import { estimateRemaining } from '../../eta'
+import type { DownloadFormat } from '../../../core/types'
+import type { MpAccount } from '../../../core/mp-types'
 
-export default function BatchCrawl() {
+export default function AccountMode() {
   const [authValid, setAuthValid] = useState<boolean | null>(null)
   const [name, setName] = useState('')
   const [searching, setSearching] = useState(false)
@@ -92,19 +92,12 @@ export default function BatchCrawl() {
       : x)))
   }
 
-  if (authValid === null) return <div className="page" style={{ textAlign: 'center', paddingTop: 80 }}><Spin /></div>
-  if (!authValid) return <div className="page"><div className="page-narrow"><LoginGate onLoggedIn={() => setAuthValid(true)} /></div></div>
+  if (authValid === null) return <div style={{ textAlign: 'center', paddingTop: 60 }}><Spin /></div>
+  if (!authValid) return <LoginGate onLoggedIn={() => setAuthValid(true)} />
 
   return (
-    <div className="page">
-      <div className="page-narrow fade-in">
-        <div className="page-head">
-          <div className="eyebrow">Batch</div>
-          <h1 className="page-title">批量爬取</h1>
-          <p className="page-sub">搜索公众号，按数量或日期范围批量下载它的文章。</p>
-        </div>
-
-        <Input.Search placeholder="输入公众号名称" enterButton="搜索" value={name}
+    <>
+      <Input.Search placeholder="输入公众号名称" enterButton="搜索" value={name}
           onChange={(e) => setName(e.target.value)} onSearch={search} loading={searching}
           disabled={running} style={{ maxWidth: 420 }} data-testid="account-search" />
 
@@ -160,7 +153,6 @@ export default function BatchCrawl() {
           <CrawlProgress account={selected?.nickname ?? ''} rows={rows} eta={eta} running={running}
             onCancel={() => api.mpCancelCrawl()} onRetry={retry} />
         )}
-      </div>
-    </div>
+    </>
   )
 }

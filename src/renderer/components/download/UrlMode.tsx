@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Input, Button, message } from 'antd'
-import { api } from '../api'
-import FormatPicker from '../components/FormatPicker'
-import type { DownloadFormat, DownloadItemResult, ProgressEvent } from '../../core/types'
+import { api } from '../../api'
+import FormatPicker from '../FormatPicker'
+import type { DownloadFormat, DownloadItemResult, ProgressEvent } from '../../../core/types'
 
 const PHASE_LABEL: Record<ProgressEvent['phase'], string> = {
   fetch: '抓取页面',
@@ -13,7 +13,7 @@ const PHASE_LABEL: Record<ProgressEvent['phase'], string> = {
   failed: '处理失败',
 }
 
-export default function UrlDownload() {
+export default function UrlMode() {
   const [text, setText] = useState('')
   const [formats, setFormats] = useState<DownloadFormat[]>(['md', 'html', 'meta'])
   const [running, setRunning] = useState(false)
@@ -47,15 +47,8 @@ export default function UrlDownload() {
   const pct = progress ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100) : 0
 
   return (
-    <div className="page">
-      <div className="page-narrow fade-in">
-        <div className="page-head">
-          <div className="eyebrow">Download</div>
-          <h1 className="page-title">下载文章</h1>
-          <p className="page-sub">粘贴微信公众号文章链接，下载为可永久保存的多种格式。每行一个链接，支持批量。</p>
-        </div>
-
-        <Input.TextArea
+    <>
+      <Input.TextArea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="https://mp.weixin.qq.com/s/..."
@@ -104,7 +97,6 @@ export default function UrlDownload() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </>
   )
 }
