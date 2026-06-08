@@ -11,10 +11,6 @@ export default function Download() {
   return (
     <div className="page">
       <div className="page-narrow fade-in">
-        <div className="page-head" style={{ marginBottom: 0 }}>
-          <div className="eyebrow">Download</div>
-          <h1 className="page-title">下载文章</h1>
-        </div>
         <div className="mode-tabs" role="tablist">
           <button role="tab" aria-selected={mode === 'url'} data-testid="mode-url"
             className={`mode-tab${mode === 'url' ? ' on' : ''}`} onClick={() => setMode('url')}>
