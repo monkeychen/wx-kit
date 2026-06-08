@@ -383,7 +383,8 @@ body {
 .tb-toggle:hover { border-color: var(--line-strong); }
 .tb-toggle.on { background: var(--cinnabar-wash); border-color: var(--cinnabar-soft); color: var(--cinnabar); font-weight: 600; }
 
-.selbar { display: flex; align-items: center; gap: 16px; margin: 0 0 16px; padding: 10px 16px; background: var(--cinnabar-wash); border: 1px solid var(--cinnabar-soft); border-radius: 9px; font-size: 13.5px; color: var(--cinnabar); }
+/* 底部浮动批量条：不挤动列表（避免选中后内容重排，单击/双击不串位），Gmail 式 */
+.selbar { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 16px; padding: 10px 18px; background: var(--cinnabar-wash); border: 1px solid var(--cinnabar-soft); border-radius: 999px; font-size: 13.5px; color: var(--cinnabar); box-shadow: 0 6px 24px rgba(33, 28, 21, 0.16); }
 .selbar .n { font-weight: 700; }
 .selbar a { color: var(--ink-soft); cursor: pointer; }
 .selbar a:hover { color: var(--ink); }

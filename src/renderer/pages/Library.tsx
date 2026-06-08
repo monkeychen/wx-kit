@@ -99,13 +99,13 @@ export default function Library() {
             style={{ width: 240 }} prefix={<span className="faint">🔍</span>} />
           <div style={{ flex: 1 }} />
           <span className="tb-label">排序</span>
-          <Select size="middle" value={sortKey} onChange={(v) => setSortKey(v)} style={{ width: 116 }}
-            options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({ value: k, label: SORT_LABEL[k] }))} />
-          <button className="tb-dir" title={sortDir === 'desc' ? '降序' : '升序'}
+          <span data-testid="sort-select"><Select size="middle" value={sortKey} onChange={(v) => setSortKey(v)} style={{ width: 116 }}
+            options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({ value: k, label: SORT_LABEL[k] }))} /></span>
+          <button className="tb-dir" data-testid="sort-dir" title={sortDir === 'desc' ? '降序' : '升序'}
             onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}>{sortDir === 'desc' ? '↓' : '↑'}</button>
-          <Select size="middle" value={account ?? '__all'} onChange={(v) => setAccount(v === '__all' ? null : v)}
-            style={{ width: 150 }} options={[{ value: '__all', label: '全部公众号' }, ...accounts.map((a) => ({ value: a, label: a }))]} />
-          <button className={`tb-toggle${grouped ? ' on' : ''}`} onClick={() => setGrouped((g) => !g)}>⊟ 分组</button>
+          <span data-testid="account-select"><Select size="middle" value={account ?? '__all'} onChange={(v) => setAccount(v === '__all' ? null : v)}
+            style={{ width: 150 }} options={[{ value: '__all', label: '全部公众号' }, ...accounts.map((a) => ({ value: a, label: a }))]} /></span>
+          <button className={`tb-toggle${grouped ? ' on' : ''}`} data-testid="group-toggle" onClick={() => setGrouped((g) => !g)}>⊟ 分组</button>
           <Segmented value={view} onChange={(v) => setView(v as 'card' | 'list')}
             options={[{ label: '卡片', value: 'card' }, { label: '列表', value: 'list' }]} />
         </div>
