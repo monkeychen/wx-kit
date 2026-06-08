@@ -21,7 +21,9 @@ const api: WxApi = {
   mpAuthStatus: () => ipcRenderer.invoke('mp:authStatus'),
   mpLogin: () => ipcRenderer.invoke('mp:login'),
   mpSearch: (name) => ipcRenderer.invoke('mp:search', name),
-  mpCrawl: (fakeid, range, formats) => ipcRenderer.invoke('mp:crawl', { fakeid, range, formats }),
+  mpCrawl: (fakeid, nickname, range, formats) => ipcRenderer.invoke('mp:crawl', { fakeid, nickname, range, formats }),
+  historyList: (offset, limit) => ipcRenderer.invoke('history:list', { offset, limit }),
+  historyClear: () => ipcRenderer.invoke('history:clear'),
   onCrawlProgress: (cb) => {
     const listener = (_e: unknown, ev: Parameters<typeof cb>[0]) => cb(ev)
     ipcRenderer.on('mp:crawl:progress', listener)

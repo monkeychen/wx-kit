@@ -72,7 +72,7 @@ export default function AccountMode() {
       : { from: dates![0].format('YYYY-MM-DD'), to: dates![1].format('YYYY-MM-DD') }
     setRunning(true); setRows([]); setEta('')
     try {
-      const summary = await api.mpCrawl(selected.fakeid, range, formats)
+      const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats)
       message.success(`完成 · 成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
     } catch (e) {
       const msg = (e as Error).message

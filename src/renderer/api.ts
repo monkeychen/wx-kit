@@ -3,6 +3,9 @@ import type { ArticleMeta, DownloadFormat, DownloadSummary, ProgressEvent } from
 import type { AppSettings } from '../../electron/services/settings'
 import type { ReadableKind } from '../core/read-article'
 import type { MpAccount, CrawlSummary, CrawlItemStatus } from '../core/mp-types'
+import type { HistoryEvent } from '../core/download-history'
+
+export type { HistoryEvent } from '../core/download-history'
 
 export interface CrawlRangeInput { count?: number; from?: string; to?: string }
 export type CrawlEvent =
@@ -27,9 +30,12 @@ export interface WxApi {
   mpAuthStatus(): Promise<{ valid: boolean }>
   mpLogin(): Promise<{ ok: boolean; error?: string }>
   mpSearch(name: string): Promise<{ ok: boolean; list?: MpAccount[]; error?: { code: string; message: string } }>
-  mpCrawl(fakeid: string, range: CrawlRangeInput, formats: DownloadFormat[]): Promise<CrawlSummary>
+  mpCrawl(fakeid: string, nickname: string, range: CrawlRangeInput, formats: DownloadFormat[]): Promise<CrawlSummary>
   onCrawlProgress(cb: (e: CrawlEvent) => void): () => void
   mpCancelCrawl(): void
+  // —— M6 下载历史 ——
+  historyList(offset: number, limit: number): Promise<{ events: HistoryEvent[]; total: number }>
+  historyClear(): Promise<void>
 }
 
 declare global {
