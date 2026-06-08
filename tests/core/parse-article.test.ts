@@ -23,3 +23,19 @@ describe('parseArticle', () => {
   })
   it('keeps content html non-empty', () => expect(a.contentHtml).toContain('第一段正文'))
 })
+
+describe('parseArticle publishTime fallback', () => {
+  // 真实微信页：#publish_time 元素为空（运行时 JS 填充），时间藏在脚本变量里
+  it('falls back to the human-readable createTime var when #publish_time is empty', () => {
+    const html =
+      '<h1 id="activity-name">x</h1><div id="js_content"><p>正文</p></div>' +
+      '<script>var oriCreateTime = \'1779415680\';createTime = \'2026-05-22 10:08\';var ct = "1779415680";</script>'
+    expect(parseArticle(html, 'x').publishTime).toBe('2026-05-22 10:08')
+  })
+  it('falls back to a unix timestamp var (Asia/Shanghai) when no readable createTime', () => {
+    const html =
+      '<h1 id="activity-name">x</h1><div id="js_content"><p>正文</p></div>' +
+      '<script>var ct = "1779415680";</script>'
+    expect(parseArticle(html, 'x').publishTime).toBe('2026-05-22 10:08')
+  })
+})

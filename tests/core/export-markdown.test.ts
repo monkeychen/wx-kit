@@ -24,6 +24,18 @@ describe('buildMarkdown', () => {
   it('keeps local image reference', () => {
     expect(md).toContain('![](images/img-1.jpg)')
   })
+  it('keeps every line of a WeChat multi-<code> code block (not just the first)', () => {
+    // 微信代码块把每行单独包成一个 <code>，turndown 默认只取第一行 → 静默丢正文
+    const html =
+      '<pre class="code-snippet__js" data-lang="markdown">' +
+      '<code><span leaf=""># 寓言写作 Prompt</span></code>' +
+      '<code><span leaf="">围绕 **{concept}** 写一个寓言故事</span></code>' +
+      '<code><span leaf="">不出现概念的名字</span></code>' +
+      '</pre>'
+    const out = buildMarkdown(meta, html)
+    expect(out).toContain('```markdown')
+    expect(out).toContain('# 寓言写作 Prompt\n围绕 **{concept}** 写一个寓言故事\n不出现概念的名字')
+  })
   it('escapes newlines and backslashes in frontmatter', () => {
     const md = buildMarkdown({ ...meta, title: 'Line1\nLine2', author: 'A\\B' }, '')
     expect(md).toContain('title: "Line1\\nLine2"')
