@@ -101,6 +101,13 @@ export class History {
     await this.write(data)
   }
 
+  /** 删除单条历史记录（只删记录，不碰文件）。 */
+  async removeEvent(id: string): Promise<void> {
+    const data = await this.read()
+    data.events = data.events.filter((e) => e.id !== id)
+    await this.write(data)
+  }
+
   /** 只清动作记录，绝不触碰已下文件与 library.json。 */
   async clear(): Promise<void> {
     await this.write({ version: 1, events: [] })

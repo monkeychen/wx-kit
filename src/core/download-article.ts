@@ -22,7 +22,7 @@ export async function downloadArticle(
   const id = articleId(url)
   if (await deps.library.has(id)) {
     const existing = await deps.library.get(id)
-    return { url, ok: true, id, skipped: true, title: existing?.title }
+    return { url, ok: true, id, skipped: true, title: existing?.title, dir: existing?.dir }
   }
 
   const html = await deps.fetchHtml(url)

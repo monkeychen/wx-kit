@@ -35,6 +35,7 @@ export interface WxApi {
   mpCancelCrawl(): void
   // —— M6 下载历史 ——
   historyList(offset: number, limit: number): Promise<{ events: HistoryEvent[]; total: number }>
+  historyRemove(id: string): Promise<void>
   historyClear(): Promise<void>
 }
 

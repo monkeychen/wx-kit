@@ -602,6 +602,13 @@ body {
   cursor: pointer; padding: 5px 12px; border-radius: 7px; transition: 0.16s ease;
 }
 .ev-again:hover { border-color: var(--cinnabar); color: var(--cinnabar); background: var(--cinnabar-wash); }
+.ev-del {
+  flex: 0 0 auto;
+  border: none; background: transparent;
+  color: var(--ink-faint); font-family: inherit; font-size: 12.5px;
+  cursor: pointer; padding: 5px 8px; border-radius: 7px; transition: 0.16s ease;
+}
+.ev-del:hover { color: var(--cinnabar); background: var(--cinnabar-wash); }
 .ev-body { border-top: 1px solid var(--line); padding: 2px 18px 4px; }
 .art { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
 .art:last-child { border-bottom: none; }

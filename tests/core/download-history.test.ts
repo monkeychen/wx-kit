@@ -71,6 +71,16 @@ describe('History (file)', () => {
     expect(r.events.map((e) => e.id)).toEqual(['new'])
   })
 
+  it('removeEvent drops one record by id, keeps the rest', async () => {
+    const h = new History(root)
+    await h.append(ev('a', 100), 1000)
+    await h.append(ev('b', 200), 1000)
+    await h.removeEvent('a')
+    const r = await h.list(0, 10, 1000)
+    expect(r.total).toBe(1)
+    expect(r.events.map((e) => e.id)).toEqual(['b'])
+  })
+
   it('clear empties records', async () => {
     const h = new History(root)
     await h.append(ev('a', 100), 1000)

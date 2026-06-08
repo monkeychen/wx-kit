@@ -97,6 +97,7 @@ describe('downloadArticle', () => {
     expect(second.ok).toBe(true)
     expect(second.skipped).toBe(true)
     expect(second.title).toBe('有效标题')
+    expect(second.dir).toBe(first.dir)   // 跳过项也带 dir，供「在文件夹显示」
     expect(fetchCalled).toBe(false)
   })
 })

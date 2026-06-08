@@ -41,6 +41,7 @@ export function registerIpc(settings: SettingsService): void {
 
   ipcMain.handle('history:list', async (_e, { offset, limit }: { offset: number; limit: number }) =>
     (await historyFor()).list(offset, limit))
+  ipcMain.handle('history:remove', async (_e, id: string) => { await (await historyFor()).removeEvent(id) })
   ipcMain.handle('history:clear', async () => { await (await historyFor()).clear() })
   ipcMain.handle('library:readContent', (_e, { dir, kind }: { dir: string; kind: ReadableKind }) =>
     readArticleContent(dir, kind))
