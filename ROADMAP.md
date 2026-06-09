@@ -27,6 +27,7 @@
 - **M9** — `docs/plans/2026-06-08-m9-library-organization.md`（文库组织 + 卡片/列表视图）
 
 ## 当前状态
+- **最新发布：v0.2.1（2026-06-09，安全补丁）** —— 功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，Dependabot 28 项全部 fixed 归零。tag + GitHub Release（mac dmg arm64/x64 + win nsis exe）已发。详见下方「v0.2.0 迭代」段。
 - M9 文库组织：文库从「只能搜+删」升级为可治理的藏馆——排序（下载/发布时间/标题，升降）、按公众号筛选+可折叠分组、批量选择+批量删除；并新增**卡片⇄列表**视图切换（列表为访达式紧凑行）。交互：默认分组+卡片；单击=选中、双击=阅读、行尾/卡片 hover 常驻「阅读/文件夹/删除」。排序/分组/筛选是纯逻辑（`src/renderer/library-view.ts`，TDD）；批量删除走 `library:removeMany`（联动历史标记已删除）。真实 session 截图（5 公众号 15 篇）验证三态。
 - M8 PDF 保真：导出 PDF 时图片/表格/代码块/引用不再被 A4 页边界拦腰切断——在 `buildHtml` 的内联样式注入 `@media print { break-inside: avoid }`，只作用于打印态、屏幕阅读器零影响。对照验证（同一会跨页的代码块，有/无规则出 PDF）：无规则版被切到第 17 行、有规则版整块下移到次页完整；真实图文长文 9 页 PDF 图片完整无切断。
 - M7 反馈引导：公众号列表阶段命中频控时，朱砂退避横幅可见（「约 N 秒后重试 · 第 k 次」客户端倒数），不再像卡死；所有下载失败经 `explainError` 归一为「人话标题 + 下一步建议」，原始报错折叠在 tooltip。R3「完成/取消回到配置」经端到端验证为既有流程已满足（`await mpCrawl` 完成即清空进度、配置卡自动重现、状态不丢），未加冗余按钮。
@@ -38,12 +39,12 @@
 - 测试规模不在此写死数字——跑 `npm test`（单测）与 `npm run test:e2e`（GUI 端到端）看当前真实结果。
 
 ## 下一步
-第一阶段功能（M1–M3.5）与分发（M4）已齐活，v0.1.0 可分发物：`release/wx-kit-0.1.0-arm64.dmg`、`release/wx-kit-0.1.0.dmg`、`release/wx-kit Setup 0.1.0.exe`。
+v0.1.0（M1–M4 第一阶段 + 分发）与 v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布；v0.2.1 安全补丁清掉全部 Dependabot。后续方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
 
 ## v0.2.0 迭代（已发布，2026-06-09）
 需求见 `docs/PRD-v0.2.0.md`。主题：把下载闭环做扎实、信息架构理顺——「下得放心、找得到、看得见」。
 > R1–R7 全部落地：信息架构重构（M5）、下载闭环+历史（M6）、频控可见+失败引导（M7）、PDF 防跨页（M8）、文库组织+卡片/列表视图（M9）。发布说明 `docs/releases/v0.2.0.md`。
-> **v0.2.1（2026-06-09，安全补丁）**：功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，清掉全部 Dependabot 告警。安装包 `wx-kit-0.2.1-arm64.dmg` / `wx-kit-0.2.1.dmg` / `wx-kit Setup 0.2.1.exe`；发布说明 `docs/releases/v0.2.1.md`。依赖审计 `docs/plans/2026-06-09-deps-audit.md`。
+> **v0.2.1（已发布，2026-06-09，安全补丁）**：功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，**Dependabot 28 项全部 fixed、归零**。tag `v0.2.1` + GitHub Release（含 `wx-kit-0.2.1-arm64.dmg` / `wx-kit-0.2.1.dmg` / `wx-kit Setup 0.2.1.exe`）已发布。发布说明 `docs/releases/v0.2.1.md`；依赖审计与网络坑（npmmirror 镜像 + no_proxy、gh 直连）`docs/plans/2026-06-09-deps-audit.md`。
 > v0.1.0 收尾期已随手修复：md 代码块丢失 / 发布时间解析 / fetch 硬超时（`4905bcf`）、格式选择器一行化 + 批量页一体卡（`0ae3870`）。
 
 | 里程碑 | 范围 | 状态 |
