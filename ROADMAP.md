@@ -42,7 +42,8 @@
 
 ## v0.2.0 迭代（已发布，2026-06-09）
 需求见 `docs/PRD-v0.2.0.md`。主题：把下载闭环做扎实、信息架构理顺——「下得放心、找得到、看得见」。
-> R1–R7 全部落地：信息架构重构（M5）、下载闭环+历史（M6）、频控可见+失败引导（M7）、PDF 防跨页（M8）、文库组织+卡片/列表视图（M9）。安装包已出：`wx-kit-0.2.0-arm64.dmg` / `wx-kit-0.2.0.dmg` / `wx-kit Setup 0.2.0.exe`；发布说明 `docs/releases/v0.2.0.md`。
+> R1–R7 全部落地：信息架构重构（M5）、下载闭环+历史（M6）、频控可见+失败引导（M7）、PDF 防跨页（M8）、文库组织+卡片/列表视图（M9）。发布说明 `docs/releases/v0.2.0.md`。
+> **v0.2.1（2026-06-09，安全补丁）**：功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，清掉全部 Dependabot 告警。安装包 `wx-kit-0.2.1-arm64.dmg` / `wx-kit-0.2.1.dmg` / `wx-kit Setup 0.2.1.exe`；发布说明 `docs/releases/v0.2.1.md`。依赖审计 `docs/plans/2026-06-09-deps-audit.md`。
 > v0.1.0 收尾期已随手修复：md 代码块丢失 / 发布时间解析 / fetch 硬超时（`4905bcf`）、格式选择器一行化 + 批量页一体卡（`0ae3870`）。
 
 | 里程碑 | 范围 | 状态 |

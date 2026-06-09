@@ -65,11 +65,12 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 ## 关键约束与已知陷阱（容易重踩，务必注意）
 - **微信频控**：批量抓取默认串行 + 随机延迟（PRD §9）。已删除文章会返回 HTTP 200 错误页 → 用"解析后标题为空即视为无效文章"判定失败（见 `src/core/download-article.ts`）。
 - **文章库**：默认在用户文档目录下（`~/Documents/wx-kit`），可在设置改。文件系统存储 + `library.json` 索引，不用数据库。
-- **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（v0.2.0 时为 Electron 38），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
+- **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（Electron 42 仍如此），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
 - **CLI 模式必须注册 no-op `window-all-closed`**（`electron/main.ts`）：否则 PDF 用的离屏 BrowserWindow 关闭会触发 Electron 默认自动退出，截断流程。
 - **`wxfile://` 协议**：阅读器读本地图片用，路径严格限制在库根内（`electron/protocol.ts` 的 `resolveWxfilePath`，含编码 `..` 穿越防护）。
 - **HTML 阅读器 iframe** 用 `sandbox`（无 `allow-scripts`）：安全，但意味着 Playwright 无法在其内部执行脚本——e2e 里 HTML 视图只断言 iframe src，图片渲染由 md 视图的 `naturalWidth>0` 等价证明。
 - **e2e 只能在主会话/本地跑**：子 agent 的沙箱解析不了 electron 二进制。Antd v6 会在两个汉字按钮文本间自动插空格（"阅 读"），写选择器时注意。
+- **npm/依赖下载优先国内镜像，代理是最后兜底**：所有 npm 相关操作**尽量不依赖系统环境变量里的 `http_proxy`/`https_proxy`**。包优先走 `.npmrc` 指定的国内镜像（registry=`registry.npmmirror.com`）；npm 包国内镜像找不到才退官方 registry。二进制（electron 等）走国内镜像并给镜像域名加 `no_proxy`（让其直连）：`ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/`、`ELECTRON_CUSTOM_DIR=v{{ version }}`、`ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/`、`no_proxy=npmmirror.com,.npmmirror.com,cdn.npmmirror.com,registry.npmmirror.com`。**只有访问 github.com 等国外站出现网络不可达时，才用 `http_proxy`/`https_proxy` 代理兜底**——而且本机 8118 代理拉 100MB+ 大文件会截断，能用国内镜像就别走它。（坑：本机无 `timeout` 命令，用 `curl --max-time`。详见 `docs/plans/2026-06-09-deps-audit.md` Round 2。）
 
 ---
 
