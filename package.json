@@ -40,8 +40,8 @@
     "@types/turndown": "^5.0.5",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.5.0",
-    "electron": "^38.8.6",
-    "electron-builder": "^24.13.3",
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.2",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^17.6.0",
@@ -96,5 +96,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
+  },
+  "allowScripts": {
+    "electron@42.3.3": true
   }
 }

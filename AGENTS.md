@@ -65,7 +65,7 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 ## 关键约束与已知陷阱（容易重踩，务必注意）
 - **微信频控**：批量抓取默认串行 + 随机延迟（PRD §9）。已删除文章会返回 HTTP 200 错误页 → 用"解析后标题为空即视为无效文章"判定失败（见 `src/core/download-article.ts`）。
 - **文章库**：默认在用户文档目录下（`~/Documents/wx-kit`），可在设置改。文件系统存储 + `library.json` 索引，不用数据库。
-- **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（v0.2.0 时为 Electron 38），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
+- **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（Electron 42 仍如此），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
 - **CLI 模式必须注册 no-op `window-all-closed`**（`electron/main.ts`）：否则 PDF 用的离屏 BrowserWindow 关闭会触发 Electron 默认自动退出，截断流程。
 - **`wxfile://` 协议**：阅读器读本地图片用，路径严格限制在库根内（`electron/protocol.ts` 的 `resolveWxfilePath`，含编码 `..` 穿越防护）。
 - **HTML 阅读器 iframe** 用 `sandbox`（无 `allow-scripts`）：安全，但意味着 Playwright 无法在其内部执行脚本——e2e 里 HTML 视图只断言 iframe src，图片渲染由 md 视图的 `naturalWidth>0` 等价证明。
