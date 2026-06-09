@@ -276,6 +276,21 @@ R5 的本质不是加功能，是把系统已有但藏起来的状态**翻译给
 
 ---
 
+## 15. v0.2.1 增补：依赖安全审计——把 26 个 Dependabot 清零（2026-06-09）
+
+v0.2.0 发布后 GitHub 报 26 个 Dependabot 漏洞。一个看似「升级版本号」的小活，真正难点全在**国内网络环境**，逼出几条可复用的工程教训。
+
+- **先看清「真漏洞」再动手**：26 个全是 `package-lock.json` 的**间接依赖**。真能动手的只有直接依赖：electron / vite / vitest / electron-builder。Round 1 先升 vite v6 + vitest v3 + electron 38（每个 bump 后跑 119 单测 + tsc + lint + e2e），收掉 16 个。剩 10 个（electron 3 + tar 6 + glob 1）要跨大版本。
+- **「单测全绿 ≠ 升级安全」，打包正确性靠真实启动**：electron 跨大版本（31→38→42）最怕 `undici external` 失效（cheerio 间接依赖 sqlite-cache-store 静态 `require('node:sqlite')`，打进 bundle 会让主进程加载即崩）。e2e 走的是 `vite dev`、不覆盖打包后的 .app。所以每次大版本跳，都**真实启动打包后的 `wx-kit.app` + 触发 cheerio 解析路径 + 断言零 console/page 错误**——这是 M4 立的规矩，在 electron 42 上再次兑现。
+- **最大的坑是网络，不是代码**：本机常驻死代理 `http_proxy=8118`。`@electron/get` 用 Node 24 内置 `fetch`(undici)，它**默认不读 `http_proxy`**、直连 github 在国内不可达 → `UND_ERR_CONNECT_TIMEOUT`；走 8118 拉 130MB 又**中途截断**。**正解：electron 二进制走 npmmirror 国内镜像 + 给镜像域名加 `no_proxy` 直连**（cdn.npmmirror.com ~1.5MB/s 稳），代理保留 set。安哥据此立了项目规则：npm/二进制走国内镜像优先、代理只兜底。
+- **坑中坑**：本机**没有 `timeout` 命令**——`timeout 12 curl …` 静默报 command-not-found 让 curl 根本没跑，误判「镜像 0 字节不通」，差点把唯一正解否掉。验证下载只能用 `curl --max-time`。
+- **方向反转的第二条规则**：二进制下载要镜像+保留代理，但 **`gh`/`git push` 到 github 反而要 unset 代理**——8118 代理传 github 大文件同样卡死（单个 140MB release 资产传 10+ 分钟零字节），直连才稳。安哥实测后补进规则。
+- **证伪一次冒进**：升级中途一度想「electron 42 + builder 26 全跟 latest」，但在「代理拉不全二进制」时我误判为「本机环境物理不可解、回滚」。其实是镜像方案没用对（`timeout` 坑 + 没配 `ELECTRON_MIRROR`）。**环境问题也要找根因，别急着判死刑**——换镜像后一次过。
+
+> 一句话：**这次没写几行代码，难的全是「让正确的包从正确的源、用正确的代理策略、完整地下到本地」**。最后 28 个 Dependabot 全部 `fixed`、0 残留 0 忽略（升级中 GitHub 又新录 2 条 electron advisory 一并被 42 覆盖）。教训沉淀成项目规则（AGENTS.md）+ 记忆，比清零本身更值钱。
+
+---
+
 ## 附：提交结构速览
 
 - 文档类：PRD（初稿 + 2 次迭代）、M1 计划、M2 计划、AGENTS.md（×2）、本复盘。
