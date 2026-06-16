@@ -32,7 +32,7 @@
 ### 发版规约（统一，勿再不一致）
 发版只走一条路：**feat 分支 → 合 main → 在 main 打 annotated tag `vX.Y.Z` → 建 GitHub Release**。
 - **不单开 `release/*` 分支**——版本的不可变快照由 **tag** 锁定（分支会漂移、tag 不会）。历史上的 `release/v0.2.0` 是早期不一致的遗留，已删。
-- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ commit、合 main、打 tag。
+- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）；⑥ commit、合 main、打 tag。
 - **`gh release create` 中途别被中断**——它是「先建草稿 → 传附件 → 最后才 publish」，杀在中途会留下未发布的 Draft（外部不可见）。若已成 Draft，用 `gh release edit vX.Y.Z --draft=false --latest` 补发布。
 - **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
 
@@ -86,7 +86,7 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - `ROADMAP.md` — **里程碑状态与路线图（续接看这里）**。状态/进度只在这里维护；各里程碑的详细实现计划放在 `docs/plans/`，其逐里程碑索引也在 ROADMAP 维护。
 - `docs/PRD.md` — 第一阶段（v0.1.0）产品需求（全貌、F1–F5、架构、风控、验收）。
 - `docs/PRD-v0.2.0.md` — **v0.2.0 迭代需求**（信息架构重构、下载闭环/历史、流程可回退、保真与反馈、文库组织；里程碑 M5–M9）。
-- `docs/PRD-v0.3.0.md` — **v0.3.0 迭代需求**（列表视图优化 + 公众号订阅；里程碑 M10–M11；含逐条可勾的验收标准）。
+- `docs/PRD-v0.3.0.md` — **v0.3.0 迭代需求**（列表视图优化 + 公众号订阅 + 订阅触发/可观测性；里程碑 M10–M12；含逐条可勾的验收标准）。
 - `docs/devlog/wx-kit-vibe-coding.md` — vibe-coding 全程复盘（活文档，每完成一个里程碑增补；流程/决策/踩坑/方法论）。
 
 > 进度的唯一真相是 `git log` + `ROADMAP.md` + `docs/plans/`，不是散落在指南里的散文。

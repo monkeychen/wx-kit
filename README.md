@@ -6,9 +6,9 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.2.1-released-success.svg)
+![Status](https://img.shields.io/badge/v0.3.0-released-success.svg)
 
-<!-- 截图：v0.2.0（真实数据态，v0.2.1 功能一致） -->
+<!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
 | :---: | :---: | :---: | :---: | :---: |
 | ![按链接下载](docs/screenshots/download-url.png) | ![按公众号下载](docs/screenshots/download-account.png) | ![文库·分组卡片](docs/screenshots/library-cards.png) | ![文库·列表](docs/screenshots/library-list.png) | ![设置](docs/screenshots/settings.png) |
@@ -22,11 +22,10 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**v0.2.0 已落地**(主题「下得放心、找得到、看得见」,v0.2.1 为同功能安全补丁):
+**v0.3.0 已落地**(列表顺手 + 公众号订阅):
 
-- **下得放心** —— 下载结果就地确认/阅读/复制下载项;失败归一为人话话术+下一步,频控退避有朱砂横幅+倒数;**取消要二次确认**,未下载的文章进历史可单篇补下。
-- **找得到** —— 文库可按下载/发布时间排序、按公众号筛选与分组折叠,批量选择+批量删除(只删记录不删文件)。
-- **看得见** —— 卡片⇄列表(访达式)两视图随切,分组时列头只一次;PDF 导出不跨页切图。
+- **列表顺手** —— 文库「列表」视图列宽可拖拽调整（持久化）、排序移到表头点击（↑↓ 指示，同列再点翻向）。
+- **公众号订阅** —— 新增「订阅」页，类 RSS：订阅公众号后定时检查（每天某时刻或每隔 N 小时）有没有新文章，按设置仅提示或自动下载；订阅页有检查记录、落盘日志、下次预计检查时间，**定时跑没跑看得见**。
 
 ## 特性
 
@@ -54,8 +53,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.2.1:`wx-kit-0.2.1-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.2.1.dmg`(Intel) / `wx-kit Setup 0.2.1.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.3.0:`wx-kit-0.3.0-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.3.0.dmg`(Intel) / `wx-kit Setup 0.3.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -144,7 +143,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 / v0.2.0 / v0.2.1 均已发布**(最新 v0.2.1 为安全补丁:electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3,Dependabot 28 项归零,功能同 v0.2.0)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 均已发布**(最新 **v0.3.0**:列表视图优化 + 公众号订阅)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -162,6 +161,12 @@ wx-kit auth-status
 
 **v0.2.1 · 安全补丁(2026-06-09)**
 - ✅ 依赖审计:electron 31→42、electron-builder 24→26、vite 6、vitest 3,Dependabot 28 项全部 fixed 归零;功能与 v0.2.0 一致,已出三平台安装包。
+
+**v0.3.0 · 列表顺手 + 公众号订阅(2026-06-16)**
+- ✅ M10 — 文库列表视图优化:列宽可拖拽调整(持久化)+ 排序移到表头点击
+- ✅ M11 — 公众号订阅:订阅页 + 定时检查(每天某时刻)+ 新文章提示/自动下载 + session 过期登录引导
+- ✅ M12 — 订阅触发升级(daily/interval)+ 检查可观测性(检查记录 + 落盘日志 + 下次预计)
+- ✅ UI 打磨:四个导航页栏宽统一(满宽)
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 
