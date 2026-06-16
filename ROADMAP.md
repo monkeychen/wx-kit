@@ -25,6 +25,8 @@
 - **M7** — `docs/plans/2026-06-08-m7-feedback-guidance.md`（频控可见 + 失败引导）
 - **M8** — `docs/plans/2026-06-08-m8-pdf-page-break.md`（PDF 防跨页切断）
 - **M9** — `docs/plans/2026-06-08-m9-library-organization.md`（文库组织 + 卡片/列表视图）
+- **M10** — `docs/plans/2026-06-16-m10-list-view-polish.md`（列表视图列宽可调 + 表头排序；v0.3.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-16-v0.3.0-list-polish-and-subscriptions-design.md`）
+- **M11** — 公众号订阅（设计依据同上 spec；实现计划待写）
 
 ## 当前状态
 - **最新发布：v0.2.1（2026-06-09，安全补丁）** —— 功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，Dependabot 28 项全部 fixed 归零。tag + GitHub Release（mac dmg arm64/x64 + win nsis exe）已发。详见下方「v0.2.0 迭代」段。
