@@ -32,6 +32,17 @@ const api: WxApi = {
     return () => { ipcRenderer.removeListener('mp:crawl:progress', listener) }
   },
   mpCancelCrawl: () => ipcRenderer.send('mp:crawl:cancel'),
+  subscriptionsList: () => ipcRenderer.invoke('subscriptions:list'),
+  subscriptionsAddAccount: (fakeid, nickname) => ipcRenderer.invoke('subscriptions:addAccount', { fakeid, nickname }),
+  subscriptionsSetSubscribed: (fakeid, nickname, subscribed) => ipcRenderer.invoke('subscriptions:setSubscribed', { fakeid, nickname, subscribed }),
+  subscriptionsCheckNow: () => ipcRenderer.invoke('subscriptions:checkNow'),
+  subscriptionsDownloadNew: (fakeid) => ipcRenderer.invoke('subscriptions:downloadNew', fakeid),
+  subscriptionsDismissNew: (fakeid) => ipcRenderer.invoke('subscriptions:dismissNew', fakeid),
+  onSubscriptionsUpdated: (cb) => {
+    const listener = () => cb()
+    ipcRenderer.on('subscriptions:updated', listener)
+    return () => { ipcRenderer.removeListener('subscriptions:updated', listener) }
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)

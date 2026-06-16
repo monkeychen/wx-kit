@@ -4,8 +4,12 @@ import type { AppSettings } from '../../electron/services/settings'
 import type { ReadableKind } from '../core/read-article'
 import type { MpAccount, CrawlSummary, CrawlItemStatus } from '../core/mp-types'
 import type { HistoryEvent } from '../core/download-history'
+import type { SubscribedAccount } from '../core/subscriptions'
 
 export type { HistoryEvent } from '../core/download-history'
+export type { SubscribedAccount } from '../core/subscriptions'
+
+export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null }
 
 export interface CrawlRangeInput { count?: number; from?: string; to?: string }
 export type CrawlEvent =
@@ -39,6 +43,14 @@ export interface WxApi {
   historyList(offset: number, limit: number): Promise<{ events: HistoryEvent[]; total: number }>
   historyRemove(id: string): Promise<void>
   historyClear(): Promise<void>
+  // —— M11 公众号订阅 ——
+  subscriptionsList(): Promise<SubscriptionsState>
+  subscriptionsAddAccount(fakeid: string, nickname: string): Promise<void>
+  subscriptionsSetSubscribed(fakeid: string, nickname: string, subscribed: boolean): Promise<void>
+  subscriptionsCheckNow(): Promise<void>
+  subscriptionsDownloadNew(fakeid: string): Promise<void>
+  subscriptionsDismissNew(fakeid: string): Promise<void>
+  onSubscriptionsUpdated(cb: () => void): () => void
 }
 
 declare global {

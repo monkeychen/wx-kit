@@ -10,10 +10,13 @@ import { downloadArticle } from '../src/core/download-article'
 import { readArticleContent, type ReadableKind } from '../src/core/read-article'
 import { login, getSession } from './services/mp-auth'
 import { makeMpFetch } from './services/mp-fetch'
-import { searchAccount } from '../src/core/mp-client'
+import { searchAccount, listArticles } from '../src/core/mp-client'
 import { crawlAccount } from '../src/core/mp-crawl'
 import { MpAuthExpired } from '../src/core/mp-errors'
-import type { CrawlRange } from '../src/core/mp-types'
+import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
+import { Subscriptions, accountsFromHistory, mergeAccounts } from '../src/core/subscriptions'
+import { checkSubscriptions } from '../src/core/check-subscriptions'
+import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { SettingsService } from './services/settings'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -128,4 +131,101 @@ export function registerIpc(settings: SettingsService): void {
     await recordHistory({ kind: 'account', nickname, fakeid, range }, formats, summary)
     return summary
   })
+
+  // —— M11 公众号订阅 ——
+  const subsFor = async () => new Subscriptions((await settings.get()).libraryRoot)
+  const emitSubsUpdated = () => {
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('subscriptions:updated')
+  }
+  let subsAuthExpired = false
+
+  // 订阅/新订阅一刻确定水位：能取到最新一篇就用其 createTime，否则用「现在」（秒），避免存量被当新文章
+  const establishWatermark = async (fakeid: string): Promise<number> => {
+    const session = getSession()
+    if (!session) return Math.floor(Date.now() / 1000)
+    try {
+      const refs = await listArticles(makeMpFetch(session), session.token, fakeid, { count: 1 })
+      return refs[0]?.createTime ?? Math.floor(Date.now() / 1000)
+    } catch { return Math.floor(Date.now() / 1000) }
+  }
+
+  const downloadRefs = async (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
+    const { libraryRoot } = await settings.get()
+    const library = new Library(libraryRoot)
+    const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot }
+    const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps))
+    const summary = await queue.run(refs.map((r) => r.url))
+    await recordHistory(source, formats, summary)
+  }
+
+  const runSubscriptionCheck = async () => {
+    const session = getSession()
+    if (!session) { subsAuthExpired = true; emitSubsUpdated(); return }
+    const subs = await subsFor()
+    const accounts = (await subs.list()).filter((a) => a.subscribed)
+    if (!accounts.length) { await subs.setLastRunAt(Date.now()); return }
+    const s = await settings.get()
+    let results
+    try {
+      results = await checkSubscriptions(accounts, { mpFetch: makeMpFetch(session), token: session.token })
+    } catch (e) {
+      if (e instanceof MpAuthExpired) { subsAuthExpired = true; emitSubsUpdated(); return }
+      throw e
+    }
+    subsAuthExpired = false
+    for (const r of results) {
+      if (!r.ok) continue
+      await subs.updateWatermark(r.fakeid, r.latest)
+      if (r.newRefs.length === 0) continue
+      if (s.subscriptionNewArticleAction === 'download') {
+        const acc = accounts.find((a) => a.fakeid === r.fakeid)!
+        await downloadRefs(r.newRefs, s.defaultFormats, { kind: 'account', nickname: acc.nickname, fakeid: r.fakeid, range: { count: r.newRefs.length } })
+        await subs.clearNewRefs(r.fakeid)
+      } else {
+        await subs.setNewRefs(r.fakeid, r.newRefs)
+      }
+    }
+    await subs.setLastRunAt(Date.now())
+    emitSubsUpdated()
+  }
+
+  ipcMain.handle('subscriptions:list', async () => {
+    const { events } = await (await historyFor()).list(0, 1_000_000)
+    const subs = await subsFor()
+    const merged = mergeAccounts(accountsFromHistory(events), await subs.list())
+    return { accounts: merged, authExpired: subsAuthExpired, lastRunAt: await subs.getLastRunAt() }
+  })
+  ipcMain.handle('subscriptions:addAccount', async (_e, { fakeid, nickname }: { fakeid: string; nickname: string }) => {
+    await (await subsFor()).addAccount({ fakeid, nickname, subscribed: true, watermark: await establishWatermark(fakeid) })
+    emitSubsUpdated()
+  })
+  ipcMain.handle('subscriptions:setSubscribed', async (_e, { fakeid, nickname, subscribed }: { fakeid: string; nickname: string; subscribed: boolean }) => {
+    const subs = await subsFor()
+    const ex = (await subs.list()).find((a) => a.fakeid === fakeid)
+    if (!ex) {
+      await subs.addAccount({ fakeid, nickname, subscribed, watermark: subscribed ? await establishWatermark(fakeid) : 0 })
+    } else {
+      if (subscribed && ex.watermark === 0) await subs.updateWatermark(fakeid, await establishWatermark(fakeid))
+      await subs.setSubscribed(fakeid, subscribed)
+    }
+    emitSubsUpdated()
+  })
+  ipcMain.handle('subscriptions:checkNow', async () => { await runSubscriptionCheck() })
+  ipcMain.handle('subscriptions:downloadNew', async (_e, fakeid: string) => {
+    const subs = await subsFor()
+    const acc = (await subs.list()).find((a) => a.fakeid === fakeid)
+    if (!acc || !acc.newRefs.length) return
+    await downloadRefs(acc.newRefs, (await settings.get()).defaultFormats, { kind: 'account', nickname: acc.nickname, fakeid, range: { count: acc.newRefs.length } })
+    await subs.clearNewRefs(fakeid)
+    emitSubsUpdated()
+  })
+  ipcMain.handle('subscriptions:dismissNew', async (_e, fakeid: string) => {
+    const subs = await subsFor()
+    const acc = (await subs.list()).find((a) => a.fakeid === fakeid)
+    if (acc) await subs.updateWatermark(fakeid, acc.newRefs.reduce((mx, r) => Math.max(mx, r.createTime), acc.watermark))
+    await subs.clearNewRefs(fakeid)
+    emitSubsUpdated()
+  })
+
+  new SubscriptionScheduler({ settings, subsFor, runCheck: runSubscriptionCheck }).start()
 }
