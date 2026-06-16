@@ -105,6 +105,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 ### CLI 子命令
 
+开发期(源码内)用 `npx electron .`:
+
 ```bash
 npx electron . download --url <u> [--formats md,html,pdf,meta] [--out <dir>]
 npx electron . login                                   # 扫码登录公众号后台
@@ -115,6 +117,30 @@ npx electron . library list                            # 列已下文章
 ```
 
 退出码:`0` 成功、`1` 业务失败、`2` 用法或鉴权错误。详见 [`docs/PRD.md` §F4](docs/PRD.md)。
+
+### 安装包后的 CLI 用法
+
+GUI 与 CLI 是**同一个二进制**:不带子命令开窗口,带子命令(`download`/`login`/`auth-status`/`search`/`crawl`/`library`)即进 CLI。装完后直接调安装目录里的可执行文件(**不是** `npx electron .`):
+
+**macOS** —— 可执行文件在 .app 包内层:
+
+```bash
+/Applications/wx-kit.app/Contents/MacOS/wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,meta --out ~/Documents/wx-kit
+
+# 嫌路径长,建个软链一劳永逸:
+ln -sf /Applications/wx-kit.app/Contents/MacOS/wx-kit /usr/local/bin/wx-kit
+wx-kit auth-status
+```
+
+> 用内层 `Contents/MacOS/wx-kit`,**别用 `open -a wx-kit`**——`open` 不透传 stdout / 退出码,拿不到 JSON 结果。
+
+**Windows** —— 默认装在 `%LOCALAPPDATA%\Programs\wx-kit\wx-kit.exe`(安装时可改目录):
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\wx-kit\wx-kit.exe" download --url "..." --formats md,meta --out . > result.json 2>progress.log
+```
+
+> ⚠️ Electron 在 Windows 是 GUI 子系统程序,**stdout 不会回贴到调用它的控制台**——直接在 cmd/PowerShell 里跑看不到那串 JSON。请**重定向到文件**(`> result.json`,GUI 子系统下仍生效);管道 `|` 取 stdout 不可靠。需要稳定 stdout 的 agent 集成优先在 macOS/Linux 上跑。
 
 ## 项目状态
 

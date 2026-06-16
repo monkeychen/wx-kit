@@ -74,6 +74,7 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - **文章库**：默认在用户文档目录下（`~/Documents/wx-kit`），可在设置改。文件系统存储 + `library.json` 索引，不用数据库。
 - **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（Electron 42 仍如此），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
 - **CLI 模式必须注册 no-op `window-all-closed`**（`electron/main.ts`）：否则 PDF 用的离屏 BrowserWindow 关闭会触发 Electron 默认自动退出，截断流程。
+- **打包后 CLI 走内层二进制，不是 `npx electron .`**（模式分流见 `electron/main.ts` 的 `app.isPackaged` 分支）：mac 是 `/Applications/wx-kit.app/Contents/MacOS/wx-kit <子命令>`（别用 `open -a`，拿不到 stdout/退出码），win 是 `%LOCALAPPDATA%\Programs\wx-kit\wx-kit.exe`。**Windows 坑：Electron 是 GUI 子系统程序，stdout 不回贴调用控制台**——直接在 cmd/PowerShell 跑看不到 JSON，必须重定向到文件（`> out.json`，GUI 子系统下仍生效），管道 `|` 取 stdout 不可靠。agent 集成优先 mac/Linux。
 - **`wxfile://` 协议**：阅读器读本地图片用，路径严格限制在库根内（`electron/protocol.ts` 的 `resolveWxfilePath`，含编码 `..` 穿越防护）。
 - **HTML 阅读器 iframe** 用 `sandbox`（无 `allow-scripts`）：安全，但意味着 Playwright 无法在其内部执行脚本——e2e 里 HTML 视图只断言 iframe src，图片渲染由 md 视图的 `naturalWidth>0` 等价证明。
 - **e2e 只能在主会话/本地跑**：子 agent 的沙箱解析不了 electron 二进制。Antd v6 会在两个汉字按钮文本间自动插空格（"阅 读"），写选择器时注意。
