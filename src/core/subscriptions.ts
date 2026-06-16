@@ -14,7 +14,22 @@ export interface SubscribedAccount {
   newRefs: ArticleRef[]        // 已发现、待下载/忽略的新文章
 }
 
-interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: SubscribedAccount[] }
+export interface CheckLogEntry {
+  time: number                       // unix ms
+  trigger: 'auto' | 'manual'
+  accounts: number                   // 本次检查的订阅号数
+  newFound: number                   // 发现的新文章总数
+  failed: number                     // 失败的号数
+  note?: string                      // 特殊情形：'no-session' | 'auth-expired' | 'no-accounts'
+}
+
+/** 落盘日志的一行（人类可读）。纯函数。 */
+export function formatCheckLogLine(e: CheckLogEntry): string {
+  const base = `[${new Date(e.time).toISOString()}] ${e.trigger === 'auto' ? 'AUTO' : 'MANUAL'} accounts=${e.accounts} new=${e.newFound} failed=${e.failed}`
+  return e.note ? `${base} note=${e.note}` : base
+}
+
+interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: SubscribedAccount[]; checkLog: CheckLogEntry[] }
 
 /** 从下载历史抽出去重的「按公众号抓取」账号（fakeid → nickname，后出现的昵称覆盖）。纯函数。 */
 export function accountsFromHistory(events: HistoryEvent[]): { fakeid: string; nickname: string }[] {
@@ -47,7 +62,7 @@ export class Subscriptions {
     try {
       return JSON.parse(await readFile(this.path, 'utf-8')) as SubscriptionsFile
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { version: 1, lastRunAt: null, accounts: [] }
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { version: 1, lastRunAt: null, accounts: [], checkLog: [] }
       throw new Error(`subscriptions file is corrupt at ${this.path} — delete it to reset`)
     }
   }
@@ -85,5 +100,9 @@ export class Subscriptions {
   }
   async clearNewRefs(fakeid: string): Promise<void> {
     await this.mutate((d) => { const a = this.find(d, fakeid); if (a) a.newRefs = [] })
+  }
+  async getCheckLog(): Promise<CheckLogEntry[]> { return (await this.read()).checkLog ?? [] }
+  async appendCheckLog(entry: CheckLogEntry, keep = 50): Promise<void> {
+    await this.mutate((d) => { d.checkLog = [entry, ...(d.checkLog ?? [])].slice(0, keep) })
   }
 }
