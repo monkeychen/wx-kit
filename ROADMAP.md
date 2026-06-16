@@ -30,10 +30,11 @@
 - **M12** — `docs/plans/2026-06-16-m12-subscription-schedule-and-observability.md`（订阅触发机制 daily/interval + 检查可观测性：页内记录 + 落盘日志 + 下次预计；设计依据同上 spec，验收 `docs/PRD-v0.3.0.md` §4 R3）✅ 已合入 main
 
 ## 当前状态
-- **v0.3.0 迭代（M10+M11 已合入 main）**：
+- **v0.3.0 迭代（M10+M11+M12 已合入 main，功能完成待发版）**：
   - **M10 列表视图优化**——文库「列表」视图列宽可拖拽调整（持久化进 `settings.json` 的 `listColumnWidths`）、排序移到表头点击（标题/发布/下载，↑↓ 指示，同列再点翻向），卡片视图保留工具栏排序入口。纯逻辑抽 `src/renderer/list-columns.ts` TDD；拖拽/点表头本地 e2e 验证。
-  - **M11 公众号订阅**——新增「订阅」页（导航在下载与文库之间），列出有 fakeid 的公众号（按公众号抓取历史 ∪ 搜号添加，URL-only 不入列），可订阅/取消订阅 + 搜号添加；运行期定时检查（opt-in，`subscriptionAutoCheck` + 每日 `subscriptionCheckTime`，启动补检），发现新文章按 `subscriptionNewArticleAction` 仅提示（角标 + 逐号下载/忽略）或自动下载。core 三件套 `subscriptions` / `subscription-schedule` / `check-subscriptions` 全 TDD（17 条新单测）；主进程 scheduler + IPC 编排，session 过期不静默（页面登录引导）。验收 `docs/PRD-v0.3.0.md` §4 R2 逐条已勾。单测 143 全绿、e2e 全绿（含订阅页可达/渲染、设置三控件、零 console 错误）。
+  - **M11 公众号订阅**——新增「订阅」页（导航在下载与文库之间），列出有 fakeid 的公众号（按公众号抓取历史 ∪ 搜号添加，URL-only 不入列），可订阅/取消订阅 + 搜号添加；运行期定时检查（opt-in，`subscriptionAutoCheck` + 每日 `subscriptionCheckTime`，启动补检），发现新文章按 `subscriptionNewArticleAction` 仅提示（角标 + 逐号下载/忽略）或自动下载。core 三件套 `subscriptions` / `subscription-schedule` / `check-subscriptions` 全 TDD（17 条新单测）；主进程 scheduler + IPC 编排，session 过期不静默（页面登录引导）。验收 `docs/PRD-v0.3.0.md` §4 R2 逐条已勾。
   - **M12 触发机制升级 + 检查可观测性**——定时检查支持两种模式：每天某时刻 / 每隔 N 小时（interval 网格锚定每天 0 点，两模式均启动补检），`subscription-schedule` 抽象出 `lastScheduledInstant`/`nextScheduledInstant`/`shouldCheckNow`（纯函数，13 条单测覆盖 daily×interval 各分支）。检查可观测性三处呈现：订阅页「检查记录」（倒序最近 10，由 `subscriptions.json` 的 `checkLog` 留 50 驱动）、落盘日志 `userData/subscriptions-check.log`（全量追加 + 「打开日志文件」）、「下次预计检查」时间。每次检查（auto/manual）留痕，写盘失败不阻断主流程。core 12 条新单测、e2e 全绿（含 daily⇄interval 切换、可观测性元素）。
+  - **UI 一致性打磨（M12 后）**——四个导航页统一成满宽内容栏（去掉仅下载/设置套的 `.page-narrow` 居中窄栏），切页面不再跳宽窄。真实 session 测量四个页面 `.fade-in` 宽度一致验证。
 - **最新发布：v0.2.1（2026-06-09，安全补丁）** —— 功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，Dependabot 28 项全部 fixed 归零。tag + GitHub Release（mac dmg arm64/x64 + win nsis exe）已发。详见下方「v0.2.0 迭代」段。
 - M9 文库组织：文库从「只能搜+删」升级为可治理的藏馆——排序（下载/发布时间/标题，升降）、按公众号筛选+可折叠分组、批量选择+批量删除；并新增**卡片⇄列表**视图切换（列表为访达式紧凑行）。交互：默认分组+卡片；单击=选中、双击=阅读、行尾/卡片 hover 常驻「阅读/文件夹/删除」。排序/分组/筛选是纯逻辑（`src/renderer/library-view.ts`，TDD）；批量删除走 `library:removeMany`（联动历史标记已删除）。真实 session 截图（5 公众号 15 篇）验证三态。
 - M8 PDF 保真：导出 PDF 时图片/表格/代码块/引用不再被 A4 页边界拦腰切断——在 `buildHtml` 的内联样式注入 `@media print { break-inside: avoid }`，只作用于打印态、屏幕阅读器零影响。对照验证（同一会跨页的代码块，有/无规则出 PDF）：无规则版被切到第 17 行、有规则版整块下移到次页完整；真实图文长文 9 页 PDF 图片完整无切断。
@@ -46,7 +47,7 @@
 - 测试规模不在此写死数字——跑 `npm test`（单测）与 `npm run test:e2e`（GUI 端到端）看当前真实结果。
 
 ## 下一步
-v0.1.0（M1–M4 第一阶段 + 分发）与 v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布；v0.2.1 安全补丁清掉全部 Dependabot。后续方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
+v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布，v0.2.1 安全补丁清掉全部 Dependabot。**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性）已全部合入 main、功能完成待发版**（验收 `docs/PRD-v0.3.0.md` §4 全勾）。下一步可议 v0.3.0 出包发版（bump 0.3.0 + tag + Release，走 `docs/AGENTS.md` 发版规约）。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
 
 候选待议（未排期，需要时单议）：
 - **Windows CLI stdout 正解** —— 当前打包后 win 是 GUI 子系统程序，CLI 模式 stdout 不回贴调用控制台，文档里只给了「重定向到文件」的绕法（见 README「安装包后的 CLI 用法」、AGENTS.md 陷阱清单）。真要让 Windows agent 集成丝滑，正解是打包时给 win 出一个 console 子系统入口（或 `wx-kit-cli.exe` wrapper 转发到主程序）。要动打包配置，等真要铺 Windows agent 场景再做。
