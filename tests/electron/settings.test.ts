@@ -12,21 +12,21 @@ describe('SettingsService', () => {
   it('returns defaults when no file exists', async () => {
     const s = new SettingsService(dir, '/default/lib')
     const v = await s.get()
-    expect(v).toEqual({ libraryRoot: '/default/lib', defaultFormats: ['md', 'html', 'meta'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify' })
+    expect(v).toEqual({ libraryRoot: '/default/lib', defaultFormats: ['md', 'html', 'meta'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6 })
   })
 
   it('persists and reloads saved settings', async () => {
     const s = new SettingsService(dir, '/default/lib')
     await s.save({ libraryRoot: '/custom', defaultFormats: ['md', 'pdf'] })
     const s2 = new SettingsService(dir, '/default/lib')
-    expect(await s2.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['md', 'pdf'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify' })
+    expect(await s2.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['md', 'pdf'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6 })
   })
 
   it('merges partial save over existing', async () => {
     const s = new SettingsService(dir, '/default/lib')
     await s.save({ libraryRoot: '/custom', defaultFormats: ['md'] })
     await s.save({ defaultFormats: ['html'] })
-    expect(await s.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['html'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify' })
+    expect(await s.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['html'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6 })
   })
 
   it('persists subscription settings', async () => {
@@ -37,6 +37,14 @@ describe('SettingsService', () => {
     expect(v.subscriptionAutoCheck).toBe(true)
     expect(v.subscriptionCheckTime).toBe('07:30')
     expect(v.subscriptionNewArticleAction).toBe('download')
+  })
+
+  it('persists schedule mode and interval', async () => {
+    const s = new SettingsService(dir, '/default/lib')
+    await s.save({ subscriptionScheduleMode: 'interval', subscriptionIntervalHours: 4 })
+    const v = await new SettingsService(dir, '/default/lib').get()
+    expect(v.subscriptionScheduleMode).toBe('interval')
+    expect(v.subscriptionIntervalHours).toBe(4)
   })
 
   it('persists custom list column widths', async () => {

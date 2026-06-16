@@ -14,6 +14,8 @@ export interface AppSettings {
   subscriptionAutoCheck: boolean
   subscriptionCheckTime: string          // "HH:MM"
   subscriptionNewArticleAction: NewArticleAction
+  subscriptionScheduleMode: 'daily' | 'interval'
+  subscriptionIntervalHours: number
 }
 
 export class SettingsService {
@@ -31,6 +33,8 @@ export class SettingsService {
       subscriptionAutoCheck: false,
       subscriptionCheckTime: '09:00',
       subscriptionNewArticleAction: 'notify',
+      subscriptionScheduleMode: 'daily',
+      subscriptionIntervalHours: 6,
     }
   }
 
