@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Input, Button, Space, InputNumber, Popconfirm, message } from 'antd'
+import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, message } from 'antd'
 import { FolderOpenOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
@@ -63,6 +63,30 @@ export default function Settings() {
                 okText="清空" cancelText="取消" onConfirm={clearHistory}>
                 <Button danger>清空下载历史</Button>
               </Popconfirm>
+            </Space>
+          </div>
+
+          <div className="setting-block">
+            <div className="setting-label">订阅</div>
+            <div className="setting-hint">检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。</div>
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <Space align="center">
+                <span style={{ minWidth: 96, display: 'inline-block' }}>自动检查更新</span>
+                <Switch checked={s.subscriptionAutoCheck} data-testid="set-subs-auto"
+                  onChange={(v) => setS({ ...s, subscriptionAutoCheck: v })} />
+              </Space>
+              <Space align="center">
+                <span style={{ minWidth: 96, display: 'inline-block' }}>每日检查时刻</span>
+                <input type="time" value={s.subscriptionCheckTime} data-testid="set-subs-time"
+                  onChange={(e) => setS({ ...s, subscriptionCheckTime: e.target.value })}
+                  style={{ height: 32, padding: '0 8px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--paper)', color: 'var(--ink)' }} />
+              </Space>
+              <Space align="center">
+                <span style={{ minWidth: 96, display: 'inline-block' }}>发现新文章时</span>
+                <Select value={s.subscriptionNewArticleAction} style={{ width: 160 }} data-testid="set-subs-action"
+                  onChange={(v) => setS({ ...s, subscriptionNewArticleAction: v })}
+                  options={[{ value: 'notify', label: '仅提示' }, { value: 'download', label: '自动下载' }]} />
+              </Space>
             </Space>
           </div>
         </div>
