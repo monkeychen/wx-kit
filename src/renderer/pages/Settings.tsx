@@ -25,11 +25,11 @@ export default function Settings() {
     catch (e) { message.error('清空失败：' + (e as Error).message) }
   }
 
-  if (!s) return <div className="page"><div className="page-narrow faint">加载中…</div></div>
+  if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
   return (
     <div className="page">
-      <div className="page-narrow fade-in">
+      <div className="fade-in">
         <div className="page-head">
           <div className="eyebrow">Settings</div>
           <h1 className="page-title">设置</h1>
