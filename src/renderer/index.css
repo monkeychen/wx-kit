@@ -126,8 +126,6 @@ body {
   overflow-y: auto;
   padding: 44px 40px 64px;
 }
-.page-narrow { max-width: 860px; margin: 0 auto; }
-
 .page-head { margin-bottom: 28px; }
 .page-title {
   font-family: var(--font-serif);

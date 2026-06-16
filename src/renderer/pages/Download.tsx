@@ -42,7 +42,7 @@ export default function Download() {
 
   return (
     <div className="page">
-      <div className="page-narrow fade-in">
+      <div className="fade-in">
         <div className="mode-tabs" role="tablist">
           <button role="tab" aria-selected={mode === 'url'} data-testid="mode-url"
             className={`mode-tab${mode === 'url' ? ' on' : ''}`} onClick={() => setMode('url')}>
