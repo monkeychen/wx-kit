@@ -258,6 +258,21 @@ async function main() {
       assert(true, 'account mode shows login gate without a session')
     }
 
+    // ============ M11 · 订阅 ============
+    await win.click('[data-testid="nav-订阅"]')
+    await win.waitForSelector('.page-title:has-text("订阅")', { timeout: 10000 })
+    assert(true, 'subscriptions page reachable from nav (订阅 between 下载 and 文库)')
+    // 账号模式抓过的号会经历史派生到订阅页；无 session 时为空态。两者都算页面健康渲染。
+    const subsRendered = (await win.locator('[data-testid="subs-list"], .empty-state').count()) >= 1
+    assert(subsRendered, 'subscriptions page renders a list or empty-state')
+    assert((await win.locator('[data-testid="subs-check-now"]').count()) === 1, 'subscriptions page offers 检查更新')
+
+    // 设置页三个订阅控件
+    await win.click('[data-testid="nav-设置"]')
+    await win.waitForSelector('[data-testid="set-subs-auto"]', { timeout: 10000 })
+    assert((await win.locator('[data-testid="set-subs-time"]').count()) === 1, 'settings has daily check-time control')
+    assert((await win.locator('[data-testid="set-subs-action"]').count()) === 1, 'settings has new-article-action control')
+
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
   } catch (e) {
