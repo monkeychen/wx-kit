@@ -50,6 +50,19 @@
 
 **存储影响**：库根下新增 `subscriptions.json`（与 `library.json`/`history.json` 同级），按 fakeid 存订阅态、水位、上次检查时间、待处理新文章 refs。`settings.json` 增上述三项。
 
+### R3 · 订阅触发机制升级 + 检查可观测性（里程碑 M12）
+
+设计依据：`docs/superpowers/specs/2026-06-16-m12-subscription-schedule-and-observability-design.md`。
+
+**需求**：
+- **触发机制两种模式二选一**：「每天某时刻」（沿用 `subscriptionCheckTime`）或「每隔 N 小时」（新增 `subscriptionIntervalHours`，网格锚定每天 0 点：N=6 → 0/6/12/18 点）。`subscriptionScheduleMode` 默认 `daily`，不改老用户行为。两模式都支持启动补检。
+- **检查可观测性**：每次检查（自动/手动）留痕——
+  - 订阅页「检查记录」区：倒序最近 ~10 条（时间 · 自动/手动 · 查 N 号 · 新 M 篇 · 失败 K）；
+  - 落盘日志 `userData/subscriptions-check.log`（人类可读、全量追加），订阅页「打开日志文件」可达；
+  - 订阅页「下次预计检查」时间（按当前模式算；未开自动检查则明示）。
+
+**存储影响**：`settings.json` 增 `subscriptionScheduleMode`、`subscriptionIntervalHours`；`subscriptions.json` 增 `checkLog`（留最近 50 条）；新增 `userData/subscriptions-check.log`。
+
 ## 4. 验收标准
 
 ### R1 / M10（✅ 已验，2026-06-16）
@@ -72,11 +85,21 @@
 
 > 说明：自动检查的「真实壁钟到点触发 → 自动下载」整链由各构成逻辑单测保证（`shouldCheckNow` + `checkSubscriptions` + `runSubscriptionCheck`），e2e 无法等真实 09:00，故未做整链实时触发断言；构成逻辑均已覆盖。
 
+### R3 / M12（待实现后验）
+- [ ] 设置可选「每天某时刻」或「每隔 N 小时」；默认 `daily`，老用户行为不变。
+- [ ] interval 模式网格锚定每天 0 点（N=6 → 0/6/12/18 点），两模式均支持启动补检。（`shouldCheckNow`/`lastScheduledInstant` 单测各分支）
+- [ ] 订阅页「检查记录」区倒序列最近 ~10 条（时间/自动手动/号数/新文章数/失败数）。
+- [ ] 落盘日志 `userData/subscriptions-check.log` 全量追加，订阅页「打开日志文件」可达。
+- [ ] 订阅页显示「下次预计检查」时间（未开自动检查则明示）。（`nextScheduledInstant` 单测）
+- [ ] `checkLog` 仅留最近 50 条；`formatCheckLogLine` 格式单测；写盘失败不阻断检查主流程。
+- [ ] core 纯逻辑 TDD + 订阅/设置页 e2e（模式切换、检查记录/下次预计/打开日志存在）通过、零 console 错误。
+
 ## 5. 里程碑拆分
 
 | 里程碑 | 范围 | 状态 |
 |--------|------|------|
 | **M10** | 列表视图优化：列宽可调 + 表头排序（R1） | ✅ 已合入 main |
-| **M11** | 公众号订阅：订阅页 + 定时轮询 + 新文章检测 + 设置项 + 提示/自动下载（R2） | 计划待写 |
+| **M11** | 公众号订阅：订阅页 + 定时轮询 + 新文章检测 + 设置项 + 提示/自动下载（R2） | ✅ 已合入 main |
+| **M12** | 订阅触发机制（daily/interval）+ 检查可观测性（页内记录 + 落盘日志 + 下次预计）（R3） | 计划待写 |
 
 两里程碑相互独立，无强制先后；已先做 M10（小、低风险），再做 M11（大）。

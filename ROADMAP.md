@@ -27,6 +27,7 @@
 - **M9** — `docs/plans/2026-06-08-m9-library-organization.md`（文库组织 + 卡片/列表视图）
 - **M10** — `docs/plans/2026-06-16-m10-list-view-polish.md`（列表视图列宽可调 + 表头排序；v0.3.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-16-v0.3.0-list-polish-and-subscriptions-design.md`）✅ 已合入 main
 - **M11** — `docs/plans/2026-06-16-m11-subscriptions.md`（公众号订阅：订阅页 + 定时轮询 + 新文章检测 + 设置项 + 提示/自动下载；设计依据同上 spec，验收 `docs/PRD-v0.3.0.md` §4 R2）✅ 已合入 main
+- **M12** — 订阅触发机制（daily/interval）+ 检查可观测性（设计依据 `docs/superpowers/specs/2026-06-16-m12-subscription-schedule-and-observability-design.md`，验收 `docs/PRD-v0.3.0.md` §4 R3；实现计划待写）
 
 ## 当前状态
 - **v0.3.0 迭代（M10+M11 已合入 main）**：
