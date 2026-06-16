@@ -26,7 +26,7 @@
 - **M8** — `docs/plans/2026-06-08-m8-pdf-page-break.md`（PDF 防跨页切断）
 - **M9** — `docs/plans/2026-06-08-m9-library-organization.md`（文库组织 + 卡片/列表视图）
 - **M10** — `docs/plans/2026-06-16-m10-list-view-polish.md`（列表视图列宽可调 + 表头排序；v0.3.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-16-v0.3.0-list-polish-and-subscriptions-design.md`）✅ 已合入 main
-- **M11** — 公众号订阅（设计依据同上 spec；实现计划待写）
+- **M11** — `docs/plans/2026-06-16-m11-subscriptions.md`（公众号订阅：订阅页 + 定时轮询 + 新文章检测 + 设置项 + 提示/自动下载；设计依据同上 spec，验收 `docs/PRD-v0.3.0.md` §4 R2）
 
 ## 当前状态
 - **v0.3.0 迭代（进行中）**：M10 列表视图优化已合入 main——文库「列表」视图列宽可拖拽调整（持久化进 `settings.json` 的 `listColumnWidths`）、排序移到表头点击（标题/发布/下载，↑↓ 指示，同列再点翻向），卡片视图保留工具栏排序入口。纯逻辑（grid 模板/排序切换/宽度钳制）抽 `src/renderer/list-columns.ts` TDD；拖拽/点表头由本地 e2e 验证（含「拖手柄 → --lcols 变化」「表头排序 desc/asc」断言）。下一步 M11 订阅（计划待写）。
