@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, message } from 'antd'
+import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmented, message } from 'antd'
 import { FolderOpenOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
@@ -76,11 +76,25 @@ export default function Settings() {
                   onChange={(v) => setS({ ...s, subscriptionAutoCheck: v })} />
               </Space>
               <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>每日检查时刻</span>
-                <input type="time" value={s.subscriptionCheckTime} data-testid="set-subs-time"
-                  onChange={(e) => setS({ ...s, subscriptionCheckTime: e.target.value })}
-                  style={{ height: 32, padding: '0 8px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--paper)', color: 'var(--ink)' }} />
+                <span style={{ minWidth: 96, display: 'inline-block' }}>检查频率</span>
+                <Segmented value={s.subscriptionScheduleMode} data-testid="set-subs-mode"
+                  onChange={(v) => setS({ ...s, subscriptionScheduleMode: v as 'daily' | 'interval' })}
+                  options={[{ label: '每天某时刻', value: 'daily' }, { label: '每隔N小时', value: 'interval' }]} />
               </Space>
+              {s.subscriptionScheduleMode === 'daily' ? (
+                <Space align="center">
+                  <span style={{ minWidth: 96, display: 'inline-block' }}>每日检查时刻</span>
+                  <input type="time" value={s.subscriptionCheckTime} data-testid="set-subs-time"
+                    onChange={(e) => setS({ ...s, subscriptionCheckTime: e.target.value })}
+                    style={{ height: 32, padding: '0 8px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--paper)', color: 'var(--ink)' }} />
+                </Space>
+              ) : (
+                <Space align="center">
+                  <span style={{ minWidth: 96, display: 'inline-block' }}>每隔</span>
+                  <InputNumber min={1} max={24} value={s.subscriptionIntervalHours} data-testid="set-subs-interval"
+                    onChange={(v) => setS({ ...s, subscriptionIntervalHours: v ?? 6 })} addonAfter="小时" />
+                </Space>
+              )}
               <Space align="center">
                 <span style={{ minWidth: 96, display: 'inline-block' }}>发现新文章时</span>
                 <Select value={s.subscriptionNewArticleAction} style={{ width: 160 }} data-testid="set-subs-action"
