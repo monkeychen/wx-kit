@@ -85,14 +85,16 @@
 
 > 说明：自动检查的「真实壁钟到点触发 → 自动下载」整链由各构成逻辑单测保证（`shouldCheckNow` + `checkSubscriptions` + `runSubscriptionCheck`），e2e 无法等真实 09:00，故未做整链实时触发断言；构成逻辑均已覆盖。
 
-### R3 / M12（待实现后验）
-- [ ] 设置可选「每天某时刻」或「每隔 N 小时」；默认 `daily`，老用户行为不变。
-- [ ] interval 模式网格锚定每天 0 点（N=6 → 0/6/12/18 点），两模式均支持启动补检。（`shouldCheckNow`/`lastScheduledInstant` 单测各分支）
-- [ ] 订阅页「检查记录」区倒序列最近 ~10 条（时间/自动手动/号数/新文章数/失败数）。
-- [ ] 落盘日志 `userData/subscriptions-check.log` 全量追加，订阅页「打开日志文件」可达。
-- [ ] 订阅页显示「下次预计检查」时间（未开自动检查则明示）。（`nextScheduledInstant` 单测）
-- [ ] `checkLog` 仅留最近 50 条；`formatCheckLogLine` 格式单测；写盘失败不阻断检查主流程。
-- [ ] core 纯逻辑 TDD + 订阅/设置页 e2e（模式切换、检查记录/下次预计/打开日志存在）通过、零 console 错误。
+### R3 / M12（✅ 已验，2026-06-16）
+- [x] 设置可选「每天某时刻」或「每隔 N 小时」；默认 `daily`，老用户行为不变。（Segmented 切换 + 默认值单测）
+- [x] interval 模式网格锚定每天 0 点（N=6 → 0/6/12/18 点），两模式均支持启动补检。（`lastScheduledInstant`/`shouldCheckNow` 单测各分支；scheduler tick 传 config）
+- [x] 订阅页「检查记录」区倒序列最近 ~10 条（时间/自动手动/号数/新文章数/失败数）。（`appendCheckLog` 留 50 倒序单测 + 页面 slice(0,10)）
+- [x] 落盘日志 `userData/subscriptions-check.log` 全量追加，订阅页「打开日志文件」可达。（`logCheck` 追加 + `subscriptions:openLog`）
+- [x] 订阅页显示「下次预计检查」时间（未开自动检查则明示）。（`nextScheduledInstant` 单测 + list 返 nextCheckAt）
+- [x] `checkLog` 仅留最近 50 条；`formatCheckLogLine` 格式单测；写盘失败不阻断检查主流程。（单测 + `logCheck` try/catch）
+- [x] core 纯逻辑 TDD + 订阅/设置页 e2e（模式切换、检查记录/下次预计/打开日志存在）通过、零 console 错误。（12 条新单测 + e2e 全绿）
+
+> 说明：定时「真实壁钟到点自动触发」整链仍由构成逻辑单测保证（`shouldCheckNow` + `runSubscriptionCheck('auto')`），e2e 等不到真实网格点；构成逻辑与留痕均已覆盖。
 
 ## 5. 里程碑拆分
 
@@ -100,6 +102,6 @@
 |--------|------|------|
 | **M10** | 列表视图优化：列宽可调 + 表头排序（R1） | ✅ 已合入 main |
 | **M11** | 公众号订阅：订阅页 + 定时轮询 + 新文章检测 + 设置项 + 提示/自动下载（R2） | ✅ 已合入 main |
-| **M12** | 订阅触发机制（daily/interval）+ 检查可观测性（页内记录 + 落盘日志 + 下次预计）（R3） | 计划待写 |
+| **M12** | 订阅触发机制（daily/interval）+ 检查可观测性（页内记录 + 落盘日志 + 下次预计）（R3） | ✅ 已合入 main |
 
 两里程碑相互独立，无强制先后；已先做 M10（小、低风险），再做 M11（大）。
