@@ -25,10 +25,11 @@
 - **M7** — `docs/plans/2026-06-08-m7-feedback-guidance.md`（频控可见 + 失败引导）
 - **M8** — `docs/plans/2026-06-08-m8-pdf-page-break.md`（PDF 防跨页切断）
 - **M9** — `docs/plans/2026-06-08-m9-library-organization.md`（文库组织 + 卡片/列表视图）
-- **M10** — `docs/plans/2026-06-16-m10-list-view-polish.md`（列表视图列宽可调 + 表头排序；v0.3.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-16-v0.3.0-list-polish-and-subscriptions-design.md`）
+- **M10** — `docs/plans/2026-06-16-m10-list-view-polish.md`（列表视图列宽可调 + 表头排序；v0.3.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-16-v0.3.0-list-polish-and-subscriptions-design.md`）✅ 已合入 main
 - **M11** — 公众号订阅（设计依据同上 spec；实现计划待写）
 
 ## 当前状态
+- **v0.3.0 迭代（进行中）**：M10 列表视图优化已合入 main——文库「列表」视图列宽可拖拽调整（持久化进 `settings.json` 的 `listColumnWidths`）、排序移到表头点击（标题/发布/下载，↑↓ 指示，同列再点翻向），卡片视图保留工具栏排序入口。纯逻辑（grid 模板/排序切换/宽度钳制）抽 `src/renderer/list-columns.ts` TDD；拖拽/点表头由本地 e2e 验证（含「拖手柄 → --lcols 变化」「表头排序 desc/asc」断言）。下一步 M11 订阅（计划待写）。
 - **最新发布：v0.2.1（2026-06-09，安全补丁）** —— 功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，Dependabot 28 项全部 fixed 归零。tag + GitHub Release（mac dmg arm64/x64 + win nsis exe）已发。详见下方「v0.2.0 迭代」段。
 - M9 文库组织：文库从「只能搜+删」升级为可治理的藏馆——排序（下载/发布时间/标题，升降）、按公众号筛选+可折叠分组、批量选择+批量删除；并新增**卡片⇄列表**视图切换（列表为访达式紧凑行）。交互：默认分组+卡片；单击=选中、双击=阅读、行尾/卡片 hover 常驻「阅读/文件夹/删除」。排序/分组/筛选是纯逻辑（`src/renderer/library-view.ts`，TDD）；批量删除走 `library:removeMany`（联动历史标记已删除）。真实 session 截图（5 公众号 15 篇）验证三态。
 - M8 PDF 保真：导出 PDF 时图片/表格/代码块/引用不再被 A4 页边界拦腰切断——在 `buildHtml` 的内联样式注入 `@media print { break-inside: avoid }`，只作用于打印态、屏幕阅读器零影响。对照验证（同一会跨页的代码块，有/无规则出 PDF）：无规则版被切到第 17 行、有规则版整块下移到次页完整；真实图文长文 9 页 PDF 图片完整无切断。
