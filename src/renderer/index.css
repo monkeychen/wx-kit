@@ -409,9 +409,8 @@ body {
 
 /* 列表视图（访达式） */
 .list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--paper-raised); }
-.lhead, .lrow { display: grid; grid-template-columns: 44px minmax(0, 1fr) 132px 100px 100px 172px; align-items: center; }
-/* 分组时按公众号已分区，去掉冗余的「公众号」列（表头与行同步变 5 列） */
-.list.grouped .lhead, .list.grouped .lrow { grid-template-columns: 44px minmax(0, 1fr) 100px 100px 172px; }
+/* 列宽由 Library 经 --lcols 内联设定（buildListColumns 据是否分组生成，分组态自动少一列）；缺省回退见下 */
+.lhead, .lrow { display: grid; grid-template-columns: var(--lcols, 44px minmax(0, 1fr) 132px 150px 110px 172px); align-items: center; }
 .lhead { padding: 9px 16px; background: var(--paper-sunken); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); font-weight: 600; }
 .lgrp-head { display: flex; align-items: center; gap: 9px; padding: 10px 16px; background: var(--paper-sunken); border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; }
 .lgrp-head .gseal { width: 22px; height: 22px; font-size: 12px; }
@@ -428,6 +427,12 @@ body {
 .lacts button { border: 0; background: transparent; font: inherit; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; padding: 0; }
 .lacts button:hover { color: var(--ink); }
 .lacts button.danger:hover { color: var(--cinnabar); }
+/* 列表表头：可排序列 + 列宽拖拽手柄 */
+.lh-sort { cursor: pointer; user-select: none; }
+.lh-sort:hover { color: var(--ink); }
+.lh-resz { position: relative; }
+.lh-resz .rz { position: absolute; top: 0; right: 0; width: 7px; height: 100%; cursor: col-resize; }
+.lh-resz .rz:hover { background: var(--cinnabar-wash); }
 
 /* ---------- 阅读器版面 ---------- */
 .reader-bar {
