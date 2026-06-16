@@ -4,12 +4,12 @@ import type { AppSettings } from '../../electron/services/settings'
 import type { ReadableKind } from '../core/read-article'
 import type { MpAccount, CrawlSummary, CrawlItemStatus } from '../core/mp-types'
 import type { HistoryEvent } from '../core/download-history'
-import type { SubscribedAccount } from '../core/subscriptions'
+import type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 
 export type { HistoryEvent } from '../core/download-history'
-export type { SubscribedAccount } from '../core/subscriptions'
+export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 
-export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null }
+export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null; checkLog: CheckLogEntry[]; nextCheckAt: number | null }
 
 export interface CrawlRangeInput { count?: number; from?: string; to?: string }
 export type CrawlEvent =
@@ -50,6 +50,7 @@ export interface WxApi {
   subscriptionsCheckNow(): Promise<void>
   subscriptionsDownloadNew(fakeid: string): Promise<void>
   subscriptionsDismissNew(fakeid: string): Promise<void>
+  subscriptionsOpenLog(): Promise<void>
   onSubscriptionsUpdated(cb: () => void): () => void
 }
 

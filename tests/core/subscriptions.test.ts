@@ -66,3 +66,34 @@ describe('mergeAccounts', () => {
     expect(merged.find((a) => a.fakeid === 'f2')).toMatchObject({ nickname: '乙', subscribed: false, watermark: 0, lastCheckedAt: null, newRefs: [] })
   })
 })
+
+import { formatCheckLogLine } from '../../src/core/subscriptions'
+
+describe('Subscriptions checkLog', () => {
+  let d2: string
+  beforeEach(() => { d2 = mkdtempSync(join(tmpdir(), 'wxk-subslog-')) })
+
+  it('appends newest-first and keeps at most 50', async () => {
+    const s = new Subscriptions(d2)
+    for (let i = 0; i < 55; i++) await s.appendCheckLog({ time: i, trigger: 'auto', accounts: 1, newFound: 0, failed: 0 })
+    const log = await s.getCheckLog()
+    expect(log).toHaveLength(50)
+    expect(log[0].time).toBe(54)   // newest first
+    expect(log[49].time).toBe(5)
+  })
+
+  it('getCheckLog empty when none', async () => {
+    expect(await new Subscriptions(d2).getCheckLog()).toEqual([])
+  })
+})
+
+describe('formatCheckLogLine', () => {
+  it('formats with and without note', () => {
+    const line = formatCheckLogLine({ time: Date.parse('2026-06-16T01:00:00Z'), trigger: 'manual', accounts: 3, newFound: 2, failed: 1 })
+    expect(line).toContain('MANUAL')
+    expect(line).toContain('accounts=3')
+    expect(line).toContain('new=2')
+    expect(line).toContain('failed=1')
+    expect(formatCheckLogLine({ time: 0, trigger: 'auto', accounts: 0, newFound: 0, failed: 0, note: 'no-session' })).toContain('note=no-session')
+  })
+})

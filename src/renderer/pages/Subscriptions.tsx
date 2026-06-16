@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Input, Switch, Button, Spin, Alert, message, List, Tag } from 'antd'
 import { api } from '../api'
-import type { SubscribedAccount } from '../api'
+import type { SubscribedAccount, CheckLogEntry } from '../api'
 import type { MpAccount } from '../../core/mp-types'
 
 export default function Subscriptions() {
@@ -11,10 +11,15 @@ export default function Subscriptions() {
   const [checking, setChecking] = useState(false)
   const [kw, setKw] = useState('')
   const [candidates, setCandidates] = useState<MpAccount[]>([])
+  const [checkLog, setCheckLog] = useState<CheckLogEntry[]>([])
+  const [nextCheckAt, setNextCheckAt] = useState<number | null>(null)
 
   const load = async () => {
     setLoading(true)
-    try { const s = await api.subscriptionsList(); setAccounts(s.accounts); setAuthExpired(s.authExpired) }
+    try {
+      const s = await api.subscriptionsList()
+      setAccounts(s.accounts); setAuthExpired(s.authExpired); setCheckLog(s.checkLog); setNextCheckAt(s.nextCheckAt)
+    }
     finally { setLoading(false) }
   }
   useEffect(() => { load(); return api.onSubscriptionsUpdated(load) }, [])
@@ -56,6 +61,11 @@ export default function Subscriptions() {
           <Button type="primary" loading={checking} onClick={checkNow} data-testid="subs-check-now">检查更新</Button>
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 13 }} className="faint">
+          <span data-testid="subs-next-check">下次预计检查：{nextCheckAt ? new Date(nextCheckAt).toLocaleString() : '未开启自动检查'}</span>
+          <a onClick={() => api.subscriptionsOpenLog()} data-testid="subs-open-log">打开日志文件</a>
+        </div>
+
         {candidates.length > 0 && (
           <List size="small" bordered style={{ marginBottom: 16 }} dataSource={candidates}
             renderItem={(c) => (
@@ -86,6 +96,18 @@ export default function Subscriptions() {
               </List.Item>
             )} />
           )}
+
+        <div style={{ marginTop: 24 }} data-testid="subs-check-log">
+          <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>检查记录</h3>
+          {checkLog.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>还没有检查记录。开启自动检查或点「检查更新」后，这里会留痕。</div>
+            : <List size="small" dataSource={checkLog.slice(0, 10)} renderItem={(e: CheckLogEntry) => (
+                <List.Item>
+                  <span style={{ fontSize: 12.5 }}>
+                    {new Date(e.time).toLocaleString()} · {e.trigger === 'auto' ? '自动' : '手动'} · 查 {e.accounts} 号 · 新 {e.newFound} · 失败 {e.failed}{e.note ? ` · ${e.note}` : ''}
+                  </span>
+                </List.Item>
+              )} />}
+        </div>
       </div>
     </div>
   )

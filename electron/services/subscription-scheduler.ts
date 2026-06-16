@@ -27,7 +27,10 @@ export class SubscriptionScheduler {
       if (!s.subscriptionAutoCheck) return
       const now = (this.deps.now ?? Date.now)()
       const lastRunAt = await (await this.deps.subsFor()).getLastRunAt()
-      if (shouldCheckNow({ now, checkTime: s.subscriptionCheckTime, lastCheckedAt: lastRunAt, autoCheck: true })) {
+      if (shouldCheckNow({
+        now, lastCheckedAt: lastRunAt, autoCheck: true,
+        config: { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours },
+      })) {
         await this.deps.runCheck()
       }
     } catch { /* 定时检查失败不应影响应用其余部分；下次 tick 再来 */ }

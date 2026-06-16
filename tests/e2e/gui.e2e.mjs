@@ -258,7 +258,7 @@ async function main() {
       assert(true, 'account mode shows login gate without a session')
     }
 
-    // ============ M11 · 订阅 ============
+    // ============ M11/M12 · 订阅 ============
     await win.click('[data-testid="nav-订阅"]')
     await win.waitForSelector('.page-title:has-text("订阅")', { timeout: 10000 })
     assert(true, 'subscriptions page reachable from nav (订阅 between 下载 and 文库)')
@@ -266,12 +266,21 @@ async function main() {
     const subsRendered = (await win.locator('[data-testid="subs-list"], .empty-state').count()) >= 1
     assert(subsRendered, 'subscriptions page renders a list or empty-state')
     assert((await win.locator('[data-testid="subs-check-now"]').count()) === 1, 'subscriptions page offers 检查更新')
+    // M12: 可观测性元素
+    assert((await win.locator('[data-testid="subs-next-check"]').count()) === 1, 'subscriptions page shows next-check line')
+    assert((await win.locator('[data-testid="subs-open-log"]').count()) === 1, 'subscriptions page offers open-log link')
+    assert((await win.locator('[data-testid="subs-check-log"]').count()) === 1, 'subscriptions page has a check-log section')
 
-    // 设置页三个订阅控件
+    // 设置页：订阅控件 + M12 调度模式切换
     await win.click('[data-testid="nav-设置"]')
     await win.waitForSelector('[data-testid="set-subs-auto"]', { timeout: 10000 })
-    assert((await win.locator('[data-testid="set-subs-time"]').count()) === 1, 'settings has daily check-time control')
     assert((await win.locator('[data-testid="set-subs-action"]').count()) === 1, 'settings has new-article-action control')
+    assert((await win.locator('[data-testid="set-subs-mode"]').count()) === 1, 'settings has schedule-mode selector')
+    // 默认 daily 显示时刻控件；切到 interval 显示小时控件
+    assert((await win.locator('[data-testid="set-subs-time"]').count()) === 1, 'daily mode shows the time control')
+    await win.click('[data-testid="set-subs-mode"] label:has-text("每隔")')
+    await win.waitForSelector('[data-testid="set-subs-interval"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="set-subs-interval"]').count()) === 1, 'switching to interval mode shows the hours control')
 
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
