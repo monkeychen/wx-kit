@@ -1,6 +1,8 @@
 // electron/ipc.ts
-import { ipcMain, dialog, shell, BrowserWindow } from 'electron'
+import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { readdir } from 'node:fs/promises'
+import { appendFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { DownloadFormat } from '../src/core/types'
 import { fetchHtml, fetchBinary } from '../src/core/fetch-html'
 import { Library } from '../src/core/library'
@@ -14,8 +16,9 @@ import { searchAccount, listArticles } from '../src/core/mp-client'
 import { crawlAccount } from '../src/core/mp-crawl'
 import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
-import { Subscriptions, accountsFromHistory, mergeAccounts } from '../src/core/subscriptions'
+import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { checkSubscriptions } from '../src/core/check-subscriptions'
+import { nextScheduledInstant } from '../src/core/subscription-schedule'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { SettingsService } from './services/settings'
 
@@ -158,25 +161,46 @@ export function registerIpc(settings: SettingsService): void {
     await recordHistory(source, formats, summary)
   }
 
-  const runSubscriptionCheck = async () => {
-    const session = getSession()
-    if (!session) { subsAuthExpired = true; emitSubsUpdated(); return }
+  const logPath = join(app.getPath('userData'), 'subscriptions-check.log')
+  const logCheck = async (subs: Subscriptions, entry: CheckLogEntry) => {
+    try { await subs.appendCheckLog(entry); appendFileSync(logPath, formatCheckLogLine(entry) + '\n') }
+    catch { /* 留痕失败不阻断检查主流程 */ }
+  }
+
+  const runSubscriptionCheck = async (trigger: 'auto' | 'manual') => {
     const subs = await subsFor()
+    const session = getSession()
+    if (!session) {
+      subsAuthExpired = true
+      await logCheck(subs, { time: Date.now(), trigger, accounts: 0, newFound: 0, failed: 0, note: 'no-session' })
+      emitSubsUpdated(); return
+    }
     const accounts = (await subs.list()).filter((a) => a.subscribed)
-    if (!accounts.length) { await subs.setLastRunAt(Date.now()); return }
+    if (!accounts.length) {
+      await subs.setLastRunAt(Date.now())
+      await logCheck(subs, { time: Date.now(), trigger, accounts: 0, newFound: 0, failed: 0, note: 'no-accounts' })
+      emitSubsUpdated(); return
+    }
     const s = await settings.get()
     let results
     try {
       results = await checkSubscriptions(accounts, { mpFetch: makeMpFetch(session), token: session.token })
     } catch (e) {
-      if (e instanceof MpAuthExpired) { subsAuthExpired = true; emitSubsUpdated(); return }
+      if (e instanceof MpAuthExpired) {
+        subsAuthExpired = true
+        await logCheck(subs, { time: Date.now(), trigger, accounts: accounts.length, newFound: 0, failed: accounts.length, note: 'auth-expired' })
+        emitSubsUpdated(); return
+      }
       throw e
     }
     subsAuthExpired = false
+    let newFound = 0
+    let failed = 0
     for (const r of results) {
-      if (!r.ok) continue
+      if (!r.ok) { failed++; continue }
       await subs.updateWatermark(r.fakeid, r.latest)
       if (r.newRefs.length === 0) continue
+      newFound += r.newRefs.length
       if (s.subscriptionNewArticleAction === 'download') {
         const acc = accounts.find((a) => a.fakeid === r.fakeid)!
         await downloadRefs(r.newRefs, s.defaultFormats, { kind: 'account', nickname: acc.nickname, fakeid: r.fakeid, range: { count: r.newRefs.length } })
@@ -186,6 +210,7 @@ export function registerIpc(settings: SettingsService): void {
       }
     }
     await subs.setLastRunAt(Date.now())
+    await logCheck(subs, { time: Date.now(), trigger, accounts: accounts.length, newFound, failed })
     emitSubsUpdated()
   }
 
@@ -193,7 +218,11 @@ export function registerIpc(settings: SettingsService): void {
     const { events } = await (await historyFor()).list(0, 1_000_000)
     const subs = await subsFor()
     const merged = mergeAccounts(accountsFromHistory(events), await subs.list())
-    return { accounts: merged, authExpired: subsAuthExpired, lastRunAt: await subs.getLastRunAt() }
+    const s = await settings.get()
+    const nextCheckAt = s.subscriptionAutoCheck
+      ? nextScheduledInstant(Date.now(), { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours })
+      : null
+    return { accounts: merged, authExpired: subsAuthExpired, lastRunAt: await subs.getLastRunAt(), checkLog: await subs.getCheckLog(), nextCheckAt }
   })
   ipcMain.handle('subscriptions:addAccount', async (_e, { fakeid, nickname }: { fakeid: string; nickname: string }) => {
     await (await subsFor()).addAccount({ fakeid, nickname, subscribed: true, watermark: await establishWatermark(fakeid) })
@@ -210,7 +239,7 @@ export function registerIpc(settings: SettingsService): void {
     }
     emitSubsUpdated()
   })
-  ipcMain.handle('subscriptions:checkNow', async () => { await runSubscriptionCheck() })
+  ipcMain.handle('subscriptions:checkNow', async () => { await runSubscriptionCheck('manual') })
   ipcMain.handle('subscriptions:downloadNew', async (_e, fakeid: string) => {
     const subs = await subsFor()
     const acc = (await subs.list()).find((a) => a.fakeid === fakeid)
@@ -226,6 +255,10 @@ export function registerIpc(settings: SettingsService): void {
     await subs.clearNewRefs(fakeid)
     emitSubsUpdated()
   })
+  ipcMain.handle('subscriptions:openLog', () => {
+    try { writeFileSync(logPath, '', { flag: 'a' }) } catch { /* 确保文件存在即可 */ }
+    shell.showItemInFolder(logPath)
+  })
 
-  new SubscriptionScheduler({ settings, subsFor, runCheck: runSubscriptionCheck }).start()
+  new SubscriptionScheduler({ settings, subsFor, runCheck: () => runSubscriptionCheck('auto') }).start()
 }
