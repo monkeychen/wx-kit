@@ -59,16 +59,18 @@
 - [x] 卡片视图保留工具栏排序入口；列表视图工具栏不再显示该入口。
 - [x] `npm test`（126）/ `tsc` / `lint` 全绿；e2e 含「表头排序 desc/asc」「拖手柄 `--lcols` 变化」断言通过、零 console/page 错误。
 
-### R2 / M11（待实现后验）
-- [ ] 导航出现「订阅」项，位于「下载」与「文库」之间。
-- [ ] 订阅页列出有 fakeid 的公众号（按公众号抓取历史 + 搜号添加）；纯 URL 下载来的号**不出现**。
-- [ ] 每个号可订阅/取消订阅；搜号可添加新号（默认订阅、水位设为当前最新）。
-- [ ] 设置页有三项：自动检查开关（默认关）、每日检查时刻（默认 09:00）、新文章处理（默认仅提示）。
-- [ ] 开启自动检查后：运行期到达配置时刻触发检查；启动时当天时刻已过且未检查则补检一次。
-- [ ] 检查只列表不下载；发现 `createTime > watermark` 的文章按配置「仅提示（角标 + 逐号下载/忽略）」或「自动下载入库」。
-- [ ] session 过期时不静默失败，订阅页显示登录引导、调度暂停并明示。
-- [ ] 手动「检查更新」可即时触发，含进度/退避反馈。
-- [ ] core 层 `subscriptions` / `check-subscriptions` / `subscription-schedule` 单测覆盖（含新检测、水位推进、单号失败隔离、调度时机与启动补检）；订阅页本地 e2e（mock 网络）通过、零 console/page 错误。
+### R2 / M11（✅ 已验，2026-06-16）
+- [x] 导航出现「订阅」项，位于「下载」与「文库」之间。（e2e 断言）
+- [x] 订阅页列出有 fakeid 的公众号（按公众号抓取历史 + 搜号添加）；纯 URL 下载来的号**不出现**。（`accountsFromHistory` 只取 account-kind，单测）
+- [x] 每个号可订阅/取消订阅；搜号可添加新号（默认订阅、水位设为当前最新）。（store 单测 + `establishWatermark` 接线）
+- [x] 设置页有三项：自动检查开关（默认关）、每日检查时刻（默认 09:00）、新文章处理（默认仅提示）。（settings 单测 + e2e 控件存在）
+- [x] 开启自动检查后：运行期到达配置时刻触发检查；启动时当天时刻已过且未检查则补检一次。（`shouldCheckNow` 单测覆盖各分支 + scheduler `start()` 立即 tick）
+- [x] 检查只列表不下载；发现 `createTime > watermark` 的文章按配置「仅提示（角标 + 逐号下载/忽略）」或「自动下载入库」。（`checkSubscriptions` 单测 + `runSubscriptionCheck` action 分支）
+- [x] session 过期时不静默失败，订阅页显示登录引导、调度暂停并明示。（`checkSubscriptions` auth-abort 单测 + `subsAuthExpired`/Alert 接线）
+- [x] 手动「检查更新」可即时触发，含进度/退避反馈。（`subscriptions:checkNow` + 页面按钮 e2e 存在）
+- [x] core 层 `subscriptions` / `check-subscriptions` / `subscription-schedule` 单测覆盖（含新检测、水位推进、单号失败隔离、调度时机与启动补检）；订阅页本地 e2e 通过、零 console/page 错误。（17 条新单测 + e2e 全绿）
+
+> 说明：自动检查的「真实壁钟到点触发 → 自动下载」整链由各构成逻辑单测保证（`shouldCheckNow` + `checkSubscriptions` + `runSubscriptionCheck`），e2e 无法等真实 09:00，故未做整链实时触发断言；构成逻辑均已覆盖。
 
 ## 5. 里程碑拆分
 
