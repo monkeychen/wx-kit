@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Input, Select, Segmented, Spin, Popconfirm, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
@@ -9,6 +9,8 @@ import {
   accountsOf, filterByAccount, sortArticles, groupByAccount,
   type SortKey, type SortDir,
 } from '../library-view'
+import { buildListColumns, clampColWidth, nextSort, DEFAULT_LIST_WIDTHS } from '../list-columns'
+import type { ListColumnWidths } from '../../../electron/services/settings'
 import type { ArticleMeta } from '../../core/types'
 
 const SORT_LABEL: Record<SortKey, string> = { download: '下载时间', publish: '发布时间', title: '标题' }
@@ -25,13 +27,16 @@ export default function Library() {
   const [account, setAccount] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [widths, setWidths] = useState<ListColumnWidths>(DEFAULT_LIST_WIDTHS)
+  const widthsRef = useRef(widths)
+  useEffect(() => { widthsRef.current = widths }, [widths])
   const nav = useNavigate()
 
   const load = async () => {
     setLoading(true)
     try {
       const [list, s] = await Promise.all([api.libraryList(), api.getSettings()])
-      setAll(list); setRoot(s.libraryRoot)
+      setAll(list); setRoot(s.libraryRoot); setWidths(s.listColumnWidths ?? DEFAULT_LIST_WIDTHS)
     } catch (e) {
       message.error('加载失败：' + (e as Error).message)
     } finally {
@@ -59,6 +64,25 @@ export default function Library() {
   const toggleCollapse = (acc: string) => setCollapsed((s) => {
     const n = new Set(s); if (n.has(acc)) n.delete(acc); else n.add(acc); return n
   })
+
+  const onHeaderSort = (k: SortKey) => {
+    const n = nextSort({ key: sortKey, dir: sortDir }, k)
+    setSortKey(n.key); setSortDir(n.dir)
+  }
+  const arrow = (k: SortKey) => (sortKey === k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '')
+  const startResize = (key: keyof ListColumnWidths, e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    const startX = e.clientX
+    const startW = widths[key]
+    const onMove = (ev: MouseEvent) => setWidths((w) => ({ ...w, [key]: clampColWidth(startW + ev.clientX - startX) }))
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      api.saveSettings({ listColumnWidths: widthsRef.current })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   const read = (id: string) => nav(`/reader/${encodeURIComponent(id)}`)
   const delSingle = async (id: string) => {
@@ -99,11 +123,13 @@ export default function Library() {
           <Input allowClear placeholder="按标题搜索" value={kw} onChange={(e) => setKw(e.target.value)}
             style={{ width: 240 }} prefix={<span className="faint">🔍</span>} />
           <div style={{ flex: 1 }} />
-          <span className="tb-label">排序</span>
-          <span data-testid="sort-select"><Select size="middle" value={sortKey} onChange={(v) => setSortKey(v)} style={{ width: 116 }}
-            options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({ value: k, label: SORT_LABEL[k] }))} /></span>
-          <button className="tb-dir" data-testid="sort-dir" title={sortDir === 'desc' ? '降序' : '升序'}
-            onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}>{sortDir === 'desc' ? '↓' : '↑'}</button>
+          {view === 'card' && <>
+            <span className="tb-label">排序</span>
+            <span data-testid="sort-select"><Select size="middle" value={sortKey} onChange={(v) => setSortKey(v)} style={{ width: 116 }}
+              options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({ value: k, label: SORT_LABEL[k] }))} /></span>
+            <button className="tb-dir" data-testid="sort-dir" title={sortDir === 'desc' ? '降序' : '升序'}
+              onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}>{sortDir === 'desc' ? '↓' : '↑'}</button>
+          </>}
           <span data-testid="account-select"><Select size="middle" value={account ?? '__all'} onChange={(v) => setAccount(v === '__all' ? null : v)}
             style={{ width: 150 }} options={[{ value: '__all', label: '全部公众号' }, ...accounts.map((a) => ({ value: a, label: a }))]} /></span>
           <button className={`tb-toggle${grouped ? ' on' : ''}`} data-testid="group-toggle" onClick={() => setGrouped((g) => !g)}>⊟ 分组</button>
@@ -133,10 +159,20 @@ export default function Library() {
           </div>
         ) : view === 'list' ? (
           /* ---- 列表视图：列头只一次，分组时各组只留分隔头（且去掉冗余的公众号列）---- */
-          <div className={`list${grouped ? ' grouped' : ''}`}>
+          <div className={`list${grouped ? ' grouped' : ''}`} style={{ ['--lcols' as string]: buildListColumns(widths, grouped) }}>
             <div className="lhead">
-              <span></span><span>标题</span>{!grouped && <span>公众号</span>}
-              <span>发布时间</span><span>下载时间</span><span style={{ textAlign: 'right' }}>操作</span>
+              <span></span>
+              <span className="lh-sort" onClick={() => onHeaderSort('title')}>标题{arrow('title')}</span>
+              {!grouped && (
+                <span className="lh-resz">公众号<i className="rz" onMouseDown={(e) => startResize('account', e)} /></span>
+              )}
+              <span className="lh-sort lh-resz" onClick={() => onHeaderSort('publish')}>
+                发布时间{arrow('publish')}<i className="rz" onMouseDown={(e) => startResize('publish', e)} />
+              </span>
+              <span className="lh-sort lh-resz" onClick={() => onHeaderSort('download')}>
+                下载时间{arrow('download')}<i className="rz" onMouseDown={(e) => startResize('download', e)} />
+              </span>
+              <span style={{ textAlign: 'right' }}>操作</span>
             </div>
             {grouped ? groups.map((g) => {
               const col = collapsed.has(g.account)

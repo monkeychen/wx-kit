@@ -3,10 +3,13 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DownloadFormat } from '../../src/core/types'
 
+export interface ListColumnWidths { account: number; publish: number; download: number }
+
 export interface AppSettings {
   libraryRoot: string
   defaultFormats: DownloadFormat[]
   historyRetentionDays: number
+  listColumnWidths: ListColumnWidths
 }
 
 export class SettingsService {
@@ -16,7 +19,12 @@ export class SettingsService {
   }
 
   private defaults(): AppSettings {
-    return { libraryRoot: this.defaultLibraryRoot, defaultFormats: ['md', 'html', 'meta'], historyRetentionDays: 365 }
+    return {
+      libraryRoot: this.defaultLibraryRoot,
+      defaultFormats: ['md', 'html', 'meta'],
+      historyRetentionDays: 365,
+      listColumnWidths: { account: 132, publish: 150, download: 110 },
+    }
   }
 
   async get(): Promise<AppSettings> {

@@ -177,6 +177,29 @@ async function main() {
     await win.click('.ant-segmented label:has-text("列表")')
     await win.waitForSelector('[data-testid="article-row"]', { timeout: 8000 })
     assert(true, 'card⇄list view toggle works (Finder-like rows)')
+
+    // M10: 列表视图表头点击排序（此处已是非分组平铺列表，先点标题列规避残留排序态）
+    const firstRowText = async () => (await win.locator('[data-testid="article-row"] .ltitle').first().textContent()) || ''
+    await win.click('.lhead .lh-sort:has-text("标题")')
+    await win.waitForTimeout(150)
+    await win.click('.lhead .lh-sort:has-text("发布时间")')   // 换列 → 默认降序 → 最新在前
+    await win.waitForTimeout(150)
+    assert((await firstRowText()).includes('贝塔'), 'list header sort by publish desc puts newest (贝塔) first')
+    await win.click('.lhead .lh-sort:has-text("发布时间")')   // 同列再点 → 翻转升序 → 最旧在前
+    await win.waitForTimeout(150)
+    assert((await firstRowText()).includes('伽马'), 'clicking same header flips to asc (oldest 伽马 first)')
+
+    // M10: 列宽拖拽 —— 拖「发布时间」列手柄，--lcols 应变化
+    const colsBefore = await win.locator('.list').evaluate((el) => getComputedStyle(el).getPropertyValue('--lcols'))
+    const rzBox = await win.locator('.lhead .lh-resz:has-text("发布时间") .rz').boundingBox()
+    await win.mouse.move(rzBox.x + 3, rzBox.y + rzBox.height / 2)
+    await win.mouse.down()
+    await win.mouse.move(rzBox.x + 60, rzBox.y + rzBox.height / 2, { steps: 6 })
+    await win.mouse.up()
+    await win.waitForTimeout(150)
+    const colsAfter = await win.locator('.list').evaluate((el) => getComputedStyle(el).getPropertyValue('--lcols'))
+    assert(colsBefore !== colsAfter, 'dragging a column handle resizes the column (--lcols changed)')
+
     await win.locator('[data-testid="article-row"]:has-text("阿尔法")').first().dblclick()
     // --- 阅读器 md：wxfile 图片真渲染 ---
     await win.waitForSelector('img[src^="wxfile://"]', { timeout: 15000 })
