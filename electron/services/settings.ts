@@ -4,12 +4,16 @@ import { join } from 'node:path'
 import type { DownloadFormat } from '../../src/core/types'
 
 export interface ListColumnWidths { account: number; publish: number; download: number }
+export type NewArticleAction = 'notify' | 'download'
 
 export interface AppSettings {
   libraryRoot: string
   defaultFormats: DownloadFormat[]
   historyRetentionDays: number
   listColumnWidths: ListColumnWidths
+  subscriptionAutoCheck: boolean
+  subscriptionCheckTime: string          // "HH:MM"
+  subscriptionNewArticleAction: NewArticleAction
 }
 
 export class SettingsService {
@@ -24,6 +28,9 @@ export class SettingsService {
       defaultFormats: ['md', 'html', 'meta'],
       historyRetentionDays: 365,
       listColumnWidths: { account: 132, publish: 150, download: 110 },
+      subscriptionAutoCheck: false,
+      subscriptionCheckTime: '09:00',
+      subscriptionNewArticleAction: 'notify',
     }
   }
 

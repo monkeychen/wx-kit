@@ -1,14 +1,27 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { api } from '../api'
 
 // 杂志刊头：左品牌、右横向导航。取代 antd 左侧 Sider —— 更像一本刊物的报头，
 // 也把纵向空间还给内容。
 const NAV = [
   { to: '/', label: '下载', end: true },
+  { to: '/subscriptions', label: '订阅', end: false },
   { to: '/library', label: '文库', end: false },
   { to: '/settings', label: '设置', end: false },
 ]
 
 export default function MainLayout() {
+  const [newCount, setNewCount] = useState(0)
+  useEffect(() => {
+    const refresh = async () => {
+      try { const s = await api.subscriptionsList(); setNewCount(s.accounts.reduce((n, a) => n + a.newRefs.length, 0)) }
+      catch { /* 忽略：导航角标不应阻塞渲染 */ }
+    }
+    refresh()
+    return api.onSubscriptionsUpdated(refresh)
+  }, [])
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }} data-testid="app-shell">
       <header className="masthead">
@@ -22,6 +35,7 @@ export default function MainLayout() {
               className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
               data-testid={`nav-${n.label}`}>
               {n.label}
+              {n.to === '/subscriptions' && newCount > 0 && <span className="nav-badge" data-testid="subs-nav-badge">{newCount}</span>}
             </NavLink>
           ))}
         </nav>

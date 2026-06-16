@@ -727,3 +727,5 @@ body {
 
 /* antd message 浮层字体跟随 */
 .ant-message, .ant-popover, .ant-tooltip { font-family: var(--font-sans); }
+
+.nav-badge { display: inline-block; min-width: 16px; height: 16px; padding: 0 5px; margin-left: 6px; border-radius: 8px; background: var(--cinnabar); color: #fff; font-size: 11px; line-height: 16px; text-align: center; vertical-align: middle; }
