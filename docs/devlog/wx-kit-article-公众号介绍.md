@@ -2,11 +2,10 @@
 公众号长文 · 「数字生命卡兹克」风格 · 介绍 wx-kit 项目
 配图说明：
 - 真实截图：docs/devlog/assets/ 下的 shot-*.png，用真实 userData 启动 v0.3.0 打包前构建截取。
-- AI 生成图：用 [图片：占位符] 标注，紧随其后给出生成提示词（统一画风：暖色编辑杂志 + 胶片质感）。
-  发布前请按提示词生成图片替换占位符。
--->
+- AI 生成图：docs/devlog/assets/ 下的 gen-*.png，由原文图片提示词生成（统一画风：暖色编辑杂志 + 胶片质感）。
+  -->
 
-# 收藏夹里的好文章会消失，所以我跟 AI 一起写了个工具把它们捞出来
+# 做了个小工具，把公众号文章从围墙里捞出来，顺便喂给AI
 
 事情是这样的。
 
@@ -16,10 +15,7 @@
 
 「该内容已被发布者删除」。
 
-[图片：GEN-1 开头情绪图]
-
-> **AI 生成提示词（GEN-1）**：一个人独自坐在昏暗房间里，面对发光的电脑屏幕，屏幕上只有一个灰色的空白页面和一行小字「该内容已被删除」。暖色调，孤独感，电影感光影，从背后侧后方拍摄，人物剪影，胶片颗粒质感，编辑杂志风格。--ar 16:9
-> EN: A lone person sitting in a dim warm-lit room facing a glowing computer screen showing only a grey empty page with a small line of text, sense of quiet loss and solitude, cinematic side-back lighting, silhouette, film grain, muted warm tones, editorial photography style --ar 16:9
+![开头情绪图：昏暗房间里，一个人面对显示已删除内容的电脑屏幕](assets/gen-1-deleted-content.png)
 
 我盯着那个灰色的页面看了几秒，有种很微妙的失落。不是愤怒，就是那种，你以为攥在手里的东西，其实从来就不在你手里。
 
@@ -33,10 +29,7 @@
 
 我想把一批公众号文章喂给 AI，让它帮我做点分析整理。结果你猜怎么着，我只能一篇一篇点开，一篇一篇复制，粘贴到对话框里。图片还带不出来，排版全乱。搞了七八篇我就不想干了。
 
-[图片：GEN-2 人肉搬运工]
-
-> **AI 生成提示词（GEN-2）**：一双手疲惫地重复复制粘贴的动作，屏幕上密密麻麻堆叠着无数个文章窗口和复制粘贴的图标，凌乱、重复、令人窒息的工作流，暖黄色调带一点焦躁的橙红，扁平编辑插画风格，略带荒诞夸张。--ar 16:9
-> EN: Flat editorial illustration, a pair of tired hands endlessly copy-pasting, screen overflowing with countless stacked article windows and copy-paste icons, repetitive suffocating workflow, warm amber tones with anxious orange-red accents, slightly absurd exaggeration --ar 16:9
+![人肉搬运工：疲惫双手在堆满文章窗口的屏幕前重复复制粘贴](assets/gen-2-copy-paste.png)
 
 两件烦事撞一块儿，我突然就有点上头。
 
@@ -90,10 +83,7 @@ wx-kit 是一个 app，你可以开窗口点点点。但它同时也是一个命
 
 为啥要这样？因为我想让我的 AI agent 能直接调用它。
 
-[图片：GEN-3 人与 AI 共读同一份内容]
-
-> **AI 生成提示词（GEN-3）**：极简概念示意图，中间是一个文件/文档图标，向左连接一个「人(眼睛)」的图标，向右连接一个「AI(芯片/机器人)」的图标，两条线对称流动，表示同一份内容既给人读也给 AI 读。暖色背景，线条干净，瑞士国际主义平面设计风格，留白充足。--ar 16:9
-> EN: Minimalist concept diagram, a document icon in the center connected by two symmetric flowing lines, left to a human-eye icon, right to an AI-chip/robot icon, representing the same content readable by both human and AI, warm beige background, clean lines, Swiss international typographic style, generous whitespace --ar 16:9
+![人与 AI 共读同一份内容：文档图标连接人眼与 AI 图标](assets/gen-3-human-ai-reading.png)
 
 你想想看这个画面。我跟我的 AI 说，把「数字生命卡兹克」最近十篇文章扒下来，整理一份选题分析给我。然后它自己去调 wx-kit，自己把文章下到本地，自己读，自己分析。我全程不用动手。
 
@@ -149,10 +139,7 @@ Windows 上，这个程序因为是带图形界面的，它在命令行里跑的
 
 那种感觉，怎么说呢，有点像两个人打一局很难的副本。
 
-[图片：GEN-4 人与 AI 并肩作战]
-
-> **AI 生成提示词（GEN-4）**：一个人和一个发光的 AI 形象并肩坐在电脑前，像并肩作战的搭档，屏幕上代码与思维导图交织，暖色调，有篝火般的温暖光感，信任与协作的氛围，电影海报式构图，半写实插画。--ar 16:9
-> EN: A person and a glowing AI figure sitting side by side at a desk like battle companions, screen filled with intertwined code and mind-maps, warm campfire-like glow, atmosphere of trust and collaboration, cinematic poster composition, semi-realistic illustration --ar 16:9
+![人与 AI 并肩作战：人和发光 AI 形象并肩坐在电脑前协作](assets/gen-4-ai-pair-programming.png)
 
 我用 AI 写代码这一年多，最深的一个体会是，它把「一个人也能做出一个完整产品」这件事，变成了真的。
 
@@ -186,10 +173,7 @@ Windows 上，这个程序因为是带图形界面的，它在命令行里跑的
 
 我一直信一件事，好的内容、好的工具，都应该尽量自由地流动，而不是被锁在某一个花园的高墙里。
 
-[图片：GEN-5 磨开围墙的缺口]
-
-> **AI 生成提示词（GEN-5）**：一堵高墙上有一道被磨开的小缺口，缺口里透出温暖的光，一个小小的人形剪影正从缺口往外走，墙外是开阔明亮的世界。象征打破信息围墙。暖色调，极简，富有诗意和希望感，大量留白。--ar 16:9
-> EN: A tall wall with a small worn-through gap glowing with warm light, a tiny human silhouette stepping through the gap toward an open bright world beyond, symbolizing breaking down information walls, minimalist, poetic and hopeful, warm tones, generous negative space --ar 16:9
+![磨开围墙的缺口：高墙缺口透出暖光，一个人走向墙外开阔世界](assets/gen-5-wall-gap.png)
 
 我们能做的，就是一点一点，磨平这些信息之间的墙。
 
@@ -198,6 +182,3 @@ Windows 上，这个程序因为是带图形界面的，它在命令行里跑的
 以上，既然看到这里了，如果觉得不错，随手点个赞、在看、转发三连吧，如果想第一时间收到推送，也可以给我个星标⭐～
 
 谢谢你看我的文章，我们，下次再见。
-
-> / 作者：卡兹克
-> / 投稿或爆料，请联系邮箱：wzglyay@virxact.com
