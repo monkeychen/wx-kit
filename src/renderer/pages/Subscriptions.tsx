@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Input, Switch, Button, Spin, Alert, message, List, Tag } from 'antd'
+import { LoadingOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import type { SubscribedAccount, CheckLogEntry } from '../api'
 import type { MpAccount } from '../../core/mp-types'
+
+interface DlState { fakeid: string; total: number; done: number }
 
 export default function Subscriptions() {
   const [accounts, setAccounts] = useState<SubscribedAccount[]>([])
@@ -13,6 +16,14 @@ export default function Subscriptions() {
   const [candidates, setCandidates] = useState<MpAccount[]>([])
   const [checkLog, setCheckLog] = useState<CheckLogEntry[]>([])
   const [nextCheckAt, setNextCheckAt] = useState<number | null>(null)
+  const [dl, setDl] = useState<DlState | null>(null)
+  const dlRef = useRef<DlState | null>(null)
+  useEffect(() => { dlRef.current = dl }, [dl])
+  // 下载进度：只在「自己触发的那个号」窗口期更新行内文字（completed 计数）
+  useEffect(() => api.onSubscriptionDownloadProgress((e) => {
+    const cur = dlRef.current
+    if (cur && e.fakeid === cur.fakeid) setDl({ fakeid: e.fakeid, total: e.total, done: e.done })
+  }), [])
 
   const load = async () => {
     setLoading(true)
@@ -41,6 +52,20 @@ export default function Subscriptions() {
     try { await api.subscriptionsCheckNow(); await load() }
     finally { setChecking(false) }
   }
+  const downloadNew = async (a: SubscribedAccount) => {
+    const n = a.newRefs.length
+    setDl({ fakeid: a.fakeid, total: n, done: 0 })
+    try {
+      await api.subscriptionsDownloadNew(a.fakeid)
+      message.success(`已下载「${a.nickname}」${n} 篇新文章`)
+      await load()
+    } catch (e) {
+      message.error('下载失败：' + (e as Error).message)
+    } finally {
+      setDl(null)
+    }
+  }
+  const dismiss = async (a: SubscribedAccount) => { await api.subscriptionsDismissNew(a.fakeid); await load() }
 
   return (
     <div className="page">
@@ -58,7 +83,7 @@ export default function Subscriptions() {
             onPressEnter={search} style={{ width: 280 }} data-testid="subs-search-input" allowClear />
           <Button onClick={search} data-testid="subs-search-btn">搜索</Button>
           <div style={{ flex: 1 }} />
-          <Button type="primary" loading={checking} onClick={checkNow} data-testid="subs-check-now">检查更新</Button>
+          <Button type="primary" loading={checking} disabled={dl !== null} onClick={checkNow} data-testid="subs-check-now">检查更新</Button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 13 }} className="faint">
@@ -83,18 +108,30 @@ export default function Subscriptions() {
               <div>下载过某公众号的文章后它会出现在这里，或上方搜索名称直接添加。</div>
             </div>
           ) : (
-            <List dataSource={accounts} data-testid="subs-list" renderItem={(a) => (
-              <List.Item data-testid="subs-row" actions={[
-                a.newRefs.length > 0 ? <a key="dl" data-testid="subs-download-new" onClick={async () => { await api.subscriptionsDownloadNew(a.fakeid); await load() }}>下载 {a.newRefs.length} 篇新文章</a> : <span key="none" className="faint">无新文章</span>,
-                a.newRefs.length > 0 ? <a key="ig" onClick={async () => { await api.subscriptionsDismissNew(a.fakeid); await load() }}>忽略</a> : null,
-              ]}>
+            <List dataSource={accounts} data-testid="subs-list" renderItem={(a) => {
+              const busy = dl !== null
+              const downloadingThis = dl?.fakeid === a.fakeid
+              const actions = downloadingThis
+                ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>]
+                : a.newRefs.length > 0
+                  ? [
+                      busy
+                        ? <span key="dl" className="faint" data-testid="subs-download-new">下载 {a.newRefs.length} 篇新文章</span>
+                        : <a key="dl" data-testid="subs-download-new" onClick={() => downloadNew(a)}>下载 {a.newRefs.length} 篇新文章</a>,
+                      busy
+                        ? <span key="ig" className="faint">忽略</span>
+                        : <a key="ig" onClick={() => dismiss(a)}>忽略</a>,
+                    ]
+                  : [<span key="none" className="faint">无新文章</span>]
+              return (
+              <List.Item data-testid="subs-row" actions={actions}>
                 <List.Item.Meta
                   title={<span>{a.nickname} {a.newRefs.length > 0 && <Tag color="red">{a.newRefs.length} 新</Tag>}</span>}
                   description={a.lastCheckedAt ? `上次检查 ${new Date(a.lastCheckedAt).toLocaleString()}` : '尚未检查'} />
                 <Switch checked={a.subscribed} onChange={(v) => toggle(a, v)} data-testid="subs-toggle"
-                  checkedChildren="已订阅" unCheckedChildren="未订阅" />
+                  disabled={dl !== null} checkedChildren="已订阅" unCheckedChildren="未订阅" />
               </List.Item>
-            )} />
+              ) }} />
           )}
 
         <div style={{ marginTop: 24 }} data-testid="subs-check-log">

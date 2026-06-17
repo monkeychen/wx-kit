@@ -44,6 +44,11 @@ const api: WxApi = {
     ipcRenderer.on('subscriptions:updated', listener)
     return () => { ipcRenderer.removeListener('subscriptions:updated', listener) }
   },
+  onSubscriptionDownloadProgress: (cb) => {
+    const listener = (_e: unknown, ev: Parameters<typeof cb>[0]) => cb(ev)
+    ipcRenderer.on('subscriptions:download:progress', listener)
+    return () => { ipcRenderer.removeListener('subscriptions:download:progress', listener) }
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)

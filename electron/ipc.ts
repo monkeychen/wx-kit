@@ -152,11 +152,11 @@ export function registerIpc(settings: SettingsService): void {
     } catch { return Math.floor(Date.now() / 1000) }
   }
 
-  const downloadRefs = async (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
+  const downloadRefs = async (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource, onProgress?: (e: import('../src/core/types').ProgressEvent) => void) => {
     const { libraryRoot } = await settings.get()
     const library = new Library(libraryRoot)
     const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot }
-    const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps))
+    const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps), onProgress)
     const summary = await queue.run(refs.map((r) => r.url))
     await recordHistory(source, formats, summary)
   }
@@ -240,12 +240,20 @@ export function registerIpc(settings: SettingsService): void {
     emitSubsUpdated()
   })
   ipcMain.handle('subscriptions:checkNow', async () => { await runSubscriptionCheck('manual') })
-  ipcMain.handle('subscriptions:downloadNew', async (_e, fakeid: string) => {
+  ipcMain.handle('subscriptions:downloadNew', async (event, fakeid: string) => {
     const subs = await subsFor()
     const acc = (await subs.list()).find((a) => a.fakeid === fakeid)
     if (!acc || !acc.newRefs.length) return
-    await downloadRefs(acc.newRefs, (await settings.get()).defaultFormats, { kind: 'account', nickname: acc.nickname, fakeid, range: { count: acc.newRefs.length } })
+    const total = acc.newRefs.length
+    const emitProgress = (done: number, phase: string) => {
+      if (!event.sender.isDestroyed()) event.sender.send('subscriptions:download:progress', { fakeid, total, done, phase })
+    }
+    emitProgress(0, 'start')
+    await downloadRefs(acc.newRefs, (await settings.get()).defaultFormats,
+      { kind: 'account', nickname: acc.nickname, fakeid, range: { count: total } },
+      (e) => emitProgress(e.completed, e.phase))
     await subs.clearNewRefs(fakeid)
+    emitProgress(total, 'done')
     emitSubsUpdated()
   })
   ipcMain.handle('subscriptions:dismissNew', async (_e, fakeid: string) => {

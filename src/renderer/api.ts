@@ -10,6 +10,7 @@ export type { HistoryEvent } from '../core/download-history'
 export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 
 export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null; checkLog: CheckLogEntry[]; nextCheckAt: number | null }
+export interface SubscriptionDownloadProgress { fakeid: string; total: number; done: number; phase: string }
 
 export interface CrawlRangeInput { count?: number; from?: string; to?: string }
 export type CrawlEvent =
@@ -52,6 +53,7 @@ export interface WxApi {
   subscriptionsDismissNew(fakeid: string): Promise<void>
   subscriptionsOpenLog(): Promise<void>
   onSubscriptionsUpdated(cb: () => void): () => void
+  onSubscriptionDownloadProgress(cb: (e: SubscriptionDownloadProgress) => void): () => void
 }
 
 declare global {
