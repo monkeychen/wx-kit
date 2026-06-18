@@ -17,6 +17,8 @@ export interface CrawlDeps {
   onItem?: (ev: CrawlItemEvent) => void
   /** 返回 false 则停止后续（取消）；已下载的保留。 */
   shouldContinue?: () => boolean
+  /** 取消信号：用于即时打断列表阶段的频控退避等待（否则要干等满 30~90s）。 */
+  signal?: AbortSignal
   /** 列表阶段命中频控、进入退避等待前上报，供 UI 显示「退避中 · N 秒后重试」。 */
   onBackoff?: (ev: { attempt: number; waitMs: number; reason: 'rate-limit' }) => void
   /** 测试可注入假 listArticles。 */
@@ -29,9 +31,10 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
   const sleep = deps.sleep ?? sleepImpl
   const listFn = deps.listFn ?? listArticlesImpl
 
-  // 列表阶段：命中频控则指数退避，最多 3 次
+  // 列表阶段：命中频控则指数退避，最多 3 次。退避等待可被取消即时打断（见 abortableWait）。
   let refs: ArticleRef[] = []
   for (let attempt = 0; ; attempt++) {
+    if (deps.signal?.aborted) break   // 已取消则停止重试，进下载阶段空跑收尾
     try {
       refs = await listFn(deps.mpFetch, deps.token, fakeid, range, { sleep })
       break
@@ -39,7 +42,9 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
       if (e instanceof MpRateLimited && attempt < 3) {
         const waitMs = 30000 * (attempt + 1)
         deps.onBackoff?.({ attempt: attempt + 1, waitMs, reason: 'rate-limit' })
-        await sleep(waitMs); continue
+        await abortableWait(sleep(waitMs), deps.signal)
+        if (deps.signal?.aborted) break
+        continue
       }
       throw e
     }
@@ -77,4 +82,18 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
     total: s.total, succeeded: s.succeeded, failed: s.failed, skipped: s.skipped,
     items: [...s.items, ...cancelled],
   }
+}
+
+/**
+ * 等 wait 结束，但 signal 一旦 abort 就立即返回（不等满）。
+ * 用于让频控退避的长 sleep 能被「取消」即时打断；底层 timer 即使空转也无副作用（调用方随后 break）。
+ */
+function abortableWait(wait: Promise<void>, signal?: AbortSignal): Promise<void> {
+  if (!signal) return wait
+  if (signal.aborted) return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const done = () => { signal.removeEventListener('abort', done); resolve() }
+    signal.addEventListener('abort', done, { once: true })
+    wait.then(done, done)
+  })
 }

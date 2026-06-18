@@ -109,10 +109,11 @@ export function registerIpc(settings: SettingsService): void {
     }
   })
 
-  let cancelRequested = false
-  ipcMain.on('mp:crawl:cancel', () => { cancelRequested = true })
+  let crawlAbort: AbortController | null = null
+  ipcMain.on('mp:crawl:cancel', () => { crawlAbort?.abort() })
   ipcMain.handle('mp:crawl', async (event, { fakeid, nickname, range, formats }: { fakeid: string; nickname: string; range: CrawlRange; formats: DownloadFormat[] }) => {
-    cancelRequested = false
+    const abort = new AbortController()
+    crawlAbort = abort
     const session = getSession()
     if (!session) throw new Error('AUTH_REQUIRED')
     const { libraryRoot } = await settings.get()
@@ -122,17 +123,22 @@ export function registerIpc(settings: SettingsService): void {
       now: () => new Date().toISOString(), library, libraryRoot,
     }
     const send = (ev: unknown) => { if (!event.sender.isDestroyed()) event.sender.send('mp:crawl:progress', ev) }
-    const summary = await crawlAccount(fakeid, range, {
-      mpFetch: makeMpFetch(session), token: session.token,
-      downloadOne: (url) => downloadArticle(url, formats, ddeps),
-      onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
-      onItem: (ev) => send({ kind: 'item', ...ev }),
-      onBackoff: (ev) => send({ kind: 'backoff', ...ev }),
-      shouldContinue: () => !cancelRequested,
-    })
-    send({ kind: 'done', summary })
-    await recordHistory({ kind: 'account', nickname, fakeid, range }, formats, summary)
-    return summary
+    try {
+      const summary = await crawlAccount(fakeid, range, {
+        mpFetch: makeMpFetch(session), token: session.token,
+        downloadOne: (url) => downloadArticle(url, formats, ddeps),
+        onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
+        onItem: (ev) => send({ kind: 'item', ...ev }),
+        onBackoff: (ev) => send({ kind: 'backoff', ...ev }),
+        shouldContinue: () => !abort.signal.aborted,
+        signal: abort.signal,
+      })
+      send({ kind: 'done', summary })
+      await recordHistory({ kind: 'account', nickname, fakeid, range }, formats, summary)
+      return summary
+    } finally {
+      if (crawlAbort === abort) crawlAbort = null   // 任务结束后清引用，避免晚到的取消误伤下一次
+    }
   })
 
   // —— M11 公众号订阅 ——

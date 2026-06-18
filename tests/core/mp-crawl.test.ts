@@ -45,6 +45,24 @@ describe('crawlAccount', () => {
     expect(sleep).toHaveBeenCalledWith(30000) // 第一次退避 30s
   })
 
+  it('aborts the rate-limit backoff wait the moment cancel fires (does not retry)', async () => {
+    const controller = new AbortController()
+    let calls = 0
+    // 退避等待用「永不自行 resolve」的 sleep 模拟还卡在 30s 退避里；只有取消能让它返回。
+    const sleep = vi.fn(() => new Promise<void>(() => {}))
+    const listFn = async () => { calls++; throw new MpRateLimited('rl') }
+    const out = await crawlAccount('FID', { count: 1 }, {
+      listFn, mpFetch: (async () => ({})) as never, token: 'T',
+      downloadOne: async (url) => ({ url, ok: true, id: url }), sleep,
+      signal: controller.signal,
+      // onBackoff 在进入退避等待时触发 → 立刻取消，验证等待被即时打断、不再 retry。
+      onBackoff: () => controller.abort(),
+    })
+    expect(sleep).toHaveBeenCalledWith(30000) // 退避仍以 30s 发起（契约不变）
+    expect(calls).toBe(1)                      // 取消后没有第二次 listFn 重试
+    expect(out.listed).toBe(0)                 // 列表阶段被取消，无文章
+  })
+
   it('reports each backoff so the UI can show「退避中」(R5)', async () => {
     const sleep = vi.fn(async () => {})
     const onBackoff = vi.fn()
