@@ -15,6 +15,7 @@ import { makeMpFetch } from '../../electron/services/mp-fetch'
 import { searchAccount } from '../core/mp-client'
 import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
+import { rebuildLibrary } from '../core/rebuild-library'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -162,6 +163,16 @@ export async function runCli(argv: string[]): Promise<number> {
       const all = await new Library(opts.out).list()
       const items = opts.account ? all.filter((a) => a.account === opts.account) : all
       outJson({ ok: true, items })
+      exitCode = 0
+    })
+
+  library
+    .command('rebuild')
+    .description('从各文章目录的 meta.json 重建文库索引（library.json 损坏时的恢复手段）')
+    .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
+    .action(async (opts) => {
+      const res = await rebuildLibrary(opts.out)
+      outJson({ ok: true, ...res })
       exitCode = 0
     })
 
