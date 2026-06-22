@@ -71,3 +71,19 @@ describe('Library', () => {
     expect(await lib.has('3')).toBe(false)                    // index entry still removed
   })
 })
+
+// —— M13: 并发写不丢更新 ——
+const concMeta = (id: string, root: string): ArticleMeta => ({
+  id, title: 'T' + id, author: '', account: 'acc', publishTime: '', sourceUrl: '',
+  digest: '', coverUrl: '', downloadTime: '', formats: ['md'], dir: join(root, 'acc', id),
+})
+
+describe('Library concurrent writes (M13)', () => {
+  it('serializes concurrent add across instances — no lost update', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-lib-conc-'))
+    const a = new Library(root); const b = new Library(root)
+    await Promise.all([a.add(concMeta('1', root)), b.add(concMeta('2', root))])
+    const ids = (await new Library(root).list()).map((x) => x.id).sort()
+    expect(ids).toEqual(['1', '2'])
+  })
+})
