@@ -24,6 +24,12 @@ export default function Settings() {
     try { await api.historyClear(); message.success('已清空下载历史') }
     catch (e) { message.error('清空失败：' + (e as Error).message) }
   }
+  const rebuildIndex = async () => {
+    try {
+      const r = await api.libraryRebuild()
+      message.success(`已重建文库索引：扫描 ${r.scanned} 篇，重建 ${r.rebuilt} 篇，跳过 ${r.skipped} 篇`)
+    } catch (e) { message.error('重建失败：' + (e as Error).message) }
+  }
 
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
@@ -43,6 +49,13 @@ export default function Settings() {
               <Input value={s.libraryRoot} readOnly />
               <Button icon={<FolderOpenOutlined />} onClick={choose}>选择目录</Button>
             </Space.Compact>
+            <div className="setting-hint" style={{ marginTop: 10 }}>
+              若文库列表异常为空或提示索引损坏，可从磁盘各文章目录的 meta.json 重建索引（不动已下载文件）。
+            </div>
+            <Popconfirm title="重建文库索引？" description="扫描库目录重建 library.json，不会删除任何文章文件。"
+              okText="重建" cancelText="取消" onConfirm={rebuildIndex}>
+              <Button style={{ marginTop: 8 }}>重建索引</Button>
+            </Popconfirm>
           </div>
 
           <div className="setting-block">

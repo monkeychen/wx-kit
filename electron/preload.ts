@@ -13,6 +13,7 @@ const api: WxApi = {
   librarySearch: (kw) => ipcRenderer.invoke('library:search', kw),
   libraryRemove: (id) => ipcRenderer.invoke('library:remove', id),
   libraryRemoveMany: (ids) => ipcRenderer.invoke('library:removeMany', ids),
+  libraryRebuild: () => ipcRenderer.invoke('library:rebuild'),
   coverName: (dir) => ipcRenderer.invoke('library:coverName', dir),
   readContent: (dir, kind) => ipcRenderer.invoke('library:readContent', { dir, kind }),
   getSettings: () => ipcRenderer.invoke('settings:get'),

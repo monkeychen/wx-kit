@@ -16,6 +16,7 @@ import { searchAccount, listArticles } from '../src/core/mp-client'
 import { crawlAccount } from '../src/core/mp-crawl'
 import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
+import { rebuildLibrary } from '../src/core/rebuild-library'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { checkSubscriptions } from '../src/core/check-subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
@@ -48,6 +49,7 @@ export function registerIpc(settings: SettingsService): void {
     const lib = await libraryFor(); const hist = await historyFor()
     for (const id of ids) { await lib.remove(id); await hist.markDeleted(id) }
   })
+  ipcMain.handle('library:rebuild', async () => rebuildLibrary((await settings.get()).libraryRoot))
 
   ipcMain.handle('history:list', async (_e, { offset, limit }: { offset: number; limit: number }) =>
     (await historyFor()).list(offset, limit))
