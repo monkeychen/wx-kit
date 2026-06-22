@@ -9,6 +9,7 @@ import type { ExtraProps } from 'react-markdown'
 import { api } from '../api'
 import { toWxfileBase, wxfileJoin } from '../wxfile'
 import { relativeTime } from '../time'
+import { stripLeadingTitle } from '../strip-leading-title'
 import type { ArticleMeta } from '../../core/types'
 
 type ImgProps = ClassAttributes<HTMLImageElement> & ImgHTMLAttributes<HTMLImageElement> & ExtraProps
@@ -76,7 +77,7 @@ export default function Reader() {
                     return <img src={resolved} alt={rest.alt ?? ''} />
                   },
                 }}>
-                {md}
+                {stripLeadingTitle(md, meta.title)}
               </ReactMarkdown>
             </div>
           </article>
