@@ -15,11 +15,12 @@ describe('atomicWriteFile', () => {
     expect(readdirSync(dir).filter((n) => n.includes('.tmp-'))).toEqual([])
   })
 
-  it('leaves the original file intact when rename fails', async () => {
+  it('cleans up the temp file and leaves the original intact when rename fails', async () => {
     const dir = tmp(); const f = join(dir, 'x.json')
     await atomicWriteFile(f, 'v1')
     const failing = { writeFile: fsp.writeFile, rename: async () => { throw new Error('boom') } }
     await expect(atomicWriteFile(f, 'v2', failing)).rejects.toThrow('boom')
     expect(readFileSync(f, 'utf-8')).toBe('v1')
+    expect(readdirSync(dir).filter((n) => n.includes('.tmp-'))).toEqual([])
   })
 })
