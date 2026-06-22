@@ -50,10 +50,21 @@
 - 测试规模不在此写死数字——跑 `npm test`（单测）与 `npm run test:e2e`（GUI 端到端）看当前真实结果。
 
 ## 下一步
-v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布，v0.2.1 安全补丁清掉全部 Dependabot。**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性）已全部合入 main、功能完成待发版**（验收 `docs/PRD-v0.3.0.md` §4 全勾）。下一步可议 v0.3.0 出包发版（bump 0.3.0 + tag + Release，走 `docs/AGENTS.md` 发版规约）。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
+v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布，v0.2.1 安全补丁清掉全部 Dependabot。**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性）已全部合入 main、功能完成待发版**（验收 `docs/PRD-v0.3.0.md` §4 全勾）。**v0.4.0（M13–M15 文库供料 agent + 存储加固）已启动：M13 存储加固已合入 main，M14/M15 待实现**（需求 `docs/PRD-v0.4.0.md`，设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`）。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
 
 候选待议（未排期，需要时单议）：
 - **Windows CLI stdout 正解** —— 当前打包后 win 是 GUI 子系统程序，CLI 模式 stdout 不回贴调用控制台，文档里只给了「重定向到文件」的绕法（见 README「安装包后的 CLI 用法」、AGENTS.md 陷阱清单）。真要让 Windows agent 集成丝滑，正解是打包时给 win 出一个 console 子系统入口（或 `wx-kit-cli.exe` wrapper 转发到主程序）。要动打包配置，等真要铺 Windows agent 场景再做。
+
+## v0.4.0 迭代（进行中，2026-06-22 启动）
+需求见 `docs/PRD-v0.4.0.md`，设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`。主题：把文库变成**可被 AI agent 消费的素材源**，并先夯实文件存储地基。三里程碑强先后：M13 存储加固 → M14 供料能力 → M15 贯通样例 skill。
+
+| 里程碑 | 范围 | 状态 |
+|--------|------|------|
+| **M13** | 存储加固：原子写（temp+rename）+ 按路径写锁（杜绝并发丢更新）+ `rebuildLibrary`（从各文章目录 `meta.json` 重建索引，CLI `library rebuild` + 设置页「重建索引」按钮）；`library.json` 损坏提示改为指向 rebuild（R1） | ✅ 已合入 main |
+| **M14** | 供料能力：`library export` CLI（JSON 清单 + content.md 路径，`--ids`/`--since`/`--account`/`--all` 选料）+ 文库 GUI「导出选中为素材」按钮（写库内 `exports/`）（R2） | ⏳ 待实现 |
+| **M15** | 贯通样例 skill（仓库 `agent/`）：选料 → 选题候选 → 人工拍板 → khazix-writer 初稿 → 人工审定，带检查点；复用 hv-analysis/khazix-writer，wx-kit 只供料（R3） | ⏳ 待实现 |
+
+**M13 实现说明**：核心新增 `atomic-write.ts`（写临时文件+原子 `rename`，失败 best-effort 清理）、`path-lock.ts`（模块级按绝对路径 keyed 的异步互斥锁），接入 `Library`/`History`/`Subscriptions` 三索引的读-改-写；`rebuild-library.ts` 递归扫 `meta.json` 重建（忽略 `exports/` 与点目录）。全程 TDD（含「两实例并发 add/append 不丢更新」回归用例），`npm test` + `tsc` + `lint` 全绿，`npm run test:e2e` 实机全流程通过。实现计划 `docs/superpowers/plans/2026-06-22-m13-storage-hardening.md`。
 
 ## v0.2.0 迭代（已发布，2026-06-09）
 需求见 `docs/PRD-v0.2.0.md`。主题：把下载闭环做扎实、信息架构理顺——「下得放心、找得到、看得见」。
