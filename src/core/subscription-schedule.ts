@@ -47,10 +47,43 @@ export function nextScheduledInstant(now: number, config: ScheduleConfig): numbe
   return now < ts ? ts : ts + 24 * 3600_000
 }
 
-/** 现在是否该触发一次检查。 */
+/** 现在是否该触发一次检查（网格 + 去重，不含抖动）。 */
 export function shouldCheckNow(i: ScheduleInput): boolean {
   if (!i.autoCheck) return false
   const inst = lastScheduledInstant(i.now, i.config)
   if (inst == null) return false
   return i.lastCheckedAt == null || i.lastCheckedAt < inst
+}
+
+// —— 去规律化（B）——
+// 微信频控盯的是「不像人」的节奏：每天同一秒触发是明显的机器指纹。给每个计划时段叠加一个
+// 「确定性随机顺延」——同一时段每次轮询算出同一个偏移（否则会早触发/重复触发），日间/段间各异。
+const DEFAULT_JITTER_MS = 30 * 60_000   // 触发时刻最多顺延 30 分钟（只往后，不会早于设定点）
+
+/** 由时段起点确定性派生的顺延量，落在 [0, maxJitterMs)。整数哈希，无需 crypto。 */
+export function scheduleJitterMs(slotInstant: number, maxJitterMs = DEFAULT_JITTER_MS): number {
+  if (maxJitterMs <= 0) return 0
+  const seed = Math.floor(slotInstant / 60_000)
+  const h = Math.imul(seed ^ 0x9e3779b9, 2654435761) >>> 0
+  return h % maxJitterMs
+}
+
+/** 在 shouldCheckNow 之上叠加抖动闸门：到点后还要等过本时段的随机顺延量才真正触发。 */
+export function shouldRunCheck(i: ScheduleInput, maxJitterMs = DEFAULT_JITTER_MS): boolean {
+  if (!shouldCheckNow(i)) return false
+  const inst = lastScheduledInstant(i.now, i.config)!   // shouldCheckNow 已保证非空
+  return i.now >= inst + scheduleJitterMs(inst, maxJitterMs)
+}
+
+/** 下次实际触发时刻（含抖动，供页面显示）。当前时段已到点但还在顺延窗口内且未跑→就是本时段顺延点。 */
+export function nextCheckAt(
+  now: number, lastCheckedAt: number | null, config: ScheduleConfig, maxJitterMs = DEFAULT_JITTER_MS,
+): number {
+  const last = lastScheduledInstant(now, config)
+  if (last != null) {
+    const fireAt = last + scheduleJitterMs(last, maxJitterMs)
+    if (now < fireAt && (lastCheckedAt == null || lastCheckedAt < last)) return fireAt
+  }
+  const rawNext = nextScheduledInstant(now, config)
+  return rawNext + scheduleJitterMs(rawNext, maxJitterMs)
 }

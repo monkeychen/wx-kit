@@ -1,6 +1,6 @@
 // electron/services/subscription-scheduler.ts
-// 运行期每分钟 tick：到达配置时刻且当天未检查则触发；start() 时立即 tick 一次做启动补检。GUI 模式专用。
-import { shouldCheckNow } from '../../src/core/subscription-schedule'
+// 运行期每分钟 tick：到达配置时刻（叠加去规律化的随机顺延）且当天未检查则触发；start() 时立即 tick 一次做启动补检。GUI 模式专用。
+import { shouldRunCheck } from '../../src/core/subscription-schedule'
 import type { Subscriptions } from '../../src/core/subscriptions'
 import type { SettingsService } from './settings'
 
@@ -27,7 +27,7 @@ export class SubscriptionScheduler {
       if (!s.subscriptionAutoCheck) return
       const now = (this.deps.now ?? Date.now)()
       const lastRunAt = await (await this.deps.subsFor()).getLastRunAt()
-      if (shouldCheckNow({
+      if (shouldRunCheck({
         now, lastCheckedAt: lastRunAt, autoCheck: true,
         config: { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours },
       })) {

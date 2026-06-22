@@ -18,7 +18,7 @@ import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { checkSubscriptions } from '../src/core/check-subscriptions'
-import { nextScheduledInstant } from '../src/core/subscription-schedule'
+import { nextCheckAt } from '../src/core/subscription-schedule'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { SettingsService } from './services/settings'
 
@@ -225,10 +225,11 @@ export function registerIpc(settings: SettingsService): void {
     const subs = await subsFor()
     const merged = mergeAccounts(accountsFromHistory(events), await subs.list())
     const s = await settings.get()
-    const nextCheckAt = s.subscriptionAutoCheck
-      ? nextScheduledInstant(Date.now(), { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours })
+    const lastRunAt = await subs.getLastRunAt()
+    const nextCheckTime = s.subscriptionAutoCheck
+      ? nextCheckAt(Date.now(), lastRunAt, { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours })
       : null
-    return { accounts: merged, authExpired: subsAuthExpired, lastRunAt: await subs.getLastRunAt(), checkLog: await subs.getCheckLog(), nextCheckAt }
+    return { accounts: merged, authExpired: subsAuthExpired, lastRunAt, checkLog: await subs.getCheckLog(), nextCheckAt: nextCheckTime }
   })
   ipcMain.handle('subscriptions:addAccount', async (_e, { fakeid, nickname }: { fakeid: string; nickname: string }) => {
     await (await subsFor()).addAccount({ fakeid, nickname, subscribed: true, watermark: await establishWatermark(fakeid) })
