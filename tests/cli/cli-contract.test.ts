@@ -1,6 +1,7 @@
 // tests/cli/cli-contract.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdirSync as _mkdirSync, writeFileSync as _writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -54,5 +55,19 @@ describe('CLI library list', () => {
     const code = await runCli(['library', 'list', '--out', root])
     expect(code).toBe(0)
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, items: [{ id: 'x', title: 'T' }] })
+  })
+})
+
+describe('CLI library rebuild', () => {
+  it('rebuilds library.json from meta.json and reports counts', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-rebuild-'))
+    const art = join(root, 'acc', 'art1'); _mkdirSync(art, { recursive: true })
+    _writeFileSync(join(art, 'meta.json'), JSON.stringify({
+      id: 'z', title: 'T', author: '', account: 'acc', publishTime: '', sourceUrl: '',
+      digest: '', coverUrl: '', downloadTime: '', formats: ['md'], dir: art,
+    }))
+    const code = await runCli(['library', 'rebuild', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, scanned: 1, rebuilt: 1, skipped: 0 })
   })
 })

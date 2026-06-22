@@ -1,7 +1,9 @@
 // src/core/subscriptions.ts
 // 公众号订阅存储（库根下 subscriptions.json）+ 派生/合并纯函数。仿 download-history 的文件读写。
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { atomicWriteFile } from './atomic-write'
+import { withPathLock } from './path-lock'
 import type { ArticleRef } from './mp-types'
 import type { HistoryEvent } from './download-history'
 
@@ -68,10 +70,12 @@ export class Subscriptions {
   }
   private async write(data: SubscriptionsFile): Promise<void> {
     await mkdir(this.root, { recursive: true })
-    await writeFile(this.path, JSON.stringify(data, null, 2), 'utf-8')
+    await atomicWriteFile(this.path, JSON.stringify(data, null, 2))
   }
   private async mutate(fn: (d: SubscriptionsFile) => void): Promise<void> {
-    const d = await this.read(); fn(d); await this.write(d)
+    await withPathLock(this.path, async () => {
+      const d = await this.read(); fn(d); await this.write(d)
+    })
   }
   private find(d: SubscriptionsFile, fakeid: string): SubscribedAccount | undefined {
     return d.accounts.find((a) => a.fakeid === fakeid)

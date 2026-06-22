@@ -1,6 +1,8 @@
 // src/core/download-history.ts
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { atomicWriteFile } from './atomic-write'
+import { withPathLock } from './path-lock'
 import type { DownloadFormat, DownloadSummary } from './types'
 import type { CrawlRange } from './mp-types'
 
@@ -86,7 +88,7 @@ export class History {
 
   private async write(data: HistoryFile): Promise<void> {
     await mkdir(this.root, { recursive: true })
-    await writeFile(this.path, JSON.stringify(data, null, 2), 'utf-8')
+    await atomicWriteFile(this.path, JSON.stringify(data, null, 2))
   }
 
   /** 倒序 + 裁过期后切片分页。 */
@@ -96,32 +98,38 @@ export class History {
   }
 
   async append(ev: HistoryEvent, now = Date.now()): Promise<void> {
-    const data = await this.read()
-    data.events = pruneEvents([ev, ...data.events], now, this.retentionDays)
-    await this.write(data)
+    await withPathLock(this.path, async () => {
+      const data = await this.read()
+      data.events = pruneEvents([ev, ...data.events], now, this.retentionDays)
+      await this.write(data)
+    })
   }
 
   /** 删除单条历史记录（只删记录，不碰文件）。 */
   async removeEvent(id: string): Promise<void> {
-    const data = await this.read()
-    data.events = data.events.filter((e) => e.id !== id)
-    await this.write(data)
+    await withPathLock(this.path, async () => {
+      const data = await this.read()
+      data.events = data.events.filter((e) => e.id !== id)
+      await this.write(data)
+    })
   }
 
   /** 只清动作记录，绝不触碰已下文件与 library.json。 */
   async clear(): Promise<void> {
-    await this.write({ version: 1, events: [] })
+    await withPathLock(this.path, async () => { await this.write({ version: 1, events: [] }) })
   }
 
   /** 文库删除某文章后，把历史里引用它的 item 标记为已删除（保留记录、解除 id 引用）。 */
   async markDeleted(articleId: string): Promise<void> {
-    const data = await this.read()
-    let touched = false
-    for (const ev of data.events) {
-      for (const it of ev.items) {
-        if (it.id === articleId) { it.deleted = true; it.id = undefined; touched = true }
+    await withPathLock(this.path, async () => {
+      const data = await this.read()
+      let touched = false
+      for (const ev of data.events) {
+        for (const it of ev.items) {
+          if (it.id === articleId) { it.deleted = true; it.id = undefined; touched = true }
+        }
       }
-    }
-    if (touched) await this.write(data)
+      if (touched) await this.write(data)
+    })
   }
 }

@@ -103,3 +103,14 @@ describe('History (file)', () => {
     expect(DEFAULT_RETENTION_DAYS).toBe(365)
   })
 })
+
+// —— M13: 并发 append 不丢更新 ——
+describe('History concurrent append (M13)', () => {
+  it('serializes concurrent appends across instances — keeps both', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-hist-conc-'))
+    const a = new History(root); const b = new History(root)
+    await Promise.all([a.append(ev('e1', 1000 * DAY), 1000 * DAY), b.append(ev('e2', 1000 * DAY), 1000 * DAY)])
+    const { events } = await new History(root).list(0, 10, 1000 * DAY)
+    expect(events.map((e) => e.id).sort()).toEqual(['e1', 'e2'])
+  })
+})
