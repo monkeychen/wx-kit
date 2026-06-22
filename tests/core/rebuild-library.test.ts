@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { rebuildLibrary } from '../../src/core/rebuild-library'
+import { withPathLock } from '../../src/core/path-lock'
 import type { ArticleMeta } from '../../src/core/types'
 
 const meta = (id: string, dir: string): ArticleMeta => ({
@@ -40,5 +41,20 @@ describe('rebuildLibrary', () => {
     writeFileSync(join(bad, 'meta.json'), '{ not json')
     const res = await rebuildLibrary(root)
     expect(res).toEqual({ scanned: 4, rebuilt: 3, skipped: 1 })
+  })
+})
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+describe('rebuildLibrary locking', () => {
+  it('serializes behind a concurrent holder of the same library.json lock', async () => {
+    const root = tree()
+    const order: string[] = []
+    const holder = withPathLock(join(root, 'library.json'), async () => {
+      await delay(25); order.push('holder')
+    })
+    const rebuild = rebuildLibrary(root).then(() => { order.push('rebuild') })
+    await Promise.all([holder, rebuild])
+    expect(order).toEqual(['holder', 'rebuild'])
   })
 })

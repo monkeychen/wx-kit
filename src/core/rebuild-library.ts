@@ -4,6 +4,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { atomicWriteFile } from './atomic-write'
+import { withPathLock } from './path-lock'
 import type { ArticleMeta } from './types'
 
 export interface RebuildResult { scanned: number; rebuilt: number; skipped: number }
@@ -32,16 +33,19 @@ async function findMetaFiles(dir: string): Promise<string[]> {
 }
 
 export async function rebuildLibrary(root: string): Promise<RebuildResult> {
-  const metaPaths = await findMetaFiles(root)
-  const articles: ArticleMeta[] = []
-  let skipped = 0
-  for (const p of metaPaths) {
-    try {
-      articles.push(JSON.parse(await readFile(p, 'utf-8')) as ArticleMeta)
-    } catch {
-      skipped++
+  const indexPath = join(root, 'library.json')
+  return withPathLock(indexPath, async () => {
+    const metaPaths = await findMetaFiles(root)
+    const articles: ArticleMeta[] = []
+    let skipped = 0
+    for (const p of metaPaths) {
+      try {
+        articles.push(JSON.parse(await readFile(p, 'utf-8')) as ArticleMeta)
+      } catch {
+        skipped++
+      }
     }
-  }
-  await atomicWriteFile(join(root, 'library.json'), JSON.stringify({ version: 1, articles }, null, 2))
-  return { scanned: metaPaths.length, rebuilt: articles.length, skipped }
+    await atomicWriteFile(indexPath, JSON.stringify({ version: 1, articles }, null, 2))
+    return { scanned: metaPaths.length, rebuilt: articles.length, skipped }
+  })
 }
