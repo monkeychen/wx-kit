@@ -33,7 +33,7 @@
 - **M15** — 无独立 bite-sized 计划（skill 创作而非 TDD 代码）；交付物即 `agent/wx-kit-compose/SKILL.md` + `agent/README.md`，设计依据 spec「M15」节，验收 `docs/PRD-v0.4.0.md` §4 R3。✅ 已合入 main（端到端样例已实跑通）
 
 ## 当前状态
-- **v0.3.0 迭代（M10+M11+M12 已合入 main，功能完成待发版）**：
+- **v0.3.0 迭代（M10+M11+M12，已发布 2026-06-16）**——tag `v0.3.0` + GitHub Release「列表优化 + 公众号订阅」已发，发布说明 `docs/releases/v0.3.0.md`：
   - **M10 列表视图优化**——文库「列表」视图列宽可拖拽调整（持久化进 `settings.json` 的 `listColumnWidths`）、排序移到表头点击（标题/发布/下载，↑↓ 指示，同列再点翻向），卡片视图保留工具栏排序入口。纯逻辑抽 `src/renderer/list-columns.ts` TDD；拖拽/点表头本地 e2e 验证。
   - **M11 公众号订阅**——新增「订阅」页（导航在下载与文库之间），列出有 fakeid 的公众号（按公众号抓取历史 ∪ 搜号添加，URL-only 不入列），可订阅/取消订阅 + 搜号添加；运行期定时检查（opt-in，`subscriptionAutoCheck` + 每日 `subscriptionCheckTime`，启动补检），发现新文章按 `subscriptionNewArticleAction` 仅提示（角标 + 逐号下载/忽略）或自动下载。core 三件套 `subscriptions` / `subscription-schedule` / `check-subscriptions` 全 TDD（17 条新单测）；主进程 scheduler + IPC 编排，session 过期不静默（页面登录引导）。验收 `docs/PRD-v0.3.0.md` §4 R2 逐条已勾。
   - **M12 触发机制升级 + 检查可观测性**——定时检查支持两种模式：每天某时刻 / 每隔 N 小时（interval 网格锚定每天 0 点，两模式均启动补检），`subscription-schedule` 抽象出 `lastScheduledInstant`/`nextScheduledInstant`/`shouldCheckNow`（纯函数，13 条单测覆盖 daily×interval 各分支）。检查可观测性三处呈现：订阅页「检查记录」（倒序最近 10，由 `subscriptions.json` 的 `checkLog` 留 50 驱动）、落盘日志 `userData/subscriptions-check.log`（全量追加 + 「打开日志文件」）、「下次预计检查」时间。每次检查（auto/manual）留痕，写盘失败不阻断主流程。core 12 条新单测、e2e 全绿（含 daily⇄interval 切换、可观测性元素）。
@@ -53,7 +53,7 @@
 - 测试规模不在此写死数字——跑 `npm test`（单测）与 `npm run test:e2e`（GUI 端到端）看当前真实结果。
 
 ## 下一步
-v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布，v0.2.1 安全补丁清掉全部 Dependabot。**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性）已全部合入 main、功能完成待发版**（验收 `docs/PRD-v0.3.0.md` §4 全勾）。**v0.4.0（M13–M15 文库供料 agent + 存储加固）三里程碑全部合入 main、功能完成待发版**：M13 存储加固 + M14 供料能力 + M15 贯通样例 skill（`agent/wx-kit-compose`，端到端样例已实跑通：刘备教授 3 篇 → 选题 → khazix-writer 初稿，两检查点均停）。需求 `docs/PRD-v0.4.0.md`、设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
+v0.1.0（M1–M4）、v0.2.0（M5–M9）、v0.2.1（安全补丁）、**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性，已发布 2026-06-16，tag + GitHub Release 已发）** 均已发布。**v0.4.0（M13–M15 文库供料 agent + 存储加固）三里程碑全部合入 main、功能完成待发版**（当前 `package.json` 仍为 0.3.0，无 v0.4.0 tag）：M13 存储加固 + M14 供料能力 + M15 贯通样例 skill（`agent/wx-kit-compose`，端到端样例已实跑通：刘备教授 3 篇 → 选题 → khazix-writer 初稿，两检查点均停）。需求 `docs/PRD-v0.4.0.md`、设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`。**下一步可议 v0.4.0 出包发版**（bump 0.4.0 + tag + Release，走 `docs/AGENTS.md` 发版规约）。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
 
 候选待议（未排期，需要时单议）：
 - **Windows CLI stdout 正解** —— 当前打包后 win 是 GUI 子系统程序，CLI 模式 stdout 不回贴调用控制台，文档里只给了「重定向到文件」的绕法（见 README「安装包后的 CLI 用法」、AGENTS.md 陷阱清单）。真要让 Windows agent 集成丝滑，正解是打包时给 win 出一个 console 子系统入口（或 `wx-kit-cli.exe` wrapper 转发到主程序）。要动打包配置，等真要铺 Windows agent 场景再做。
