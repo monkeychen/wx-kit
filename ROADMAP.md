@@ -33,6 +33,7 @@
 - **M15** — 无独立 bite-sized 计划（skill 创作而非 TDD 代码）；交付物即 `agent/wx-kit-compose/SKILL.md` + `agent/README.md`，设计依据 spec「M15」节，验收 `docs/PRD-v0.4.0.md` §4 R3。✅ 已合入 main（端到端样例已实跑通）
 
 ## 当前状态
+- **最新发布：v0.4.0（2026-06-23，文库供料 agent + 存储加固）**——M13 存储加固 + M14 供料能力 + M15 贯通样例 skill（`agent/wx-kit-compose`）。tag `v0.4.0` + GitHub Release（mac dmg arm64/x64 + win nsis exe，标 Latest）已发，发布说明 `docs/releases/v0.4.0.md`，详见下方「v0.4.0 迭代」段。
 - **v0.3.0 迭代（M10+M11+M12，已发布 2026-06-16）**——tag `v0.3.0` + GitHub Release「列表优化 + 公众号订阅」已发，发布说明 `docs/releases/v0.3.0.md`：
   - **M10 列表视图优化**——文库「列表」视图列宽可拖拽调整（持久化进 `settings.json` 的 `listColumnWidths`）、排序移到表头点击（标题/发布/下载，↑↓ 指示，同列再点翻向），卡片视图保留工具栏排序入口。纯逻辑抽 `src/renderer/list-columns.ts` TDD；拖拽/点表头本地 e2e 验证。
   - **M11 公众号订阅**——新增「订阅」页（导航在下载与文库之间），列出有 fakeid 的公众号（按公众号抓取历史 ∪ 搜号添加，URL-only 不入列），可订阅/取消订阅 + 搜号添加；运行期定时检查（opt-in，`subscriptionAutoCheck` + 每日 `subscriptionCheckTime`，启动补检），发现新文章按 `subscriptionNewArticleAction` 仅提示（角标 + 逐号下载/忽略）或自动下载。core 三件套 `subscriptions` / `subscription-schedule` / `check-subscriptions` 全 TDD（17 条新单测）；主进程 scheduler + IPC 编排，session 过期不静默（页面登录引导）。验收 `docs/PRD-v0.3.0.md` §4 R2 逐条已勾。
@@ -41,7 +42,7 @@
   - **频控韧性 + 去规律化（M12 后，2026-06-18~22）**——① 按公众号下载时，列表阶段命中频控进入 30/60/90s 退避，点「取消」原先不生效（取消信号只在下载阶段查，够不着退避里的长 `sleep`）；改用 `AbortSignal` 让退避等待与取消竞速、即时打断（`abortableWait`），`mp:crawl:cancel` 频道不变、渲染层无改（`abbcc57`）。② 订阅检查命中频控原先退避重试 3 次——但重试是在已被限的登录态上追加请求、只会加重冷却，故删除重试：命中即记为本轮失败跳过、下一轮再来（连带删死代码 `onBackoff`，`601d8f7`）。③ 订阅检查去规律化（破坏频控指纹）：账号间隔由恒定 2.0s 改 `randMs(3000,8000)`、触发时刻叠加按时段确定性顺延（0~30min，只往后，同一时段不抖动以免早触发/重复触发，新增 `scheduleJitterMs`/`shouldRunCheck`/`nextCheckAt`）、账号顺序每轮 Fisher-Yates 打乱（`3050167`）。认知：微信频控认登录态（账号+token+cookie）不认 IP，换 IP 无效；抖动削的是机器节奏指纹，挡不住高频轮询本身，大杠杆仍是降频率/减账号数；订阅回看篇数 `count=20` 不是频控杠杆（恒 1 次请求）而是防漏窗口，保持不变。详见 devlog §21。
   - **阅读器 Markdown 标题重复修复（M12 后，2026-06-22）**——`buildMarkdown` 在正文顶部注入 `# <title>`（导出文件对外部编辑器有用，文件不动），但阅读器自带标题头又渲染一个 → md 视图标题出现两次。渲染前用 `stripLeadingTitle` 剥掉「开头第一行恰为 `# <title>`」的那行，正文真实小节/非首行标题保留（`9ad515e`）。详见 devlog §22。
   - **undici 安全补丁（M12 后，2026-06-22）**——Dependabot #32（high，SOCKS5 ProxyAgent TLS 校验绕过）+ #33（medium，共享 HTTP 缓存信息泄露），同为 `undici@7.27.1`，均 7.28.0 修复。实际暴露面为零（只用 `cheerio.load` 纯解析、不碰 undici 的 ProxyAgent/SOCKS5/缓存，且 undici 已 external 永不加载），但照 form-data 先例加 `overrides: { "undici": "^7.28.0" }` 把三处实例（cheerio/@electron/get/node-gyp）统一 deduped 到 7.28.0，保持 Dependabot 归零（`3b82782`）。验证：174 单测 + tsc + lint 绿；mac build 成功；`main.js` 未打包 undici（`node:sqlite` 0 次、`require("undici")` 1 次惰性引用，external 陷阱仍站得住）；打包 .app CLI 启动 `auth-status` exit 0、合法 JSON。
-- **最新发布：v0.2.1（2026-06-09，安全补丁）** —— 功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，Dependabot 28 项全部 fixed 归零。tag + GitHub Release（mac dmg arm64/x64 + win nsis exe）已发。详见下方「v0.2.0 迭代」段。
+- **v0.2.1（2026-06-09，安全补丁）** —— 功能同 v0.2.0，升 electron 31→42 + electron-builder 24→26 + vite 6 + vitest 3，Dependabot 28 项全部 fixed 归零。tag + GitHub Release（mac dmg arm64/x64 + win nsis exe）已发。详见下方「v0.2.0 迭代」段。
 - M9 文库组织：文库从「只能搜+删」升级为可治理的藏馆——排序（下载/发布时间/标题，升降）、按公众号筛选+可折叠分组、批量选择+批量删除；并新增**卡片⇄列表**视图切换（列表为访达式紧凑行）。交互：默认分组+卡片；单击=选中、双击=阅读、行尾/卡片 hover 常驻「阅读/文件夹/删除」。排序/分组/筛选是纯逻辑（`src/renderer/library-view.ts`，TDD）；批量删除走 `library:removeMany`（联动历史标记已删除）。真实 session 截图（5 公众号 15 篇）验证三态。
 - M8 PDF 保真：导出 PDF 时图片/表格/代码块/引用不再被 A4 页边界拦腰切断——在 `buildHtml` 的内联样式注入 `@media print { break-inside: avoid }`，只作用于打印态、屏幕阅读器零影响。对照验证（同一会跨页的代码块，有/无规则出 PDF）：无规则版被切到第 17 行、有规则版整块下移到次页完整；真实图文长文 9 页 PDF 图片完整无切断。
 - M7 反馈引导：公众号列表阶段命中频控时，朱砂退避横幅可见（「约 N 秒后重试 · 第 k 次」客户端倒数），不再像卡死；所有下载失败经 `explainError` 归一为「人话标题 + 下一步建议」，原始报错折叠在 tooltip。R3「完成/取消回到配置」经端到端验证为既有流程已满足（`await mpCrawl` 完成即清空进度、配置卡自动重现、状态不丢），未加冗余按钮。
@@ -53,12 +54,12 @@
 - 测试规模不在此写死数字——跑 `npm test`（单测）与 `npm run test:e2e`（GUI 端到端）看当前真实结果。
 
 ## 下一步
-v0.1.0（M1–M4）、v0.2.0（M5–M9）、v0.2.1（安全补丁）、**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性，已发布 2026-06-16，tag + GitHub Release 已发）** 均已发布。**v0.4.0（M13–M15 文库供料 agent + 存储加固）三里程碑全部合入 main、功能完成待发版**（当前 `package.json` 仍为 0.3.0，无 v0.4.0 tag）：M13 存储加固 + M14 供料能力 + M15 贯通样例 skill（`agent/wx-kit-compose`，端到端样例已实跑通：刘备教授 3 篇 → 选题 → khazix-writer 初稿，两检查点均停）。需求 `docs/PRD-v0.4.0.md`、设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`。**下一步可议 v0.4.0 出包发版**（bump 0.4.0 + tag + Release，走 `docs/AGENTS.md` 发版规约）。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
+v0.1.0（M1–M4）、v0.2.0（M5–M9）、v0.2.1（安全补丁）、**v0.3.0（M10–M12 列表优化 + 公众号订阅，已发布 2026-06-16）**、**v0.4.0（M13–M15 文库供料 agent + 存储加固，已发布 2026-06-23）** 均已发布。v0.4.0 = M13 存储加固 + M14 供料能力 + M15 贯通样例 skill（`agent/wx-kit-compose`）；`package.json` 0.4.0，tag `v0.4.0` + GitHub Release（三平台安装包：mac dmg arm64/x64 + win nsis exe，标 Latest）已发，发布说明 `docs/releases/v0.4.0.md`。**当前无进行中迭代**——下一步方向待定（v0.5.0 候选见下；mac 签名公证、应用内更新、其他形式内容保真等见各版「非目标」，需要时再单议）。
 
 候选待议（未排期，需要时单议）：
 - **Windows CLI stdout 正解** —— 当前打包后 win 是 GUI 子系统程序，CLI 模式 stdout 不回贴调用控制台，文档里只给了「重定向到文件」的绕法（见 README「安装包后的 CLI 用法」、AGENTS.md 陷阱清单）。真要让 Windows agent 集成丝滑，正解是打包时给 win 出一个 console 子系统入口（或 `wx-kit-cli.exe` wrapper 转发到主程序）。要动打包配置，等真要铺 Windows agent 场景再做。
 
-## v0.4.0 迭代（进行中，2026-06-22 启动）
+## v0.4.0 迭代（已发布，2026-06-23）
 需求见 `docs/PRD-v0.4.0.md`，设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`。主题：把文库变成**可被 AI agent 消费的素材源**，并先夯实文件存储地基。三里程碑强先后：M13 存储加固 → M14 供料能力 → M15 贯通样例 skill。
 
 | 里程碑 | 范围 | 状态 |

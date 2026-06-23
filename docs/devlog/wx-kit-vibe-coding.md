@@ -443,6 +443,18 @@ v0.4.0 收口：交付一个仓库内的 Claude Code skill `agent/wx-kit-compose
 
 ---
 
+## 27. v0.4.0 发版：被一句陈旧的「待发版」绊了一跤（2026-06-23）
+
+M13–M15 合齐后给 v0.4.0 出包发版。发版流程本身按规约六步顺顺当当跑完，真正值得记的是发版前那一跤——它和 §22、§26 是同一个病根的第三次复发。
+
+- **「文档里的旧话」被我当事实重复了一整个会话**：我好几次跟安哥说「v0.3.0 功能完成待发版」，因为 ROADMAP 的「下一步」段一直这么写。直到安哥一句「v0.3.0 早就发版了」，我去查 `git tag` + `gh release list`，30 秒就真相大白——v0.3.0 在 2026-06-16 就发了 tag + Release，那句「待发版」从发版那天起就 stale 了，是 v0.3.0 发版时漏刷「下一步」段留下的债，我又原样背了一路。**这和 fakeid（spec 说有、代码没有）、docs/plans 路径（信 skill 默认没核项目约定）是同一个错：把文档/默认值当事实，没回源验证。** 教训钉死成一条操作习惯：**凡涉及「发没发版/什么状态」，先 `git tag` + `gh release list` 看实际，别信 ROADMAP 的散文。** 而且发版必须当场刷新所有状态文档（README + ROADMAP 当前状态/下一步 + 迭代段标题），否则下一个版本又踩同一处——这正是 memory「发版要刷 README」该扩到「连 ROADMAP 下一步一起刷」。
+- **发版规约六步，一步没省**：① `package.json` + lock 只 sed 改 version 行（不跑 `npm version` 免重排配置）；② 写 `docs/releases/v0.4.0.md`；③ 国内镜像出 mac dmg(arm64+x64) + win nsis；④ **真机验证打包后的 .app**——`auth-status` exit 0 证 undici external 站得住，外加专门验了 M14 新命令 `library export` 在打包二进制里也跑通（count 10），新版有新 CLI 就顺手验新 CLI；⑤ README 版本位全刷（徽章/安装包名/已落地段/项目状态 changelog）；⑥ commit + annotated tag + 推送。
+- **防 Draft 残留：先建空 Release 再逐个传包**：`gh release create` 是「建草稿→传附件→最后 publish」，中途被杀会留个外部不可见的 Draft。三个包共约 380MB，所以先 `gh release create`（不带附件，秒 publish），再 `gh release upload` 逐个传——任何一个传断都不影响 Release 已发布的事实，重传那个即可。全程 unset 代理直连（8118 代理传 github 大文件会卡）。
+
+> 一句话：v0.4.0 发版的方法论是**「状态从 git tag/gh release 回源核实、别信文档旧话；发版当场刷全部状态文档不留债；规约六步一步不省、新版顺手验新 CLI；先发布空 Release 再逐个传包防 Draft 残留」**——技术动作不难，难的是不让一句没人维护的散文把你带沟里。
+
+---
+
 ## 附：提交结构速览
 
 - 文档类：PRD（初稿 + 2 次迭代）、M1 计划、M2 计划、AGENTS.md（×2）、本复盘。
