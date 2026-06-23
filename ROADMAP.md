@@ -30,6 +30,7 @@
 - **M12** — `docs/plans/2026-06-16-m12-subscription-schedule-and-observability.md`（订阅触发机制 daily/interval + 检查可观测性：页内记录 + 落盘日志 + 下次预计；设计依据同上 spec，验收 `docs/PRD-v0.3.0.md` §4 R3）✅ 已合入 main
 - **M13** — `docs/plans/2026-06-22-m13-storage-hardening.md`（存储加固：原子写 + 按路径写锁 + rebuildLibrary 恢复；v0.4.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`，验收 `docs/PRD-v0.4.0.md` §4 R1）✅ 已合入 main
 - **M14** — `docs/plans/2026-06-22-m14-material-feed.md`（供料能力：`library export` CLI + 文库 GUI「导出选中为素材」；设计依据同上 spec，验收 `docs/PRD-v0.4.0.md` §4 R2）✅ 已合入 main
+- **M15** — 无独立 bite-sized 计划（skill 创作而非 TDD 代码）；交付物即 `agent/wx-kit-compose/SKILL.md` + `agent/README.md`，设计依据 spec「M15」节，验收 `docs/PRD-v0.4.0.md` §4 R3。🟡 skill 已交付，端到端样例待跑
 
 ## 当前状态
 - **v0.3.0 迭代（M10+M11+M12 已合入 main，功能完成待发版）**：
@@ -52,7 +53,7 @@
 - 测试规模不在此写死数字——跑 `npm test`（单测）与 `npm run test:e2e`（GUI 端到端）看当前真实结果。
 
 ## 下一步
-v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布，v0.2.1 安全补丁清掉全部 Dependabot。**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性）已全部合入 main、功能完成待发版**（验收 `docs/PRD-v0.3.0.md` §4 全勾）。**v0.4.0（M13–M15 文库供料 agent + 存储加固）进行中：M13 存储加固 + M14 供料能力已合入 main，M15 贯通样例 skill 待实现**（需求 `docs/PRD-v0.4.0.md`，设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`）。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
+v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载闭环/文库组织）均已发布，v0.2.1 安全补丁清掉全部 Dependabot。**v0.3.0（M10–M12 列表优化 + 公众号订阅 + 订阅触发/可观测性）已全部合入 main、功能完成待发版**（验收 `docs/PRD-v0.3.0.md` §4 全勾）。**v0.4.0（M13–M15 文库供料 agent + 存储加固）进行中：M13 存储加固 + M14 供料能力已合入 main；M15 贯通样例 skill（`agent/wx-kit-compose`）已交付，端到端样例验收（选 2–3 篇 → 选题 → 写作）待主会话与安哥跑通一次**（需求 `docs/PRD-v0.4.0.md`，设计 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`）。其余方向待定（mac 签名公证、应用内更新、其他形式内容保真等见「非目标」，需要时再单议）。
 
 候选待议（未排期，需要时单议）：
 - **Windows CLI stdout 正解** —— 当前打包后 win 是 GUI 子系统程序，CLI 模式 stdout 不回贴调用控制台，文档里只给了「重定向到文件」的绕法（见 README「安装包后的 CLI 用法」、AGENTS.md 陷阱清单）。真要让 Windows agent 集成丝滑，正解是打包时给 win 出一个 console 子系统入口（或 `wx-kit-cli.exe` wrapper 转发到主程序）。要动打包配置，等真要铺 Windows agent 场景再做。
@@ -64,11 +65,13 @@ v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载
 |--------|------|------|
 | **M13** | 存储加固：原子写（temp+rename）+ 按路径写锁（杜绝并发丢更新）+ `rebuildLibrary`（从各文章目录 `meta.json` 重建索引，CLI `library rebuild` + 设置页「重建索引」按钮）；`library.json` 损坏提示改为指向 rebuild（R1） | ✅ 已合入 main |
 | **M14** | 供料能力：`library export` CLI（JSON 清单 + content.md 路径，`--ids`/`--since`/`--account`/`--all` 选料）+ 文库 GUI「导出选中为素材」按钮（写库内 `exports/`）（R2） | ✅ 已合入 main |
-| **M15** | 贯通样例 skill（仓库 `agent/`）：选料 → 选题候选 → 人工拍板 → khazix-writer 初稿 → 人工审定，带检查点；复用 hv-analysis/khazix-writer，wx-kit 只供料（R3） | ⏳ 待实现 |
+| **M15** | 贯通样例 skill（仓库 `agent/wx-kit-compose`）：选料 → 选题候选 → 人工拍板 → khazix-writer 初稿 → 人工审定，带检查点；选题轻量内联（不调 hv-analysis）、写作委派 khazix-writer，wx-kit 只供料（R3） | 🟡 skill 已交付，端到端样例待跑 |
 
 **M13 实现说明**：核心新增 `atomic-write.ts`（写临时文件+原子 `rename`，失败 best-effort 清理）、`path-lock.ts`（模块级按绝对路径 keyed 的异步互斥锁），接入 `Library`/`History`/`Subscriptions` 三索引的读-改-写；`rebuild-library.ts` 递归扫 `meta.json` 重建（忽略 `exports/` 与点目录）。全程 TDD（含「两实例并发 add/append 不丢更新」回归用例），`npm test` + `tsc` + `lint` 全绿，`npm run test:e2e` 实机全流程通过。实现计划 `docs/plans/2026-06-22-m13-storage-hardening.md`。
 
 **M14 实现说明**：核心新增 `material-export.ts`——纯函数 `selectArticles`（按 `ids`/`account`/`since` 过滤，交集语义）+ `buildManifest`（组装固定字段清单，`contentPath = dir/content.md`，不内联正文）+ `writeMaterialExport`（写 `exports/<时间戳>.json`，复用 M13 原子写）。CLI `library export`（无选料器报 `NO_SELECTOR`、`--all` 才导全库，stdout 纯 JSON）与 GUI 经 `library:exportMaterial` IPC **共用同一套核心**，清单同源一致；文库批量条加「导出为素材」按钮。全程 TDD，`npm test`+`tsc`+`lint` 全绿、`npm run test:e2e` 实机回归通过。实现计划 `docs/plans/2026-06-22-m14-material-feed.md`。
+
+**M15 实现说明**：交付一个 Claude Code skill `agent/wx-kit-compose`（仓库内、与应用代码隔离，经 skill-kit 安装）——编排「选料（读 GUI 导出的 `exports/*.json` 或跑 `library export`）→ 轻量内联选题候选（HKR + 横纵交叉思路，**不调 hv-analysis**）→ 🛑人工拍板 → 委派 `khazix-writer` 出初稿 → 🛑人工审定」，两个检查点强制人在环中。关键认知：`khazix-writer` 天生吃任意素材 + 自带 HKR 选题判断 + 承载笔调，故写作全权委派、本 skill 不重写；`hv-analysis` 是重量级单主题联网深研→PDF 工具，与「从多篇素材提选题」错位，仅作旁路。机械环节（真实 `library export` 取料）已验证；端到端编辑样例（选 2–3 篇→选题→出稿）需主会话与安哥跑通一次（PRD §4 R3 验收）。集成文档 `agent/README.md`。
 
 ## v0.2.0 迭代（已发布，2026-06-09）
 需求见 `docs/PRD-v0.2.0.md`。主题：把下载闭环做扎实、信息架构理顺——「下得放心、找得到、看得见」。
