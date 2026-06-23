@@ -46,7 +46,7 @@
 - **选料三选器，可组合**（交集语义）：
   - `--ids a,b,c`（按文章 id 显式选）；
   - `--since YYYY-MM-DD`（按 `downloadTime` 过滤——「某日及之后自动订阅下载的」用这个，不引入新水位状态）；
-  - `--account <昵称/fakeid>`（按号选）。
+  - `--account <昵称>`（按公众号名选，大小写不敏感包含匹配；`ArticleMeta` 无 fakeid，故仅按昵称）。
   - 无选择器时报错避免误导全库；全库须显式 `--all`。
 - **GUI「导出选中为素材」**：复用 M9 文库多选，选中 ≥1 篇后工具栏出现该按钮；点击把素材清单写到库内 `exports/<时间戳>.json` 并提示路径（+「在文件夹显示」）。外部 skill 接此文件即可。
 
@@ -78,7 +78,7 @@
 
 ### R2 / M14 · 供料能力
 - [ ] `library export --ids a,b,c` 输出含这些文章的 JSON 清单，字段含 `contentPath`（content.md 绝对路径）且路径真实存在。
-- [ ] `library export --since YYYY-MM-DD` 只含 `downloadTime` ≥ 该日 00:00 的文章；`--account <昵称/fakeid>` 只含该号文章；多选器组合取交集。
+- [ ] `library export --since YYYY-MM-DD` 只含 `downloadTime` ≥ 该日 00:00 的文章；`--account <昵称>` 只含该号文章（昵称包含匹配）；多选器组合取交集。
 - [ ] 无选择器时报错、不导出全库；`--all` 才导出全库。stdout 为纯 JSON（守 CLI 契约，退出码 0/1/2）。
 - [ ] GUI 文库多选 ≥1 篇后出现「导出为素材」按钮；点击在库内 `exports/<时间戳>.json` 生成清单、提示路径、可「在文件夹显示」；清单内容与 CLI 同源一致。
 - [ ] `exports/` 不被文库扫描/重建当作文章目录。
