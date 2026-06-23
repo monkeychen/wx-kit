@@ -28,6 +28,7 @@
 - **M10** — `docs/plans/2026-06-16-m10-list-view-polish.md`（列表视图列宽可调 + 表头排序；v0.3.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-16-v0.3.0-list-polish-and-subscriptions-design.md`）✅ 已合入 main
 - **M11** — `docs/plans/2026-06-16-m11-subscriptions.md`（公众号订阅：订阅页 + 定时轮询 + 新文章检测 + 设置项 + 提示/自动下载；设计依据同上 spec，验收 `docs/PRD-v0.3.0.md` §4 R2）✅ 已合入 main
 - **M12** — `docs/plans/2026-06-16-m12-subscription-schedule-and-observability.md`（订阅触发机制 daily/interval + 检查可观测性：页内记录 + 落盘日志 + 下次预计；设计依据同上 spec，验收 `docs/PRD-v0.3.0.md` §4 R3）✅ 已合入 main
+- **M13** — `docs/plans/2026-06-22-m13-storage-hardening.md`（存储加固：原子写 + 按路径写锁 + rebuildLibrary 恢复；v0.4.0 首个里程碑，设计依据 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`，验收 `docs/PRD-v0.4.0.md` §4 R1）✅ 已合入 main
 
 ## 当前状态
 - **v0.3.0 迭代（M10+M11+M12 已合入 main，功能完成待发版）**：
@@ -64,7 +65,7 @@ v0.1.0（M1–M4 第一阶段 + 分发）、v0.2.0（M5–M9 信息架构/下载
 | **M14** | 供料能力：`library export` CLI（JSON 清单 + content.md 路径，`--ids`/`--since`/`--account`/`--all` 选料）+ 文库 GUI「导出选中为素材」按钮（写库内 `exports/`）（R2） | ⏳ 待实现 |
 | **M15** | 贯通样例 skill（仓库 `agent/`）：选料 → 选题候选 → 人工拍板 → khazix-writer 初稿 → 人工审定，带检查点；复用 hv-analysis/khazix-writer，wx-kit 只供料（R3） | ⏳ 待实现 |
 
-**M13 实现说明**：核心新增 `atomic-write.ts`（写临时文件+原子 `rename`，失败 best-effort 清理）、`path-lock.ts`（模块级按绝对路径 keyed 的异步互斥锁），接入 `Library`/`History`/`Subscriptions` 三索引的读-改-写；`rebuild-library.ts` 递归扫 `meta.json` 重建（忽略 `exports/` 与点目录）。全程 TDD（含「两实例并发 add/append 不丢更新」回归用例），`npm test` + `tsc` + `lint` 全绿，`npm run test:e2e` 实机全流程通过。实现计划 `docs/superpowers/plans/2026-06-22-m13-storage-hardening.md`。
+**M13 实现说明**：核心新增 `atomic-write.ts`（写临时文件+原子 `rename`，失败 best-effort 清理）、`path-lock.ts`（模块级按绝对路径 keyed 的异步互斥锁），接入 `Library`/`History`/`Subscriptions` 三索引的读-改-写；`rebuild-library.ts` 递归扫 `meta.json` 重建（忽略 `exports/` 与点目录）。全程 TDD（含「两实例并发 add/append 不丢更新」回归用例），`npm test` + `tsc` + `lint` 全绿，`npm run test:e2e` 实机全流程通过。实现计划 `docs/plans/2026-06-22-m13-storage-hardening.md`。
 
 ## v0.2.0 迭代（已发布，2026-06-09）
 需求见 `docs/PRD-v0.2.0.md`。主题：把下载闭环做扎实、信息架构理顺——「下得放心、找得到、看得见」。
