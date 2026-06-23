@@ -2,6 +2,8 @@
 // 把文库文章选成「素材清单」供外部 agent 消费。纯函数：选料过滤 + 清单组装；
 // 写盘（exports/<时间戳>.json）见同文件的 writeMaterialExport（Task 3）。
 import { join } from 'node:path'
+import { mkdir } from 'node:fs/promises'
+import { atomicWriteFile } from './atomic-write'
 import type { ArticleMeta } from './types'
 
 export interface MaterialSelector {
@@ -65,4 +67,19 @@ export function buildManifest(articles: ArticleMeta[]): MaterialManifest {
       contentPath: join(m.dir, 'content.md'),
     })),
   }
+}
+
+/** exports 文件名：本地时区 YYYYMMDD-HHMMSS.json。 */
+export function exportFileName(now: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}.json`
+}
+
+/** 把清单原子写到 <root>/exports/<时间戳>.json，返回绝对路径。 */
+export async function writeMaterialExport(root: string, manifest: MaterialManifest, now = new Date()): Promise<string> {
+  const dir = join(root, 'exports')
+  await mkdir(dir, { recursive: true })
+  const path = join(dir, exportFileName(now))
+  await atomicWriteFile(path, JSON.stringify(manifest, null, 2))
+  return path
 }

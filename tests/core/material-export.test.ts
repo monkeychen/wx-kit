@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
-import { selectArticles, buildManifest } from '../../src/core/material-export'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { selectArticles, buildManifest, exportFileName, writeMaterialExport } from '../../src/core/material-export'
 import type { ArticleMeta } from '../../src/core/types'
 
 const a = (over: Partial<ArticleMeta>): ArticleMeta => ({
@@ -43,5 +45,21 @@ describe('buildManifest', () => {
         dir: '/lib/acc/1', contentPath: join('/lib/acc/1', 'content.md'),
       }],
     })
+  })
+})
+
+describe('exportFileName', () => {
+  it('formats local YYYYMMDD-HHMMSS.json', () => {
+    expect(exportFileName(new Date(2026, 5, 22, 9, 7, 3))).toBe('20260622-090703.json')
+  })
+})
+
+describe('writeMaterialExport', () => {
+  it('writes the manifest under exports/ and returns its absolute path', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-matexp-'))
+    const manifest = buildManifest([a({ id: '1', dir: join(root, 'acc', '1') })])
+    const p = await writeMaterialExport(root, manifest, new Date(2026, 5, 22, 9, 7, 3))
+    expect(p).toBe(join(root, 'exports', '20260622-090703.json'))
+    expect(JSON.parse(readFileSync(p, 'utf-8'))).toEqual(manifest)
   })
 })
