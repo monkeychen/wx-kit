@@ -95,6 +95,17 @@ export default function Library() {
     catch (e) { message.error('批量删除失败：' + (e as Error).message) }
   }
 
+  const exportMaterial = async () => {
+    const ids = [...sel]
+    try {
+      const { path, count } = await api.libraryExportMaterial(ids)
+      message.success({
+        content: `已导出 ${count} 篇素材清单 → ${path}`,
+        onClick: () => api.reveal(path),
+      })
+    } catch (e) { message.error('导出失败：' + (e as Error).message) }
+  }
+
   const renderCards = (items: ArticleMeta[]) => (
     <div className="shelf">
       {items.map((m, i) => (
@@ -142,6 +153,7 @@ export default function Library() {
           <div className="selbar">
             <span className="n">已选 {sel.size} 篇</span>
             <a onClick={selectAll}>全选</a><a onClick={clearSel}>清除</a>
+            <a data-testid="batch-export" onClick={exportMaterial}>📤 导出为素材</a>
             <Popconfirm title={`删除选中的 ${sel.size} 篇？`} description="磁盘文件将一并删除，不可恢复。"
               okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={batchDelete}>
               <span className="del" data-testid="batch-delete">🗑 批量删除</span>
