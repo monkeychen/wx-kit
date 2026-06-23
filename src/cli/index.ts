@@ -16,6 +16,7 @@ import { searchAccount } from '../core/mp-client'
 import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
 import { rebuildLibrary } from '../core/rebuild-library'
+import { selectArticles, buildManifest } from '../core/material-export'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -173,6 +174,27 @@ export async function runCli(argv: string[]): Promise<number> {
     .action(async (opts) => {
       const res = await rebuildLibrary(opts.out)
       outJson({ ok: true, ...res })
+      exitCode = 0
+    })
+
+  library
+    .command('export')
+    .description('把选中的文章导出为 agent 素材清单（JSON 到 stdout）')
+    .option('--ids <csv>', '按文章 id 选（逗号分隔）')
+    .option('--since <date>', '按下载日期选：YYYY-MM-DD 及之后')
+    .option('--account <name>', '按公众号名选（大小写不敏感包含匹配）')
+    .option('--all', '导出全库（无选料器时必须显式指定）')
+    .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
+    .action(async (opts) => {
+      const ids = opts.ids ? String(opts.ids).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined
+      if (!ids && !opts.since && !opts.account && !opts.all) {
+        outJson({ ok: false, error: { code: 'NO_SELECTOR', message: '需指定 --ids / --since / --account 之一，或 --all 导全库' } })
+        exitCode = 1
+        return
+      }
+      const all = await new Library(opts.out).list()
+      const picked = selectArticles(all, { ids, since: opts.since, account: opts.account, all: opts.all })
+      outJson(buildManifest(picked))
       exitCode = 0
     })
 

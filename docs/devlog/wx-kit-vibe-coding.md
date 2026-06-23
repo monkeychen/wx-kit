@@ -414,6 +414,21 @@ push 后 GitHub 弹出 2 个 Dependabot 漏洞（1 high + 1 moderate），安哥
 
 ---
 
+## 25. M14 供料能力：把文库变成 agent 的「素材出口」（2026-06-22）
+
+M14 给 v0.4.0 的主线落地第一块：让选中的文库文章变成 agent 能直接吃的结构化素材。沿用 M13 的 subagent-driven 节奏，4 个任务一气呵成。
+
+- **CLI 与 GUI 共用同一套核心，清单同源**：选料过滤（`selectArticles`）+ 清单组装（`buildManifest`）+ 写盘（`writeMaterialExport`）全在 `material-export.ts` 一处，CLI `library export` 走 stdout、GUI `library:exportMaterial` IPC 写文件，但**清单由同一个 `buildManifest` 出**——不会出现「命令行导的和界面导的字段不一样」这种漂移。这正是「系统承担复杂性」：两个入口、一套真相。
+- **只给路径不内联正文**：清单字段固定 `{id,title,account,author,publishTime,sourceUrl,dir,contentPath}`，`contentPath = dir/content.md`。stdout 轻、agent 按需读盘，复用磁盘已有的 `content.md`，不把正文塞进 JSON。**供料的边界感：wx-kit 给「料在哪」，不替 agent 决定「怎么吃」。**
+- **「无选料器报错」是防误操作的小闸**：`library export` 不给 `--ids/--since/--account` 也不给 `--all` 时直接 `NO_SELECTOR` 报错退出，而不是默默导全库——避免手一滑把整个文库吐出来。要全库必须显式 `--all`。**危险的默认行为，宁可报错也不猜。**
+- **`exports/` 的目录归属在 M13 就埋好了**：GUI 导出写到库内 `exports/<时间戳>.json`，而 M13 的 `rebuildLibrary` 递归扫描早已忽略 `exports/`——所以素材清单不会被误当成文章重建进索引。**跨里程碑的约定提前对齐，比事后打补丁省事。**
+- **复用 M13 的原子写**：`writeMaterialExport` 用 `atomicWriteFile` 落盘，导出文件天然也享受「写一半不留半截」。地基夯实后，上层白捡。
+- **GUI 按钮镜像既有批量删除**：文库批量条加「导出为素材」，处理器结构、错误提示、`api.reveal` 点击跳转全照 `batchDelete` 的样子——新入口长得像老入口，用户不用重新学。真机验证（`npm run test:e2e` 全流程 + 0 console 错误）由主会话做（子 agent 跑不了 electron）。
+
+> 一句话：M14 的方法论是**「一套核心两个入口（CLI/GUI 同源）、供料只给路径不越界、危险默认宁可报错、跨里程碑约定提前对齐」**——把文库变成素材出口，难的不是导出本身，是守住「下载器只供料」的边界不让它膨胀。
+
+---
+
 ## 附：提交结构速览
 
 - 文档类：PRD（初稿 + 2 次迭代）、M1 计划、M2 计划、AGENTS.md（×2）、本复盘。

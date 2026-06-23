@@ -71,3 +71,34 @@ describe('CLI library rebuild', () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, scanned: 1, rebuilt: 1, skipped: 0 })
   })
 })
+
+describe('CLI library export', () => {
+  const seed = () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-export-'))
+    const dir1 = join(root, 'acc', 'a1')
+    writeFileSync(join(root, 'library.json'), JSON.stringify({
+      version: 1,
+      articles: [
+        { id: 'a1', title: 'T1', author: 'au', account: 'acc', publishTime: '2026-06-01', sourceUrl: 'https://x/1', digest: '', coverUrl: '', downloadTime: '2026-06-20T00:00:00.000Z', formats: ['md'], dir: dir1 },
+        { id: 'a2', title: 'T2', author: 'au', account: 'other', publishTime: '2026-06-02', sourceUrl: 'https://x/2', digest: '', coverUrl: '', downloadTime: '2026-06-21T00:00:00.000Z', formats: ['md'], dir: join(root, 'other', 'a2') },
+      ],
+    }))
+    return { root, dir1 }
+  }
+
+  it('exports selected ids as a JSON manifest with contentPath', async () => {
+    const { root, dir1 } = seed()
+    const code = await runCli(['library', 'export', '--ids', 'a1', '--out', root])
+    expect(code).toBe(0)
+    const out = JSON.parse(stdout)
+    expect(out).toMatchObject({ ok: true, count: 1 })
+    expect(out.articles[0]).toMatchObject({ id: 'a1', title: 'T1', contentPath: join(dir1, 'content.md') })
+  })
+
+  it('errors (exit 1) when no selector is given', async () => {
+    const { root } = seed()
+    const code = await runCli(['library', 'export', '--out', root])
+    expect(code).toBe(1)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SELECTOR' } })
+  })
+})
