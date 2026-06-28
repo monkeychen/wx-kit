@@ -192,6 +192,30 @@ describe('CLI library remove', () => {
   })
 })
 
+describe('CLI subscription list', () => {
+  it('lists accounts merged from subscriptions + history', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-subs-'))
+    writeFileSync(join(root, 'subscriptions.json'), JSON.stringify({
+      version: 1, lastRunAt: null, checkLog: [],
+      accounts: [{ fakeid: 'f1', nickname: 'A', subscribed: true, watermark: 10, lastCheckedAt: null, newRefs: [] }],
+    }))
+    const code = await runCli(['subscription', 'list', '--out', root])
+    expect(code).toBe(0)
+    const out = JSON.parse(stdout)
+    expect(out.ok).toBe(true)
+    expect(out.accounts).toEqual(expect.arrayContaining([expect.objectContaining({ fakeid: 'f1', subscribed: true })]))
+  })
+})
+
+describe('CLI subscription check-now', () => {
+  it('without session returns ok with note no-session', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-chk-'))
+    const code = await runCli(['subscription', 'check-now', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session', newFound: 0 })
+  })
+})
+
 describe('CLI help & version', () => {
   it('--version prints bare version to stdout, exit 0', async () => {
     const code = await runCli(['--version'], { version: '9.9.9' })

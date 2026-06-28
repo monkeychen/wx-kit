@@ -20,6 +20,9 @@ import { selectArticles, buildManifest } from '../core/material-export'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
 import { History } from '../core/download-history'
+import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine } from '../core/subscriptions'
+import { nextCheckAt } from '../core/subscription-schedule'
+import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -241,6 +244,48 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const all = await new Library(await resolveRoot(opts.out)).list()
       const picked = selectArticles(all, { ids, since: opts.since, account: opts.account, all: opts.all })
       outJson(buildManifest(picked))
+      exitCode = 0
+    })
+
+  const subscription = program.command('subscription').description('公众号订阅')
+  subscription
+    .command('list')
+    .description('列出订阅账号、水位、上次/下次检查')
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (opts) => {
+      const s = await settingsFor().get()
+      const root = await resolveRoot(opts.out)
+      const subs = new Subscriptions(root)
+      const { events } = await new History(root, s.historyRetentionDays).list(0, 1_000_000)
+      const merged = mergeAccounts(accountsFromHistory(events), await subs.list())
+      const lastRunAt = await subs.getLastRunAt()
+      const next = s.subscriptionAutoCheck
+        ? nextCheckAt(Date.now(), lastRunAt, { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours })
+        : null
+      outJson({ ok: true, accounts: merged, lastRunAt, nextCheckAt: next, authExpired: false })
+      exitCode = 0
+    })
+  subscription
+    .command('check-now')
+    .description('立即检查一次订阅更新（频控不重试）')
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (opts) => {
+      const s = await settingsFor().get()
+      const root = await resolveRoot(opts.out)
+      const subs = new Subscriptions(root)
+      const session = getSession()
+      const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[]) => {
+        const library = new Library(root)
+        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
+        const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps))
+        await queue.run(refs.map((r) => r.url))
+      }
+      const result = await runSubscriptionCheck('manual', {
+        subs, settings: s, session: session ? { token: session.token } : null,
+        mpFetch: session ? makeMpFetch(session) : null, downloadRefs,
+        log: async (e) => { process.stderr.write(formatCheckLogLine(e) + '\n') },
+      })
+      outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, ...(result.note ? { note: result.note } : {}) })
       exitCode = 0
     })
 
