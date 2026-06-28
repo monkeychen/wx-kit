@@ -1,6 +1,6 @@
 // tests/cli/cli-contract.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { mkdirSync as _mkdirSync, writeFileSync as _writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -163,6 +163,32 @@ describe('CLI library search', () => {
     await runCli(['library', 'search', '', '--account', '文学', '--out', root])
     const out = JSON.parse(stdout)
     expect(out.items.map((i: { id: string }) => i.id)).toEqual(['a2'])
+  })
+})
+
+describe('CLI library remove', () => {
+  it('removes by ids and marks history items deleted', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-rm-'))
+    const dir = join(root, 'AI', 'a1'); mkdirSync(dir, { recursive: true })
+    writeFileSync(join(root, 'library.json'), JSON.stringify({
+      version: 1, articles: [{ id: 'a1', title: 'T', account: 'AI', publishTime: '', sourceUrl: 'https://x/1', digest: '', coverUrl: '', downloadTime: '', formats: ['md'], dir }],
+    }))
+    writeFileSync(join(root, 'history.json'), JSON.stringify({
+      version: 1, events: [{ id: 'e1', time: Date.now(), source: { kind: 'url', count: 1 }, formats: ['md'], total: 1, succeeded: 1, skipped: 0, failed: 0, items: [{ id: 'a1', url: 'https://x/1', title: 'T', dir, status: 'ok' }] }],
+    }))
+    const code = await runCli(['library', 'remove', '--ids', 'a1', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, removed: 1 })
+    const lib = JSON.parse(readFileSync(join(root, 'library.json'), 'utf-8'))
+    expect(lib.articles).toHaveLength(0)
+    const hist = JSON.parse(readFileSync(join(root, 'history.json'), 'utf-8'))
+    expect(hist.events[0].items[0]).toMatchObject({ deleted: true })
+  })
+  it('errors with exit 2 when --ids missing', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-rm2-'))
+    const code = await runCli(['library', 'remove', '--out', root])
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SELECTOR' } })
   })
 })
 

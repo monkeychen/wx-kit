@@ -19,6 +19,7 @@ import { rebuildLibrary } from '../core/rebuild-library'
 import { selectArticles, buildManifest } from '../core/material-export'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
+import { History } from '../core/download-history'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -190,6 +191,25 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const hits = await lib.search(keyword)
       const items = opts.account ? hits.filter((a) => a.account === opts.account) : hits
       outJson({ ok: true, items })
+      exitCode = 0
+    })
+
+  library
+    .command('remove')
+    .description('按 id 删除文库文章（删文件 + 索引 + 历史联动标记已删除）')
+    .option('--ids <csv>', '文章 id（逗号分隔）')
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (opts) => {
+      const ids = opts.ids ? String(opts.ids).split(',').map((s: string) => s.trim()).filter(Boolean) : []
+      if (!ids.length) { outJson({ ok: false, error: { code: 'NO_SELECTOR', message: '需指定 --ids' } }); exitCode = 2; return }
+      const root = await resolveRoot(opts.out)
+      const lib = new Library(root)
+      const hist = new History(root)
+      let removed = 0
+      for (const id of ids) {
+        if (await lib.has(id)) { await lib.remove(id); await hist.markDeleted(id); removed++ }
+      }
+      outJson({ ok: true, removed })
       exitCode = 0
     })
 
