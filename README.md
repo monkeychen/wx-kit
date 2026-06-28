@@ -22,6 +22,14 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
+**v0.5.0 已合入 main(待发版,CLI 体验优化)**:
+
+- **help/version + 分流修复** —— `wx-kit -h/--help`、`-v/--version`、`version` / `help <子命令>` 都进 CLI 并走 stdout(修了 `--version` 误开 GUI 的 bug);无参仍开窗口。
+- **CLI 补齐 + 与 GUI 同库** —— 新增 `library search`/`library remove`、`subscription list`/`subscription check-now`、`settings get`/`settings set`;CLI 默认操作「设置」里的库根,不再与 GUI 各管一个库。
+- **首启建命令行快捷方式**(macOS/Linux)—— 首次开 GUI 提示在 `~/bin` 建软链(不在 PATH 时引导写 shell profile),省去手敲 .app 内层长路径;设置页可随时重建。
+
+> v0.5.0 代码已在 main、单测 / lint / 类型 / GUI e2e 全绿,但**尚未出安装包、未打 tag**;下方「下载安装包」与顶部版本徽章仍指向已发布的 **v0.4.0**。
+
 **v0.4.0 已落地**(文库供料 agent + 存储加固):
 
 - **供料 agent** —— 文库文章可一键导出为结构化素材（`library export` CLI / 文库「导出选中为素材」按钮），交给应用之外的 Claude Code skill（仓库内 `agent/wx-kit-compose`）驱动「选题 → 写作」，人在环中。wx-kit 只供料、不内置创作。
@@ -115,13 +123,22 @@ npx electron . auth-status                             # 查登录态(真探测)
 npx electron . search <公众号名>                        # 搜号,返候选
 npx electron . crawl <公众号名> --count 2              # 批量爬取
 npx electron . library list                            # 列已下文章
+npx electron . library search <关键词> [--account <号>] # 按标题搜文库
+npx electron . library remove --ids <id,id>            # 删文章(联动历史)(v0.5.0)
+npx electron . subscription list                       # 列订阅号 / 水位 / 下次检查(v0.5.0)
+npx electron . subscription check-now                  # 立即检查订阅更新(v0.5.0)
+npx electron . settings get [键]                        # 读设置(全量或单键)(v0.5.0)
+npx electron . settings set <键> <值>                   # 写设置(v0.5.0)
+npx electron . --version            # 版本号(裸 semver);--help / help <子命令> 看帮助(v0.5.0)
 ```
+
+> `library list` 等涉及库根的命令,`--out` 缺省即取「设置」里的库根(与 GUI 同库,v0.5.0 起)。
 
 退出码:`0` 成功、`1` 业务失败、`2` 用法或鉴权错误。详见 [`docs/PRD.md` §F4](docs/PRD.md)。
 
 ### 安装包后的 CLI 用法
 
-GUI 与 CLI 是**同一个二进制**:不带子命令开窗口,带子命令(`download`/`login`/`auth-status`/`search`/`crawl`/`library`)即进 CLI。装完后直接调安装目录里的可执行文件(**不是** `npx electron .`):
+GUI 与 CLI 是**同一个二进制**:不带子命令开窗口,带子命令(`download`/`login`/`auth-status`/`search`/`crawl`/`library`/`subscription`/`settings`/`version`/`help`)或 `-h`/`--help`/`-v`/`--version` 即进 CLI。装完后直接调安装目录里的可执行文件(**不是** `npx electron .`):
 
 **macOS** —— 可执行文件在 .app 包内层:
 
@@ -132,6 +149,8 @@ GUI 与 CLI 是**同一个二进制**:不带子命令开窗口,带子命令(`dow
 ln -sf /Applications/wx-kit.app/Contents/MacOS/wx-kit /usr/local/bin/wx-kit
 wx-kit auth-status
 ```
+
+> v0.5.0 起,首次打开 GUI 会提示在 `~/bin` 自动建这个软链(并在 `~/bin` 不在 PATH 时引导写入 shell 配置),设置页也能随时重建——发版后此处手动 `ln` 即可省去。
 
 > 用内层 `Contents/MacOS/wx-kit`,**别用 `open -a wx-kit`**——`open` 不透传 stdout / 退出码,拿不到 JSON 结果。
 
@@ -145,7 +164,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 / v0.4.0 均已发布**(最新 **v0.4.0**:文库供料 agent + 存储加固)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 / v0.4.0 均已发布**(最新已发布 **v0.4.0**:文库供料 agent + 存储加固);**v0.5.0 已合入 main、待发版**(CLI 体验优化)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -174,6 +193,12 @@ wx-kit auth-status
 - ✅ M13 — 存储加固:三索引原子写 + 按文件写锁(并发不丢更新)+「重建索引」(CLI `library rebuild` + 设置页按钮)
 - ✅ M14 — 供料能力:`library export` CLI(JSON 清单 + content.md 路径)+ 文库「导出选中为素材」
 - ✅ M15 — 贯通样例 skill `agent/wx-kit-compose`:选料 → 选题 → 写作(委派 khazix-writer),两个人工检查点;wx-kit 只供料
+
+**v0.5.0 · CLI 体验优化(代码已合入 main,待发版)**
+- ✅ M16 — 模式分流修复 + help/version:`-h/--help`、`-v/--version`、`version` / `help [子命令]` 都进 CLI 走 stdout,无参仍 GUI
+- ✅ M17 — CLI 补齐:`library search`/`remove`、`subscription list`/`check-now`、`settings get`/`set`;`--out` 默认回落设置库根(GUI/CLI 同库);抽出共享 `runSubscriptionCheck`(CLI 检查同步落盘 check log + 历史)
+- ✅ M18 — 首启建 PATH 软链(macOS/Linux):`~/bin` 软链 + 不在 PATH 引导写 shell profile + 设置页重建入口
+- ⏳ 待发版:version bump 0.4.0→0.5.0、出三平台包、打 tag `v0.5.0`、建 Release、刷版本徽章/安装包名
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 
