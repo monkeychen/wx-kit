@@ -180,6 +180,20 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     })
 
   library
+    .command('search')
+    .description('按标题关键词搜索文库')
+    .argument('<keyword>', '标题关键词（空字符串表示不按标题过滤）')
+    .option('--account <name>', '再按公众号名过滤')
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (keyword: string, opts) => {
+      const lib = new Library(await resolveRoot(opts.out))
+      const hits = await lib.search(keyword)
+      const items = opts.account ? hits.filter((a) => a.account === opts.account) : hits
+      outJson({ ok: true, items })
+      exitCode = 0
+    })
+
+  library
     .command('rebuild')
     .description('从各文章目录的 meta.json 重建文库索引（library.json 损坏时的恢复手段）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')

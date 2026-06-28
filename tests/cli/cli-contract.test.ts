@@ -141,6 +141,31 @@ describe('CLI settings get/set', () => {
   })
 })
 
+describe('CLI library search', () => {
+  const seed = () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-search-'))
+    writeFileSync(join(root, 'library.json'), JSON.stringify({
+      version: 1, articles: [
+        { id: 'a1', title: '深度学习入门', account: 'AI', publishTime: '', sourceUrl: '', digest: '', coverUrl: '', downloadTime: '', formats: ['md'], dir: join(root, 'AI', 'a1') },
+        { id: 'a2', title: '红楼梦杂谈', account: '文学', publishTime: '', sourceUrl: '', digest: '', coverUrl: '', downloadTime: '', formats: ['md'], dir: join(root, '文学', 'a2') },
+      ],
+    }))
+    return root
+  }
+  it('returns title-matching articles', async () => {
+    const code = await runCli(['library', 'search', '学习', '--out', seed()])
+    expect(code).toBe(0)
+    const out = JSON.parse(stdout)
+    expect(out.ok).toBe(true); expect(out.items).toHaveLength(1); expect(out.items[0].id).toBe('a1')
+  })
+  it('further filters by --account', async () => {
+    const root = seed()
+    await runCli(['library', 'search', '', '--account', '文学', '--out', root])
+    const out = JSON.parse(stdout)
+    expect(out.items.map((i: { id: string }) => i.id)).toEqual(['a2'])
+  })
+})
+
 describe('CLI help & version', () => {
   it('--version prints bare version to stdout, exit 0', async () => {
     const code = await runCli(['--version'], { version: '9.9.9' })
