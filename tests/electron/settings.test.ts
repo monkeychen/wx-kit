@@ -12,21 +12,21 @@ describe('SettingsService', () => {
   it('returns defaults when no file exists', async () => {
     const s = new SettingsService(dir, '/default/lib')
     const v = await s.get()
-    expect(v).toEqual({ libraryRoot: '/default/lib', defaultFormats: ['md', 'html', 'meta'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6 })
+    expect(v).toEqual({ libraryRoot: '/default/lib', defaultFormats: ['md', 'html', 'meta'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6, cliLinkPrompted: false })
   })
 
   it('persists and reloads saved settings', async () => {
     const s = new SettingsService(dir, '/default/lib')
     await s.save({ libraryRoot: '/custom', defaultFormats: ['md', 'pdf'] })
     const s2 = new SettingsService(dir, '/default/lib')
-    expect(await s2.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['md', 'pdf'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6 })
+    expect(await s2.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['md', 'pdf'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6, cliLinkPrompted: false })
   })
 
   it('merges partial save over existing', async () => {
     const s = new SettingsService(dir, '/default/lib')
     await s.save({ libraryRoot: '/custom', defaultFormats: ['md'] })
     await s.save({ defaultFormats: ['html'] })
-    expect(await s.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['html'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6 })
+    expect(await s.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['html'], historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6, cliLinkPrompted: false })
   })
 
   it('persists subscription settings', async () => {
@@ -52,5 +52,12 @@ describe('SettingsService', () => {
     await s.save({ listColumnWidths: { account: 200, publish: 180, download: 120 } })
     const s2 = new SettingsService(dir, '/default/lib')
     expect((await s2.get()).listColumnWidths).toEqual({ account: 200, publish: 180, download: 120 })
+  })
+
+  it('defaults cliLinkPrompted to false and persists true', async () => {
+    const s = new SettingsService(dir, '/default/lib')
+    expect((await s.get()).cliLinkPrompted).toBe(false)
+    await s.save({ cliLinkPrompted: true })
+    expect((await new SettingsService(dir, '/default/lib').get()).cliLinkPrompted).toBe(true)
   })
 })

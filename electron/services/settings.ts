@@ -16,6 +16,7 @@ export interface AppSettings {
   subscriptionNewArticleAction: NewArticleAction
   subscriptionScheduleMode: 'daily' | 'interval'
   subscriptionIntervalHours: number
+  cliLinkPrompted: boolean
 }
 
 export class SettingsService {
@@ -35,6 +36,7 @@ export class SettingsService {
       subscriptionNewArticleAction: 'notify',
       subscriptionScheduleMode: 'daily',
       subscriptionIntervalHours: 6,
+      cliLinkPrompted: false,
     }
   }
 
