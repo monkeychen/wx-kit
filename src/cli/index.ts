@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { readFileSync } from 'node:fs'
+import { readFileSync, appendFileSync } from 'node:fs'
 import type { DownloadFormat, DownloadSummary } from '../core/types'
 import { ALL_FORMATS } from '../core/types'
 import { fetchHtml, fetchBinary } from '../core/fetch-html'
@@ -19,7 +19,7 @@ import { rebuildLibrary } from '../core/rebuild-library'
 import { selectArticles, buildManifest } from '../core/material-export'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
-import { History } from '../core/download-history'
+import { History, eventFromSummary, type HistorySource } from '../core/download-history'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine } from '../core/subscriptions'
 import { nextCheckAt } from '../core/subscription-schedule'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
@@ -53,10 +53,13 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   // opts.userDataDir 由 main.ts 注入真实 app.getPath('userData')，与 GUI 同源；
   // '.wx-kit' 仅为 opts 缺省时的安全兜底，实际运行不会用到
+  const userDataDir = opts.userDataDir ?? join(homedir(), '.wx-kit')
   const settingsFor = () =>
-    new SettingsService(opts.userDataDir ?? join(homedir(), '.wx-kit'), defaultLibraryRoot())
+    new SettingsService(userDataDir, defaultLibraryRoot())
   const resolveRoot = async (optOut?: string): Promise<string> =>
     optOut ?? (await settingsFor().get()).libraryRoot
+
+  const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
   let exitCode = 0
 
@@ -274,16 +277,21 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const root = await resolveRoot(opts.out)
       const subs = new Subscriptions(root)
       const session = getSession()
-      const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[]) => {
+      const logFilePath = join(userDataDir, 'subscriptions-check.log')
+      const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
         const library = new Library(root)
         const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
         const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps))
-        await queue.run(refs.map((r) => r.url))
+        const summary = await queue.run(refs.map((r) => r.url))
+        try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
       }
       const result = await runSubscriptionCheck('manual', {
         subs, settings: s, session: session ? { token: session.token } : null,
         mpFetch: session ? makeMpFetch(session) : null, downloadRefs,
-        log: async (e) => { process.stderr.write(formatCheckLogLine(e) + '\n') },
+        log: async (e) => {
+          try { await subs.appendCheckLog(e); appendFileSync(logFilePath, formatCheckLogLine(e) + '\n') } catch { /* 留痕失败不阻断 */ }
+          process.stderr.write(formatCheckLogLine(e) + '\n')
+        },
       })
       outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, ...(result.note ? { note: result.note } : {}) })
       exitCode = 0
@@ -311,6 +319,11 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const next = await settingsFor().save(parsed.patch)
       outJson({ ok: true, settings: next })
     })
+
+  program
+    .command('version')
+    .description('输出版本号')
+    .action(() => { process.stdout.write((opts.version ?? '0.0.0-dev') + '\n') })
 
   try {
     await program.parseAsync(argv, { from: 'user' })

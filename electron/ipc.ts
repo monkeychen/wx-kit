@@ -97,6 +97,7 @@ export function registerIpc(settings: SettingsService): void {
     }
   })
   ipcMain.handle('cliLink:create', async (_e, force: boolean) => {
+    if (!CLI_LINK_SUPPORTED) return { status: 'unlinked' as const }
     await createLink(cliLinkDir(), cliLinkPath(), process.execPath, force)
     return { status: await linkStatus(cliLinkPath(), process.execPath) }
   })

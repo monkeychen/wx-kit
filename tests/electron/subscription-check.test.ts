@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Subscriptions } from '../../src/core/subscriptions'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
+import { MpAuthExpired } from '../../src/core/mp-errors'
 
 const newSubs = async (accs: Array<{ fakeid: string; nickname: string; watermark: number }>) => {
   const subs = new Subscriptions(mkdtempSync(join(tmpdir(), 'wxk-subchk-')))
@@ -48,5 +49,17 @@ describe('runSubscriptionCheck', () => {
     expect(r).toMatchObject({ newFound: 1 })
     expect(downloadRefs).toHaveBeenCalledOnce()
     expect((await subs.list())[0].newRefs).toEqual([])
+  })
+
+  it('auth-expired → note auth-expired, authExpired true, failed = accounts count, downloadRefs not called', async () => {
+    const subs = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 0 }])
+    const downloadRefs = vi.fn()
+    const check = vi.fn(async () => { throw new MpAuthExpired('登录态失效') })
+    const r = await runSubscriptionCheck('manual', {
+      subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs, log: vi.fn(), check: check as never,
+    })
+    expect(r).toMatchObject({ note: 'auth-expired', authExpired: true, failed: 1 })
+    expect(downloadRefs).not.toHaveBeenCalled()
   })
 })

@@ -214,6 +214,23 @@ describe('CLI subscription check-now', () => {
     expect(code).toBe(0)
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session', newFound: 0 })
   })
+  it('check-now persists no-session entry to subscriptions-check.log under userDataDir', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-chk2-'))
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-cli-ud-'))
+    const code = await runCli(['subscription', 'check-now', '--out', root], { userDataDir })
+    expect(code).toBe(0)
+    const logContent = readFileSync(join(userDataDir, 'subscriptions-check.log'), 'utf-8')
+    expect(logContent).toContain('no-session')
+  })
+})
+
+describe('CLI settings get unknown key', () => {
+  it('get <unknown-key> → exit 2, CLI_ERROR', async () => {
+    const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli-unk-'))
+    const code = await runCli(['settings', 'get', 'nonExistentKey'], { userDataDir: ud })
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+  })
 })
 
 describe('CLI help & version', () => {
@@ -224,6 +241,11 @@ describe('CLI help & version', () => {
   })
   it('-v is an alias for --version', async () => {
     const code = await runCli(['-v'], { version: '9.9.9' })
+    expect(code).toBe(0)
+    expect(stdout).toBe('9.9.9\n')
+  })
+  it('version bareword subcommand prints version to stdout, exit 0', async () => {
+    const code = await runCli(['version'], { version: '9.9.9' })
     expect(code).toBe(0)
     expect(stdout).toBe('9.9.9\n')
   })
