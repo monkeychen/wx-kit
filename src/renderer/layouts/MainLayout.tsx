@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { api } from '../api'
+import CliLinkPrompt from '../components/CliLinkPrompt'
 
 // 杂志刊头：左品牌、右横向导航。取代 antd 左侧 Sider —— 更像一本刊物的报头，
 // 也把纵向空间还给内容。
@@ -41,6 +42,7 @@ export default function MainLayout() {
         </nav>
       </header>
       <Outlet />
+      <CliLinkPrompt />
     </div>
   )
 }
