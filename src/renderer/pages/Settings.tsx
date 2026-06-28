@@ -8,8 +8,10 @@ import type { DownloadFormat } from '../../core/types'
 
 export default function Settings() {
   const [s, setS] = useState<AppSettings | null>(null)
+  const [cliLink, setCliLink] = useState<Awaited<ReturnType<typeof api.cliLinkStatus>> | null>(null)
 
   useEffect(() => { api.getSettings().then(setS) }, [])
+  useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
 
   const choose = async () => {
     const dir = await api.chooseDir()
@@ -29,6 +31,18 @@ export default function Settings() {
       const r = await api.libraryRebuild()
       message.success(`已重建文库索引：扫描 ${r.scanned} 篇，重建 ${r.rebuilt} 篇，跳过 ${r.skipped} 篇`)
     } catch (e) { message.error('重建失败：' + (e as Error).message) }
+  }
+  const createCliLink = async () => {
+    try {
+      await api.cliLinkCreate(cliLink?.status === 'conflict')
+      if (cliLink && !cliLink.inPath) {
+        const r = await api.cliLinkAddToPath()
+        message.success(`已创建，并将 ~/bin 写入 ${r.profilePath}，重开终端生效`)
+      } else {
+        message.success('已创建命令行快捷方式')
+      }
+      setCliLink(await api.cliLinkStatus())
+    } catch (e) { message.error('创建失败：' + (e as Error).message) }
   }
 
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
@@ -116,6 +130,20 @@ export default function Settings() {
               </Space>
             </Space>
           </div>
+
+          {cliLink?.supported && (
+            <div className="setting-block">
+              <div className="setting-label">命令行快捷方式</div>
+              <div className="setting-hint">
+                在 <code>{cliLink.dir}</code> 创建指向应用的软链，便于在终端运行 <code>wx-kit</code>（供 AI agent 调用）。
+                当前状态：{cliLink.status === 'linked' ? '已创建' : cliLink.status === 'conflict' ? '该位置被占用（创建将覆盖）' : '未创建'}
+                {!cliLink.inPath && '；~/bin 不在 PATH，创建时会引导写入 shell 配置'}。
+              </div>
+              <Button style={{ marginTop: 8 }} onClick={createCliLink} data-testid="set-cli-link">
+                {cliLink.status === 'linked' ? '重新创建' : '创建命令行快捷方式'}
+              </Button>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: 24 }}>
