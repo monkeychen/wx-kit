@@ -19,6 +19,9 @@ export type CrawlEvent =
   | { kind: 'backoff'; attempt: number; waitMs: number; reason: 'rate-limit' }
   | { kind: 'done'; summary: CrawlSummary }
 
+export type CliLinkStatus = 'linked' | 'unlinked' | 'conflict'
+export interface CliLinkInfo { supported: boolean; status: CliLinkStatus; inPath: boolean; dir: string }
+
 export interface WxApi {
   download(urls: string[], formats: DownloadFormat[]): Promise<DownloadSummary>
   onDownloadProgress(cb: (e: ProgressEvent) => void): () => void
@@ -56,6 +59,10 @@ export interface WxApi {
   subscriptionsOpenLog(): Promise<void>
   onSubscriptionsUpdated(cb: () => void): () => void
   onSubscriptionDownloadProgress(cb: (e: SubscriptionDownloadProgress) => void): () => void
+  // —— M18 命令行软链 ——
+  cliLinkStatus(): Promise<CliLinkInfo>
+  cliLinkCreate(force: boolean): Promise<{ status: CliLinkStatus }>
+  cliLinkAddToPath(): Promise<{ profilePath: string; result: 'added' | 'present' }>
 }
 
 declare global {

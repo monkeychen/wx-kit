@@ -51,6 +51,9 @@ const api: WxApi = {
     ipcRenderer.on('subscriptions:download:progress', listener)
     return () => { ipcRenderer.removeListener('subscriptions:download:progress', listener) }
   },
+  cliLinkStatus: () => ipcRenderer.invoke('cliLink:status'),
+  cliLinkCreate: (force) => ipcRenderer.invoke('cliLink:create', force),
+  cliLinkAddToPath: () => ipcRenderer.invoke('cliLink:addToPath'),
 }
 
 contextBridge.exposeInMainWorld('api', api)

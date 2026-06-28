@@ -3,6 +3,8 @@ import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import { readdir } from 'node:fs/promises'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
+import { linkStatus, createLink, pathContains, ensureInProfile, profilePathFor } from './services/cli-link'
 import type { DownloadFormat } from '../src/core/types'
 import { fetchHtml, fetchBinary } from '../src/core/fetch-html'
 import { Library } from '../src/core/library'
@@ -79,6 +81,30 @@ export function registerIpc(settings: SettingsService): void {
     return r.canceled ? null : r.filePaths[0]
   })
   ipcMain.handle('shell:reveal', (_e, path: string) => { shell.showItemInFolder(path) })
+
+  // —— M18 命令行软链 ——
+  const CLI_LINK_SUPPORTED = process.platform === 'darwin' || process.platform === 'linux'
+  const cliLinkDir = () => join(homedir(), 'bin')
+  const cliLinkPath = () => join(cliLinkDir(), 'wx-kit')
+
+  ipcMain.handle('cliLink:status', async () => {
+    if (!CLI_LINK_SUPPORTED) return { supported: false, status: 'unlinked', inPath: false, dir: cliLinkDir() }
+    return {
+      supported: true,
+      status: await linkStatus(cliLinkPath(), process.execPath),
+      inPath: pathContains(cliLinkDir(), process.env.PATH),
+      dir: cliLinkDir(),
+    }
+  })
+  ipcMain.handle('cliLink:create', async (_e, force: boolean) => {
+    await createLink(cliLinkDir(), cliLinkPath(), process.execPath, force)
+    return { status: await linkStatus(cliLinkPath(), process.execPath) }
+  })
+  ipcMain.handle('cliLink:addToPath', async () => {
+    const profilePath = profilePathFor(process.env.SHELL, homedir())
+    const result = await ensureInProfile(profilePath)
+    return { profilePath, result }
+  })
 
   ipcMain.handle('download', async (event, { urls, formats }: { urls: string[]; formats: DownloadFormat[] }) => {
     const { libraryRoot } = await settings.get()
