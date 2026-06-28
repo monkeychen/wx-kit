@@ -71,8 +71,10 @@ async function main() {
   // --- isolated userData + library root, seed settings ---
   const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-e2e-udd-'))
   const libraryRoot = mkdtempSync(join(tmpdir(), 'wxk-e2e-lib-'))
+  // cliLinkPrompted:true 防 M18 首启软链 Modal 在 e2e 里弹出——它跑在真实 HOME 上，
+  // 若触发会污染开发机的 ~/bin / shell profile，且 Modal 遮罩会干扰后续断言。
   writeFileSync(join(userDataDir, 'settings.json'),
-    JSON.stringify({ libraryRoot, defaultFormats: ['cover', 'md', 'html', 'meta'] }))
+    JSON.stringify({ libraryRoot, defaultFormats: ['cover', 'md', 'html', 'meta'], cliLinkPrompted: true }))
   log('libraryRoot', libraryRoot)
 
   const realSession = join(homedir(), 'Library', 'Application Support', 'wx-kit', 'mp-session.json')
