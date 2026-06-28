@@ -6,12 +6,12 @@
 ## 当前状态
 
 - **最新发布:v0.4.0(2026-06-23,文库供料 agent + 存储加固)** —— tag `v0.4.0` + GitHub Release(三平台安装包,标 Latest)已发。
-- **进行中:v0.5.0 — CLI 体验优化(M16–M18)** 🚧。需求/验收 `docs/PRD-v0.5.0.md`,设计 `docs/superpowers/specs/2026-06-28-v0.5.0-cli-experience-design.md`,计划 `docs/plans/2026-06-28-m16/m17/m18-*.md`。范围:① help/version + 分流修复;② CLI 补齐(文库 search/remove、订阅 list/check-now、设置 get/set)+ 默认同库;③ 首启建 PATH 软链(mac/Linux)。
+- **v0.5.0 代码已合入 main,待发版** —— CLI 体验优化(M16–M18)已实现、逐任务评审 + 整分支终评 + fix 复评全过、237 单测绿、M18 软链真 e2e 验证;已快进合入 main(分支已删)。**尚未发版**:还需 version bump(0.4.0→0.5.0)、出包、打 tag `v0.5.0`、建 Release、刷 README(等安哥发话)。需求/验收 `docs/PRD-v0.5.0.md`,设计 `docs/superpowers/specs/2026-06-28-v0.5.0-cli-experience-design.md`,复盘 devlog §28。范围:① help/version + 分流修复;② CLI 补齐(文库 search/remove、订阅 list/check-now、设置 get/set)+ 默认同库;③ 首启建 PATH 软链(mac/Linux)。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-截至 v0.4.0,**M1–M15 全部 ✅ 已合入 main 并随对应版本发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M15 已随 v0.1.0–v0.4.0 发布;M16–M18 已合入 main、待随 v0.5.0 发版**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -31,9 +31,9 @@
 | **M13** | v0.4.0 | 存储加固:原子写 + 按路径写锁(并发不丢更新)+ `rebuildLibrary` 恢复(CLI `library rebuild` + 设置页按钮) | `plans/2026-06-22-m13-storage-hardening.md`(+ v0.4.0 spec) |
 | **M14** | v0.4.0 | 供料能力:`library export` CLI(JSON 清单 + content.md 路径)+ 文库「导出选中为素材」 | `plans/2026-06-22-m14-material-feed.md` |
 | **M15** | v0.4.0 | 贯通样例 skill `agent/wx-kit-compose`:选料 → 选题 → 写作(委派 khazix-writer),两个人工检查点;wx-kit 只供料 | 无独立计划(skill 创作);交付物 `agent/wx-kit-compose/` + `agent/README.md` |
-| **M16** 🚧 | v0.5.0 | 模式分流修复 + help/version:`-h/--help`、`-v/--version`、`help [cmd]` 都进 CLI 并走 stdout,无参仍 GUI | `plans/2026-06-28-m16-cli-dispatch-help-version.md`(+ v0.5.0 spec) |
-| **M17** 🚧 | v0.5.0 | CLI 补齐:文库 search/remove、订阅 list/check-now、设置 get/set;`--out` 默认回落 `settings.libraryRoot`;抽出共享 `runSubscriptionCheck` | `plans/2026-06-28-m17-cli-parity-commands.md` |
-| **M18** 🚧 | v0.5.0 | 首启建 PATH 软链(mac/Linux):`~/bin` 软链 + 不在 PATH 引导写 profile + 设置页重建入口 | `plans/2026-06-28-m18-first-run-path-symlink.md` |
+| **M16** | v0.5.0 | 模式分流修复 + help/version:`-h/--help`、`-v/--version`、`version`/`help [cmd]` 都进 CLI 并走 stdout,无参仍 GUI | `plans/2026-06-28-m16-cli-dispatch-help-version.md`(+ v0.5.0 spec) |
+| **M17** | v0.5.0 | CLI 补齐:文库 search/remove、订阅 list/check-now、设置 get/set;`--out` 默认回落 `settings.libraryRoot`;抽出共享 `runSubscriptionCheck`(CLI 检查同步落盘 check log + 历史) | `plans/2026-06-28-m17-cli-parity-commands.md` |
+| **M18** | v0.5.0 | 首启建 PATH 软链(mac/Linux):`~/bin` 软链 + 不在 PATH 引导写 profile + 设置页重建入口 | `plans/2026-06-28-m18-first-run-path-symlink.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`(逐条验收看各 §4)。
 
