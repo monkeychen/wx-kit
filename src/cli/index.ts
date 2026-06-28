@@ -36,12 +36,13 @@ function out(summary: DownloadSummary): void {
 function outJson(obj: unknown): void { process.stdout.write(JSON.stringify(obj) + '\n') }
 
 /** 解析 CLI 参数并执行；返回退出码 */
-export async function runCli(argv: string[]): Promise<number> {
+export async function runCli(argv: string[], opts: { version?: string } = {}): Promise<number> {
   const program = new Command()
   program.name('wx-kit').description('微信百宝箱 CLI').exitOverride()
+  program.version(opts.version ?? '0.0.0-dev', '-v, --version', '输出版本号')
   program.configureOutput({
-    writeOut: (s) => process.stderr.write(s),
-    writeErr: (s) => process.stderr.write(s),
+    writeOut: (s) => process.stdout.write(s),   // help/version 是主动查询,走 stdout
+    writeErr: (s) => process.stderr.write(s),   // 报错 usage 走 stderr
   })
 
   let exitCode = 0
@@ -203,7 +204,7 @@ export async function runCli(argv: string[]): Promise<number> {
   } catch (err) {
     const code = (err as { code?: string }).code
     if (code === 'commander.helpDisplayed' || code === 'commander.help' || code === 'commander.version') {
-      // help/version already printed to stderr; success, no JSON error
+      // help/version already printed to stdout; success, no JSON error
     } else {
       process.stdout.write(JSON.stringify({ ok: false, error: { code: 'CLI_ERROR', message: (err as Error).message } }) + '\n')
       exitCode = 2

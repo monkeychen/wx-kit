@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron'
 import path, { join } from 'node:path'
 import { runCli } from '../src/cli'
+import { isCliInvocation } from './cli-dispatch'
 import { registerWxfileScheme, handleWxfileProtocol } from './protocol'
 import { registerIpc } from './ipc'
 import { SettingsService } from './services/settings'
@@ -9,12 +10,6 @@ import { SettingsService } from './services/settings'
 // Must be called before app 'ready'. Safe in CLI mode — the registered
 // scheme is never exercised without a BrowserWindow.
 registerWxfileScheme()
-
-const CLI_COMMANDS = new Set(['download', 'crawl', 'search', 'login', 'auth-status', 'library'])
-
-function isCliInvocation(argv: string[]): boolean {
-  return argv.length > 0 && CLI_COMMANDS.has(argv[0])
-}
 
 // 打包后 argv: [exe, ...args]；开发时 argv: [electron, '.', ...args]
 function userArgs(): string[] {
@@ -32,7 +27,7 @@ async function main() {
     // before the summary/library write finish. We exit explicitly below.
     app.on('window-all-closed', () => {})
     await app.whenReady()
-    const code = await runCli(args)
+    const code = await runCli(args, { version: app.getVersion() })
     app.exit(code)
     return
   }

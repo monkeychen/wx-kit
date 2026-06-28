@@ -102,3 +102,22 @@ describe('CLI library export', () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SELECTOR' } })
   })
 })
+
+describe('CLI help & version', () => {
+  it('--version prints bare version to stdout, exit 0', async () => {
+    const code = await runCli(['--version'], { version: '9.9.9' })
+    expect(code).toBe(0)
+    expect(stdout).toBe('9.9.9\n')
+  })
+  it('-v is an alias for --version', async () => {
+    const code = await runCli(['-v'], { version: '9.9.9' })
+    expect(code).toBe(0)
+    expect(stdout).toBe('9.9.9\n')
+  })
+  it('--help prints usage to stdout, exit 0, no JSON error', async () => {
+    const code = await runCli(['--help'])
+    expect(code).toBe(0)
+    expect(stdout).toContain('Usage')
+    expect(stdout).not.toContain('"ok"')
+  })
+})
