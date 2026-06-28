@@ -18,6 +18,7 @@ import { MpAuthExpired } from '../core/mp-errors'
 import { rebuildLibrary } from '../core/rebuild-library'
 import { selectArticles, buildManifest } from '../core/material-export'
 import { SettingsService } from '../../electron/services/settings'
+import { parseSettingAssignment } from '../../electron/services/settings-cli'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -207,6 +208,29 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const picked = selectArticles(all, { ids, since: opts.since, account: opts.account, all: opts.all })
       outJson(buildManifest(picked))
       exitCode = 0
+    })
+
+  const settings = program.command('settings').description('读写应用设置')
+  settings
+    .command('get')
+    .description('输出全部设置，或单个键的值')
+    .argument('[key]', '设置键名')
+    .action(async (key: string | undefined) => {
+      const all = await settingsFor().get()
+      if (key === undefined) { outJson({ ok: true, settings: all }); return }
+      if (!(key in all)) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: `未知设置键:${key}` } }); exitCode = 2; return }
+      outJson({ ok: true, key, value: (all as unknown as Record<string, unknown>)[key] })
+    })
+  settings
+    .command('set')
+    .description('设置一个键的值（仅开放用户可配置键）')
+    .argument('<key>', '设置键名')
+    .argument('<value>', '值（布尔用 true/false，格式用逗号分隔）')
+    .action(async (key: string, value: string) => {
+      const parsed = parseSettingAssignment(key, value)
+      if (!parsed.ok) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: parsed.error } }); exitCode = 2; return }
+      const next = await settingsFor().save(parsed.patch)
+      outJson({ ok: true, settings: next })
     })
 
   try {

@@ -118,6 +118,29 @@ describe('CLI library root falls back to settings.libraryRoot', () => {
   })
 })
 
+describe('CLI settings get/set', () => {
+  it('get returns full settings; get <key> returns one', async () => {
+    const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli-'))
+    await runCli(['settings', 'get'], { userDataDir: ud })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, settings: { subscriptionScheduleMode: 'daily' } })
+    stdout = ''
+    await runCli(['settings', 'get', 'subscriptionScheduleMode'], { userDataDir: ud })
+    expect(JSON.parse(stdout)).toEqual({ ok: true, key: 'subscriptionScheduleMode', value: 'daily' })
+  })
+  it('set writes a valid key and echoes full settings', async () => {
+    const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli2-'))
+    const code = await runCli(['settings', 'set', 'subscriptionIntervalHours', '4'], { userDataDir: ud })
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, settings: { subscriptionIntervalHours: 4 } })
+  })
+  it('set rejects invalid key/value with exit 2', async () => {
+    const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli3-'))
+    const code = await runCli(['settings', 'set', 'subscriptionScheduleMode', 'weekly'], { userDataDir: ud })
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+  })
+})
+
 describe('CLI help & version', () => {
   it('--version prints bare version to stdout, exit 0', async () => {
     const code = await runCli(['--version'], { version: '9.9.9' })
