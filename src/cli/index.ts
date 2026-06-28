@@ -17,6 +17,7 @@ import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
 import { rebuildLibrary } from '../core/rebuild-library'
 import { selectArticles, buildManifest } from '../core/material-export'
+import { SettingsService } from '../../electron/services/settings'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -36,7 +37,7 @@ function out(summary: DownloadSummary): void {
 function outJson(obj: unknown): void { process.stdout.write(JSON.stringify(obj) + '\n') }
 
 /** 解析 CLI 参数并执行；返回退出码 */
-export async function runCli(argv: string[], opts: { version?: string } = {}): Promise<number> {
+export async function runCli(argv: string[], opts: { version?: string; userDataDir?: string } = {}): Promise<number> {
   const program = new Command()
   program.name('wx-kit').description('微信百宝箱 CLI').exitOverride()
   program.version(opts.version ?? '0.0.0-dev', '-v, --version', '输出版本号')
@@ -44,6 +45,13 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
     writeOut: (s) => process.stdout.write(s),   // help/version 是主动查询,走 stdout
     writeErr: (s) => process.stderr.write(s),   // 报错 usage 走 stderr
   })
+
+  // opts.userDataDir 由 main.ts 注入真实 app.getPath('userData')，与 GUI 同源；
+  // '.wx-kit' 仅为 opts 缺省时的安全兜底，实际运行不会用到
+  const settingsFor = () =>
+    new SettingsService(opts.userDataDir ?? join(homedir(), '.wx-kit'), defaultLibraryRoot())
+  const resolveRoot = async (optOut?: string): Promise<string> =>
+    optOut ?? (await settingsFor().get()).libraryRoot
 
   let exitCode = 0
 
@@ -53,7 +61,7 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
     .option('-u, --url <url...>', '文章 URL（可多次）', [])
     .option('-f, --urls-file <file>', '每行一个 URL 的文件')
     .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
-    .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
       const urls: string[] = [...(opts.url ?? [])].map((s: string) => s.trim()).filter(Boolean)
       if (opts.urlsFile) {
@@ -61,8 +69,9 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
       }
       if (!urls.length) throw new Error('no urls; use --url or --urls-file')
       const formats = parseFormats(opts.formats)
-      const library = new Library(opts.out)
-      const deps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: opts.out }
+      const root = await resolveRoot(opts.out)
+      const library = new Library(root)
+      const deps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
 
       const queue = new DownloadQueue(
         (url) => downloadArticle(url, formats, deps),
@@ -108,7 +117,7 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
     .option('--from <date>', '起始日期 YYYY-MM-DD')
     .option('--to <date>', '结束日期 YYYY-MM-DD')
     .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
-    .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (name: string | undefined, opts) => {
       const session = getSession()
       if (!session) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login' } }); exitCode = 2; return }
@@ -127,8 +136,9 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
           fakeid = cands[0].fakeid
         }
         const formats = parseFormats(opts.formats)
-        const library = new Library(opts.out)
-        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: opts.out }
+        const root = await resolveRoot(opts.out)
+        const library = new Library(root)
+        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
         const summary = await crawlAccount(fakeid, range, {
           mpFetch, token: session.token,
           downloadOne: (url) => downloadArticle(url, formats, ddeps),
@@ -160,9 +170,9 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
     .command('list')
     .description('列出已下载文章')
     .option('--account <name>', '按公众号过滤')
-    .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
-      const all = await new Library(opts.out).list()
+      const all = await new Library(await resolveRoot(opts.out)).list()
       const items = opts.account ? all.filter((a) => a.account === opts.account) : all
       outJson({ ok: true, items })
       exitCode = 0
@@ -171,9 +181,9 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
   library
     .command('rebuild')
     .description('从各文章目录的 meta.json 重建文库索引（library.json 损坏时的恢复手段）')
-    .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
-      const res = await rebuildLibrary(opts.out)
+      const res = await rebuildLibrary(await resolveRoot(opts.out))
       outJson({ ok: true, ...res })
       exitCode = 0
     })
@@ -185,7 +195,7 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
     .option('--since <date>', '按下载日期选：YYYY-MM-DD 及之后')
     .option('--account <name>', '按公众号名选（大小写不敏感包含匹配）')
     .option('--all', '导出全库（无选料器时必须显式指定）')
-    .option('-o, --out <dir>', '文章库根目录', defaultLibraryRoot())
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
       const ids = opts.ids ? String(opts.ids).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined
       if (!ids && !opts.since && !opts.account && !opts.all) {
@@ -193,7 +203,7 @@ export async function runCli(argv: string[], opts: { version?: string } = {}): P
         exitCode = 1
         return
       }
-      const all = await new Library(opts.out).list()
+      const all = await new Library(await resolveRoot(opts.out)).list()
       const picked = selectArticles(all, { ids, since: opts.since, account: opts.account, all: opts.all })
       outJson(buildManifest(picked))
       exitCode = 0

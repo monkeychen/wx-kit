@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
 import { mkdirSync as _mkdirSync, writeFileSync as _writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { SettingsService } from '../../electron/services/settings'
 
 // mock 掉 electron 绑定的服务，让 runCli 在纯 node 下可测
 vi.mock('electron', () => ({ BrowserWindow: class {} }))
@@ -100,6 +101,20 @@ describe('CLI library export', () => {
     const code = await runCli(['library', 'export', '--out', root])
     expect(code).toBe(1)
     expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SELECTOR' } })
+  })
+})
+
+describe('CLI library root falls back to settings.libraryRoot', () => {
+  it('library list without --out reads settings.libraryRoot', async () => {
+    const userData = mkdtempSync(join(tmpdir(), 'wxk-ud-'))
+    const lib = mkdtempSync(join(tmpdir(), 'wxk-lib-'))
+    await new SettingsService(userData, '/unused').save({ libraryRoot: lib })
+    writeFileSync(join(lib, 'library.json'), JSON.stringify({
+      version: 1, articles: [{ id: 'k', title: 'K', account: 'a', publishTime: '', sourceUrl: '', digest: '', coverUrl: '', downloadTime: '', formats: ['md'], dir: join(lib, 'a') }],
+    }))
+    const code = await runCli(['library', 'list'], { userDataDir: userData })
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, items: [{ id: 'k' }] })
   })
 })
 

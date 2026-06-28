@@ -27,7 +27,7 @@ async function main() {
     // before the summary/library write finish. We exit explicitly below.
     app.on('window-all-closed', () => {})
     await app.whenReady()
-    const code = await runCli(args, { version: app.getVersion() })
+    const code = await runCli(args, { version: app.getVersion(), userDataDir: app.getPath('userData') })
     app.exit(code)
     return
   }
