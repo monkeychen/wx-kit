@@ -19,10 +19,10 @@ import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
 import { rebuildLibrary } from '../src/core/rebuild-library'
 import { selectArticles, buildManifest, writeMaterialExport } from '../src/core/material-export'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
-import { checkSubscriptions } from '../src/core/check-subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { SettingsService } from './services/settings'
+import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
@@ -185,49 +185,14 @@ export function registerIpc(settings: SettingsService): void {
 
   const runSubscriptionCheck = async (trigger: 'auto' | 'manual') => {
     const subs = await subsFor()
-    const session = getSession()
-    if (!session) {
-      subsAuthExpired = true
-      await logCheck(subs, { time: Date.now(), trigger, accounts: 0, newFound: 0, failed: 0, note: 'no-session' })
-      emitSubsUpdated(); return
-    }
-    const accounts = (await subs.list()).filter((a) => a.subscribed)
-    if (!accounts.length) {
-      await subs.setLastRunAt(Date.now())
-      await logCheck(subs, { time: Date.now(), trigger, accounts: 0, newFound: 0, failed: 0, note: 'no-accounts' })
-      emitSubsUpdated(); return
-    }
     const s = await settings.get()
-    let results
-    try {
-      results = await checkSubscriptions(accounts, { mpFetch: makeMpFetch(session), token: session.token })
-    } catch (e) {
-      if (e instanceof MpAuthExpired) {
-        subsAuthExpired = true
-        await logCheck(subs, { time: Date.now(), trigger, accounts: accounts.length, newFound: 0, failed: accounts.length, note: 'auth-expired' })
-        emitSubsUpdated(); return
-      }
-      throw e
-    }
-    subsAuthExpired = false
-    let newFound = 0
-    let failed = 0
-    for (const r of results) {
-      if (!r.ok) { failed++; continue }
-      await subs.updateWatermark(r.fakeid, r.latest)
-      if (r.newRefs.length === 0) continue
-      newFound += r.newRefs.length
-      if (s.subscriptionNewArticleAction === 'download') {
-        const acc = accounts.find((a) => a.fakeid === r.fakeid)!
-        await downloadRefs(r.newRefs, s.defaultFormats, { kind: 'account', nickname: acc.nickname, fakeid: r.fakeid, range: { count: r.newRefs.length } })
-        await subs.clearNewRefs(r.fakeid)
-      } else {
-        await subs.setNewRefs(r.fakeid, r.newRefs)
-      }
-    }
-    await subs.setLastRunAt(Date.now())
-    await logCheck(subs, { time: Date.now(), trigger, accounts: accounts.length, newFound, failed })
-    emitSubsUpdated()
+    const session = getSession()
+    const result = await svcRunSubscriptionCheck(trigger, {
+      subs, settings: s, session: session ? { token: session.token } : null,
+      mpFetch: session ? makeMpFetch(session) : null,
+      downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
+    })
+    if (result.note !== 'no-accounts') subsAuthExpired = result.authExpired
   }
 
   ipcMain.handle('subscriptions:list', async () => {
