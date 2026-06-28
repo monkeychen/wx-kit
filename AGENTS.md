@@ -45,7 +45,8 @@
 
 ## 沟通语言（强约束）
 - **与用户的所有交流一律用中文**——回答、解释、提问、进度报告、方案对比，全程中文。
-- 代码、标识符、注释、commit message、PR 描述用英文。
+- 标识符（变量/函数/类型/文件名）、commit message、PR 描述用英文。
+- **代码注释以中文为主**——与全库既成风格一致（match surrounding code），不强制英文。
 
 ## 命名/格式
 - 文件 kebab-case，类型 PascalCase，函数/变量 camelCase。
