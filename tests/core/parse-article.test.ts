@@ -39,3 +39,28 @@ describe('parseArticle publishTime fallback', () => {
     expect(parseArticle(html, 'x').publishTime).toBe('2026-05-22 10:08')
   })
 })
+
+describe('parseArticle account fallback', () => {
+  // 真实微信页：#js_name 元素为空（运行时 JS 填充），账号名藏在脚本变量 d.nick_name 里。
+  // 形态：d.nick_name = (xml ? getXmlValue('nick_name.DATA') : '公众号名').html(false)
+  it('falls back to the d.nick_name script var when #js_name is empty', () => {
+    const html =
+      '<h1 id="activity-name">x</h1><div id="js_content"><p>正文</p></div>' +
+      "<script>var d = {};\n  d.nick_name = (xml ? getXmlValue('nick_name.DATA') : '刘备教授').html(false);</script>"
+    expect(parseArticle(html, 'x').account).toBe('刘备教授')
+  })
+  it('ignores unrelated nick_name occurrences (comments/game profile)', () => {
+    // 评论区/游戏资料里也有 nick_name，但不是 d.nick_name = (...) 形态，不应误取
+    const html =
+      '<h1 id="activity-name">x</h1><div id="js_content"><p>正文</p></div>' +
+      "<script>if (user_game_profile.user_info.nick_name) {}\n" +
+      "  d.nick_name = (xml ? getXmlValue('nick_name.DATA') : '正确账号').html(false);</script>"
+    expect(parseArticle(html, 'x').account).toBe('正确账号')
+  })
+  it('still prefers #js_name element text when present', () => {
+    const html =
+      '<span id="js_name">实时账号</span><h1 id="activity-name">x</h1><div id="js_content"><p>正文</p></div>' +
+      "<script>d.nick_name = (xml ? '' : '脚本账号').html(false);</script>"
+    expect(parseArticle(html, 'x').account).toBe('实时账号')
+  })
+})
