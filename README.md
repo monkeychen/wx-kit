@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.4.0-released-success.svg)
+![Status](https://img.shields.io/badge/v0.5.0-released-success.svg)
 
 <!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
@@ -22,15 +22,13 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**v0.5.0 已合入 main(待发版,CLI 体验优化)**:
+**v0.5.0 已发布(CLI 体验优化)**:
 
 - **help/version + 分流修复** —— `wx-kit -h/--help`、`-v/--version`、`version` / `help <子命令>` 都进 CLI 并走 stdout(修了 `--version` 误开 GUI 的 bug);无参仍开窗口。
 - **CLI 补齐 + 与 GUI 同库** —— 新增 `library search`/`library remove`、`subscription list`/`subscription check-now`、`settings get`/`settings set`;CLI 默认操作「设置」里的库根,不再与 GUI 各管一个库。
 - **首启建命令行快捷方式**(macOS/Linux)—— 首次开 GUI 提示在 `~/bin` 建软链(不在 PATH 时引导写 shell profile),省去手敲 .app 内层长路径;设置页可随时重建。
 
-> v0.5.0 代码已在 main、单测 / lint / 类型 / GUI e2e 全绿,但**尚未出安装包、未打 tag**;下方「下载安装包」与顶部版本徽章仍指向已发布的 **v0.4.0**。
-
-**v0.4.0 已落地**(文库供料 agent + 存储加固):
+**v0.4.0**(文库供料 agent + 存储加固):
 
 - **供料 agent** —— 文库文章可一键导出为结构化素材（`library export` CLI / 文库「导出选中为素材」按钮），交给应用之外的 Claude Code skill（仓库内 `agent/wx-kit-compose`）驱动「选题 → 写作」，人在环中。wx-kit 只供料、不内置创作。
 - **存储加固** —— 三个索引改原子写 + 按文件写锁，崩溃/断电不再写出半截索引、后台与前台并发不丢更新；新增「重建索引」（CLI `library rebuild` + 设置页按钮）从各文章 `meta.json` 恢复。
@@ -63,8 +61,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.4.0:`wx-kit-0.4.0-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.4.0.dmg`(Intel) / `wx-kit Setup 0.4.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.5.0:`wx-kit-0.5.0-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.5.0.dmg`(Intel) / `wx-kit Setup 0.5.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -150,7 +148,7 @@ ln -sf /Applications/wx-kit.app/Contents/MacOS/wx-kit /usr/local/bin/wx-kit
 wx-kit auth-status
 ```
 
-> v0.5.0 起,首次打开 GUI 会提示在 `~/bin` 自动建这个软链(并在 `~/bin` 不在 PATH 时引导写入 shell 配置),设置页也能随时重建——发版后此处手动 `ln` 即可省去。
+> v0.5.0 起,首次打开 GUI 会提示在 `~/bin` 自动建这个软链(并在 `~/bin` 不在 PATH 时引导写入 shell 配置),设置页也能随时重建——接受引导后此处手动 `ln` 即可省去。
 
 > 用内层 `Contents/MacOS/wx-kit`,**别用 `open -a wx-kit`**——`open` 不透传 stdout / 退出码,拿不到 JSON 结果。
 
@@ -164,7 +162,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 / v0.4.0 均已发布**(最新已发布 **v0.4.0**:文库供料 agent + 存储加固);**v0.5.0 已合入 main、待发版**(CLI 体验优化)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 / v0.4.0 / v0.5.0 均已发布**(最新 **v0.5.0**:CLI 体验优化)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -194,11 +192,10 @@ wx-kit auth-status
 - ✅ M14 — 供料能力:`library export` CLI(JSON 清单 + content.md 路径)+ 文库「导出选中为素材」
 - ✅ M15 — 贯通样例 skill `agent/wx-kit-compose`:选料 → 选题 → 写作(委派 khazix-writer),两个人工检查点;wx-kit 只供料
 
-**v0.5.0 · CLI 体验优化(代码已合入 main,待发版)**
+**v0.5.0 · CLI 体验优化(2026-06-29)**
 - ✅ M16 — 模式分流修复 + help/version:`-h/--help`、`-v/--version`、`version` / `help [子命令]` 都进 CLI 走 stdout,无参仍 GUI
 - ✅ M17 — CLI 补齐:`library search`/`remove`、`subscription list`/`check-now`、`settings get`/`set`;`--out` 默认回落设置库根(GUI/CLI 同库);抽出共享 `runSubscriptionCheck`(CLI 检查同步落盘 check log + 历史)
 - ✅ M18 — 首启建 PATH 软链(macOS/Linux):`~/bin` 软链 + 不在 PATH 引导写 shell profile + 设置页重建入口
-- ⏳ 待发版:version bump 0.4.0→0.5.0、出三平台包、打 tag `v0.5.0`、建 Release、刷版本徽章/安装包名
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 

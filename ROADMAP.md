@@ -5,13 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.4.0(2026-06-23,文库供料 agent + 存储加固)** —— tag `v0.4.0` + GitHub Release(三平台安装包,标 Latest)已发。
-- **v0.5.0 代码已合入 main,待发版** —— CLI 体验优化(M16–M18)已实现、逐任务评审 + 整分支终评 + fix 复评全过、237 单测绿、M18 软链真 e2e 验证;已快进合入 main(分支已删)。**尚未发版**:还需 version bump(0.4.0→0.5.0)、出包、打 tag `v0.5.0`、建 Release、刷 README(等安哥发话)。需求/验收 `docs/PRD-v0.5.0.md`,设计 `docs/superpowers/specs/2026-06-28-v0.5.0-cli-experience-design.md`,复盘 devlog §28。范围:① help/version + 分流修复;② CLI 补齐(文库 search/remove、订阅 list/check-now、设置 get/set)+ 默认同库;③ 首启建 PATH 软链(mac/Linux)。
+- **最新发布:v0.5.0(2026-06-29,CLI 体验优化)** —— tag `v0.5.0` + GitHub Release(三平台安装包,标 Latest)已发。范围:① help/version + 分流修复;② CLI 补齐(文库 search/remove、订阅 list/check-now、设置 get/set)+ 默认同库;③ 首启建 PATH 软链(mac/Linux)。需求/验收 `docs/PRD-v0.5.0.md`,设计 `docs/superpowers/specs/2026-06-28-v0.5.0-cli-experience-design.md`,发布说明 `docs/releases/v0.5.0.md`,复盘 devlog §28。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M15 已随 v0.1.0–v0.4.0 发布;M16–M18 已合入 main、待随 v0.5.0 发版**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M18 已随 v0.1.0–v0.5.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -39,6 +38,7 @@
 
 ## 版本发布史(最新在前)
 
+- **v0.5.0 · 2026-06-29 · CLI 体验优化** —— M16 模式分流修复 + help/version、M17 CLI 补齐(文库 search/remove、订阅 list/check-now、设置 get/set)+ 默认同库 + 抽出共享 `runSubscriptionCheck`、M18 首启建 PATH 软链(mac/Linux)。把 CLI 从「能被 agent 调」打磨到「顺手、自洽、与 GUI 同库」。另含解析兜底:`#js_name` 空时从 `d.nick_name` 脚本变量取公众号名。发布说明 `docs/releases/v0.5.0.md`,复盘 devlog §28。
 - **v0.4.0 · 2026-06-23 · 文库供料 agent + 存储加固** —— M13 存储加固 + M14 供料能力 + M15 样例 skill `agent/wx-kit-compose`。把文库升级为「可被 AI agent 消费的素材源」,wx-kit 只供料、不内置创作。发布说明 `docs/releases/v0.4.0.md`,复盘 devlog §24–§27。
 - **v0.3.0 · 2026-06-16 · 列表优化 + 公众号订阅** —— M10 列宽+表头排序、M11 类 RSS 订阅、M12 触发模式 + 可观测性。发布说明 `docs/releases/v0.3.0.md`,复盘 devlog §17–§20。
   - *v0.3.0→v0.4.0 间维护(2026-06-18~22)*:频控取消即时打断 + 订阅命中频控不重试 + 订阅去规律化(`abbcc57`/`601d8f7`/`3050167`)、阅读器 md 标题重复修复(`9ad515e`)、undici 安全补丁 Dependabot #32/#33 归零(`3b82782`)。复盘 devlog §21–§23。
