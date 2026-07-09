@@ -33,8 +33,9 @@
 | **M16** | v0.5.0 | 模式分流修复 + help/version:`-h/--help`、`-v/--version`、`version`/`help [cmd]` 都进 CLI 并走 stdout,无参仍 GUI | `plans/2026-06-28-m16-cli-dispatch-help-version.md`(+ v0.5.0 spec) |
 | **M17** | v0.5.0 | CLI 补齐:文库 search/remove、订阅 list/check-now、设置 get/set;`--out` 默认回落 `settings.libraryRoot`;抽出共享 `runSubscriptionCheck`(CLI 检查同步落盘 check log + 历史) | `plans/2026-06-28-m17-cli-parity-commands.md` |
 | **M18** | v0.5.0 | 首启建 PATH 软链(mac/Linux):`~/bin` 软链 + 不在 PATH 引导写 profile + 设置页重建入口 | `plans/2026-06-28-m18-first-run-path-symlink.md` |
+| **M19** 🚧 | v0.5.1 | 非标准消息类型解析:文字消息(type 10)+ 图文消息/小绿书(type 8)——脚本变量提取正文/图片、标题策略、og 兜底清洗 | `plans/2026-07-09-m19-message-type-parsing.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
@@ -48,7 +49,9 @@
 
 ## 下一步 / 候选
 
-当前无排期。候选(需要时单议):
+- **v0.5.1(进行中)· M19 非标准消息类型解析** —— 文字消息(`item_show_type: '10'`)与图文消息/小绿书(`'8'`)现状:标题被塞整篇正文/正文空白/图片全丢。需求/验收 `docs/PRD-v0.5.1.md`,计划 `plans/2026-07-09-m19-message-type-parsing.md`。
+
+候选(需要时单议):
 
 - **Windows CLI stdout 正解** —— 打包后 win 是 GUI 子系统程序,CLI 模式 stdout 不回贴控制台,现仅有「重定向到文件」绕法(见 README、AGENTS.md 陷阱清单)。正解是打包时给 win 出 console 子系统入口(或 `wx-kit-cli.exe` wrapper)。要动打包配置,铺 Windows agent 场景时再做。
 - 其余方向(mac 签名公证、应用内更新、其他形式内容保真如公式/音视频卡片/合集、整本导出、多 session)均为各版**非目标**,需要时单独立项。
