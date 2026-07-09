@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.5.0-released-success.svg)
+![Status](https://img.shields.io/badge/v0.5.1-released-success.svg)
 
 <!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
@@ -22,7 +22,12 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**v0.5.0 已发布(CLI 体验优化)**:
+**v0.5.1 已发布(支持文字消息与图文消息)**:
+
+- **文字消息**(纯文字短内容)—— 修复下载后「标题是整篇正文、正文一片空白」:正文从页面脚本变量提取并分段,标题取正文首行截断(与微信客户端一致)。
+- **图文消息 / 小绿书** —— 修复正文空白与图片全丢:文字 + 全部主图(自动排除水印/分享封面)完整下载并本地化,md/html/pdf/阅读器全链路正常。
+
+**v0.5.0(CLI 体验优化)**:
 
 - **help/version + 分流修复** —— `wx-kit -h/--help`、`-v/--version`、`version` / `help <子命令>` 都进 CLI 并走 stdout(修了 `--version` 误开 GUI 的 bug);无参仍开窗口。
 - **CLI 补齐 + 与 GUI 同库** —— 新增 `library search`/`library remove`、`subscription list`/`subscription check-now`、`settings get`/`settings set`;CLI 默认操作「设置」里的库根,不再与 GUI 各管一个库。
@@ -61,8 +66,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.5.0:`wx-kit-0.5.0-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.5.0.dmg`(Intel) / `wx-kit Setup 0.5.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.5.1:`wx-kit-0.5.1-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.5.1.dmg`(Intel) / `wx-kit Setup 0.5.1.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -162,7 +167,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 / v0.4.0 / v0.5.0 均已发布**(最新 **v0.5.0**:CLI 体验优化)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 / v0.4.0 / v0.5.0 / v0.5.1 均已发布**(最新 **v0.5.1**:支持文字消息与图文消息)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -196,6 +201,9 @@ wx-kit auth-status
 - ✅ M16 — 模式分流修复 + help/version:`-h/--help`、`-v/--version`、`version` / `help [子命令]` 都进 CLI 走 stdout,无参仍 GUI
 - ✅ M17 — CLI 补齐:`library search`/`remove`、`subscription list`/`check-now`、`settings get`/`set`;`--out` 默认回落设置库根(GUI/CLI 同库);抽出共享 `runSubscriptionCheck`(CLI 检查同步落盘 check log + 历史)
 - ✅ M18 — 首启建 PATH 软链(macOS/Linux):`~/bin` 软链 + 不在 PATH 引导写 shell profile + 设置页重建入口
+
+**v0.5.1 · 支持文字消息与图文消息(2026-07-09)**
+- ✅ M19 — 非标准消息类型解析:文字消息(`item_show_type: '10'`)+ 图文消息/小绿书(`'8'`)——正文/图片从页面脚本变量提取,标题策略 + og 兜底清洗,md/html/pdf/阅读器/CLI 全链路修复
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 

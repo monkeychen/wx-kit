@@ -1,7 +1,7 @@
 {
   "name": "wx-kit",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "微信百宝箱 - 第一阶段：文章下载器",
   "license": "Apache-2.0",
   "author": "monkeychen",
