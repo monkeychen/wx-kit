@@ -72,7 +72,7 @@
 - [x] `package.json`/`package-lock.json` version = 0.5.1；`docs/releases/v0.5.1.md` 就绪。
 - [x] 重新打包并**真实启动打包后的 .app** 验证两条 URL 下载 + 阅读正常（CLI 全格式 + GUI 阅读器 7 图渲染，2026-07-09）。
 - [x] README 徽章/版本号/安装包文件名、ROADMAP 状态段同步刷新。
-- [ ] main 打 annotated tag `v0.5.1` + GitHub Release 三平台包（push 与 release 等安哥发话）。
+- [x] main 打 annotated tag `v0.5.1` + GitHub Release 三平台包（2026-07-09 已发,标 Latest）。
 
 ## 5. 里程碑拆分
 
