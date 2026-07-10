@@ -32,22 +32,22 @@
 ## 4. 验收标准
 
 ### R1 / M20 · wrapper 脚本 + 自愈
-- [ ] `createLink` 产出可执行 wrapper 脚本,内容含 `exec "<target>" "$@"`;非 force 遇占位报错、force 覆盖。
-- [ ] `linkStatus`:wrapper 匹配 → `linked`;指向 target 的 symlink → `legacy`;指向别处的 symlink / 内容不符文件 → `conflict`;缺失 → `unlinked`。
-- [ ] ipc `cliLink:status` 遇 `legacy` 自动重建为 wrapper 后返回 `linked`（真机场景:旧软链用户开一次 GUI 即自愈）。
-- [ ] 纯逻辑 TDD 覆盖上述状态矩阵;`npm test` / `tsc` / `lint` / `npm run test:e2e` 全绿。
-- [ ] 真机:经 wrapper 命令行入口跑 `download --formats md,pdf` 成功、无 Helper/GPU 报错。
+- [x] `createLink` 产出可执行 wrapper 脚本,内容含 `exec "<target>" "$@"`;非 force 遇占位报错、force 覆盖。
+- [x] `linkStatus`:wrapper 匹配 → `linked`;指向 target 的 symlink → `legacy`;指向别处的 symlink / 内容不符文件 → `conflict`;缺失 → `unlinked`。
+- [x] ipc `cliLink:status` 遇 `legacy` 自动重建为 wrapper 后返回 `linked`（真机验证 2026-07-10:放回旧 symlink → 开 GUI → 自动替换为 wrapper,内容/可执行位断言通过）。
+- [x] 纯逻辑 TDD 覆盖上述状态矩阵;`npm test`（260）/ `tsc` / `lint` / `npm run test:e2e` 全绿。
+- [x] 真机:经 wrapper 命令行入口跑 `download --formats md,pdf` 成功、无 Helper/GPU 报错。
 
 ### R2 · 发版
-- [ ] version 0.5.2、`docs/releases/v0.5.2.md`、README/ROADMAP 同步。
-- [ ] 重新打包;**打包态经命令行入口（wrapper）跑 `--version` + `download`（含 pdf）**全部正常。
+- [x] version 0.5.2、`docs/releases/v0.5.2.md`、README/ROADMAP 同步（含改掉 README 教用户 `ln -sf` 的同坑段落）。
+- [x] 重新打包;**打包态经命令行入口（wrapper）跑 `--version` + `download`（含 pdf）**全部正常,stderr 零 Helper/GPU 报错（2026-07-10）。
 - [ ] main 打 annotated tag `v0.5.2` + GitHub Release 三平台包（push 与 release 等安哥发话）。
 
 ## 5. 里程碑拆分
 
 | 里程碑 | 范围 | 状态 |
 |--------|------|------|
-| **M20** | 命令行入口 wrapper 脚本 + 旧软链自愈（R1） | ⏳ 待实现 |
+| **M20** | 命令行入口 wrapper 脚本 + 旧软链自愈（R1） | ✅ 已完成（2026-07-10） |
 
 ## 6. 非目标
 
