@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.5.1-released-success.svg)
+![Status](https://img.shields.io/badge/v0.5.2-released-success.svg)
 
 <!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
@@ -22,7 +22,11 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**v0.5.1 已发布(支持文字消息与图文消息)**:
+**v0.5.2 已发布(修复命令行入口崩溃)**:
+
+- 修复经 `wx-kit` 快捷命令跑 `download` 报 `Unable to find helper app` 崩溃:快捷方式从软链改为 wrapper 脚本(macOS 上 Electron 经软链定位不到 bundle 内 Helper 子进程);旧软链**打开一次 GUI 自动升级**,无需手动处理。
+
+**v0.5.1(支持文字消息与图文消息)**:
 
 - **文字消息**(纯文字短内容)—— 修复下载后「标题是整篇正文、正文一片空白」:正文从页面脚本变量提取并分段,标题取正文首行截断(与微信客户端一致)。
 - **图文消息 / 小绿书** —— 修复正文空白与图片全丢:文字 + 全部主图(自动排除水印/分享封面)完整下载并本地化,md/html/pdf/阅读器全链路正常。
@@ -66,8 +70,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.5.1:`wx-kit-0.5.1-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.5.1.dmg`(Intel) / `wx-kit Setup 0.5.1.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.5.2:`wx-kit-0.5.2-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.5.2.dmg`(Intel) / `wx-kit Setup 0.5.2.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -148,12 +152,14 @@ GUI 与 CLI 是**同一个二进制**:不带子命令开窗口,带子命令(`dow
 ```bash
 /Applications/wx-kit.app/Contents/MacOS/wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,meta --out ~/Documents/wx-kit
 
-# 嫌路径长,建个软链一劳永逸:
-ln -sf /Applications/wx-kit.app/Contents/MacOS/wx-kit /usr/local/bin/wx-kit
+# 嫌路径长,建个 wrapper 脚本一劳永逸(⚠️ 别用 ln 软链——macOS 上 Electron
+# 经软链找不到 bundle 内 Helper 子进程,download 等命令会崩):
+printf '#!/bin/sh\nexec "/Applications/wx-kit.app/Contents/MacOS/wx-kit" "$@"\n' > /usr/local/bin/wx-kit
+chmod +x /usr/local/bin/wx-kit
 wx-kit auth-status
 ```
 
-> v0.5.0 起,首次打开 GUI 会提示在 `~/bin` 自动建这个软链(并在 `~/bin` 不在 PATH 时引导写入 shell 配置),设置页也能随时重建——接受引导后此处手动 `ln` 即可省去。
+> v0.5.0 起,首次打开 GUI 会提示在 `~/bin` 自动创建这个快捷命令(v0.5.2 起为 wrapper 脚本;`~/bin` 不在 PATH 时引导写入 shell 配置),设置页也能随时重建——接受引导后此处手动创建即可省去。
 
 > 用内层 `Contents/MacOS/wx-kit`,**别用 `open -a wx-kit`**——`open` 不透传 stdout / 退出码,拿不到 JSON 结果。
 
@@ -167,7 +173,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 / v0.2.0 / v0.2.1 / v0.3.0 / v0.4.0 / v0.5.0 / v0.5.1 均已发布**(最新 **v0.5.1**:支持文字消息与图文消息)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 – v0.5.2 均已发布**(最新 **v0.5.2**:修复命令行入口崩溃)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -204,6 +210,9 @@ wx-kit auth-status
 
 **v0.5.1 · 支持文字消息与图文消息(2026-07-09)**
 - ✅ M19 — 非标准消息类型解析:文字消息(`item_show_type: '10'`)+ 图文消息/小绿书(`'8'`)——正文/图片从页面脚本变量提取,标题策略 + og 兜底清洗,md/html/pdf/阅读器/CLI 全链路修复
+
+**v0.5.2 · 修复命令行入口崩溃(2026-07-10)**
+- ✅ M20 — 命令行入口 symlink → wrapper 脚本(macOS 经软链找不到 Helper app,`download` 必崩)+ 旧软链开 GUI 自动升级
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 

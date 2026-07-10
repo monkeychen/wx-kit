@@ -135,7 +135,7 @@ export default function Settings() {
             <div className="setting-block">
               <div className="setting-label">命令行快捷方式</div>
               <div className="setting-hint">
-                在 <code>{cliLink.dir}</code> 创建指向应用的软链，便于在终端运行 <code>wx-kit</code>（供 AI agent 调用）。
+                在 <code>{cliLink.dir}</code> 创建指向应用的快捷命令，便于在终端运行 <code>wx-kit</code>（供 AI agent 调用）。
                 当前状态：{cliLink.status === 'linked' ? '已创建' : cliLink.status === 'conflict' ? '该位置被占用（创建将覆盖）' : '未创建'}
                 {!cliLink.inPath && '；~/bin 不在 PATH，创建时会引导写入 shell 配置'}。
               </div>
