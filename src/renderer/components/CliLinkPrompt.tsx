@@ -43,7 +43,7 @@ export default function CliLinkPrompt() {
       data-testid="cli-link-modal">
       <p>创建后可在终端直接运行 <code>wx-kit …</code>，供 AI agent 调用。</p>
       <p className="faint">
-        将在 <code>{info.dir}</code> 下创建指向应用的软链
+        将在 <code>{info.dir}</code> 下创建指向应用的快捷命令
         {info.status === 'conflict' && '（该位置已有同名文件，将被覆盖）'}
         {!info.inPath && '；并把 ~/bin 加入 PATH（写入 shell 配置）'}。
       </p>

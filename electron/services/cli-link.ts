@@ -1,29 +1,42 @@
-// 命令行软链 + PATH 的纯文件逻辑(无 electron,参数全注入,可单测)。
-import { symlink, mkdir, readlink, readFile, appendFile, unlink } from 'node:fs/promises'
+// 命令行快捷命令 + PATH 的纯文件逻辑(无 electron,参数全注入,可单测)。
+import { mkdir, readlink, readFile, writeFile, appendFile, unlink } from 'node:fs/promises'
 import { join, delimiter } from 'node:path'
 
-export type LinkStatus = 'linked' | 'unlinked' | 'conflict'
+// 'legacy' = 指向 target 的旧版 symlink(≤v0.5.1 的形态):mac 上 Electron 按调用路径
+// 定位 bundle 内 Helper app,经软链调用找不到 → download 等需子进程的命令必崩,须升级为 wrapper。
+export type LinkStatus = 'linked' | 'unlinked' | 'conflict' | 'legacy'
 
 const PROFILE_LINE = 'export PATH="$HOME/bin:$PATH"'
 
-/** linkPath 不存在=unlinked;是指向 target 的 symlink=linked;否则(指别处或普通文件)=conflict。 */
+/** 命令行入口的 wrapper 脚本:exec 真实路径,让 Electron 以 bundle 内路径定位 Helper app。 */
+export function wrapperScript(target: string): string {
+  return `#!/bin/sh\nexec "${target}" "$@"\n`
+}
+
+/**
+ * linkPath 不存在=unlinked;内容等于目标 wrapper 的普通文件=linked;
+ * 指向 target 的旧版 symlink=legacy(坏的,待自愈升级);其余占位=conflict。
+ */
 export async function linkStatus(linkPath: string, target: string): Promise<LinkStatus> {
   try {
     const cur = await readlink(linkPath)
-    return cur === target ? 'linked' : 'conflict'
+    return cur === target ? 'legacy' : 'conflict'
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
     if (code === 'ENOENT') return 'unlinked'
-    if (code === 'EINVAL' || code === 'UNKNOWN') return 'conflict'   // 存在但不是 symlink
-    throw e
+    if (code !== 'EINVAL' && code !== 'UNKNOWN') throw e
+    // 存在但不是 symlink:比对 wrapper 内容
+    const content = await readFile(linkPath, 'utf-8').catch(() => '')
+    return content === wrapperScript(target) ? 'linked' : 'conflict'
   }
 }
 
-/** 建 linkDir 后把 linkPath 软链到 target;force=true 先删占位项再建。 */
+/** 建 linkDir 后在 linkPath 写指向 target 的 wrapper 脚本;force=true 先删占位项再建。 */
 export async function createLink(linkDir: string, linkPath: string, target: string, force = false): Promise<void> {
   await mkdir(linkDir, { recursive: true })
+  // 必须先删旧项再写:linkPath 若是 symlink,直接 writeFile 会写穿到其指向的目标
   if (force) { try { await unlink(linkPath) } catch { /* 无占位项 */ } }
-  await symlink(target, linkPath)
+  await writeFile(linkPath, wrapperScript(target), { mode: 0o755, flag: 'wx' })
 }
 
 /** dir 是否作为完整一项出现在 PATH 里。纯函数。 */

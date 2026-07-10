@@ -82,16 +82,23 @@ export function registerIpc(settings: SettingsService): void {
   })
   ipcMain.handle('shell:reveal', (_e, path: string) => { shell.showItemInFolder(path) })
 
-  // —— M18 命令行软链 ——
+  // —— M18 命令行快捷命令(M20 起为 wrapper 脚本) ——
   const CLI_LINK_SUPPORTED = process.platform === 'darwin' || process.platform === 'linux'
   const cliLinkDir = () => join(homedir(), 'bin')
   const cliLinkPath = () => join(cliLinkDir(), 'wx-kit')
 
   ipcMain.handle('cliLink:status', async () => {
     if (!CLI_LINK_SUPPORTED) return { supported: false, status: 'unlinked', inPath: false, dir: cliLinkDir() }
+    let status = await linkStatus(cliLinkPath(), process.execPath)
+    if (status === 'legacy') {
+      // ≤v0.5.1 建的是 symlink,mac 上经软链调用找不到 Helper app(download 必崩)——静默升级为 wrapper 脚本。
+      // GUI 每次启动 CliLinkPrompt 都会查一次 status,老用户开一次 GUI 即自愈。
+      await createLink(cliLinkDir(), cliLinkPath(), process.execPath, true)
+      status = await linkStatus(cliLinkPath(), process.execPath)
+    }
     return {
       supported: true,
-      status: await linkStatus(cliLinkPath(), process.execPath),
+      status,
       inPath: pathContains(cliLinkDir(), process.env.PATH),
       dir: cliLinkDir(),
     }
