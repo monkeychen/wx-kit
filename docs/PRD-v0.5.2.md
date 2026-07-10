@@ -41,7 +41,7 @@
 ### R2 · 发版
 - [x] version 0.5.2、`docs/releases/v0.5.2.md`、README/ROADMAP 同步（含改掉 README 教用户 `ln -sf` 的同坑段落）。
 - [x] 重新打包;**打包态经命令行入口（wrapper）跑 `--version` + `download`（含 pdf）**全部正常,stderr 零 Helper/GPU 报错（2026-07-10）。
-- [ ] main 打 annotated tag `v0.5.2` + GitHub Release 三平台包（push 与 release 等安哥发话）。
+- [x] main 打 annotated tag `v0.5.2` + GitHub Release 三平台包（2026-07-11 已发,标 Latest）。
 
 ## 5. 里程碑拆分
 

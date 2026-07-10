@@ -5,12 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.5.1(2026-07-09,支持文字消息与图文消息)** —— tag `v0.5.1` + GitHub Release(三平台安装包,标 Latest)已发。范围:M19 非标准消息类型解析——文字消息(`item_show_type: '10'`)与图文消息/小绿书(`'8'`)的正文/图片/标题在 md/html/pdf/阅读器/CLI 全链路修复。需求/验收 `docs/PRD-v0.5.1.md`,计划 `plans/2026-07-09-m19-message-type-parsing.md`,发布说明 `docs/releases/v0.5.1.md`,复盘 devlog §29。
+- **最新发布:v0.5.2(2026-07-11,修复命令行入口崩溃)** —— tag `v0.5.2` + GitHub Release(三平台安装包,标 Latest)已发。范围:M20 命令行入口 symlink → wrapper 脚本(mac 软链下 Electron 找不到 Helper app,`download` 必崩)+ 旧软链开 GUI 自动升级。需求/验收 `docs/PRD-v0.5.2.md`,计划 `plans/2026-07-10-m20-cli-wrapper-script.md`,发布说明 `docs/releases/v0.5.2.md`,复盘 devlog §30。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M19 已随 v0.1.0–v0.5.1 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M20 已随 v0.1.0–v0.5.2 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -40,6 +40,7 @@
 
 ## 版本发布史(最新在前)
 
+- **v0.5.2 · 2026-07-11 · 修复命令行入口崩溃** —— M20 快捷命令 symlink → wrapper 脚本:mac 上 Electron 经软链定位不到 bundle 内 Helper app,`download`/PDF 等需子进程的命令必崩(`--version` 等纯主进程命令侥幸可用,M18 验证漏网);旧软链开一次 GUI 静默自愈。README 同坑示例(`ln -sf`)一并清理。发布说明 `docs/releases/v0.5.2.md`,复盘 devlog §30。
 - **v0.5.1 · 2026-07-09 · 支持文字消息与图文消息** —— M19 非标准消息类型解析:文字消息(type 10)正文从脚本变量提取、标题取首行截断(修「标题是整篇正文、正文空白」);图文消息/小绿书(type 8)文字 + 主图完整下载(排除水印/分享封面);og 兜底清洗字面转义。解析层单点根治,下游全链路零改动受益。发布说明 `docs/releases/v0.5.1.md`,复盘 devlog §29。
 - **v0.5.0 · 2026-06-29 · CLI 体验优化** —— M16 模式分流修复 + help/version、M17 CLI 补齐(文库 search/remove、订阅 list/check-now、设置 get/set)+ 默认同库 + 抽出共享 `runSubscriptionCheck`、M18 首启建 PATH 软链(mac/Linux)。把 CLI 从「能被 agent 调」打磨到「顺手、自洽、与 GUI 同库」。另含解析兜底:`#js_name` 空时从 `d.nick_name` 脚本变量取公众号名。发布说明 `docs/releases/v0.5.0.md`,复盘 devlog §28。
 - **v0.4.0 · 2026-06-23 · 文库供料 agent + 存储加固** —— M13 存储加固 + M14 供料能力 + M15 样例 skill `agent/wx-kit-compose`。把文库升级为「可被 AI agent 消费的素材源」,wx-kit 只供料、不内置创作。发布说明 `docs/releases/v0.4.0.md`,复盘 devlog §24–§27。
@@ -51,9 +52,7 @@
 
 ## 下一步 / 候选
 
-- **v0.5.2(M20 已完成,待发版)· 修复命令行入口崩溃** —— 快捷命令 symlink → wrapper 脚本(mac 软链下 Electron 找不到 Helper app,`download` 必崩),旧软链开 GUI 自动升级。需求/验收 `docs/PRD-v0.5.2.md`,复盘 devlog §30。
-
-候选(需要时单议):
+当前无排期。候选(需要时单议):
 
 - **Windows CLI stdout 正解** —— 打包后 win 是 GUI 子系统程序,CLI 模式 stdout 不回贴控制台,现仅有「重定向到文件」绕法(见 README、AGENTS.md 陷阱清单)。正解是打包时给 win 出 console 子系统入口(或 `wx-kit-cli.exe` wrapper)。要动打包配置,铺 Windows agent 场景时再做。
 - 其余方向(mac 签名公证、应用内更新、其他形式内容保真如公式/音视频卡片/合集、整本导出、多 session)均为各版**非目标**,需要时单独立项。
