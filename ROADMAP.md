@@ -5,12 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.5.2(2026-07-11,修复命令行入口崩溃)** —— tag `v0.5.2` + GitHub Release(三平台安装包,标 Latest)已发。范围:M20 命令行入口 symlink → wrapper 脚本(mac 软链下 Electron 找不到 Helper app,`download` 必崩)+ 旧软链开 GUI 自动升级。需求/验收 `docs/PRD-v0.5.2.md`,计划 `plans/2026-07-10-m20-cli-wrapper-script.md`,发布说明 `docs/releases/v0.5.2.md`,复盘 devlog §30。
+- **最新发布:v0.5.3(2026-07-13,修复 macOS 关窗后程序坞无法重开窗口)** —— tag `v0.5.3` + GitHub Release(三平台安装包,标 Latest)已发。范围:M21 补注册 `app.on('activate')` 重建主窗口(关窗驻留后点程序坞图标此前无响应,应用假死)。需求/验收 `docs/PRD-v0.5.3.md`,计划 `plans/2026-07-13-m21-dock-reactivate.md`,发布说明 `docs/releases/v0.5.3.md`,复盘 devlog §31。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M20 已随 v0.1.0–v0.5.2 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M21 已随 v0.1.0–v0.5.3 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -35,11 +35,13 @@
 | **M18** | v0.5.0 | 首启建 PATH 软链(mac/Linux):`~/bin` 软链 + 不在 PATH 引导写 profile + 设置页重建入口 | `plans/2026-06-28-m18-first-run-path-symlink.md` |
 | **M19** | v0.5.1 | 非标准消息类型解析:文字消息(type 10)+ 图文消息/小绿书(type 8)——脚本变量提取正文/图片、标题策略、og 兜底清洗 | `plans/2026-07-09-m19-message-type-parsing.md` |
 | **M20** | v0.5.2 | 命令行入口 symlink → wrapper 脚本(mac 软链下 Electron 找不到 Helper app,download 必崩)+ 旧软链自愈 | `plans/2026-07-10-m20-cli-wrapper-script.md` |
+| **M21** | v0.5.3 | macOS 程序坞激活重建窗口:补注册 `app.on('activate')`(关窗驻留后点程序坞图标此前无响应) | `plans/2026-07-13-m21-dock-reactivate.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
+- **v0.5.3 · 2026-07-13 · 修复 macOS 关窗后程序坞无法重开窗口** —— M21 补注册 `app.on('activate')`:主进程此前只做了 mac 惯例的一半(关窗驻留程序坞)而缺重建窗口的代码路径,点程序坞图标无响应、应用假死只能强退。缺陷自 v0.1.0 即存在,整进程启停的开发/测试路径一直未暴露。发布说明 `docs/releases/v0.5.3.md`,复盘 devlog §31。
 - **v0.5.2 · 2026-07-11 · 修复命令行入口崩溃** —— M20 快捷命令 symlink → wrapper 脚本:mac 上 Electron 经软链定位不到 bundle 内 Helper app,`download`/PDF 等需子进程的命令必崩(`--version` 等纯主进程命令侥幸可用,M18 验证漏网);旧软链开一次 GUI 静默自愈。README 同坑示例(`ln -sf`)一并清理。发布说明 `docs/releases/v0.5.2.md`,复盘 devlog §30。
 - **v0.5.1 · 2026-07-09 · 支持文字消息与图文消息** —— M19 非标准消息类型解析:文字消息(type 10)正文从脚本变量提取、标题取首行截断(修「标题是整篇正文、正文空白」);图文消息/小绿书(type 8)文字 + 主图完整下载(排除水印/分享封面);og 兜底清洗字面转义。解析层单点根治,下游全链路零改动受益。发布说明 `docs/releases/v0.5.1.md`,复盘 devlog §29。
 - **v0.5.0 · 2026-06-29 · CLI 体验优化** —— M16 模式分流修复 + help/version、M17 CLI 补齐(文库 search/remove、订阅 list/check-now、设置 get/set)+ 默认同库 + 抽出共享 `runSubscriptionCheck`、M18 首启建 PATH 软链(mac/Linux)。把 CLI 从「能被 agent 调」打磨到「顺手、自洽、与 GUI 同库」。另含解析兜底:`#js_name` 空时从 `d.nick_name` 脚本变量取公众号名。发布说明 `docs/releases/v0.5.0.md`,复盘 devlog §28。
