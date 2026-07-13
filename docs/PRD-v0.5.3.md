@@ -37,7 +37,7 @@
 ### R2 · 发版
 - [x] version 0.5.3、`docs/releases/v0.5.3.md`、README/ROADMAP 同步。
 - [x] 重新打包；**打包态 .app 真机验证：关窗后 `open -a`（等价程序坞点击的 reopen 事件）窗口重建、界面完整、不重复开窗**，stderr 无异常（2026-07-13）。
-- [ ] main 打 annotated tag `v0.5.3` + GitHub Release 三平台包。
+- [x] main 打 annotated tag `v0.5.3` + GitHub Release 三平台包（2026-07-13 已发,标 Latest,包大小与本地逐字节一致）。
 
 ## 5. 里程碑拆分
 
