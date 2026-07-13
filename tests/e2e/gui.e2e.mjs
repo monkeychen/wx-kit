@@ -286,6 +286,21 @@ async function main() {
 
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
+
+    // --- M21: 关窗后 activate(等价点程序坞图标)重建窗口 ---
+    await win.close()
+    const zero = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)
+    assert(zero === 0, 'closing the window leaves zero windows (app stays alive on darwin)')
+    const reopened = app.waitForEvent('window')
+    await app.evaluate(({ app: a }) => { a.emit('activate') })
+    const win2 = await reopened
+    await win2.waitForSelector('[data-testid="app-shell"]', { timeout: 20000 })
+    assert(true, 'activate after close recreates the window with full UI')
+    // 窗口存在时再 activate 不应重复开窗
+    await app.evaluate(({ app: a }) => { a.emit('activate') })
+    await win2.waitForTimeout(300)
+    const count = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)
+    assert(count === 1, 'activate with a window present does not open a duplicate')
   } catch (e) {
     failed = true
     await win.screenshot({ path: '/tmp/wxk-e2e-fail.png' }).catch(() => {})
