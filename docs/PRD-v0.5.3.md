@@ -30,20 +30,20 @@
 ## 4. 验收标准
 
 ### R1 / M21 · activate 重建窗口
-- [ ] 关闭主窗口后触发 `activate`，应用重建主窗口且界面完整可用（e2e：关窗 → 触发 activate → `app-shell` 重新渲染）。
-- [ ] 窗口存在时触发 `activate` 不新开重复窗口。
-- [ ] `npm test` / `tsc` / `lint` / `npm run test:e2e` 全绿。
+- [x] 关闭主窗口后触发 `activate`，应用重建主窗口且界面完整可用（e2e：关窗 → 触发 activate → `app-shell` 重新渲染）。
+- [x] 窗口存在时触发 `activate` 不新开重复窗口。
+- [x] `npm test`（260）/ `tsc` / `lint` / `npm run test:e2e` 全绿。
 
 ### R2 · 发版
-- [ ] version 0.5.3、`docs/releases/v0.5.3.md`、README/ROADMAP 同步。
-- [ ] 重新打包；**打包态 .app 真机验证：关窗后 `open -a`（等价程序坞点击的 reopen 事件）窗口重建**，stderr 无异常。
+- [x] version 0.5.3、`docs/releases/v0.5.3.md`、README/ROADMAP 同步。
+- [x] 重新打包；**打包态 .app 真机验证：关窗后 `open -a`（等价程序坞点击的 reopen 事件）窗口重建、界面完整、不重复开窗**，stderr 无异常（2026-07-13）。
 - [ ] main 打 annotated tag `v0.5.3` + GitHub Release 三平台包。
 
 ## 5. 里程碑拆分
 
 | 里程碑 | 范围 | 状态 |
 |--------|------|------|
-| **M21** | macOS 程序坞激活重建窗口（R1） | 🚧 进行中 |
+| **M21** | macOS 程序坞激活重建窗口（R1） | ✅ 已完成（2026-07-13） |
 
 ## 6. 非目标
 
