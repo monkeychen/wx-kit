@@ -289,7 +289,13 @@ async function main() {
 
     // --- M21: 关窗后 activate(等价点程序坞图标)重建窗口 ---
     await win.close()
-    const zero = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)
+    // close() 只保证发起关闭,销毁略滞后 → 轮询而非单次查询(曾 flake)
+    let zero = -1
+    for (let i = 0; i < 20; i++) {
+      zero = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)
+      if (zero === 0) break
+      await new Promise((r) => setTimeout(r, 100))
+    }
     assert(zero === 0, 'closing the window leaves zero windows (app stays alive on darwin)')
     const reopened = app.waitForEvent('window')
     await app.evaluate(({ app: a }) => { a.emit('activate') })

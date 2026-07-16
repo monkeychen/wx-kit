@@ -6,6 +6,7 @@
 ## 当前状态
 
 - **最新发布:v0.5.3(2026-07-13,修复 macOS 关窗后程序坞无法重开窗口)** —— tag `v0.5.3` + GitHub Release(三平台安装包,标 Latest)已发。范围:M21 补注册 `app.on('activate')` 重建主窗口(关窗驻留后点程序坞图标此前无响应,应用假死)。需求/验收 `docs/PRD-v0.5.3.md`,计划 `plans/2026-07-13-m21-dock-reactivate.md`,发布说明 `docs/releases/v0.5.3.md`,复盘 devlog §31。
+- **进行中:v0.5.4(M22 订阅检查加固)** —— 实现与验证已完成(2026-07-16),待发版。需求/验收 `docs/PRD-v0.5.4.md`,计划 `plans/2026-07-16-m22-subscription-check-hardening.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
@@ -36,6 +37,7 @@
 | **M19** | v0.5.1 | 非标准消息类型解析:文字消息(type 10)+ 图文消息/小绿书(type 8)——脚本变量提取正文/图片、标题策略、og 兜底清洗 | `plans/2026-07-09-m19-message-type-parsing.md` |
 | **M20** | v0.5.2 | 命令行入口 symlink → wrapper 脚本(mac 软链下 Electron 找不到 Helper app,download 必崩)+ 旧软链自愈 | `plans/2026-07-10-m20-cli-wrapper-script.md` |
 | **M21** | v0.5.3 | macOS 程序坞激活重建窗口:补注册 `app.on('activate')`(关窗驻留后点程序坞图标此前无响应) | `plans/2026-07-13-m21-dock-reactivate.md` |
+| **M22** | v0.5.4 | 订阅检查加固:调度防重入(同时段重复检查)+ 失败明细弹窗(检查记录可点开逐号原因)+ 翻到水位为止(平时每号 1 次请求,空窗不漏) | `plans/2026-07-16-m22-subscription-check-hardening.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`(逐条验收看各 §4)。
 

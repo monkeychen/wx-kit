@@ -19,6 +19,12 @@ describe('checkSubscriptions', () => {
     expect(r.latest).toBe(120)
   })
 
+  it('passes the account watermark to the list function (翻到水位为止的接缝契约)', async () => {
+    const listFn = vi.fn(async () => [] as ArticleRef[])
+    await checkSubscriptions([acc('f1', 12345)], { mpFetch: fetchStub, token: 't', listFn: listFn as never, sleep: fastSleep })
+    expect(listFn).toHaveBeenCalledWith(fetchStub, 't', 'f1', 12345, expect.anything())
+  })
+
   it('no new articles → empty newRefs, latest stays at observed max', async () => {
     const listFn = vi.fn(async () => [ref(50), ref(80)])
     const [r] = await checkSubscriptions([acc('f1', 100)], { mpFetch: fetchStub, token: 't', listFn, sleep: fastSleep })

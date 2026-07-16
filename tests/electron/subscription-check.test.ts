@@ -51,6 +51,33 @@ describe('runSubscriptionCheck', () => {
     expect((await subs.list())[0].newRefs).toEqual([])
   })
 
+  it('failed accounts carry per-account failure details (nickname + error) into log and result', async () => {
+    const subs = await newSubs([{ fakeid: 'f1', nickname: '猫笔刀', watermark: 100 }, { fakeid: 'f2', nickname: 'B', watermark: 100 }])
+    const check = vi.fn(async () => [
+      { fakeid: 'f1', ok: false, latest: 100, newRefs: [], error: '微信频率限制（200013）' },
+      { fakeid: 'f2', ok: true, latest: 100, newRefs: [] },
+    ])
+    const log = vi.fn()
+    const r = await runSubscriptionCheck('auto', {
+      subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log, check: check as never,
+    })
+    const expected = [{ nickname: '猫笔刀', error: '微信频率限制（200013）' }]
+    expect(r).toMatchObject({ failed: 1, failures: expected })
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ failed: 1, failures: expected }))
+  })
+
+  it('all-success check logs no failures field (old entries stay clean)', async () => {
+    const subs = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 100 }])
+    const check = vi.fn(async () => [{ fakeid: 'f1', ok: true, latest: 100, newRefs: [] }])
+    const log = vi.fn()
+    await runSubscriptionCheck('auto', {
+      subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log, check: check as never,
+    })
+    expect(log.mock.calls[0][0]).not.toHaveProperty('failures')
+  })
+
   it('auth-expired → note auth-expired, authExpired true, failed = accounts count, downloadRefs not called', async () => {
     const subs = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 0 }])
     const downloadRefs = vi.fn()

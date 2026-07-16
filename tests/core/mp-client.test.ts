@@ -1,6 +1,6 @@
 // tests/core/mp-client.test.ts
 import { describe, it, expect } from 'vitest'
-import { searchAccount, listArticles } from '../../src/core/mp-client'
+import { searchAccount, listArticles, listArticlesSince } from '../../src/core/mp-client'
 import { MpAuthExpired, MpRateLimited, MpApiError } from '../../src/core/mp-errors'
 import type { MpFetch } from '../../src/core/mp-types'
 
@@ -83,6 +83,58 @@ describe('listArticles count mode', () => {
     }) as never
     const refs = await listArticles(fetch, 'T', 'FID', { count: 10 }, noSleep)
     expect(refs.map((r) => r.url)).toEqual(['u1'])
+  })
+})
+
+describe('listArticlesSince (订阅检查:翻到水位为止)', () => {
+  // create_time 递减(最新在前):第 i 篇 = 1000 - i
+  const mkTs = (i: number) => ({ link: `u${i}`, title: `t${i}`, create_time: 1000 - i })
+  // 统计请求次数的分页 fetch(每页 5 篇,贴近真实微信)
+  const counted = (items: ReturnType<typeof mkTs>[]) => {
+    let calls = 0
+    const fetch: MpFetch = async (_e, params) => {
+      calls++
+      const begin = Number(params.begin)
+      return { base_resp: { ret: 0 }, app_msg_cnt: items.length, app_msg_list: items.slice(begin, begin + 5) } as never
+    }
+    return { fetch, calls: () => calls }
+  }
+
+  it('first page already reaches the watermark → exactly 1 request (the common daily case)', async () => {
+    const { fetch, calls } = counted(Array.from({ length: 15 }, (_, i) => mkTs(i)))
+    // 水位 = 第 2 篇的时间:第一页(前 5 篇)就含已读
+    const refs = await listArticlesSince(fetch, 'T', 'FID', 1000 - 2, noSleep)
+    expect(calls()).toBe(1)
+    expect(refs.map((r) => r.url)).toContain('u0')
+  })
+
+  it('whole first page newer than watermark → pages deeper until a known article', async () => {
+    const { fetch, calls } = counted(Array.from({ length: 15 }, (_, i) => mkTs(i)))
+    // 水位 = 第 7 篇:第一页 5 篇全新 → 翻第二页(含第 7 篇)即止
+    const refs = await listArticlesSince(fetch, 'T', 'FID', 1000 - 7, noSleep)
+    expect(calls()).toBe(2)
+    const newer = refs.filter((r) => r.createTime > 1000 - 7)
+    expect(newer).toHaveLength(7)   // u0..u6 全部带回,不漏
+  })
+
+  it('caps at 20 scanned articles when everything is newer', async () => {
+    const { fetch, calls } = counted(Array.from({ length: 40 }, (_, i) => mkTs(i)))
+    const refs = await listArticlesSince(fetch, 'T', 'FID', 0, noSleep)   // 水位极旧:全新
+    expect(refs.length).toBeLessThanOrEqual(20)
+    expect(calls()).toBe(4)   // 4 页 × 5 = 20 封顶
+  })
+
+  it('stops when the list is exhausted', async () => {
+    const { fetch, calls } = counted([mkTs(0), mkTs(1)])
+    const refs = await listArticlesSince(fetch, 'T', 'FID', 0, noSleep)
+    expect(refs).toHaveLength(2)
+    expect(calls()).toBe(1)
+  })
+
+  it('empty list → no refs, 1 request', async () => {
+    const { fetch, calls } = counted([])
+    expect(await listArticlesSince(fetch, 'T', 'FID', 100, noSleep)).toEqual([])
+    expect(calls()).toBe(1)
   })
 })
 

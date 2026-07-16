@@ -96,4 +96,14 @@ describe('formatCheckLogLine', () => {
     expect(line).toContain('failed=1')
     expect(formatCheckLogLine({ time: 0, trigger: 'auto', accounts: 0, newFound: 0, failed: 0, note: 'no-session' })).toContain('note=no-session')
   })
+
+  it('appends per-account failure details when present', () => {
+    const line = formatCheckLogLine({
+      time: 0, trigger: 'auto', accounts: 3, newFound: 0, failed: 2,
+      failures: [{ nickname: '猫笔刀', error: '微信频率限制（200013）' }, { nickname: 'B', error: 'fetch failed' }],
+    })
+    expect(line).toContain('[猫笔刀: 微信频率限制（200013）; B: fetch failed]')
+    // 无明细不带方括号段
+    expect(formatCheckLogLine({ time: 0, trigger: 'auto', accounts: 1, newFound: 0, failed: 0 })).not.toContain('[猫')
+  })
 })

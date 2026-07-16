@@ -217,16 +217,22 @@ export function registerIpc(settings: SettingsService): void {
     catch { /* 留痕失败不阻断检查主流程 */ }
   }
 
-  const runSubscriptionCheck = async (trigger: 'auto' | 'manual') => {
-    const subs = await subsFor()
-    const s = await settings.get()
-    const session = getSession()
-    const result = await svcRunSubscriptionCheck(trigger, {
-      subs, settings: s, session: session ? { token: session.token } : null,
-      mpFetch: session ? makeMpFetch(session) : null,
-      downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
-    })
-    if (result.note !== 'no-accounts') subsAuthExpired = result.authExpired
+  // 共享 in-flight:自动检查与手动「检查更新」重叠时并入同一次运行(防重入的第二道闸,第一道在 scheduler tick)
+  let checkInFlight: Promise<void> | null = null
+  const runSubscriptionCheck = (trigger: 'auto' | 'manual'): Promise<void> => {
+    if (checkInFlight) return checkInFlight
+    checkInFlight = (async () => {
+      const subs = await subsFor()
+      const s = await settings.get()
+      const session = getSession()
+      const result = await svcRunSubscriptionCheck(trigger, {
+        subs, settings: s, session: session ? { token: session.token } : null,
+        mpFetch: session ? makeMpFetch(session) : null,
+        downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
+      })
+      if (result.note !== 'no-accounts') subsAuthExpired = result.authExpired
+    })().finally(() => { checkInFlight = null })
+    return checkInFlight
   }
 
   ipcMain.handle('subscriptions:list', async () => {
