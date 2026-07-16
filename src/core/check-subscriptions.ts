@@ -1,12 +1,10 @@
 // src/core/check-subscriptions.ts
 // 订阅检查编排：逐号「只列表不下载」，串行 + 账号间随机延迟 + 每轮打乱账号顺序（去规律化，破坏频控指纹）；
 // 频控不重试（命中即跳过，下一轮再来）；单号失败隔离，登录失效整体中止。
-import { listArticles as listImpl, sleep as sleepImpl, randMs } from './mp-client'
+import { listArticlesSince as listSinceImpl, sleep as sleepImpl, randMs } from './mp-client'
 import { MpAuthExpired } from './mp-errors'
-import type { ArticleRef, MpFetch, CrawlRange } from './mp-types'
+import type { ArticleRef, MpFetch } from './mp-types'
 import type { SubscribedAccount } from './subscriptions'
-
-const RECENT: CrawlRange = { count: 20 }   // 每号取最近 20 篇与水位比对；日检测频率下足够
 
 /** Fisher-Yates，返回新数组（默认账号顺序打乱用；可注入以便测试确定化）。 */
 function shuffleImpl<T>(arr: T[]): T[] {
@@ -21,7 +19,8 @@ function shuffleImpl<T>(arr: T[]): T[] {
 export interface CheckDeps {
   mpFetch: MpFetch
   token: string
-  listFn?: typeof listImpl
+  /** 按水位取件:返回「至少覆盖比 watermark 新的全部文章」的列表,可含旧文章(新旧过滤在本层)。 */
+  listFn?: typeof listSinceImpl
   sleep?: (ms: number) => Promise<void>
   shuffle?: <T>(arr: T[]) => T[]
 }
@@ -29,7 +28,7 @@ export interface AccountCheckResult { fakeid: string; ok: boolean; newRefs: Arti
 
 export async function checkSubscriptions(accounts: SubscribedAccount[], deps: CheckDeps): Promise<AccountCheckResult[]> {
   const sleep = deps.sleep ?? sleepImpl
-  const listFn = deps.listFn ?? listImpl
+  const listFn = deps.listFn ?? listSinceImpl
   const shuffle = deps.shuffle ?? shuffleImpl
   const results: AccountCheckResult[] = []
   let first = true
@@ -39,7 +38,7 @@ export async function checkSubscriptions(accounts: SubscribedAccount[], deps: Ch
     // 频控不重试：命中即把该号记为本轮失败、跳过，等下一轮检查再来。
     // （退避重试只会在已被限的状态下追加请求，反而加重/延长频控——见 devlog 频控原则。）
     let refs: ArticleRef[]
-    try { refs = await listFn(deps.mpFetch, deps.token, acc.fakeid, RECENT, { sleep }) }
+    try { refs = await listFn(deps.mpFetch, deps.token, acc.fakeid, acc.watermark, { sleep }) }
     catch (e) {
       if (e instanceof MpAuthExpired) throw e   // 登录态失效：整体中止，交上层引导重新登录
       results.push({ fakeid: acc.fakeid, ok: false, newRefs: [], latest: acc.watermark, error: (e as Error).message })

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Input, Switch, Button, Spin, Alert, message, List, Tag } from 'antd'
+import { Input, Switch, Button, Spin, Alert, message, List, Tag, Modal } from 'antd'
 import { LoadingOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import type { SubscribedAccount, CheckLogEntry } from '../api'
@@ -66,6 +66,22 @@ export default function Subscriptions() {
     }
   }
   const dismiss = async (a: SubscribedAccount) => { await api.subscriptionsDismissNew(a.fakeid); await load() }
+
+  // 检查记录里「失败 x」的明细弹窗(v0.5.4 起的记录才有 failures;旧记录保持纯文本)
+  const showFailures = (e: CheckLogEntry) => {
+    Modal.info({
+      title: `检查失败明细（${new Date(e.time).toLocaleString()}）`,
+      content: (
+        <List size="small" dataSource={e.failures} renderItem={(f) => (
+          <List.Item>
+            <List.Item.Meta title={f.nickname} description={f.error} />
+          </List.Item>
+        )} />
+      ),
+      okText: '知道了',
+      width: 480,
+    })
+  }
 
   return (
     <div className="page">
@@ -140,7 +156,10 @@ export default function Subscriptions() {
             : <List size="small" dataSource={checkLog.slice(0, 10)} renderItem={(e: CheckLogEntry) => (
                 <List.Item>
                   <span style={{ fontSize: 12.5 }}>
-                    {new Date(e.time).toLocaleString()} · {e.trigger === 'auto' ? '自动' : '手动'} · 查 {e.accounts} 号 · 新 {e.newFound} · 失败 {e.failed}{e.note ? ` · ${e.note}` : ''}
+                    {new Date(e.time).toLocaleString()} · {e.trigger === 'auto' ? '自动' : '手动'} · 查 {e.accounts} 号 · 新 {e.newFound} ·{' '}
+                    {e.failures?.length
+                      ? <a onClick={() => showFailures(e)} data-testid="subs-log-failures">失败 {e.failed}</a>
+                      : <>失败 {e.failed}</>}{e.note ? ` · ${e.note}` : ''}
                   </span>
                 </List.Item>
               )} />}

@@ -293,7 +293,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
           process.stderr.write(formatCheckLogLine(e) + '\n')
         },
       })
-      outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, ...(result.note ? { note: result.note } : {}) })
+      outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, ...(result.failures ? { failures: result.failures } : {}), ...(result.note ? { note: result.note } : {}) })
       exitCode = 0
     })
 

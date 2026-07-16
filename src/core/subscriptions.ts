@@ -16,19 +16,24 @@ export interface SubscribedAccount {
   newRefs: ArticleRef[]        // 已发现、待下载/忽略的新文章
 }
 
+export interface CheckFailure { nickname: string; error: string }
+
 export interface CheckLogEntry {
   time: number                       // unix ms
   trigger: 'auto' | 'manual'
   accounts: number                   // 本次检查的订阅号数
   newFound: number                   // 发现的新文章总数
   failed: number                     // 失败的号数
+  failures?: CheckFailure[]          // 逐号失败明细（v0.5.4 起;旧条目无此字段）
   note?: string                      // 特殊情形：'no-session' | 'auth-expired' | 'no-accounts'
 }
 
 /** 落盘日志的一行（人类可读）。纯函数。 */
 export function formatCheckLogLine(e: CheckLogEntry): string {
-  const base = `[${new Date(e.time).toISOString()}] ${e.trigger === 'auto' ? 'AUTO' : 'MANUAL'} accounts=${e.accounts} new=${e.newFound} failed=${e.failed}`
-  return e.note ? `${base} note=${e.note}` : base
+  let line = `[${new Date(e.time).toISOString()}] ${e.trigger === 'auto' ? 'AUTO' : 'MANUAL'} accounts=${e.accounts} new=${e.newFound} failed=${e.failed}`
+  if (e.note) line += ` note=${e.note}`
+  if (e.failures?.length) line += ` [${e.failures.map((f) => `${f.nickname}: ${f.error}`).join('; ')}]`
+  return line
 }
 
 interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: SubscribedAccount[]; checkLog: CheckLogEntry[] }

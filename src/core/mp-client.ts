@@ -51,6 +51,31 @@ async function fetchPage(
   return { items, total: Number(json.app_msg_cnt ?? 0), pageLen: raw.length }
 }
 
+/**
+ * 订阅检查专用:从最新往回翻,直到看见 ≤sinceTs 的已读文章为止,封顶 cap 篇。
+ * 日常(水位就在第一页内)恒 1 次请求——微信每页实回 ~5 篇,固定取 20 要翻 4 页,
+ * 对「日更最多一篇」的订阅号是纯浪费;空窗多日后整页全新才继续翻深,不漏文章。
+ * 返回值含扫到的旧文章,新旧判定留给调用方(checkSubscriptions 按水位过滤)。
+ */
+export async function listArticlesSince(
+  mpFetch: MpFetch, token: string, fakeid: string, sinceTs: number, opts: ListOpts = {}, cap = 20,
+): Promise<ArticleRef[]> {
+  const sleepFn = opts.sleep ?? sleep
+  const out: ArticleRef[] = []
+  let begin = 0
+  for (;;) {
+    if (begin > 0) await sleepFn(randMs(1000, 3000))
+    const { items, total, pageLen } = await fetchPage(mpFetch, token, fakeid, begin)
+    if (!pageLen) break
+    out.push(...items)
+    if (items.some((i) => i.createTime <= sinceTs)) break   // 已翻到水位(本页含已读)
+    if (out.length >= cap) break
+    begin += pageLen
+    if (begin >= total) break
+  }
+  return out
+}
+
 export async function listArticles(
   mpFetch: MpFetch, token: string, fakeid: string, range: CrawlRange, opts: ListOpts = {},
 ): Promise<ArticleRef[]> {
