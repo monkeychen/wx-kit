@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.5.3-released-success.svg)
+![Status](https://img.shields.io/badge/v0.5.4-released-success.svg)
 
 <!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
@@ -22,7 +22,11 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**v0.5.3 已发布(修复 macOS 关窗后程序坞无法重开窗口)**:
+**v0.5.4 已发布(订阅检查:不重跑、看得清失败、请求更省)**:
+
+- 修复检查耗时较长时同一时段重复检查(同批新文章数两遍);检查记录「失败 x」可点开弹窗看逐号失败原因;检查请求「翻到水位为止」,日常每号 1 次请求(原 4 次),多日未开应用也不漏文章。
+
+**v0.5.3(修复 macOS 关窗后程序坞无法重开窗口)**:
 
 - 修复关闭窗口后点程序坞图标无响应、只能强退重开:补上 macOS 惯例缺失的另一半——`activate` 事件重建主窗口。
 
@@ -74,8 +78,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.5.3:`wx-kit-0.5.3-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.5.3.dmg`(Intel) / `wx-kit Setup 0.5.3.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.5.4:`wx-kit-0.5.4-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.5.4.dmg`(Intel) / `wx-kit Setup 0.5.4.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -177,7 +181,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 – v0.5.3 均已发布**(最新 **v0.5.3**:修复 macOS 关窗后程序坞无法重开窗口)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 – v0.5.4 均已发布**(最新 **v0.5.4**:订阅检查加固)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -220,6 +224,9 @@ wx-kit auth-status
 
 **v0.5.3 · 修复 macOS 关窗后程序坞无法重开窗口(2026-07-13)**
 - ✅ M21 — 补注册 `app.on('activate')`:关窗驻留后点程序坞图标重建主窗口(缺陷自 v0.1.0 即存在,整进程启停的开发/测试路径一直未暴露)
+
+**v0.5.4 · 订阅检查:不重跑、看得清失败、请求更省(2026-07-16)**
+- ✅ M22 — 订阅检查加固:调度防重入(检查跨 tick 时曾并发重复跑)+ 检查记录「失败 x」可点开逐号原因弹窗 + 「翻到水位为止」(日常每号 1 次请求,空窗多日不漏文章)
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 

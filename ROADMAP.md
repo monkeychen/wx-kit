@@ -5,13 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.5.3(2026-07-13,修复 macOS 关窗后程序坞无法重开窗口)** —— tag `v0.5.3` + GitHub Release(三平台安装包,标 Latest)已发。范围:M21 补注册 `app.on('activate')` 重建主窗口(关窗驻留后点程序坞图标此前无响应,应用假死)。需求/验收 `docs/PRD-v0.5.3.md`,计划 `plans/2026-07-13-m21-dock-reactivate.md`,发布说明 `docs/releases/v0.5.3.md`,复盘 devlog §31。
-- **进行中:v0.5.4(M22 订阅检查加固)** —— 实现与验证已完成(2026-07-16),待发版。需求/验收 `docs/PRD-v0.5.4.md`,计划 `plans/2026-07-16-m22-subscription-check-hardening.md`。
+- **最新发布:v0.5.4(2026-07-16,订阅检查加固)** —— tag `v0.5.4` + GitHub Release(三平台安装包,标 Latest)已发。范围:M22 调度防重入(同时段重复检查)+ 检查记录失败明细弹窗 + 检查请求「翻到水位为止」(日常每号 1 次请求,空窗不漏)。需求/验收 `docs/PRD-v0.5.4.md`,计划 `plans/2026-07-16-m22-subscription-check-hardening.md`,发布说明 `docs/releases/v0.5.4.md`,复盘 devlog §32。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M21 已随 v0.1.0–v0.5.3 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M22 已随 v0.1.0–v0.5.4 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -39,10 +38,11 @@
 | **M21** | v0.5.3 | macOS 程序坞激活重建窗口:补注册 `app.on('activate')`(关窗驻留后点程序坞图标此前无响应) | `plans/2026-07-13-m21-dock-reactivate.md` |
 | **M22** | v0.5.4 | 订阅检查加固:调度防重入(同时段重复检查)+ 失败明细弹窗(检查记录可点开逐号原因)+ 翻到水位为止(平时每号 1 次请求,空窗不漏) | `plans/2026-07-16-m22-subscription-check-hardening.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
+- **v0.5.4 · 2026-07-16 · 订阅检查:不重跑、看得清失败、请求更省** —— M22 三合一:调度防重入(检查耗时跨 tick 曾并发重复跑,真机同时段两条相同记录);失败明细可观测(检查记录/落盘日志/CLI JSON 逐号原因,GUI 弹窗);「翻到水位为止」取代固定取 20 篇(微信每页实回 ~5,日常 4 次请求 → 1 次,空窗多日自动翻深不漏)。发布说明 `docs/releases/v0.5.4.md`,复盘 devlog §32。
 - **v0.5.3 · 2026-07-13 · 修复 macOS 关窗后程序坞无法重开窗口** —— M21 补注册 `app.on('activate')`:主进程此前只做了 mac 惯例的一半(关窗驻留程序坞)而缺重建窗口的代码路径,点程序坞图标无响应、应用假死只能强退。缺陷自 v0.1.0 即存在,整进程启停的开发/测试路径一直未暴露。发布说明 `docs/releases/v0.5.3.md`,复盘 devlog §31。
 - **v0.5.2 · 2026-07-11 · 修复命令行入口崩溃** —— M20 快捷命令 symlink → wrapper 脚本:mac 上 Electron 经软链定位不到 bundle 内 Helper app,`download`/PDF 等需子进程的命令必崩(`--version` 等纯主进程命令侥幸可用,M18 验证漏网);旧软链开一次 GUI 静默自愈。README 同坑示例(`ln -sf`)一并清理。发布说明 `docs/releases/v0.5.2.md`,复盘 devlog §30。
 - **v0.5.1 · 2026-07-09 · 支持文字消息与图文消息** —— M19 非标准消息类型解析:文字消息(type 10)正文从脚本变量提取、标题取首行截断(修「标题是整篇正文、正文空白」);图文消息/小绿书(type 8)文字 + 主图完整下载(排除水印/分享封面);og 兜底清洗字面转义。解析层单点根治,下游全链路零改动受益。发布说明 `docs/releases/v0.5.1.md`,复盘 devlog §29。
