@@ -58,9 +58,9 @@
 - [x] `npm test`(272)/ `tsc` / `lint` / `npm run test:e2e` 全绿。
 
 ### R4 · 发版
-- [ ] version 0.5.4、`docs/releases/v0.5.4.md`、README/ROADMAP 同步。
-- [ ] 重新打包,打包态 GUI 真机验证(含订阅页失败明细弹窗的真实数据态截图)。
-- [ ] main 打 annotated tag `v0.5.4` + GitHub Release 三平台包。
+- [x] version 0.5.4、`docs/releases/v0.5.4.md`、README/ROADMAP 同步。
+- [x] 重新打包,打包态 GUI 真机验证(订阅页失败明细弹窗 seed 数据态 + `--version`,2026-07-16)。
+- [x] main 打 annotated tag `v0.5.4` + GitHub Release 三平台包(2026-07-16 已发,标 Latest,包大小与本地逐字节一致)。
 
 ## 5. 里程碑拆分
 
