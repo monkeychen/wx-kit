@@ -148,14 +148,24 @@ async function main() {
     assert((await win.inputValue('input[readonly]')) === libraryRoot, 'settings shows the seeded library root')
     assert((await win.locator('text=下载历史').count()) >= 1, 'settings has a 下载历史 (retention/clear) section')
 
-    // ============ M9 · 文库组织 ============
+    // ============ M9/M23 · 文库组织(分组默认折叠 = 目录态) ============
     await win.click('[data-testid="nav-文库"]')
-    await win.waitForSelector('[data-testid="article-card"]', { timeout: 15000 })
-    const libCount = await win.locator('[data-testid="article-card"]').count()
-    assert(libCount === 3, `library holds the 3 successfully-downloaded articles (got ${libCount})`)
+    await win.waitForSelector('.ghead', { timeout: 15000 })
+    assert((await win.locator('[data-testid="article-card"]').count()) === 0,
+      'M23: groups are collapsed by default (library opens as an account directory)')
     // 默认按公众号分组：组头出现 甲号 / 乙号
     const heads = await win.locator('.ghead .gname').allInnerTexts()
     assert(heads.includes('甲号') && heads.includes('乙号'), `card view grouped by account (${heads.join('/')})`)
+    // 点组头只展开该组
+    await win.locator('.ghead:has-text("甲号")').click()
+    await win.waitForTimeout(250)
+    const afterOne = await win.locator('[data-testid="article-card"]').count()
+    assert(afterOne === 2, `M23: clicking a group head expands just that group (got ${afterOne})`)
+    // 全部展开
+    await win.click('[data-testid="expand-all"]')
+    await win.waitForTimeout(250)
+    const libCount = await win.locator('[data-testid="article-card"]').count()
+    assert(libCount === 3, `expand-all shows the 3 successfully-downloaded articles (got ${libCount})`)
 
     // 排序：关分组 → 发布时间升序 → 首篇为最早的「伽马·乙」
     await win.click('[data-testid="group-toggle"]')
@@ -218,8 +228,9 @@ async function main() {
       `reader html view: iframe src is wxfile .../index.html`)
 
     // ============ M9 · 批量删除 + 单篇删除 ============
-    await win.click('[data-testid="nav-文库"]')   // 回到文库（状态重置为默认 卡片+分组）
+    await win.click('[data-testid="nav-文库"]')   // 回到文库（卡片+分组；M23 展开态已持久化 → 卡片直接可见）
     await win.waitForSelector('[data-testid="article-card"]', { timeout: 10000 })
+    assert(true, 'M23: expanded state persists across navigation (cards visible on re-entry)')
     // 单击选中 2 张 → 批量条 → 批量删除
     await win.locator('[data-testid="article-card"]').nth(0).click()
     await win.locator('[data-testid="article-card"]').nth(1).click()

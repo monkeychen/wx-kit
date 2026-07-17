@@ -155,7 +155,7 @@ export function registerIpc(settings: SettingsService): void {
 
   let crawlAbort: AbortController | null = null
   ipcMain.on('mp:crawl:cancel', () => { crawlAbort?.abort() })
-  ipcMain.handle('mp:crawl', async (event, { fakeid, nickname, range, formats }: { fakeid: string; nickname: string; range: CrawlRange; formats: DownloadFormat[] }) => {
+  ipcMain.handle('mp:crawl', async (event, { fakeid, nickname, range, formats, keywords }: { fakeid: string; nickname: string; range: CrawlRange; formats: DownloadFormat[]; keywords?: import('../src/core/mp-crawl').KeywordFilter }) => {
     const abort = new AbortController()
     crawlAbort = abort
     const session = getSession()
@@ -169,7 +169,7 @@ export function registerIpc(settings: SettingsService): void {
     const send = (ev: unknown) => { if (!event.sender.isDestroyed()) event.sender.send('mp:crawl:progress', ev) }
     try {
       const summary = await crawlAccount(fakeid, range, {
-        mpFetch: makeMpFetch(session), token: session.token,
+        mpFetch: makeMpFetch(session), token: session.token, keywords,
         downloadOne: (url) => downloadArticle(url, formats, ddeps),
         onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
         onItem: (ev) => send({ kind: 'item', ...ev }),

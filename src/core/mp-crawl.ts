@@ -5,10 +5,30 @@ import { MpRateLimited } from './mp-errors'
 import type { MpFetch, ArticleRef, CrawlRange, CrawlSummary, CrawlItemEvent } from './mp-types'
 import type { DownloadItemResult } from './types'
 
+export interface KeywordFilter { include?: string[]; exclude?: string[] }
+
+/**
+ * 标题关键词过滤(issue #1):include 任一命中才留(空/未传=不限),exclude 任一命中即去
+ * (在 include 之后应用,冲突时 exclude 优先)。不区分大小写;空白关键词忽略。
+ * 只看标题——正文要下载后才有;且只在已列出的范围内筛,不为凑数翻页(频控)。
+ */
+export function filterRefsByTitle(refs: ArticleRef[], f?: KeywordFilter): ArticleRef[] {
+  const clean = (ks?: string[]) => (ks ?? []).map((k) => k.trim().toLowerCase()).filter(Boolean)
+  const inc = clean(f?.include), exc = clean(f?.exclude)
+  if (!inc.length && !exc.length) return refs
+  return refs.filter((r) => {
+    const t = r.title.toLowerCase()
+    if (inc.length && !inc.some((k) => t.includes(k))) return false
+    return !exc.some((k) => t.includes(k))
+  })
+}
+
 export interface CrawlDeps {
   mpFetch: MpFetch
   token: string
   downloadOne: (url: string) => Promise<DownloadItemResult>
+  /** 标题关键词过滤(列表后、下载前应用;见 filterRefsByTitle)。 */
+  keywords?: KeywordFilter
   sleep?: (ms: number) => Promise<void>
   onProgress?: OnProgress
   /** 列表阶段拿到全部文章后整批上报（含标题，供 UI 立即铺行）。 */
@@ -50,6 +70,10 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
     }
   }
 
+  const beforeFilter = refs.length
+  refs = filterRefsByTitle(refs, deps.keywords)
+  const filteredOut = beforeFilter - refs.length
+
   deps.onListed?.(refs)
 
   // 下载阶段：复用 DownloadQueue（串行 + 单篇失败不中断 + 汇总）。
@@ -80,6 +104,7 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
   return {
     ok: s.ok, fakeid, listed: refs.length,
     total: s.total, succeeded: s.succeeded, failed: s.failed, skipped: s.skipped,
+    ...(filteredOut > 0 ? { filteredOut } : {}),
     items: [...s.items, ...cancelled],
   }
 }

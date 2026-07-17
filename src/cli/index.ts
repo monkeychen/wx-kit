@@ -125,6 +125,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .option('--from <date>', '起始日期 YYYY-MM-DD')
     .option('--to <date>', '结束日期 YYYY-MM-DD')
     .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
+    .option('--include <csv>', '仅下载标题含任一关键词的文章（逗号分隔）')
+    .option('--exclude <csv>', '排除标题含任一关键词的文章（逗号分隔，优先于 --include）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (name: string | undefined, opts) => {
       const session = getSession()
@@ -147,8 +149,11 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         const root = await resolveRoot(opts.out)
         const library = new Library(root)
         const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
+        const parseKws = (csv?: string) => csv ? String(csv).split(',').map((s) => s.trim()).filter(Boolean) : undefined
+        const include = parseKws(opts.include), exclude = parseKws(opts.exclude)
         const summary = await crawlAccount(fakeid, range, {
           mpFetch, token: session.token,
+          ...(include || exclude ? { keywords: { include, exclude } } : {}),
           downloadOne: (url) => downloadArticle(url, formats, ddeps),
           onProgress: (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}\n`),
         })

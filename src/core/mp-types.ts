@@ -23,11 +23,12 @@ export type CrawlRange = { count: number } | { from: string; to: string }
 export interface CrawlSummary {
   ok: boolean
   fakeid: string
-  listed: number
+  listed: number          // 进入下载的篇数(关键词过滤后)
   total: number
   succeeded: number
   failed: number
   skipped: number
+  filteredOut?: number    // 被标题关键词过滤掉的篇数(M24;未过滤或全通过则缺省)
   items: import('./types').DownloadItemResult[]
 }
 

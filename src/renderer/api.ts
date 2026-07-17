@@ -42,7 +42,7 @@ export interface WxApi {
   mpAuthStatus(): Promise<{ valid: boolean }>
   mpLogin(): Promise<{ ok: boolean; error?: string }>
   mpSearch(name: string): Promise<{ ok: boolean; list?: MpAccount[]; error?: { code: string; message: string } }>
-  mpCrawl(fakeid: string, nickname: string, range: CrawlRangeInput, formats: DownloadFormat[]): Promise<CrawlSummary>
+  mpCrawl(fakeid: string, nickname: string, range: CrawlRangeInput, formats: DownloadFormat[], keywords?: { include?: string[]; exclude?: string[] }): Promise<CrawlSummary>
   onCrawlProgress(cb: (e: CrawlEvent) => void): () => void
   mpCancelCrawl(): void
   // —— M6 下载历史 ——
