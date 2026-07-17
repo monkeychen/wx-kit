@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Input, Segmented, InputNumber, DatePicker, Spin, message } from 'antd'
+import { Input, Segmented, InputNumber, DatePicker, Select, Spin, message } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../../api'
 import type { CrawlEvent, CrawlRangeInput } from '../../api'
@@ -27,8 +27,9 @@ export default function AccountMode({ onDone, prefill }: Props) {
   const [count, setCount] = useState(10)
   const [dates, setDates] = useState<[Dayjs, Dayjs] | null>(null)
   const [formats, setFormats] = useState<DownloadFormat[]>(['md', 'html', 'meta'])
-  const [kwInclude, setKwInclude] = useState('')
-  const [kwExclude, setKwExclude] = useState('')
+  // 关键词筛选(issue #1):操作类型互斥(仅下载含/排除含),结构上杜绝「两种并填」的歧义
+  const [kwMode, setKwMode] = useState<'include' | 'exclude'>('include')
+  const [kwText, setKwText] = useState('')
   const [running, setRunning] = useState(false)
   const [rows, setRows] = useState<CrawlRow[]>([])
   const [eta, setEta] = useState('')
@@ -95,10 +96,9 @@ export default function AccountMode({ onDone, prefill }: Props) {
     const range: CrawlRangeInput = mode === 'count'
       ? { count }
       : { from: dates![0].format('YYYY-MM-DD'), to: dates![1].format('YYYY-MM-DD') }
-    // 关键词过滤(issue #1):逗号/中文逗号分隔,留空不过滤
-    const parseKws = (s: string) => s.split(/[,，]/).map((k) => k.trim()).filter(Boolean)
-    const include = parseKws(kwInclude), exclude = parseKws(kwExclude)
-    const keywords = include.length || exclude.length ? { include, exclude } : undefined
+    // 关键词过滤:逗号/中文逗号分隔,留空不过滤;按操作类型只传 include 或 exclude 之一
+    const kws = kwText.split(/[,，]/).map((k) => k.trim()).filter(Boolean)
+    const keywords = kws.length ? (kwMode === 'include' ? { include: kws } : { exclude: kws }) : undefined
     setRunning(true); setRows([]); setEta(''); setBackoff(null)
     try {
       const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats, keywords)
@@ -176,10 +176,10 @@ export default function AccountMode({ onDone, prefill }: Props) {
             <div className="cfg-sec">
               <p className="sec-label">关键词筛选<span className="faint" style={{ fontWeight: 400, marginLeft: 6 }}>可选 · 按标题匹配,多个用逗号分隔</span></p>
               <div className="range-row">
-                <Input allowClear placeholder="仅下载:标题含任一关键词" value={kwInclude}
-                  onChange={(e) => setKwInclude(e.target.value)} style={{ maxWidth: 260 }} data-testid="kw-include" />
-                <Input allowClear placeholder="排除:标题含任一关键词" value={kwExclude}
-                  onChange={(e) => setKwExclude(e.target.value)} style={{ maxWidth: 260 }} data-testid="kw-exclude" />
+                <span data-testid="kw-mode"><Select value={kwMode} onChange={(v) => setKwMode(v)} style={{ width: 132 }}
+                  options={[{ value: 'include', label: '仅下载含' }, { value: 'exclude', label: '排除含' }]} /></span>
+                <Input allowClear placeholder="关键词,留空不筛选" value={kwText}
+                  onChange={(e) => setKwText(e.target.value)} style={{ maxWidth: 280 }} data-testid="kw-input" />
               </div>
             </div>
 
