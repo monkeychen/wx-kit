@@ -1,6 +1,6 @@
 // tests/core/mp-crawl.test.ts
 import { describe, it, expect, vi } from 'vitest'
-import { crawlAccount } from '../../src/core/mp-crawl'
+import { crawlAccount, filterRefsByTitle } from '../../src/core/mp-crawl'
 import { MpRateLimited } from '../../src/core/mp-errors'
 import type { ArticleRef, CrawlItemEvent } from '../../src/core/mp-types'
 import type { DownloadItemResult } from '../../src/core/types'
@@ -121,5 +121,67 @@ describe('crawlAccount reporting & cancel', () => {
       { url: 'c', ok: false, title: 'c', cancelled: true },
     ])
     expect(out.items.filter((i) => i.cancelled)).toHaveLength(2)
+  })
+})
+
+describe('filterRefsByTitle (M24 · issue #1 关键词过滤)', () => {
+  const mk = (titles: string[]): ArticleRef[] => titles.map((t, i) => ({ url: `u${i}`, title: t, createTime: i }))
+
+  it('include keeps only titles containing any keyword', () => {
+    const out = filterRefsByTitle(mk(['AI 周报', '生活随笔', '谈 AI 落地']), { include: ['AI'] })
+    expect(out.map((r) => r.title)).toEqual(['AI 周报', '谈 AI 落地'])
+  })
+
+  it('exclude drops titles containing any keyword', () => {
+    const out = filterRefsByTitle(mk(['AI 周报', '广告合作', '随笔']), { exclude: ['广告'] })
+    expect(out.map((r) => r.title)).toEqual(['AI 周报', '随笔'])
+  })
+
+  it('include then exclude — exclude wins on conflict', () => {
+    const out = filterRefsByTitle(mk(['AI 周报', 'AI 广告专场', '随笔']), { include: ['AI'], exclude: ['广告'] })
+    expect(out.map((r) => r.title)).toEqual(['AI 周报'])
+  })
+
+  it('matching is case-insensitive', () => {
+    const out = filterRefsByTitle(mk(['openai 观察', 'OpenAI 发布会', '其他']), { include: ['OpenAI'] })
+    expect(out).toHaveLength(2)
+  })
+
+  it('blank/empty keywords are ignored; empty filter keeps all', () => {
+    const all = mk(['a', 'b'])
+    expect(filterRefsByTitle(all, { include: ['', '  '], exclude: ['   '] })).toEqual(all)
+    expect(filterRefsByTitle(all, {})).toEqual(all)
+    expect(filterRefsByTitle(all, undefined)).toEqual(all)
+  })
+})
+
+describe('crawlAccount with keywords', () => {
+  it('filters before onListed/download and reports filteredOut', async () => {
+    const listed: ArticleRef[][] = []
+    const order: string[] = []
+    const downloadOne = async (url: string): Promise<DownloadItemResult> => { order.push(url); return { url, ok: true, id: url } }
+    const out = await crawlAccount('FID', { count: 4 }, {
+      listFn: async () => [
+        { url: 'a', title: 'AI 周报', createTime: 1 },
+        { url: 'b', title: '广告', createTime: 2 },
+        { url: 'c', title: '谈 AI', createTime: 3 },
+        { url: 'd', title: '随笔', createTime: 4 },
+      ],
+      keywords: { include: ['AI'] },
+      onListed: (r) => { listed.push(r) },
+      mpFetch: (async () => ({})) as never, token: 'T', downloadOne, sleep: noSleep,
+    })
+    expect(listed[0].map((r) => r.url)).toEqual(['a', 'c'])   // UI 铺行即过滤后列表
+    expect(order).toEqual(['a', 'c'])
+    expect(out).toMatchObject({ listed: 2, total: 2, succeeded: 2, filteredOut: 2 })
+  })
+
+  it('no keywords → summary carries no filteredOut field', async () => {
+    const out = await crawlAccount('FID', { count: 1 }, {
+      listFn: async () => refs(['a']),
+      mpFetch: (async () => ({})) as never, token: 'T',
+      downloadOne: async (url) => ({ url, ok: true, id: url }), sleep: noSleep,
+    })
+    expect(out).not.toHaveProperty('filteredOut')
   })
 })

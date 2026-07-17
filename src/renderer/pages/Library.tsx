@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Input, Select, Segmented, Spin, Popconfirm, message } from 'antd'
+import { Input, Select, Segmented, Spin, Popconfirm, FloatButton, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import ArticleCard from '../components/ArticleCard'
@@ -26,7 +26,8 @@ export default function Library() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [account, setAccount] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // 分组展开集(M23):默认空 = 全部收起,文库首屏即公众号目录;持久化到设置,跨会话保持
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [widths, setWidths] = useState<ListColumnWidths>(DEFAULT_LIST_WIDTHS)
   const widthsRef = useRef(widths)
   useEffect(() => { widthsRef.current = widths }, [widths])
@@ -37,6 +38,7 @@ export default function Library() {
     try {
       const [list, s] = await Promise.all([api.libraryList(), api.getSettings()])
       setAll(list); setRoot(s.libraryRoot); setWidths(s.listColumnWidths ?? DEFAULT_LIST_WIDTHS)
+      setExpanded(new Set(s.libraryExpandedGroups ?? []))
     } catch (e) {
       message.error('加载失败：' + (e as Error).message)
     } finally {
@@ -61,9 +63,17 @@ export default function Library() {
   })
   const selectAll = () => setSel(new Set(visibleIds))
   const clearSel = () => setSel(new Set())
-  const toggleCollapse = (acc: string) => setCollapsed((s) => {
-    const n = new Set(s); if (n.has(acc)) n.delete(acc); else n.add(acc); return n
+  const persistExpanded = (n: Set<string>) => { api.saveSettings({ libraryExpandedGroups: [...n] }).catch(() => {}) }
+  const toggleGroup = (acc: string) => setExpanded((s) => {
+    const n = new Set(s); if (n.has(acc)) n.delete(acc); else n.add(acc); persistExpanded(n); return n
   })
+  // 可见组是否已全部展开(决定按钮语义:全部展开 ⇄ 全部收起)
+  const groupNames = useMemo(() => groups.map((g) => g.account).filter(Boolean), [groups])
+  const allExpanded = groupNames.length > 0 && groupNames.every((a) => expanded.has(a))
+  const toggleAllGroups = () => {
+    const n = allExpanded ? new Set<string>() : new Set(groupNames)
+    setExpanded(n); persistExpanded(n)
+  }
 
   const onHeaderSort = (k: SortKey) => {
     const n = nextSort({ key: sortKey, dir: sortDir }, k)
@@ -144,6 +154,7 @@ export default function Library() {
           <span data-testid="account-select"><Select size="middle" value={account ?? '__all'} onChange={(v) => setAccount(v === '__all' ? null : v)}
             style={{ width: 150 }} options={[{ value: '__all', label: '全部公众号' }, ...accounts.map((a) => ({ value: a, label: a }))]} /></span>
           <button className={`tb-toggle${grouped ? ' on' : ''}`} data-testid="group-toggle" onClick={() => setGrouped((g) => !g)}>⊟ 分组</button>
+          {grouped && <button className="tb-toggle" data-testid="expand-all" onClick={toggleAllGroups}>{allExpanded ? '⊖ 全部收起' : '⊕ 全部展开'}</button>}
           <Segmented value={view} onChange={(v) => setView(v as 'card' | 'list')}
             options={[{ label: '卡片', value: 'card' }, { label: '列表', value: 'list' }]} />
         </div>
@@ -187,10 +198,10 @@ export default function Library() {
               <span style={{ textAlign: 'right' }}>操作</span>
             </div>
             {grouped ? groups.map((g) => {
-              const col = collapsed.has(g.account)
+              const col = !expanded.has(g.account)
               return (
                 <div key={g.account}>
-                  <div className="lgrp-head" onClick={() => toggleCollapse(g.account)}>
+                  <div className="lgrp-head" onClick={() => toggleGroup(g.account)}>
                     <span className={`gcaret${col ? ' col' : ''}`}>▼</span>
                     <span className="gseal">{g.account.slice(0, 1)}</span>
                     <span className="gname">{g.account}</span><span className="gcount">{g.items.length} 篇</span>
@@ -203,10 +214,10 @@ export default function Library() {
         ) : (
           /* ---- 卡片视图 ---- */
           grouped ? groups.map((g) => {
-            const col = collapsed.has(g.account)
+            const col = !expanded.has(g.account)
             return (
               <div className="group" key={g.account}>
-                <div className="ghead" onClick={() => toggleCollapse(g.account)}>
+                <div className="ghead" onClick={() => toggleGroup(g.account)}>
                   <span className={`gcaret${col ? ' col' : ''}`}>▼</span>
                   <span className="gseal">{g.account.slice(0, 1)}</span>
                   <span className="gname">{g.account}</span><span className="gcount">{g.items.length} 篇</span>
@@ -216,6 +227,12 @@ export default function Library() {
               </div>
             )
           }) : renderCards(groups[0].items)
+        )}
+        {/* 回顶按钮:portal 到 body(避开 .fade-in 的 transform 包含块),滚动目标是 .page 容器 */}
+        {createPortal(
+          <FloatButton.BackTop visibilityHeight={600}
+            target={() => (document.querySelector('.page') as HTMLElement) ?? window} />,
+          document.body,
         )}
       </div>
     </div>

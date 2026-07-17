@@ -27,6 +27,8 @@ export default function AccountMode({ onDone, prefill }: Props) {
   const [count, setCount] = useState(10)
   const [dates, setDates] = useState<[Dayjs, Dayjs] | null>(null)
   const [formats, setFormats] = useState<DownloadFormat[]>(['md', 'html', 'meta'])
+  const [kwInclude, setKwInclude] = useState('')
+  const [kwExclude, setKwExclude] = useState('')
   const [running, setRunning] = useState(false)
   const [rows, setRows] = useState<CrawlRow[]>([])
   const [eta, setEta] = useState('')
@@ -93,12 +95,18 @@ export default function AccountMode({ onDone, prefill }: Props) {
     const range: CrawlRangeInput = mode === 'count'
       ? { count }
       : { from: dates![0].format('YYYY-MM-DD'), to: dates![1].format('YYYY-MM-DD') }
+    // 关键词过滤(issue #1):逗号/中文逗号分隔,留空不过滤
+    const parseKws = (s: string) => s.split(/[,，]/).map((k) => k.trim()).filter(Boolean)
+    const include = parseKws(kwInclude), exclude = parseKws(kwExclude)
+    const keywords = include.length || exclude.length ? { include, exclude } : undefined
     setRunning(true); setRows([]); setEta(''); setBackoff(null)
     try {
-      const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats)
+      const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats, keywords)
       const cancelled = summary.total - summary.succeeded - summary.skipped - summary.failed
-      const tail = `成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`
+      const filtered = summary.filteredOut ? `，按关键词过滤 ${summary.filteredOut} 篇` : ''
+      const tail = `成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}${filtered}`
       if (cancelled > 0) message.info(`已取消 · ${tail}，未下载 ${cancelled}（见下方历史，可单独补下）`)
+      else if (summary.total === 0 && summary.filteredOut) message.info(`列出的 ${summary.filteredOut} 篇标题均不匹配关键词，没有可下载的文章`)
       else message.success(`完成 · ${tail}`)
       setRows([]); setEta('')   // 结果折叠进下方下载历史
       onDone()
@@ -162,6 +170,16 @@ export default function AccountMode({ onDone, prefill }: Props) {
                 {mode === 'count'
                   ? <InputNumber min={1} max={200} value={count} onChange={(v) => setCount(v ?? 1)} addonAfter="篇" />
                   : <DatePicker.RangePicker value={dates ?? undefined} onChange={(v) => setDates(v as [Dayjs, Dayjs] | null)} />}
+              </div>
+            </div>
+
+            <div className="cfg-sec">
+              <p className="sec-label">关键词筛选<span className="faint" style={{ fontWeight: 400, marginLeft: 6 }}>可选 · 按标题匹配,多个用逗号分隔</span></p>
+              <div className="range-row">
+                <Input allowClear placeholder="仅下载:标题含任一关键词" value={kwInclude}
+                  onChange={(e) => setKwInclude(e.target.value)} style={{ maxWidth: 260 }} data-testid="kw-include" />
+                <Input allowClear placeholder="排除:标题含任一关键词" value={kwExclude}
+                  onChange={(e) => setKwExclude(e.target.value)} style={{ maxWidth: 260 }} data-testid="kw-exclude" />
               </div>
             </div>
 

@@ -17,6 +17,7 @@ export interface AppSettings {
   subscriptionScheduleMode: 'daily' | 'interval'
   subscriptionIntervalHours: number
   cliLinkPrompted: boolean
+  libraryExpandedGroups: string[]        // 文库分组视图的展开集(M23;默认空=全部收起)
 }
 
 export class SettingsService {
@@ -37,6 +38,7 @@ export class SettingsService {
       subscriptionScheduleMode: 'daily',
       subscriptionIntervalHours: 6,
       cliLinkPrompted: false,
+      libraryExpandedGroups: [],
     }
   }
 
