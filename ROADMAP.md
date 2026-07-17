@@ -58,5 +58,6 @@
 
 当前无排期。候选(需要时单议):
 
+- **文库虚拟滚动** —— 实测(2026-07-18,1000 篇/20 组假文库):目录态打开 169ms;全展开后滚动曾 ~23fps,加 `content-visibility: auto` 后恢复 ~52fps、挂载 420ms、堆 125MB——**千篇量级已无需虚拟滚动**。等万篇级或实测再退化时再议(届时瓶颈是 React 挂载数与逐卡 coverName IPC,需虚拟列表 + 封面批量查询)。
 - **Windows CLI stdout 正解** —— 打包后 win 是 GUI 子系统程序,CLI 模式 stdout 不回贴控制台,现仅有「重定向到文件」绕法(见 README、AGENTS.md 陷阱清单)。正解是打包时给 win 出 console 子系统入口(或 `wx-kit-cli.exe` wrapper)。要动打包配置,铺 Windows agent 场景时再做。
 - 其余方向(mac 签名公证、应用内更新、其他形式内容保真如公式/音视频卡片/合集、整本导出、多 session)均为各版**非目标**,需要时单独立项。

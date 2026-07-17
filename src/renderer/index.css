@@ -285,6 +285,9 @@ body {
   gap: 22px;
 }
 .article-card {
+  /* 千篇量级下滚动降到 ~23fps(实测):视口外卡片跳过布局/绘制,恢复满帧;高度提示避免滚动条跳动 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
   display: flex;
   flex-direction: column;
   background: var(--paper-raised);
