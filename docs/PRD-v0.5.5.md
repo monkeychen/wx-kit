@@ -70,7 +70,7 @@
 ### R5 · 发版
 - [x] version 0.5.5、`docs/releases/v0.5.5.md`、README/ROADMAP 同步(README 亮点段按新规约替换不追加)。
 - [x] 重新打包,打包态 GUI 真机验证(文库折叠目录态 + 关键词过滤真实抓取,2026-07-18)。
-- [ ] main 打 annotated tag `v0.5.5` + GitHub Release 三平台包;issue #1 回复并关闭。
+- [x] main 打 annotated tag `v0.5.5` + GitHub Release 三平台包(2026-07-18 已发,标 Latest,包大小与本地逐字节一致);issue #1 已回复并关闭(closed as completed)。
 
 ## 5. 里程碑拆分
 
