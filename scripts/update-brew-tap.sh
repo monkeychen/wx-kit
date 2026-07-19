@@ -38,8 +38,9 @@ cask "wx-kit" do
   app "wx-kit.app"
 
   caveats <<~EOS
-    应用未签名,首次打开会被 macOS 拦截:到「系统设置 → 隐私与安全性」
-    点「仍要打开」;或命令行放行:xattr -cr #{appdir}/wx-kit.app
+    应用未签名,安装后先清 quarantine(否则 GUI 被拦、CLI 调用会挂起):
+      xattr -cr #{appdir}/wx-kit.app
+    (GUI 也可走「系统设置 → 隐私与安全性」→「仍要打开」放行)
     命令行入口(供 AI agent):首次打开 GUI 会引导创建 ~/bin/wx-kit。
   EOS
 end

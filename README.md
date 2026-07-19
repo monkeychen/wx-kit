@@ -66,7 +66,8 @@ wx-kit --version
 ```
 
 > 命令行安装面向 AI agent 自动化(skill 检测未安装即可自动执行上述命令)。
-> macOS 应用未签名,**首次打开 GUI** 仍需放行:「系统设置 → 隐私与安全性」→「仍要打开」,或 `xattr -cr /Applications/wx-kit.app`(纯 CLI 使用不受影响)。
+> ⚠️ macOS 应用未签名,brew 装完后**先清 quarantine 再用**——带隔离标记时连 CLI 调用都会被 Gatekeeper 卡住(实测挂起无输出):
+> `xattr -cr /Applications/wx-kit.app`;GUI 首开也可走「系统设置 → 隐私与安全性」→「仍要打开」。npm 安装不经 Gatekeeper,无此问题。
 
 ## 30 秒上手(下载安装包)
 
