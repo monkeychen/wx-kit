@@ -58,17 +58,19 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 ```bash
 # macOS(Homebrew;装的就是完整 .app,GUI + CLI 一体)
+# 安装名是三段式「用户/tap/包」;tap 过一次后可用短名(brew install --cask wx-kit / brew upgrade --cask wx-kit)
 brew install --cask monkeychen/wx-kit/wx-kit
+xattr -cr /Applications/wx-kit.app    # 必须:未签名 app 带 quarantine 时连 CLI 都会被 Gatekeeper 卡住
 
-# macOS / Linux(npm;需 Node 20+,国内先设 electron 镜像)
+# macOS / Linux(npm;需 Node 20+,国内先设 electron 镜像;装完命令名就是 wx-kit)
 export ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/   # 国内网络
 npm install -g @simiam/wx-kit
 wx-kit --version
 ```
 
 > 命令行安装面向 AI agent 自动化(skill 检测未安装即可自动执行上述命令)。
-> ⚠️ macOS 应用未签名,brew 装完后**先清 quarantine 再用**——带隔离标记时连 CLI 调用都会被 Gatekeeper 卡住(实测挂起无输出):
-> `xattr -cr /Applications/wx-kit.app`;GUI 首开也可走「系统设置 → 隐私与安全性」→「仍要打开」。npm 安装不经 Gatekeeper,无此问题。
+> 升级:`brew update && brew upgrade --cask wx-kit`(brew 的配方缓存在本地,**先 update 再 upgrade**,否则可能升到旧版)或 `npm update -g @simiam/wx-kit`。
+> npm 安装不经 Gatekeeper,无 quarantine 问题;GUI 首开被拦也可走「系统设置 → 隐私与安全性」→「仍要打开」。
 
 ## 30 秒上手(下载安装包)
 

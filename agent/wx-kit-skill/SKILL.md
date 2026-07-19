@@ -22,15 +22,17 @@ command -v wx-kit || ls /Applications/wx-kit.app/Contents/MacOS/wx-kit
 两者皆无 → 按平台安装(装完 `wx-kit --version` 应输出裸版本号):
 
 ```sh
-# macOS(Homebrew,装完整 .app)
-brew install --cask monkeychen/wx-kit/wx-kit
+# macOS(Homebrew,装完整 .app;安装名三段式「用户/tap/包」,tap 过后可用短名 wx-kit)
+brew update && brew install --cask monkeychen/wx-kit/wx-kit
 # ⚠️ 必须紧跟这步:未签名 app 带 quarantine 标记时,连 CLI 调用都会被 Gatekeeper 卡住(挂起无输出)
 xattr -cr /Applications/wx-kit.app
 
-# macOS / Linux(npm,需 Node 20+;国内网络先设 electron 镜像)
+# macOS / Linux(npm,需 Node 20+;国内网络先设 electron 镜像;装完命令名就是 wx-kit)
 export ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/
 npm install -g @simiam/wx-kit
 ```
+
+> 升级:`brew update && brew upgrade --cask wx-kit`(brew 配方缓存在本地,先 update 否则升到旧版)/ `npm update -g @simiam/wx-kit`。
 
 > brew 装完后二进制在 `/Applications/wx-kit.app/Contents/MacOS/wx-kit`;首次打开 **GUI** 会引导创建
 > `~/bin/wx-kit` 快捷命令。npm 装完 `wx-kit` 直接在 PATH。
