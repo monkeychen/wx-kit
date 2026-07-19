@@ -22,7 +22,8 @@ export default function Library() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'card' | 'list'>('card')
   const [grouped, setGrouped] = useState(true)
-  const [sortKey, setSortKey] = useState<SortKey>('download')
+  // 排序选择跨会话记忆(M25):初始值来自 settings(默认发布时间降序),变更即持久化
+  const [sortKey, setSortKey] = useState<SortKey>('publish')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [account, setAccount] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -39,6 +40,7 @@ export default function Library() {
       const [list, s] = await Promise.all([api.libraryList(), api.getSettings()])
       setAll(list); setRoot(s.libraryRoot); setWidths(s.listColumnWidths ?? DEFAULT_LIST_WIDTHS)
       setExpanded(new Set(s.libraryExpandedGroups ?? []))
+      if (s.librarySort) { setSortKey(s.librarySort.key); setSortDir(s.librarySort.dir) }
     } catch (e) {
       message.error('加载失败：' + (e as Error).message)
     } finally {
@@ -75,9 +77,13 @@ export default function Library() {
     setExpanded(n); persistExpanded(n)
   }
 
+  const changeSort = (key: SortKey, dir: SortDir) => {
+    setSortKey(key); setSortDir(dir)
+    api.saveSettings({ librarySort: { key, dir } }).catch(() => {})
+  }
   const onHeaderSort = (k: SortKey) => {
     const n = nextSort({ key: sortKey, dir: sortDir }, k)
-    setSortKey(n.key); setSortDir(n.dir)
+    changeSort(n.key, n.dir)
   }
   const arrow = (k: SortKey) => (sortKey === k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '')
   const startResize = (key: keyof ListColumnWidths, e: React.MouseEvent) => {
@@ -146,10 +152,10 @@ export default function Library() {
           <div style={{ flex: 1 }} />
           {view === 'card' && <>
             <span className="tb-label">排序</span>
-            <span data-testid="sort-select"><Select size="middle" value={sortKey} onChange={(v) => setSortKey(v)} style={{ width: 116 }}
+            <span data-testid="sort-select"><Select size="middle" value={sortKey} onChange={(v) => changeSort(v, sortDir)} style={{ width: 116 }}
               options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({ value: k, label: SORT_LABEL[k] }))} /></span>
             <button className="tb-dir" data-testid="sort-dir" title={sortDir === 'desc' ? '降序' : '升序'}
-              onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}>{sortDir === 'desc' ? '↓' : '↑'}</button>
+              onClick={() => changeSort(sortKey, sortDir === 'desc' ? 'asc' : 'desc')}>{sortDir === 'desc' ? '↓' : '↑'}</button>
           </>}
           <span data-testid="account-select"><Select size="middle" value={account ?? '__all'} onChange={(v) => setAccount(v === '__all' ? null : v)}
             style={{ width: 150 }} options={[{ value: '__all', label: '全部公众号' }, ...accounts.map((a) => ({ value: a, label: a }))]} /></span>
