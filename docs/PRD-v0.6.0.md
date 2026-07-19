@@ -94,9 +94,8 @@
 3. **skill/agent 集成闭环**:`agent/wx-kit-compose`(及 README 的 agent 集成节)增加「检测 → 安装」样例:检测 `wx-kit` 命令不存在 → 按平台给出/执行安装命令。
 4. 两条通道装出的版本都要能被现有 CLI 契约验证(`--version`、`download`、stdout JSON)。
 
-**开放问题(安哥定)**:
-- 范围:两条都做,还是先 brew(mac 是主场)后 npm?
-- ~~npm 包名可用性~~ 已核实(2026-07-19 查 registry):**`wx-kit` 未被占用**,可直接用。
+**范围(2026-07-19 安哥确认):brew 与 npm 两条通道都做。**
+- npm 包名已核实(2026-07-19 查 registry):**`wx-kit` 未被占用**,可直接用。
 
 **验收(草)**:
 - [ ] mac 全新环境:一条 brew 命令装好,`wx-kit --version`/`download` 直接可用,无手动放行。
