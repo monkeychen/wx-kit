@@ -40,8 +40,8 @@
 | **M23** | v0.5.5 | 文库导航:分组默认收起为目录 + 展开记忆 + 粘性组头 + 回到顶部;`content-visibility` 保千篇量级流畅 | `plans/2026-07-17-m23-m24-library-nav-and-keyword-filter.md` |
 | **M24** | v0.5.5 | 按公众号下载关键词筛选(issue #1):标题匹配,GUI 互斥下拉(仅下载含/排除含),CLI `--include`/`--exclude`,零额外请求 | 同上 |
 | **M25** ✅ | v0.6.0 | 体验杂项:文库默认发布时间降序+排序跨会话记忆、检查日志入口(设置页+订阅页可发现性)、CLI 帮助完善(2026-07-19 完成) | `plans/2026-07-19-m25-ux-misc.md` |
-| **M26** 🚧 | v0.6.0 | 安装通道:brew tap + npm 包 + 发版规约扩展 | `plans/2026-07-19-m26-install-channels.md` |
-| **M27** ⏸ | v0.6.0 | headless 登录态:`session export`/`import` | 启动时补计划 |
+| **M26** ✅ | v0.6.0 | 安装通道:brew tap(monkeychen/homebrew-wx-kit)+ npm 包(dist-npm staging)+ 发版规约⑦⑧(2026-07-19 完成,双通道隔离安装真机验证) | `plans/2026-07-19-m26-install-channels.md` |
+| **M27** 🚧 | v0.6.0 | headless 登录态:`session export`/`import` | `plans/2026-07-19-m27-session-transfer.md` |
 | **M28** ⏸ | v0.6.0 | agent skill:`agent/wx-kit-skill/`(依赖 M26/M27) | 启动时补计划 |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`(逐条验收看各 §4)。
