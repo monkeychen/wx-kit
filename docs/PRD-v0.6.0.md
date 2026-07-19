@@ -124,6 +124,31 @@
 - [ ] 导入已过期 session:如实 `valid:false`,后续命令按既有 `AUTH_REQUIRED` 语义引导。
 - [ ] 导出文件权限 0600;无 session 时导出报错退出码 1。
 
+### R6 · wx-kit 使用 skill:agent 的安装与使用教程(2026-07-19 安哥)
+
+**原始需求**:开发一个关于 wx-kit 的 skill——就是 wx-kit 的安装与使用教程,让 agent 通过它学会使用 wx-kit,并基于其原子能力完成更复杂任务。
+
+**定位与边界**:
+- 这是 wx-kit 的**能力说明书 skill**(教 agent「工具怎么用」),与既有 `agent/wx-kit-compose`(M15,「选料→选题→写作」的业务流程 skill)互补不重叠;compose 里的环境检测段将来可直接引用本 skill。
+- 是 R3/R4/R5 的收口:R4 装得上、R5 登得上、R3 帮助读得懂,R6 把三者组织成 agent 可按需消费的知识包。
+
+**细化(skill 内容结构,遵循渐进式展示——主文件精炼,细节进 references)**:
+
+1. **SKILL.md 主文件**:
+   - 触发场景(何时用 wx-kit:下载微信文章、批量爬取公众号、订阅检查、供料导出);
+   - **环境检测 → 自动安装**:检测 `wx-kit` 命令是否存在 → 不存在则按平台执行安装(mac:brew 命令;Linux:npm 命令——依赖 R4 落地);
+   - **登录态处理**:`auth-status` 探测 → 无效时分场景(有图形界面:`login` 扫码;headless:引导 R5 的 session import 工作流);
+   - 原子能力速查表:download / search / crawl(含 R4 关键词过滤)/ library list·search·export / subscription list·check-now / settings get·set,各一行说明 + 一条样例;
+   - 输出契约(stdout 纯 JSON / stderr 进度 / 退出码 0/1/2)与频控注意(串行、随机延迟、失败不重试原则)。
+2. **references/**:逐命令详细参数与 JSON 输出结构(从 `-h` 与 PRD §F4 蒸馏);组合任务范例 2–3 个(如「爬某号最近 30 篇含'AI'的文章并导出素材清单」的完整命令序列)。
+3. **skill 放置与分发**:仓库内 `agent/wx-kit-skill/`(与 compose 并列);README agent 集成节指向它。
+4. **维护约束**:CLI 命令/参数变更时同步更新本 skill(写进工作流约定,类比「发版刷 README」)。
+
+**验收(草)**:
+- [ ] 全新环境(无 wx-kit)的 agent 仅凭本 skill 完成:检测缺失 → 自动安装 → 登录态处理 → 下载一篇文章 → library list 确认入库,全程无人工介入(headless 路径用 session import)。
+- [ ] skill 覆盖全部 CLI 原子能力,样例命令逐条实测可运行。
+- [ ] 与 wx-kit-compose 无内容重复(compose 可引用本 skill 的安装/检测段)。
+
 ## 3. 里程碑拆分
 
 (待需求收集完毕后拆分)
