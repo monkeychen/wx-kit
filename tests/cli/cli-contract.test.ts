@@ -270,3 +270,33 @@ describe('CLI top-level help (M25 R3)', () => {
     expect(stdout).toContain('~/Documents/wx-kit')
   })
 })
+
+describe('CLI session export/import (M27)', () => {
+  it('export without session → NO_SESSION, exit 1', async () => {
+    const code = await runCli(['session', 'export'])
+    expect(code).toBe(1)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SESSION' } })
+  })
+
+  it('import an invalid file → CLI_ERROR, exit 2', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wxk-sess-cli-'))
+    const bad = join(dir, 'bad.json'); writeFileSync(bad, JSON.stringify({ nope: 1 }))
+    const code = await runCli(['session', 'import', bad], { userDataDir: dir })
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+  })
+
+  it('import a valid file writes it and probes validity (expired here → valid:false)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wxk-sess-cli2-'))
+    const f = join(dir, 'in.json')
+    writeFileSync(f, JSON.stringify({ token: '42', cookies: [{ name: 'a', value: 'b' }], timestamp: 1 }))
+    const { MpAuthExpired } = await import('../../src/core/mp-errors')
+    const mpc = await import('../../src/core/mp-client')
+    const spy = vi.spyOn(mpc, 'searchAccount').mockRejectedValue(new MpAuthExpired('expired'))
+    const code = await runCli(['session', 'import', f], { userDataDir: dir })
+    spy.mockRestore()
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, valid: false })
+    expect(JSON.parse(readFileSync(join(dir, 'mp-session.json'), 'utf-8'))).toMatchObject({ token: '42' })
+  })
+})
