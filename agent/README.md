@@ -4,7 +4,8 @@
 
 ## 内含
 
-- `wx-kit-compose/` —— 文库素材创作编排 skill：用文库文章作素材，走「选料 → 选题 → 写作」（带人工检查点），写作委派给 `khazix-writer`。详见其 `SKILL.md`。
+- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**（v0.6.0）：安装（brew/npm 自动检测）、登录态（含 headless 的 session 迁移）、全部 CLI 原子能力速查与组合范例。agent 从零上手 wx-kit 看这个。
+- `wx-kit-compose/` —— 文库素材创作编排 skill：用文库文章作素材，走「选料 → 选题 → 写作」（带人工检查点），写作委派给 `khazix-writer`。环境/安装前置问题参见 `wx-kit-skill`。详见其 `SKILL.md`。
 
 ## 安装
 
