@@ -5,12 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.5.5(2026-07-18,文库目录化导航 + 关键词筛选下载)** —— tag `v0.5.5` + GitHub Release(三平台安装包,标 Latest)已发。范围:M23 文库分组默认收起为目录 + 展开记忆 + 粘性组头 + 回顶(`content-visibility` 保千篇流畅);M24 按公众号下载标题关键词筛选(issue #1,GUI 互斥下拉 + CLI `--include`/`--exclude`)。需求/验收 `docs/PRD-v0.5.5.md`,计划 `plans/2026-07-17-m23-m24-library-nav-and-keyword-filter.md`,发布说明 `docs/releases/v0.5.5.md`,复盘 devlog §33。
+- **最新发布:v0.6.0(2026-07-19,Agent 自动化闭环)** —— tag `v0.6.0` + GitHub Release(三平台包,标 Latest)+ brew tap + npm 包已发。范围:M25 体验杂项(排序默认+记忆/日志入口/CLI 帮助)、M26 安装通道(brew/npm)、M27 session 跨机迁移、M28 agent skill。需求/验收 `docs/PRD-v0.6.0.md`,发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M24 已随 v0.1.0–v0.5.5 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M28 已随 v0.1.0–v0.6.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -44,10 +44,11 @@
 | **M27** ✅ | v0.6.0 | headless 登录态:`session export`/`import`(0600 + 结构校验 + 导入即真探测;2026-07-19 完成,真机 export→import→valid:true) | `plans/2026-07-19-m27-session-transfer.md` |
 | **M28** ✅ | v0.6.0 | agent skill:`agent/wx-kit-skill/`(检测→安装→登录态→能力速查→范例;全新 agent 四步端到端验证;2026-07-19 完成) | `plans/2026-07-19-m28-agent-skill.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
+- **v0.6.0 · 2026-07-19 · Agent 自动化闭环** —— 四个里程碑一版打通「agent 不碰鼠标用起 wx-kit」:M25 文库默认发布时间降序+排序跨会话记忆、检查日志入口、CLI 帮助大改;M26 brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包双安装通道(发版规约⑦⑧);M27 `session export/import` 打通 headless 登录态(0600+结构校验+导入即真探测);M28 `agent/wx-kit-skill/` 能力说明书(样例逐条实测,全新 agent 四步端到端零人工)。发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
 - **v0.5.5 · 2026-07-18 · 文库目录化导航 + 关键词筛选下载** —— M23 治「滚动好久」:分组默认收起为公众号目录(一屏尽览、展开记忆、粘性组头、回顶),实测千篇量级 `content-visibility` 后滚动 23→52fps,虚拟滚动推迟万篇级;M24 落地 issue #1:标题关键词筛选(GUI 互斥下拉,初版双输入框被安哥纠正——互斥要靠结构;CLI 双 flag 可组合),列出→下载之间过滤零额外请求。发布说明 `docs/releases/v0.5.5.md`,复盘 devlog §33。
 - **v0.5.4 · 2026-07-16 · 订阅检查:不重跑、看得清失败、请求更省** —— M22 三合一:调度防重入(检查耗时跨 tick 曾并发重复跑,真机同时段两条相同记录);失败明细可观测(检查记录/落盘日志/CLI JSON 逐号原因,GUI 弹窗);「翻到水位为止」取代固定取 20 篇(微信每页实回 ~5,日常 4 次请求 → 1 次,空窗多日自动翻深不漏)。发布说明 `docs/releases/v0.5.4.md`,复盘 devlog §32。
 - **v0.5.3 · 2026-07-13 · 修复 macOS 关窗后程序坞无法重开窗口** —— M21 补注册 `app.on('activate')`:主进程此前只做了 mac 惯例的一半(关窗驻留程序坞)而缺重建窗口的代码路径,点程序坞图标无响应、应用假死只能强退。缺陷自 v0.1.0 即存在,整进程启停的开发/测试路径一直未暴露。发布说明 `docs/releases/v0.5.3.md`,复盘 devlog §31。
@@ -63,9 +64,7 @@
 
 ## 下一步 / 候选
 
-- **🚧 v0.6.0 迭代中**(2026-07-19 安哥宣布启动):两条主线——agent 自动化闭环(npm/brew 安装通道、session 跨机迁移、CLI 帮助完善、wx-kit 使用 skill)+ 日常体验(文库默认发布时间降序+排序记忆、检查日志入口)。里程碑 M25–M28,逐条需求/验收见 `docs/PRD-v0.6.0.md`;推进顺序 M25 → M26/M27 → M28(收口依赖前两者)。
-
-候选(需要时单议):
+当前无排期。候选(需要时单议):
 
 - **文库虚拟滚动** —— 实测(2026-07-18,1000 篇/20 组假文库):目录态打开 169ms;全展开后滚动曾 ~23fps,加 `content-visibility: auto` 后恢复 ~52fps、挂载 420ms、堆 125MB——**千篇量级已无需虚拟滚动**。等万篇级或实测再退化时再议(届时瓶颈是 React 挂载数与逐卡 coverName IPC,需虚拟列表 + 封面批量查询)。
 - **Windows CLI stdout 正解** —— 打包后 win 是 GUI 子系统程序,CLI 模式 stdout 不回贴控制台,现仅有「重定向到文件」绕法(见 README、AGENTS.md 陷阱清单)。正解是打包时给 win 出 console 子系统入口(或 `wx-kit-cli.exe` wrapper)。要动打包配置,铺 Windows agent 场景时再做。
