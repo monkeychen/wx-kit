@@ -11,6 +11,7 @@ import { Library } from '../core/library'
 import { DownloadQueue } from '../core/download-queue'
 import { downloadArticle } from '../core/download-article'
 import { getSession, login } from '../../electron/services/mp-auth'
+import { exportSession, importSession } from '../../electron/services/session-transfer'
 import { makeMpFetch } from '../../electron/services/mp-fetch'
 import { searchAccount } from '../core/mp-client'
 import { crawlAccount } from '../core/mp-crawl'
@@ -188,6 +189,35 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         const cancelled = (e as Error).message === 'CANCELLED'
         outJson({ ok: false, error: { code: cancelled ? 'CANCELLED' : 'LOGIN_FAILED', message: (e as Error).message } })
         exitCode = cancelled ? 2 : 1
+      }
+    })
+
+  // M27:headless 环境无法扫码,登录态从已登录机器搬运(mac login → export → scp → import)
+  const sessionCmd = program.command('session').description('登录态跨机器迁移(子命令:export / import)')
+  const cliSessionPath = () => join(userDataDir, 'mp-session.json')
+  sessionCmd
+    .command('export')
+    .description('导出当前登录态到文件(等同登录凭证,勿提交仓库/勿外传)')
+    .option('-o, --out <file>', '导出路径', './wx-kit-session.json')
+    .action(async (opts) => {
+      if (!getSession()) { outJson({ ok: false, error: { code: 'NO_SESSION', message: '尚未登录,先执行 wx-kit login' } }); exitCode = 1; return }
+      const outPath = String(opts.out)
+      await exportSession(cliSessionPath(), outPath)
+      outJson({ ok: true, path: outPath, warning: '此文件等同登录态,勿提交仓库、勿传给不信任的环境,用后即删' })
+    })
+  sessionCmd
+    .command('import')
+    .description('从文件导入登录态,并立即探测其有效性')
+    .argument('<file>', '来自 session export 的文件')
+    .action(async (file: string) => {
+      let session
+      try { session = await importSession(file, cliSessionPath()) }
+      catch (e) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: (e as Error).message } }); exitCode = 2; return }
+      // 导入即真探测:失效也保留文件(如实告知),网络失败不误判为失效
+      try { await searchAccount(makeMpFetch(session), session.token, '腾讯'); outJson({ ok: true, valid: true }) }
+      catch (e) {
+        if (e instanceof MpAuthExpired) outJson({ ok: true, valid: false, note: '已导入,但该登录态已失效,需在有图形界面的机器重新 login 后再导出' })
+        else outJson({ ok: true, valid: null, note: `已导入;有效性探测失败(${(e as Error).message}),稍后可用 auth-status 复查` })
       }
     })
 

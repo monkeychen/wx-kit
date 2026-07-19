@@ -1,7 +1,7 @@
 // 纯函数: 决定一组用户参数应进 CLI 还是 GUI。无 electron 依赖，可单测。
 export const CLI_COMMANDS = new Set([
   'download', 'crawl', 'search', 'login', 'auth-status',
-  'library', 'subscription', 'settings', 'help', 'version',
+  'library', 'subscription', 'settings', 'session', 'help', 'version',
 ])
 const CLI_FLAGS = new Set(['-h', '--help', '-v', '--version'])
 
