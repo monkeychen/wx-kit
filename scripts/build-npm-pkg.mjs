@@ -44,6 +44,9 @@ writeFileSync(join(out, 'package.json'), JSON.stringify({
   type: 'commonjs',
   bin: { 'wx-kit': 'bin/wx-kit.js' },
   os: ['darwin', 'linux'],
+  // publish 一律直发官方 registry,不受 ~/.npmrc 国内镜像影响(publishConfig 只作用于 publish,
+  // install/view 等读操作照走镜像);access: public 是 scoped 包首发必需,写死免得每次带 flag
+  publishConfig: { registry: 'https://registry.npmjs.org/', access: 'public' },
   engines: { node: '>=20' },
   dependencies: deps,
 }, null, 2) + '\n')
