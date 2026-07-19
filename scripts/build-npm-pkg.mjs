@@ -31,7 +31,8 @@ const deps = {
 }
 
 writeFileSync(join(out, 'package.json'), JSON.stringify({
-  name: 'wx-kit',
+  // npm 拒绝无 scope 的 wx-kit(与既有包 wxkit 相似度保护),故用账号 scope;bin 命令名不受影响仍是 wx-kit
+  name: '@simiam/wx-kit',
   version: pkg.version,
   description: '微信百宝箱 — 微信公众号文章下载器(GUI + agent 友好 CLI,同一二进制)',
   license: pkg.license,
@@ -47,4 +48,4 @@ writeFileSync(join(out, 'package.json'), JSON.stringify({
   dependencies: deps,
 }, null, 2) + '\n')
 
-console.log(`dist-npm/ ready (wx-kit@${pkg.version}); publish: cd dist-npm && npm publish`)
+console.log(`dist-npm/ ready (@simiam/wx-kit@${pkg.version}); publish: cd dist-npm && npm publish --access=public`)

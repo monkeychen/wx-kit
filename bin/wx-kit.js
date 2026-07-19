@@ -8,7 +8,7 @@ let electron
 try {
   electron = require('electron')   // 解析为 electron 可执行文件路径
 } catch {
-  process.stderr.write('[wx-kit] 找不到 electron 依赖。请重装:npm i -g wx-kit\n'
+  process.stderr.write('[wx-kit] 找不到 electron 依赖。请重装:npm i -g @simiam/wx-kit\n'
     + '(国内网络可先设镜像:export ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/)\n')
   process.exit(1)
 }

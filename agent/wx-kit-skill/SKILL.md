@@ -29,7 +29,7 @@ xattr -cr /Applications/wx-kit.app
 
 # macOS / Linux(npm,需 Node 20+;国内网络先设 electron 镜像)
 export ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/
-npm install -g wx-kit
+npm install -g @simiam/wx-kit
 ```
 
 > brew 装完后二进制在 `/Applications/wx-kit.app/Contents/MacOS/wx-kit`;首次打开 **GUI** 会引导创建

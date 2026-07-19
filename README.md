@@ -24,7 +24,7 @@
 
 **最新版本 v0.6.0(Agent 自动化闭环)**:
 
-- **命令行安装**:`brew install --cask monkeychen/wx-kit/wx-kit` 或 `npm i -g wx-kit`,agent 检测未装即可自动安装。
+- **命令行安装**:`brew install --cask monkeychen/wx-kit/wx-kit` 或 `npm i -g @simiam/wx-kit`,agent 检测未装即可自动安装。
 - **登录态跨机迁移**:`session export`/`import`,headless 服务器也能用需登录的能力(爬取/订阅)。
 - **专属 skill**:`agent/wx-kit-skill/` 让 agent 自学自用全部原子能力;文库默认发布时间降序+排序记忆、检查日志入口、CLI 帮助大改。
 
@@ -62,7 +62,7 @@ brew install --cask monkeychen/wx-kit/wx-kit
 
 # macOS / Linux(npm;需 Node 20+,国内先设 electron 镜像)
 export ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/   # 国内网络
-npm install -g wx-kit
+npm install -g @simiam/wx-kit
 wx-kit --version
 ```
 
