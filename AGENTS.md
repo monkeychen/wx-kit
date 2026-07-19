@@ -35,6 +35,7 @@
 - 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归「项目状态」与 ROADMAP 发布史（曾追加式维护堆出 7 版重复,2026-07-17 安哥指出后清理）；⑥ commit、合 main、打 tag。
 - **`gh release create` 中途别被中断**——它是「先建草稿 → 传附件 → 最后才 publish」，杀在中途会留下未发布的 Draft（外部不可见）。若已成 Draft，用 `gh release edit vX.Y.Z --draft=false --latest` 补发布。
 - **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
+- **安装通道同步（v0.6.0 起）**：Release 发布后 ⑦ `scripts/update-brew-tap.sh <version>` 刷新 brew tap（sha256 以**已发布资产**为准，脚本会自行下载计算——本地 release/ 重 build 后 hash 会漂，勿用本地文件）；⑧ `npm run build && node scripts/build-npm-pkg.mjs && cd dist-npm && npm publish`（需 npm 已登录）。两通道都要真实安装验证（brew 装到隔离 --appdir / npm 装 tarball 到隔离 prefix，各跑 `--version` + `download`）。注意 Homebrew 5 已移除 `--no-quarantine`，未签名 app 首开仍需系统设置放行（文档如实告知）。
 
 ## 结构约定
 - `src/core/`：UI 无关核心层，被 GUI（IPC）与 CLI 共享。**不得 import React/renderer/electron 运行时**（types 可以；electron 仅以注入的 BrowserWindow 构造器形式出现）。

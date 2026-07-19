@@ -53,6 +53,21 @@ npx electron . download --url "https://mp.weixin.qq.com/s/xxx" --formats md,html
 
 输出在 `~/Documents/wx-kit/`(**默认**库根,可在「设置」改)。
 
+## 30 秒上手(命令行安装,推荐)
+
+```bash
+# macOS(Homebrew;装的就是完整 .app,GUI + CLI 一体)
+brew install --cask monkeychen/wx-kit/wx-kit
+
+# macOS / Linux(npm;需 Node 20+,国内先设 electron 镜像)
+export ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/   # 国内网络
+npm install -g wx-kit
+wx-kit --version
+```
+
+> 命令行安装面向 AI agent 自动化(skill 检测未安装即可自动执行上述命令)。
+> macOS 应用未签名,**首次打开 GUI** 仍需放行:「系统设置 → 隐私与安全性」→「仍要打开」,或 `xattr -cr /Applications/wx-kit.app`(纯 CLI 使用不受影响)。
+
 ## 30 秒上手(下载安装包)
 
 去 [Releases](../../releases) 选平台对应包(最新 v0.5.5:`wx-kit-0.5.5-arm64.dmg`(Apple Silicon) /
