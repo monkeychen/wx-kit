@@ -103,6 +103,27 @@
 - [ ] skill 文档含「未安装 → 自动安装」的检测与命令样例。
 - [ ] 发版规约更新:发 Release 时同步刷新安装通道(tap sha256 / npm publish),并有真实安装验证步骤。
 
+### R5 · session 跨机器导出/导入(2026-07-19 安哥)
+
+**原始需求**:支持从别的机器导入 session。
+
+**背景**:`wx-kit login` 是 CLI 唯一需要弹窗(扫码)的命令——headless/SSH/Linux 服务器环境无法完成;R4 落地 npm 通道后此矛盾会放大(服务器装得上、登录不了,`crawl`/订阅等依赖 session 的能力全不可用)。session 本体是 userData 下的单文件 `mp-session.json`(token + cookies + timestamp),文件级复制本就有效——本需求把它产品化。
+
+**细化**:
+
+- **CLI 一对命令**(命名倾向挂在既有鉴权语境下,与 `login`/`auth-status` 并列):
+  - `wx-kit session export [--out <file>]`——把当前 session 复制到指定文件(默认 `./wx-kit-session.json`);无 session 时报错(退出码 1)。stdout JSON 含导出路径与提示。
+  - `wx-kit session import <file>`——校验 JSON 结构(token/cookies 字段)→ 写入 userData →**立即做一次真探测**(`auth-status` 同款廉价请求)验证有效性;有效输出 `{ok:true, valid:true}`,失效如实输出 `valid:false`(文件仍导入,提示可能需重新扫码)。
+- **安全边界**:session 即登录凭证。导出时 stdout/文档明确提醒「此文件等同登录态,勿提交仓库/勿传给不信任的环境」;导出文件权限 0600;文档建议用后即删。
+- **典型工作流写入文档/skill**:mac(能扫码)`login` → `session export` → scp 到服务器 → 服务器 `session import` → agent 全自动跑 `crawl`/`subscription check-now`。与 R4 的 npm/Linux 通道形成完整闭环。
+- **GUI 不做入口**(非目标):主场景是 agent/headless,GUI 用户直接扫码更顺;避免设置页堆低频功能。
+
+**验收(草)**:
+- [ ] A 机 `login` 后 `session export`;B 机 `session import` 后 `auth-status` 有效,`crawl` 可用(双机真机验证,B 机可用隔离 userData 模拟)。
+- [ ] 导入非法文件(缺字段/非 JSON)报结构错误、退出码 2,不污染现有 session。
+- [ ] 导入已过期 session:如实 `valid:false`,后续命令按既有 `AUTH_REQUIRED` 语义引导。
+- [ ] 导出文件权限 0600;无 session 时导出报错退出码 1。
+
 ## 3. 里程碑拆分
 
 (待需求收集完毕后拆分)
