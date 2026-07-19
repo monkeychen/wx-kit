@@ -36,13 +36,19 @@
 - 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归「项目状态」与 ROADMAP 发布史（曾追加式维护堆出 7 版重复,2026-07-17 安哥指出后清理）；⑥ commit、合 main、打 tag。
 - **`gh release create` 中途别被中断**——它是「先建草稿 → 传附件 → 最后才 publish」，杀在中途会留下未发布的 Draft（外部不可见）。若已成 Draft，用 `gh release edit vX.Y.Z --draft=false --latest` 补发布。
 - **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
-- **发版完成的定义（v0.6.0 起）＝三渠道全部上线并逐一核实**，缺一渠道即视为发版未完成，不得汇报「发版完成」：
-  | 渠道 | 上线动作 | 核实动作 |
-  |---|---|---|
-  | GitHub Release | `gh release create` + 逐个 upload 三平台包 | `gh release view`（isDraft:false、标 Latest）+ 资产大小与本地逐字节比对 |
-  | brew tap | ⑦ `scripts/update-brew-tap.sh <version>`（sha256 以**已发布资产**为准，脚本自行下载计算——本地 release/ 重 build 后 hash 会漂） | 先刷新本地 tap（`brew update` 或对 tap clone `git pull`），`brew info --cask` 确认版本号，隔离 `--appdir` 真实安装跑 `--version` + `download` |
-  | npm `@simiam/wx-kit` | ⑧ `node scripts/build-npm-pkg.mjs && cd dist-npm && npm publish`（无 scope 的 `wx-kit` 被相似度保护拒绝、与既有包 `wxkit` 太像；bin 命令仍是 `wx-kit`。生成的 package.json 内置 `publishConfig`{官方 registry + access public}——publish 自动直发 npmjs 官方源,**不受也不用改 ~/.npmrc 的国内镜像**,flag 都不用带。**publish 须安哥终端执行**——需登录 + 浏览器二次认证，agent 的非交互 shell 做不了，走到这一步就停下向安哥要这条命令） | `npm view @simiam/wx-kit version --registry=https://registry.npmjs.org`（view 会走镜像,核实要显式指官方源;可见延迟约 1–2 分钟），再从官方 registry 隔离 prefix 干净安装跑 `--version` |
-- **brew tap 的陷阱清单（v0.6.0 实录）**：① tap 是**本地 clone**——推送 tap 更新后，本机（和任何用户机）在 `brew update` 前读到的仍是旧 cask（安哥曾据此装到旧版 + 旧 caveats；发版验证前先 `git -C $(brew --repository)/Library/Taps/monkeychen/homebrew-wx-kit pull` 或 `brew update`）。② Homebrew 5 已移除 `--no-quarantine`，且实测 quarantine 对未签名 app **连纯 CLI 都拦**（Gatekeeper 拦在 exec，进程挂起无输出）——装完必须 `xattr -cr`，此文案已进 cask caveats/README/skill，勿回退成「仅 GUI 受影响」。③ 安装名是三段 `monkeychen/wx-kit/wx-kit`（用户/tap/包）；tap 过一次后短名 `brew install --cask wx-kit` 即可。④ tap 仓库的 README 不归 update-brew-tap.sh 管，改安装说明时记得单独同步（曾漏改留过期 `--no-quarantine` 文案）。
+### 发版完成的定义（v0.6.0 起）
+
+**＝三渠道全部上线并逐一核实**，缺一渠道即视为发版未完成，不得汇报「发版完成」：
+
+| 渠道 | 上线动作（接上面步骤编号） | 核实动作 |
+|---|---|---|
+| GitHub Release | `gh release create` + 逐个 upload 三平台包 | `gh release view`（isDraft:false、标 Latest）+ 资产大小与本地逐字节比对 |
+| brew tap | ⑦ `scripts/update-brew-tap.sh <version>`（sha256 以**已发布资产**为准，脚本自行下载计算——本地 release/ 重 build 后 hash 会漂） | 先刷新本地 tap（见下方陷阱①），`brew info --cask` 确认版本号，隔离 `--appdir` 真实安装跑 `--version` + `download` |
+| npm `@simiam/wx-kit` | ⑧ `node scripts/build-npm-pkg.mjs && cd dist-npm && npm publish`。**publish 须安哥终端执行**——需登录 + 浏览器二次认证，agent 的非交互 shell 做不了，走到这一步就停下向安哥要这条命令 | `npm view @simiam/wx-kit version --registry=https://registry.npmjs.org`（view 会走镜像，核实要显式指官方源；可见延迟约 1–2 分钟），再从官方 registry 隔离 prefix 干净安装跑 `--version` |
+
+npm 包名与配置背景：无 scope 的 `wx-kit` 被 npm 相似度保护拒绝（与既有包 `wxkit` 太像），故用 `@simiam/wx-kit`，**bin 命令名不变仍是 `wx-kit`**；生成的 package.json 内置 `publishConfig`（官方 registry + access public）——publish 自动直发官方源，**不受也不用改 `~/.npmrc` 的国内镜像**，flag 都不用带。
+
+**brew tap 陷阱清单（v0.6.0 实录）**：① tap 是**本地 clone**——推送 tap 更新后，本机（和任何用户机）在 `brew update`（或对 tap clone `git pull`）前读到的仍是旧 cask，安哥曾据此装到旧版 + 旧 caveats。② Homebrew 5 已移除 `--no-quarantine`，且实测 quarantine 对未签名 app **连纯 CLI 都拦**（Gatekeeper 拦在 exec，进程挂起无输出）——装完必须 `xattr -cr`，勿回退成「仅 GUI 受影响」。③ 安装名是三段 `monkeychen/wx-kit/wx-kit`（用户/tap/包）；tap 过一次后短名 `brew install --cask wx-kit` 即可。④ 改安装说明时落点有四处：README、`agent/wx-kit-skill/SKILL.md`、cask caveats（update-brew-tap.sh 内嵌模板）、tap 仓库 README（独立仓库，脚本不管，要手动同步——曾漏改留过期文案）。
 
 ## 结构约定
 - `src/core/`：UI 无关核心层，被 GUI（IPC）与 CLI 共享。**不得 import React/renderer/electron 运行时**（types 可以；electron 仅以注入的 BrowserWindow 构造器形式出现）。
@@ -70,7 +76,7 @@ npm test               # 跑 vitest 单测（纯逻辑，CI 友好）
 npm run test:e2e       # 构建 + Playwright 驱动真实 Electron 跑 GUI 全流程
 npm run lint           # eslint
 npx tsc --noEmit -p tsconfig.json   # 类型检查
-npm run build          # tsc -b + vite build + electron-builder（出安装包，M4）
+npm run build          # vite build + electron-builder（出安装包）
 
 # CLI（与 GUI 同一二进制，带子命令即进 CLI 模式）：
 npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html,pdf,meta --out <dir>
@@ -93,9 +99,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 
 ## 文档索引
 - `ROADMAP.md` — **里程碑状态与路线图（续接看这里）**。状态/进度只在这里维护；各里程碑的详细实现计划放在 `docs/plans/`，其逐里程碑索引也在 ROADMAP 维护。
-- `docs/PRD.md` — 第一阶段（v0.1.0）产品需求（全貌、F1–F5、架构、风控、验收）。
-- `docs/PRD-v0.2.0.md` — **v0.2.0 迭代需求**（信息架构重构、下载闭环/历史、流程可回退、保真与反馈、文库组织；里程碑 M5–M9）。
-- `docs/PRD-v0.3.0.md` — **v0.3.0 迭代需求**（列表视图优化 + 公众号订阅 + 订阅触发/可观测性；里程碑 M10–M12；含逐条可勾的验收标准）。
+- `docs/PRD.md` — 第一阶段（v0.1.0）产品需求（全貌、F1–F5、架构、风控、验收）。**后续每版一份 `docs/PRD-vX.Y.Z.md`**（§4 逐条可勾验收是验收契约），逐版清单见 ROADMAP 的 PRD 索引行。
 - `docs/devlog/wx-kit-vibe-coding.md` — vibe-coding 全程复盘（活文档，每完成一个里程碑增补；流程/决策/踩坑/方法论）。
+- `agent/` — 消费 wx-kit 的 skill：`wx-kit-skill/`（能力说明书，CLI 变更须同步刷新，见工作流第 7 条）、`wx-kit-compose/`（文库素材创作编排）。
 
 > 进度的唯一真相是 `git log` + `ROADMAP.md` + `docs/plans/`，不是散落在指南里的散文。
