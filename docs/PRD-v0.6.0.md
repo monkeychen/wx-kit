@@ -70,6 +70,40 @@
 - [ ] 各子命令 `wx-kit <cmd> -h` 保持 commander 默认行为,不受影响。
 - [ ] `-h`/`--help`/`help` 输出一致、走 stdout、退出码 0。
 
+### R4 · 命令行安装通道:npm / brew(2026-07-19 安哥)
+
+**原始需求**:提供可以用 npm 或 brew 安装的版本,方便命令行安装——skill 要使用 wx-kit 时,发现未安装则直接跑安装命令,而不是要人工下载 dmg 安装,不利于自动化。
+
+**目标还原**:真正要的不是「多一种安装方式」,而是**agent 自动化闭环**——skill 检测到 wx-kit 缺失 → 一条命令装好 → 继续干活,全程无人工。这是「双启动模式服务于 AI agent」定位的自然延伸。
+
+**两条路线的可行性(均可行,服务不同场景)**:
+
+| | **brew(自建 tap + cask)** | **npm(`npm i -g wx-kit`)** |
+|---|---|---|
+| 原理 | cask 指向 GitHub Release 的 dmg(URL + sha256),`brew install --cask monkeychen/wx-kit/wx-kit` | 包含构建产物(dist + dist-electron),`bin` 指向启动脚本,electron 作为依赖由 npm 装 |
+| 装出来的东西 | 与手动安装完全相同的 .app(GUI+CLI 一体,wrapper 快捷命令照常) | 独立一份 electron + 应用代码,CLI 直用;GUI 也能开 |
+| 平台 | 仅 macOS | mac / **Linux**(顺带补上当前没有的 Linux 支持)/ win |
+| 体积 | dmg ~140MB(本来就要下) | electron 依赖 ~100MB+(国内需 ELECTRON_MIRROR,`.npmrc` 可内置提示) |
+| 发版成本 | 每次 Release 后更新 tap 仓库里的版本号 + sha256(可脚本化进发版规约) | 每次 `npm publish`(可脚本化);**需确认 npm 包名 `wx-kit` 可用**,被占则换名(如 `@monkeychen/wx-kit`) |
+| 免手动放行 | `--no-quarantine` 装未签名 app 不触发 Gatekeeper 手动放行——恰好解决现有痛点 | 不涉及(不走 Gatekeeper) |
+
+**细化(暂定两条都做,轻重有别;最终范围安哥定)**:
+
+1. **brew tap(主推,mac agent 场景)**:新建 `monkeychen/homebrew-wx-kit` 仓库放 cask;发版规约增加一步「更新 tap 的 url/sha256」(脚本化);README/skill 文档给出一条安装命令(含 `--no-quarantine` 说明)。
+2. **npm 包(跨平台兜底,顺带 Linux)**:发布包含构建产物的包,`bin` 启动脚本按参数分流(与现有 `main.ts` 分流一致);处理 electron 国内镜像的安装引导;发版规约增加 `npm publish`。
+3. **skill/agent 集成闭环**:`agent/wx-kit-compose`(及 README 的 agent 集成节)增加「检测 → 安装」样例:检测 `wx-kit` 命令不存在 → 按平台给出/执行安装命令。
+4. 两条通道装出的版本都要能被现有 CLI 契约验证(`--version`、`download`、stdout JSON)。
+
+**开放问题(安哥定)**:
+- 范围:两条都做,还是先 brew(mac 是主场)后 npm?
+- ~~npm 包名可用性~~ 已核实(2026-07-19 查 registry):**`wx-kit` 未被占用**,可直接用。
+
+**验收(草)**:
+- [ ] mac 全新环境:一条 brew 命令装好,`wx-kit --version`/`download` 直接可用,无手动放行。
+- [ ] (若做 npm)`npm i -g` 后同上;Linux 上 CLI 可用。
+- [ ] skill 文档含「未安装 → 自动安装」的检测与命令样例。
+- [ ] 发版规约更新:发 Release 时同步刷新安装通道(tap sha256 / npm publish),并有真实安装验证步骤。
+
 ## 3. 里程碑拆分
 
 (待需求收集完毕后拆分)
