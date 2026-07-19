@@ -51,4 +51,4 @@ writeFileSync(join(out, 'package.json'), JSON.stringify({
   dependencies: deps,
 }, null, 2) + '\n')
 
-console.log(`dist-npm/ ready (@simiam/wx-kit@${pkg.version}); publish: cd dist-npm && npm publish --access=public`)
+console.log(`dist-npm/ ready (@simiam/wx-kit@${pkg.version}); publish: cd dist-npm && npm publish  (publishConfig 已内置官方 registry + access)`)
