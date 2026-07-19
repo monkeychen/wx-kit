@@ -38,13 +38,13 @@
 - **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
 ### 发版完成的定义（v0.6.0 起）
 
-**＝三渠道全部上线并逐一核实**，缺一渠道即视为发版未完成，不得汇报「发版完成」：
+**必做渠道 = GitHub Release + brew tap**，两者全部上线并逐一核实才算发版完成，缺一不得汇报「发版完成」。**npm 为可选渠道**：默认不发,仅当安哥明确说「发布到 npm」时执行(npm 官方仓库的版本落后于 GitHub/brew 是预期状态,不算异常)。
 
-| 渠道 | 上线动作（接上面步骤编号） | 核实动作 |
-|---|---|---|
-| GitHub Release | `gh release create` + 逐个 upload 三平台包 | `gh release view`（isDraft:false、标 Latest）+ 资产大小与本地逐字节比对 |
-| brew tap | ⑦ `scripts/update-brew-tap.sh <version>`（sha256 以**已发布资产**为准，脚本自行下载计算——本地 release/ 重 build 后 hash 会漂） | 先刷新本地 tap（见下方陷阱①），`brew info --cask` 确认版本号，隔离 `--appdir` 真实安装跑 `--version` + `download` |
-| npm `@simiam/wx-kit` | ⑧ `node scripts/build-npm-pkg.mjs && cd dist-npm && npm publish`。**publish 须安哥终端执行**——需登录 + 浏览器二次认证，agent 的非交互 shell 做不了，走到这一步就停下向安哥要这条命令 | `npm view @simiam/wx-kit version --registry=https://registry.npmjs.org`（view 会走镜像，核实要显式指官方源；可见延迟约 1–2 分钟），再从官方 registry 隔离 prefix 干净安装跑 `--version` |
+| 渠道 | 必/选 | 上线动作（接上面步骤编号） | 核实动作 |
+|---|---|---|---|
+| GitHub Release | 必 | `gh release create` + 逐个 upload 三平台包 | `gh release view`（isDraft:false、标 Latest）+ 资产大小与本地逐字节比对 |
+| brew tap | 必 | ⑦ `scripts/update-brew-tap.sh <version>`（sha256 以**已发布资产**为准，脚本自行下载计算——本地 release/ 重 build 后 hash 会漂） | 先刷新本地 tap（见下方陷阱①），`brew info --cask` 确认版本号，隔离 `--appdir` 真实安装跑 `--version` + `download` |
+| npm `@simiam/wx-kit` | **选**（安哥点名才发） | `node scripts/build-npm-pkg.mjs && cd dist-npm && npm publish`。**publish 须安哥终端执行**——需登录 + 浏览器二次认证，agent 的非交互 shell 做不了：agent 备好 dist-npm 后停下,把这条命令交给安哥 | `npm view @simiam/wx-kit version --registry=https://registry.npmjs.org`（view 会走镜像，核实要显式指官方源；可见延迟约 1–2 分钟），再从官方 registry 隔离 prefix 干净安装跑 `--version` |
 
 npm 包名与配置背景：无 scope 的 `wx-kit` 被 npm 相似度保护拒绝（与既有包 `wxkit` 太像），故用 `@simiam/wx-kit`，**bin 命令名不变仍是 `wx-kit`**；生成的 package.json 内置 `publishConfig`（官方 registry + access public）——publish 自动直发官方源，**不受也不用改 `~/.npmrc` 的国内镜像**，flag 都不用带。
 
