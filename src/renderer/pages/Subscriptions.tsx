@@ -104,7 +104,7 @@ export default function Subscriptions() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 13 }} className="faint">
           <span data-testid="subs-next-check">下次预计检查：{nextCheckAt ? new Date(nextCheckAt).toLocaleString() : '未开启自动检查'}</span>
-          <a onClick={() => api.subscriptionsOpenLog()} data-testid="subs-open-log">打开日志文件</a>
+          <a onClick={() => api.subscriptionsOpenLog()} data-testid="subs-open-log">📄 打开检查日志</a>
         </div>
 
         {candidates.length > 0 && (

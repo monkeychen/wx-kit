@@ -18,7 +18,11 @@ export interface AppSettings {
   subscriptionIntervalHours: number
   cliLinkPrompted: boolean
   libraryExpandedGroups: string[]        // 文库分组视图的展开集(M23;默认空=全部收起)
+  librarySort: LibrarySort               // 文库排序选择(M25;跨会话记忆,默认发布时间降序)
 }
+
+// 与 renderer 的 library-view 排序键/方向一致;定义在此避免主进程 import renderer
+export interface LibrarySort { key: 'download' | 'publish' | 'title'; dir: 'asc' | 'desc' }
 
 export class SettingsService {
   private path: string
@@ -39,6 +43,7 @@ export class SettingsService {
       subscriptionIntervalHours: 6,
       cliLinkPrompted: false,
       libraryExpandedGroups: [],
+      librarySort: { key: 'publish', dir: 'desc' },
     }
   }
 

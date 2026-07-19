@@ -167,13 +167,21 @@ async function main() {
     const libCount = await win.locator('[data-testid="article-card"]').count()
     assert(libCount === 3, `expand-all shows the 3 successfully-downloaded articles (got ${libCount})`)
 
-    // 排序：关分组 → 发布时间升序 → 首篇为最早的「伽马·乙」
+    // M25: 默认排序即「发布时间 · 降序」→ 关分组后最新发表(贝塔)在最前,无需手动选
     await win.click('[data-testid="group-toggle"]')
-    await pickSelect('sort-select', '发布时间')
+    await win.waitForTimeout(200)
+    assert((await firstCardText()).includes('贝塔'), 'M25: default sort is publish-time desc (newest first, no manual pick)')
     await win.click('[data-testid="sort-dir"]')   // desc → asc
     await win.waitForTimeout(200)
     assert((await firstCardText()).includes('伽马'), 'sort by publish-time asc puts the oldest article first')
-    await win.click('[data-testid="sort-dir"]')   // asc → desc
+    // M25: 排序选择跨会话记忆——离开文库再回来仍是升序(最旧在前)
+    await win.click('[data-testid="nav-设置"]')
+    await win.click('[data-testid="nav-文库"]')
+    await win.waitForSelector('[data-testid="article-card"]', { timeout: 10000 })
+    await win.click('[data-testid="group-toggle"]')   // 分组态持久化了,再平铺
+    await win.waitForTimeout(200)
+    assert((await firstCardText()).includes('伽马'), 'M25: sort choice persists across navigation (still asc)')
+    await win.click('[data-testid="sort-dir"]')   // asc → desc 复原,后续步骤依赖降序
     await win.waitForTimeout(200)
     assert((await firstCardText()).includes('贝塔'), 'flipping direction puts the newest article first')
 
@@ -294,6 +302,8 @@ async function main() {
     await win.click('[data-testid="set-subs-mode"] label:has-text("每隔")')
     await win.waitForSelector('[data-testid="set-subs-interval"]', { timeout: 5000 })
     assert((await win.locator('[data-testid="set-subs-interval"]').count()) === 1, 'switching to interval mode shows the hours control')
+    // M25 R2: 设置页有「打开检查日志」入口
+    assert((await win.locator('[data-testid="set-open-checklog"]').count()) === 1, 'M25: settings offers open-check-log entry')
 
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)

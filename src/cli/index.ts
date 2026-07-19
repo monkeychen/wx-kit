@@ -44,12 +44,25 @@ function outJson(obj: unknown): void { process.stdout.write(JSON.stringify(obj) 
 /** 解析 CLI 参数并执行；返回退出码 */
 export async function runCli(argv: string[], opts: { version?: string; userDataDir?: string } = {}): Promise<number> {
   const program = new Command()
-  program.name('wx-kit').description('微信百宝箱 CLI').exitOverride()
+  program.name('wx-kit')
+    .description('微信百宝箱 CLI — 与 GUI 同一二进制:无参启动图形界面,带子命令进入命令行模式。\n'
+      + '输出契约:stdout 纯 JSON(数据),stderr 进度/日志;退出码 0=成功 1=业务失败 2=用法或鉴权错误。')
+    .exitOverride()
   program.version(opts.version ?? '0.0.0-dev', '-v, --version', '输出版本号')
   program.configureOutput({
     writeOut: (s) => process.stdout.write(s),   // help/version 是主动查询,走 stdout
     writeErr: (s) => process.stderr.write(s),   // 报错 usage 走 stderr
   })
+  program.addHelpText('after', `
+常用示例:
+  wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,pdf
+  wx-kit crawl 公众号名 --count 10 --include "AI,大模型"
+  wx-kit library list
+  wx-kit library export --ids <id,id>
+  wx-kit settings get libraryRoot
+
+文章库默认在 ~/Documents/wx-kit(可用 settings set libraryRoot <dir> 修改)。
+各命令详情:wx-kit help <命令>`)
 
   // opts.userDataDir 由 main.ts 注入真实 app.getPath('userData')，与 GUI 同源；
   // '.wx-kit' 仅为 opts 缺省时的安全兜底，实际运行不会用到
@@ -178,7 +191,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       }
     })
 
-  const library = program.command('library').description('文章库')
+  const library = program.command('library').description('文章库(子命令:list / search / remove / rebuild / export)')
   library
     .command('list')
     .description('列出已下载文章')
@@ -255,7 +268,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       exitCode = 0
     })
 
-  const subscription = program.command('subscription').description('公众号订阅')
+  const subscription = program.command('subscription').description('公众号订阅(子命令:list / check-now)')
   subscription
     .command('list')
     .description('列出订阅账号、水位、上次/下次检查')
@@ -302,7 +315,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       exitCode = 0
     })
 
-  const settings = program.command('settings').description('读写应用设置')
+  const settings = program.command('settings').description('读写应用设置(子命令:get / set)')
   settings
     .command('get')
     .description('输出全部设置，或单个键的值')

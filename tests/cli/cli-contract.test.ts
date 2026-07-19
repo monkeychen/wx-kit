@@ -256,3 +256,17 @@ describe('CLI help & version', () => {
     expect(stdout).not.toContain('"ok"')
   })
 })
+
+describe('CLI top-level help (M25 R3)', () => {
+  it('-h covers dual-mode, output contract, group subcommands, and examples; exit 0', async () => {
+    const code = await runCli(['-h'])
+    expect(code).toBe(0)
+    expect(stdout).toContain('无参启动图形界面')
+    expect(stdout).toContain('退出码 0=成功 1=业务失败 2=用法或鉴权错误')
+    expect(stdout).toContain('子命令:list / search / remove / rebuild / export')
+    expect(stdout).toContain('子命令:list / check-now')
+    expect(stdout).toContain('子命令:get / set')
+    expect(stdout).toContain('常用示例')
+    expect(stdout).toContain('~/Documents/wx-kit')
+  })
+})

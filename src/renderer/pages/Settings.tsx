@@ -128,6 +128,11 @@ export default function Settings() {
                   onChange={(v) => setS({ ...s, subscriptionNewArticleAction: v })}
                   options={[{ value: 'notify', label: '仅提示' }, { value: 'download', label: '自动下载' }]} />
               </Space>
+              <Space align="center">
+                <span style={{ minWidth: 96, display: 'inline-block' }}>检查日志</span>
+                <Button size="small" onClick={() => api.subscriptionsOpenLog()} data-testid="set-open-checklog">📄 打开检查日志</Button>
+                <span className="faint" style={{ fontSize: 12.5 }}>完整检查历史,含每次失败原因</span>
+              </Space>
             </Space>
           </div>
 
