@@ -47,7 +47,7 @@
 | **M29** ✅ | v0.7.0 | 保真与外观:markdown GFM 表格(自写规则+微信单元格压平)、应用内版本号(刊头+设置页关于)、原生标题栏文案去重(2026-07-20 完成,真实文章 3 张表端到端验证) | `plans/2026-07-20-m29.md` |
 | **M30** ✅ | v0.7.0 | 创作工作流:导出素材后 Modal 就地显示路径 + 一键复制「给 agent 的指令」(2026-07-20 完成;调研后否决「直接唤起 Claude Code」,理由见计划) | `plans/2026-07-20-m30.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
@@ -68,7 +68,7 @@
 
 ## 下一步 / 候选
 
-- 暂无排期。v0.7.0 收集期留的候选(Windows CLI stdout 正解、npm 包 Linux 实测、文库虚拟滚动万篇级、项目更名)需要时单议。
+- **v0.8.0 需求收集中**(2026-07-21 安哥开启):R1 订阅页支持单独检查某个公众号(行内单号「检查」按钮 + 顶部「检查全部」;核心 `checkSubscriptions` 已支持子集,只开编排/IPC/UI/CLI 口子)。逐条需求/验收见 `docs/PRD-v0.8.0.md`;**等安哥宣布启动再写实现计划开工**。
 
 候选(需要时单议):
 
