@@ -46,9 +46,59 @@
 
 ## 3. 里程碑拆分
 
-(待收齐后拆。当前仅 R1 一条。)
+(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步;R2 体量明显大于 R1,大概率独立成里程碑。)
+
+### R2 · 文库「同步」到个人站点(2026-07-21 安哥)
+
+**原始需求**:文库选中文章后,底部浮动指令区(已有「导出为素材」)增加「同步」指令——按个人站点(simiam.com「聊哉梦呓」,`/Users/chenzhian/workspace/ai/dreamble/site`)的发布规范生成文章目录及内容,写到目标目录(默认 `/Users/chenzhian/workspace/ai/dreamble/site/content/posts`)。纯个人需求,「同步」默认不可见,设置页加开关 + 目标目录配置。
+
+**现状核实(2026-07-21,已通读 site 项目)**:
+
+- site 是 Astro v7 纯静态站;文章规范在 `site/AGENTS.md` 与 `src/content.config.ts`。
+- **目录规范**:`content/posts/YYYY-MM-DD-<slug>/index.md` + 图片与正文同目录相对引用(`./img-01.jpg`)。目录日期必须 = frontmatter `date`。slug 只含小写字母/数字/连字符(import 正则 `^[a-z0-9-]+$`)、全局唯一(URL 去日期,靠 slug 区分)。
+- **frontmatter schema**(`content.config.ts`,strict——未知字段构建失败):`title`(必)、`date`(必,coerce date)、`summary?`、`tags[]`(default [])、`source?: 'wechat'`、`visibility?: 'public'|'unlisted'`(default public)、`draft?`(default false)。微信导入实际只写 `title/date/source` 三字段,其余 default。
+- **关键事实:site 已有 `scripts/import-wechat.mjs`,且其「通道一」反向 spawn `wx-kit download` 抓文章**;转换逻辑(`scripts/lib/wechat.mjs` 的 `fromWxkit`/`buildIndexMd`/`imageFilename` + `import-storage.mjs` 的 `commitPostImport` 原子写入)全在 site 项目内。site 的 import 接受 URL、会重新抓取,不适合「从已下载文库直接同步」。
+
+**架构选型(2026-07-21 安哥定:路径 A)**:
+
+论证了「wx-kit 自实现 vs site 加从库入口 wx-kit 调」两条路,安哥选 **A:wx-kit 自己生成 site 文件**(自包含、不依赖 site 项目状态)。代价:转换逻辑与 site 双份维护,site 改 schema/转换规则 wx-kit 要跟(schema 稳定 + 三字段最小化,风险可控)。
+
+**细化方案**:
+
+- **核心层**(新增 `src/core/site-sync.ts`,纯函数可单测):
+  - `buildSitePost(meta, contentMd, slug)`:输入 wx-kit 文章的 `meta.json` + `content.md` + 用户给的 slug,产出 `{ dirName, indexMd, imageFiles }`。
+    - `title` / `date` 取自 `meta.json`(比正则解析 content.md frontmatter 可靠);`date` = `publishTime` 的 `YYYY-MM-DD`(安哥确认用 publishTime)。
+    - 正文:从 `content.md` 去掉 frontmatter 段 + 去掉重复的首个 H1(site 已在 frontmatter 有 title)。
+    - 图片路径改写:`]\(images/` → `](./`(wx-kit 子目录 → site 同目录)。
+    - frontmatter 只写 `title / date / source: wechat` 三字段,严格对齐 schema。
+    - `dirName` = `${date}-${slug}`。
+  - `validateSlug(slug, existingSlugs)`:格式 `^[a-z0-9-]+$`、不以连字符开头/结尾、批量内唯一、不与目标目录已有 slug 冲突;违例返回具体原因。
+  - `commitSitePost(postsRoot, post, imageSrcDir)`:复刻 site 的原子写入——写到同盘暂存目录(mkdtemp),写 index.md + 复制 images/,完整后 `rename` 到 `<postsRoot>/<dirName>`;失败 `rm` 暂存不留半成品(对齐 site `commitPostImport` 与 AGENTS.md「导入内容先暂存再原子移动」)。
+  - slug 冲突(目标目录已有同名):**不覆盖**,该篇记失败(对齐 site import「slug 已存在则报错」);保守,不破坏已发布内容。
+- **设置**(`AppSettings` 新增,均在设置页「站点同步」区块,开关默认关):
+  - `siteSyncEnabled: boolean`(默认 `false`)——关时文库「同步」按钮完全不渲染(非置灰)。
+  - `siteSyncPostsDir: string`(默认 `/Users/chenzhian/workspace/ai/dreamble/site/content/posts`)。
+- **UI**(`Library.tsx`):
+  - 底部浮动指令区(batch bar)在「导出为素材」旁加「⤴ 同步到站点」按钮,仅当 `siteSyncEnabled` 时渲染。
+  - 点「同步」→ Modal 列出选中文章(标题 + publishTime),每行一个 slug 输入框(不预填,placeholder 示例 `nanxin-tech-analysis`)+ 顶部显示目标目录。提交前统一校验(格式 / 批量内唯一 / 与已有目录不冲突),违例行内标红报原因。逐篇生成(串行),结果汇总:成功 N(列目录路径)/ 失败 N(列原因:slug 冲突、缺 meta/content、写入错误等)。失败篇不阻断其他篇。
+  - 同步成功后提示「下一步:到 site 跑 `npm run dev` 预览确认」(wx-kit 不自动跑 site 的 build/validate——不知道 site 根目录,职责止于写文件)。
+- **频控/网络**:**纯本地文件操作,零网络**(图片已在 wx-kit 库里本地化,直接复制)。与微信频控无关。
+
+**验收(草)**:
+
+- [ ] 设置页有「站点同步」开关(默认关)+ 目标目录(默认值正确);开关关时文库 batch bar 无「同步」按钮,开时出现。
+- [ ] 选 1 篇 → 填 slug → 同步:目标目录生成 `YYYY-MM-DD-<slug>/index.md`(frontmatter 仅 title/date/source,正文无重复 H1、图片引用为 `./img-*`)+ 图片复制到同目录。
+- [ ] 选 N 篇 → 逐行填 slug → 同步:批量串行生成,结果汇总准;slug 批量内重复 / 与已有目录冲突 / 格式非法 → 对应行标红报原因、不写入、不阻断其他篇。
+- [ ] 写入原子:模拟中途失败(如目标目录不可写),不留半成品目录(对齐 site 规范)。
+- [ ] 目录日期 = 文章 publishTime 的日期 = frontmatter date(三者一致,过 site `validate-content`)。
+- [ ] 生成的文章能过 site `npm run check`(schema strict + 目录日期一致 + slug 唯一)——**真机把同步产物落进 site 跑一次 `npm --prefix site run check`** 作为端到端验收。
+- [ ] 既有文库/导出/阅读链路不受影响(单测 + e2e 全绿)。
 
 ## 4. 非目标
 
 - **多选批量「检查选中」**——交互选型时安哥未选(行内单号已覆盖「某几个」逐个点);若将来用户反馈逐个点太繁再议。
 - **按订阅分组/标签批量检查**——目前订阅规模不大,无分组需求。
+- **站点同步的 CLI 入口**——高度个人需求(默认目录是安哥的 site),agent 场景用不到;仅做 GUI。需要时再开 CLI。
+- **自动跑 site 的 build/validate/publish**——wx-kit 职责止于「按规范写文件到目标目录」;预览/校验/发布仍在 site 侧(`npm run dev`/`build`/`publish`),避免跨项目耦合与权限越界。
+- **slug 自动生成**——中文标题无法可靠转合法英文 slug,site 规范也要求人工给定;批量逐行填(不预填无意义占位)。
+- **同步前 frontmatter schema 预检**——首版靠字段稳定;若 site schema 演进导致漂移,作为已知约束在 devlog 标注、手动跟进。
