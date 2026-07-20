@@ -99,13 +99,6 @@ body {
   color: var(--cinnabar);
 }
 
-/* 版本号常驻刊头：比 brand-mark 再低一个层级（无字距、更淡），只在需要时才被注意到 */
-.brand-ver {
-  font-size: 11px;
-  color: var(--ink-faint);
-  letter-spacing: 0.02em;
-}
-
 .nav { display: flex; gap: 28px; }
 .nav-link {
   position: relative;
