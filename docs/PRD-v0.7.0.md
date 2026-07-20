@@ -49,7 +49,7 @@
 - [x] 标准表格(带 thead)转出合法 GFM 表格,GUI 阅读器 md 视图正常渲染为表格。
 - [x] 无 thead 的表格自动以首行为表头,不产出非法 markdown。
 - [x] 单元格内含 `|`、换行、行内格式(粗体/链接)不破坏表格结构。
-- [x] **用安哥提供的测试文章** <https://mp.weixin.qq.com/s/th7sbu0S_FohVpPo0m3Xqw> 端到端验证:下载 → content.md 里是**单行紧凑的合法 GFM 表格**(无裸换行)→ 阅读器 md 视图渲染成真正的表格(真机截图)。
+- [x] **用两篇真实测试文章端到端验证**:① <https://mp.weixin.qq.com/s/th7sbu0S_FohVpPo0m3Xqw>(南芯科技,3 张表) ② <https://mp.weixin.qq.com/s/O0ySQ_2JZ6o-NlVITraTcA>(豆包 AI 表格指南,2 张表)。两篇均:下载 → content.md 是**单行紧凑的合法 GFM 表格**(无裸换行,逐格文本与 HTML 源头一致) → 阅读器 md 视图渲染成真正的表格(真机截图)。
 - [x] 既有 md 导出测试全部保持通过(代码块、图片、标题等不受影响)。
 
 ### R2 · 应用内可见版本号(2026-07-20 安哥)
@@ -69,7 +69,7 @@
 **验收(草)**:
 - [x] 刊头常驻显示版本号,与 `package.json`/CLI `--version` 一致;样式不喧宾夺主(真机截图确认)。
 - [x] 设置页「关于」区块显示版本号 + 可点开的项目主页/Releases 链接。
-- [x] 打包态显示正确(不是 dev 的 `0.0.0-dev`):打包 app 的 `--version` 输出 `0.6.0`,与 GUI 同走 `app.getVersion()`。
+- [x] 打包态验证:打包 app `--version` 输出 `0.6.0`,与 GUI 同走 `app.getVersion()`。
 
 ### R3 · 窗口标题栏的「wx-kit」是否有必要(2026-07-20 安哥)
 
