@@ -14,6 +14,8 @@ const NAV = [
 
 export default function MainLayout() {
   const [newCount, setNewCount] = useState(0)
+  const [ver, setVer] = useState('')
+  useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不应影响使用 */ }) }, [])
   useEffect(() => {
     const refresh = async () => {
       try { const s = await api.subscriptionsList(); setNewCount(s.accounts.reduce((n, a) => n + a.newRefs.length, 0)) }
@@ -29,6 +31,7 @@ export default function MainLayout() {
         <div className="brand">
           <span className="brand-title">微信百宝箱</span>
           <span className="brand-mark">wx-kit</span>
+          {ver && <span className="brand-ver" data-testid="brand-version">v{ver}</span>}
         </div>
         <nav className="nav">
           {NAV.map((n) => (

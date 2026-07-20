@@ -38,6 +38,8 @@ export interface WxApi {
   saveSettings(patch: Partial<AppSettings>): Promise<AppSettings>
   chooseDir(): Promise<string | null>
   reveal(path: string): Promise<void>
+  openExternal(url: string): Promise<void>
+  appVersion(): Promise<string>
   // —— M3.5 批量爬取 ——
   mpAuthStatus(): Promise<{ valid: boolean }>
   mpLogin(): Promise<{ ok: boolean; error?: string }>

@@ -21,6 +21,39 @@ td.addRule('wechatCodeSnippet', {
   },
 })
 
+// turndown 内核不支持表格（GFM 扩展语法），遇到 <table> 会退化成逐单元格取文本、行列关系全丢。
+// 这里自写规则而不引 turndown-plugin-gfm：微信的单元格内容包着 <section>，插件会把它当块级元素
+// 处理、炸出裸换行 → 非法 GFM，修它等于把插件核心重写一遍，不如直接自己来（见 M29 计划）。
+const flattenCell = (el: Element): string =>
+  td.turndown(el.innerHTML)
+    .replace(/\s+/g, ' ')      // 块级元素留下的换行/缩进一律压成单空格（GFM 表格不允许裸换行）
+    .replace(/\|/g, '\\|')     // 管道符会被当列分隔符
+    .trim()
+
+const cellsOf = (row: Element): Element[] =>
+  Array.from(row.children).filter((c) => c.nodeName === 'TD' || c.nodeName === 'TH')
+
+td.addRule('gfmTable', {
+  filter: 'table',
+  replacement: (_content, node) => {
+    const rows = Array.from((node as unknown as Element).getElementsByTagName('tr'))
+    if (rows.length === 0) return ''
+    // 无 <thead> 时以首行为表头——GFM 表格必须有表头行
+    const [head, ...body] = rows
+    const headCells = cellsOf(head).map(flattenCell)
+    if (headCells.length === 0) return ''
+    const line = (cells: string[]) =>
+      `| ${Array.from({ length: headCells.length }, (_, i) => cells[i] ?? '').join(' | ')} |`
+    return [
+      '',
+      line(headCells),
+      `| ${headCells.map(() => '---').join(' | ')} |`,
+      ...body.map((r) => line(cellsOf(r).map(flattenCell))),
+      '',
+    ].join('\n')
+  },
+})
+
 function frontmatter(m: ArticleMeta): string {
   const esc = (s: string) =>
     s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n')

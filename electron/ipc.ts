@@ -81,6 +81,13 @@ export function registerIpc(settings: SettingsService): void {
     return r.canceled ? null : r.filePaths[0]
   })
   ipcMain.handle('shell:reveal', (_e, path: string) => { shell.showItemInFolder(path) })
+  // 只放行 https,避免渲染层传入 file:// 等协议被系统当命令执行
+  ipcMain.handle('shell:openExternal', (_e, url: string) => {
+    if (/^https:\/\//.test(url)) void shell.openExternal(url)
+  })
+
+  // 版本号取自 package.json,不硬编码——发版漏改就会撒谎
+  ipcMain.handle('app:version', () => app.getVersion())
 
   // —— M18 命令行快捷命令(M20 起为 wrapper 脚本) ——
   const CLI_LINK_SUPPORTED = process.platform === 'darwin' || process.platform === 'linux'

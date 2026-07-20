@@ -42,3 +42,56 @@ describe('buildMarkdown', () => {
     expect(md).toContain('author: "A\\\\B"')
   })
 })
+
+// 正文只取 frontmatter 与 H1 之后的部分，便于对表格做整段断言
+const body = (html: string) => buildMarkdown(meta, html).split('# 标题\n\n')[1].trim()
+
+describe('buildMarkdown 的 GFM 表格', () => {
+  it('converts a standard table with thead', () => {
+    const out = body(
+      '<table><thead><tr><th>列A</th><th>列B</th></tr></thead>' +
+      '<tbody><tr><td>甲</td><td>1</td></tr><tr><td>乙</td><td>2</td></tr></tbody></table>',
+    )
+    expect(out).toBe('| 列A | 列B |\n| --- | --- |\n| 甲 | 1 |\n| 乙 | 2 |')
+  })
+
+  it('uses the first row as header when thead is missing', () => {
+    const out = body('<table><tbody><tr><td>H1</td><td>H2</td></tr><tr><td>a</td><td>b</td></tr></tbody></table>')
+    expect(out).toBe('| H1 | H2 |\n| --- | --- |\n| a | b |')
+  })
+
+  it('flattens WeChat section-wrapped cells into a single line', () => {
+    // 微信真实形态：单元格内容被包成 <section><span leaf="">…</span></section>，
+    // turndown 默认把 section 当块级 → 裸换行 → 非法 GFM
+    const cell = (t: string) => `<td><section><span leaf="">${t}</span></section></td>`
+    const out = body(
+      `<table><tbody><tr>${cell('2025年业务')}${cell('收入')}</tr>` +
+      `<tr>${cell('云服务')}${cell('120亿')}</tr></tbody></table>`,
+    )
+    expect(out).toBe('| 2025年业务 | 收入 |\n| --- | --- |\n| 云服务 | 120亿 |')
+    expect(out.split('\n')).toHaveLength(3) // 无裸换行破行
+  })
+
+  it('escapes pipes and collapses <br> / multi-paragraph cells', () => {
+    const out = body(
+      '<table><tbody><tr><td>A|B</td><td>第一行<br>第二行</td></tr>' +
+      '<tr><td><p>段一</p><p>段二</p></td><td>x</td></tr></tbody></table>',
+    )
+    expect(out).toContain('| A\\|B | 第一行 第二行 |')
+    expect(out).toContain('| 段一 段二 | x |')
+  })
+
+  it('keeps inline formatting inside cells', () => {
+    const out = body(
+      '<table><tbody><tr><td>h</td><td>h2</td></tr>' +
+      '<tr><td><strong>粗</strong></td><td><a href="https://x/y">链</a></td></tr></tbody></table>',
+    )
+    expect(out).toContain('| **粗** | [链](https://x/y) |')
+  })
+
+  it('pads short rows and drops empty tables', () => {
+    const out = body('<table><tbody><tr><td>a</td><td>b</td><td>c</td></tr><tr><td>1</td></tr></tbody></table>')
+    expect(out).toBe('| a | b | c |\n| --- | --- | --- |\n| 1 |  |  |')
+    expect(body('<table></table>')).toBe('')
+  })
+})

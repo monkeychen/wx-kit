@@ -10,8 +10,11 @@ export default function Settings() {
   const [s, setS] = useState<AppSettings | null>(null)
   const [cliLink, setCliLink] = useState<Awaited<ReturnType<typeof api.cliLinkStatus>> | null>(null)
 
+  const [ver, setVer] = useState('')
+
   useEffect(() => { api.getSettings().then(setS) }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
+  useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不阻塞设置页 */ }) }, [])
 
   const choose = async () => {
     const dir = await api.chooseDir()
@@ -149,6 +152,19 @@ export default function Settings() {
               </Button>
             </div>
           )}
+          <div className="setting-block">
+            <div className="setting-label">关于</div>
+            <div className="setting-hint">
+              wx-kit（微信百宝箱）当前版本 <strong data-testid="about-version">v{ver || '—'}</strong>
+              ——与命令行 <code>wx-kit --version</code> 同源。
+            </div>
+            <Space style={{ marginTop: 8 }}>
+              <Button size="small" data-testid="about-homepage"
+                onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit')}>项目主页</Button>
+              <Button size="small" data-testid="about-releases"
+                onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit/releases')}>查看新版本</Button>
+            </Space>
+          </div>
         </div>
 
         <div style={{ marginTop: 24 }}>
