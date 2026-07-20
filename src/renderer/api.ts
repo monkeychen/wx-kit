@@ -30,7 +30,7 @@ export interface WxApi {
   libraryRemove(id: string): Promise<void>
   libraryRemoveMany(ids: string[]): Promise<void>
   libraryRebuild(): Promise<{ scanned: number; rebuilt: number; skipped: number }>
-  libraryExportMaterial(ids: string[]): Promise<{ path: string; count: number }>
+  libraryExportMaterial(ids: string[]): Promise<{ path: string; count: number; prompt: string }>
   /** 返回文章目录内封面文件名（cover.<ext>），无则 null。用于书架缩略图。 */
   coverName(dir: string): Promise<string | null>
   readContent(dir: string, kind: ReadableKind): Promise<string>
@@ -40,6 +40,7 @@ export interface WxApi {
   reveal(path: string): Promise<void>
   openExternal(url: string): Promise<void>
   appVersion(): Promise<string>
+  copyText(text: string): Promise<void>
   // —— M3.5 批量爬取 ——
   mpAuthStatus(): Promise<{ valid: boolean }>
   mpLogin(): Promise<{ ok: boolean; error?: string }>

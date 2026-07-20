@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { join } from 'node:path'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { selectArticles, buildManifest, exportFileName, writeMaterialExport } from '../../src/core/material-export'
+import { selectArticles, buildManifest, exportFileName, writeMaterialExport, buildAgentPrompt } from '../../src/core/material-export'
 import type { ArticleMeta } from '../../src/core/types'
 
 const a = (over: Partial<ArticleMeta>): ArticleMeta => ({
@@ -61,5 +61,30 @@ describe('writeMaterialExport', () => {
     const p = await writeMaterialExport(root, manifest, new Date(2026, 5, 22, 9, 7, 3))
     expect(p).toBe(join(root, 'exports', '20260622-090703.json'))
     expect(JSON.parse(readFileSync(p, 'utf-8'))).toEqual(manifest)
+  })
+})
+
+describe('buildAgentPrompt', () => {
+  const p = buildAgentPrompt('/Users/a/Documents/wx-kit/exports/20260720-101010.json', 3)
+
+  it('states the manifest path and article count', () => {
+    expect(p).toContain('/Users/a/Documents/wx-kit/exports/20260720-101010.json')
+    expect(p).toContain('3 篇')
+  })
+  it('tells the agent where the article bodies are', () => {
+    expect(p).toContain('contentPath')
+    expect(p).toContain('content.md')
+  })
+  it('asks the agent to confirm the angle before writing', () => {
+    expect(p).toMatch(/先读|再.*确认/)
+  })
+  it('keeps paths with spaces and CJK intact', () => {
+    const q = buildAgentPrompt('/Users/a/我的 文库/exports/x.json', 1)
+    expect(q).toContain('/Users/a/我的 文库/exports/x.json')
+    expect(q).toContain('1 篇')
+  })
+  it('is a single self-contained block ready to paste', () => {
+    expect(p.startsWith('\n')).toBe(false)
+    expect(p.trim()).toBe(p)
   })
 })

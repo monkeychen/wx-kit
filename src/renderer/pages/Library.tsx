@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Input, Select, Segmented, Spin, Popconfirm, FloatButton, message } from 'antd'
+import { Input, Select, Segmented, Spin, Popconfirm, FloatButton, Modal, Button, Space, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import ArticleCard from '../components/ArticleCard'
@@ -27,6 +27,8 @@ export default function Library() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [account, setAccount] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
+  // 导出结果就地可见(M30):路径 + 一键复制给 agent 的指令,省掉「去 Finder 找路径、自己拼提示词」
+  const [exported, setExported] = useState<{ path: string; count: number; prompt: string } | null>(null)
   // 分组展开集(M23):默认空 = 全部收起,文库首屏即公众号目录;持久化到设置,跨会话保持
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [widths, setWidths] = useState<ListColumnWidths>(DEFAULT_LIST_WIDTHS)
@@ -114,11 +116,8 @@ export default function Library() {
   const exportMaterial = async () => {
     const ids = [...sel]
     try {
-      const { path, count } = await api.libraryExportMaterial(ids)
-      message.success({
-        content: `已导出 ${count} 篇素材清单 → ${path}`,
-        onClick: () => api.reveal(path),
-      })
+      const r = await api.libraryExportMaterial(ids)
+      setExported(r)
     } catch (e) { message.error('导出失败：' + (e as Error).message) }
   }
 
@@ -240,6 +239,29 @@ export default function Library() {
             target={() => (document.querySelector('.page') as HTMLElement) ?? window} />,
           document.body,
         )}
+
+        <Modal open={!!exported} onCancel={() => setExported(null)} footer={null} width={560}
+          title={`已导出 ${exported?.count ?? 0} 篇素材`} data-testid="export-modal">
+          <div className="setting-hint" style={{ marginBottom: 8 }}>
+            清单已保存到：
+            <div style={{ marginTop: 6, userSelect: 'text', wordBreak: 'break-all' }} data-testid="export-path">
+              <code>{exported?.path}</code>
+            </div>
+          </div>
+          <div className="setting-hint" style={{ marginBottom: 12 }}>
+            接下来把素材交给 AI 写作：复制下面这段指令，粘进 Claude Code 等 agent 即可开始。
+          </div>
+          <Space wrap>
+            <Button type="primary" data-testid="export-copy-prompt"
+              onClick={async () => {
+                await api.copyText(exported!.prompt)
+                message.success('指令已复制，粘进 agent 即可开始创作')
+              }}>📋 复制给 agent 的指令</Button>
+            <Button data-testid="export-copy-path"
+              onClick={async () => { await api.copyText(exported!.path); message.success('路径已复制') }}>复制路径</Button>
+            <Button data-testid="export-reveal" onClick={() => api.reveal(exported!.path)}>打开文件夹</Button>
+          </Space>
+        </Modal>
       </div>
     </div>
   )

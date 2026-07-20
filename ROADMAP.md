@@ -10,7 +10,7 @@
 
 ## 里程碑目录
 
-**M1–M28 已随 v0.1.0–v0.6.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M28 已随 v0.1.0–v0.6.0 发布;M29–M30 已完成待随 v0.7.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -44,7 +44,10 @@
 | **M27** ✅ | v0.6.0 | headless 登录态:`session export`/`import`(0600 + 结构校验 + 导入即真探测;2026-07-19 完成,真机 export→import→valid:true) | `plans/2026-07-19-m27-session-transfer.md` |
 | **M28** ✅ | v0.6.0 | agent skill:`agent/wx-kit-skill/`(检测→安装→登录态→能力速查→范例;全新 agent 四步端到端验证;2026-07-19 完成) | `plans/2026-07-19-m28-agent-skill.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`(逐条验收看各 §4)。
+| **M29** ✅ | v0.7.0 | 保真与外观:markdown GFM 表格(自写规则+微信单元格压平)、应用内版本号(刊头+设置页关于)、原生标题栏文案去重(2026-07-20 完成,真实文章 3 张表端到端验证) | `plans/2026-07-20-m29.md` |
+| **M30** ✅ | v0.7.0 | 创作工作流:导出素材后 Modal 就地显示路径 + 一键复制「给 agent 的指令」(2026-07-20 完成;调研后否决「直接唤起 Claude Code」,理由见计划) | `plans/2026-07-20-m30.md` |
+
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
@@ -64,7 +67,8 @@
 
 ## 下一步 / 候选
 
-- **v0.7.0 需求已收齐待启动**(2026-07-20):磨平「下载 → 创作」链路的四处毛刺——markdown 表格保真(R1,已抓真实样本并实测出 `<section>` 包装导致裸换行的坑)、应用内版本号(R2)、窗口标题去重(R3)、导出素材一键递给 agent(R4)。里程碑 M29–M30 已拆,逐条需求/验收见 `docs/PRD-v0.7.0.md`;**等安哥宣布启动再写实现计划开工**。项目更名(多平台定位)经评估后撤回,维持 wx-kit,理由见该 PRD 非目标。
+- **v0.7.0 开发完成、待发版**(2026-07-20):M29+M30 已合入 main,单测 307 + lint + tsc + e2e 全绿,真机验证过表格渲染/版本号/标题栏/导出复制。发版前按规约刷 README+ROADMAP、出三平台包、GitHub Release + brew tap。
+  范围:markdown 表格保真(R1)、应用内版本号(R2)、窗口标题去重(R3)、导出素材一键递给 agent(R4),逐条验收见 `docs/PRD-v0.7.0.md` §4。项目更名(多平台定位)经评估后撤回,维持 wx-kit,理由见该 PRD 非目标。
 
 候选(需要时单议):
 

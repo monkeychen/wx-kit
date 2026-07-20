@@ -1,5 +1,5 @@
 // electron/ipc.ts
-import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
+import { ipcMain, dialog, shell, BrowserWindow, app, clipboard } from 'electron'
 import { readdir } from 'node:fs/promises'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -19,7 +19,7 @@ import { crawlAccount } from '../src/core/mp-crawl'
 import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
 import { rebuildLibrary } from '../src/core/rebuild-library'
-import { selectArticles, buildManifest, writeMaterialExport } from '../src/core/material-export'
+import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } from '../src/core/material-export'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
@@ -58,7 +58,8 @@ export function registerIpc(settings: SettingsService): void {
     const all = await new Library(root).list()
     const manifest = buildManifest(selectArticles(all, { ids }))
     const path = await writeMaterialExport(root, manifest)
-    return { path, count: manifest.count }
+    // prompt 一并返回:渲染层直接拿去复制,不必重复拼串(拼串逻辑在 core 里有单测)
+    return { path, count: manifest.count, prompt: buildAgentPrompt(path, manifest.count) }
   })
 
   ipcMain.handle('history:list', async (_e, { offset, limit }: { offset: number; limit: number }) =>
@@ -88,6 +89,9 @@ export function registerIpc(settings: SettingsService): void {
 
   // 版本号取自 package.json,不硬编码——发版漏改就会撒谎
   ipcMain.handle('app:version', () => app.getVersion())
+
+  // 走主进程 clipboard:渲染层是 file:// 非安全上下文,navigator.clipboard 行为不可靠
+  ipcMain.handle('clipboard:write', (_e, text: string) => { clipboard.writeText(text) })
 
   // —— M18 命令行快捷命令(M20 起为 wrapper 脚本) ——
   const CLI_LINK_SUPPORTED = process.platform === 'darwin' || process.platform === 'linux'
