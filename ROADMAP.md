@@ -5,12 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.6.0(2026-07-19,Agent 自动化闭环)** —— tag `v0.6.0` + GitHub Release(三平台包,标 Latest)+ brew tap + npm 包已发。范围:M25 体验杂项(排序默认+记忆/日志入口/CLI 帮助)、M26 安装通道(brew/npm)、M27 session 跨机迁移、M28 agent skill。需求/验收 `docs/PRD-v0.6.0.md`,发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
+- **最新发布:v0.7.0(2026-07-20,磨平「下载 → 创作」链路)** —— tag `v0.7.0` + GitHub Release(三平台包,标 Latest)+ brew tap(npm 按需)。范围:M29 保真与外观(markdown GFM 表格/应用内版本号/标题栏去重)、M30 创作工作流(导出素材一键复制 agent 指令)。需求/验收 `docs/PRD-v0.7.0.md`,发布说明 `docs/releases/v0.7.0.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M28 已随 v0.1.0–v0.6.0 发布;M29–M30 已完成待随 v0.7.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M30 已随 v0.1.0–v0.7.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -51,6 +51,7 @@
 
 ## 版本发布史(最新在前)
 
+- **v0.7.0 · 2026-07-20 · 磨平「下载 → 创作」链路** —— 不铺新平台、不改架构,只磨四处毛刺:M29 markdown 导出保留 GFM 表格(自写规则 + 微信 `<section>` 单元格压平,不引 turndown-plugin-gfm——插件产出非法 GFM 要修等于重写)+ 应用内版本号(设置页「关于」,刊头版本号上线即按反馈撤回)+ 原生标题栏文案去重(title + index.html 同改空);M30 导出素材 Modal 就地显示路径 + 一键复制「给 agent 的指令」(调研后否决「直接唤起 Claude Code」:CLI 虽能带 prompt 起会话,但唤起的是新终端陌生 cwd 的新会话,不如粘进用户已开着的会话)。发布说明 `docs/releases/v0.7.0.md`。
 - **v0.6.0 · 2026-07-19 · Agent 自动化闭环** —— 四个里程碑一版打通「agent 不碰鼠标用起 wx-kit」:M25 文库默认发布时间降序+排序跨会话记忆、检查日志入口、CLI 帮助大改;M26 brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包双安装通道(发版规约⑦⑧);M27 `session export/import` 打通 headless 登录态(0600+结构校验+导入即真探测);M28 `agent/wx-kit-skill/` 能力说明书(样例逐条实测,全新 agent 四步端到端零人工)。发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
 - **v0.5.5 · 2026-07-18 · 文库目录化导航 + 关键词筛选下载** —— M23 治「滚动好久」:分组默认收起为公众号目录(一屏尽览、展开记忆、粘性组头、回顶),实测千篇量级 `content-visibility` 后滚动 23→52fps,虚拟滚动推迟万篇级;M24 落地 issue #1:标题关键词筛选(GUI 互斥下拉,初版双输入框被安哥纠正——互斥要靠结构;CLI 双 flag 可组合),列出→下载之间过滤零额外请求。发布说明 `docs/releases/v0.5.5.md`,复盘 devlog §33。
 - **v0.5.4 · 2026-07-16 · 订阅检查:不重跑、看得清失败、请求更省** —— M22 三合一:调度防重入(检查耗时跨 tick 曾并发重复跑,真机同时段两条相同记录);失败明细可观测(检查记录/落盘日志/CLI JSON 逐号原因,GUI 弹窗);「翻到水位为止」取代固定取 20 篇(微信每页实回 ~5,日常 4 次请求 → 1 次,空窗多日自动翻深不漏)。发布说明 `docs/releases/v0.5.4.md`,复盘 devlog §32。
@@ -67,8 +68,7 @@
 
 ## 下一步 / 候选
 
-- **v0.7.0 开发完成、待发版**(2026-07-20):M29+M30 已合入 main,单测 307 + lint + tsc + e2e 全绿,真机验证过表格渲染/版本号/标题栏/导出复制。发版前按规约刷 README+ROADMAP、出三平台包、GitHub Release + brew tap。
-  范围:markdown 表格保真(R1)、应用内版本号(R2)、窗口标题去重(R3)、导出素材一键递给 agent(R4),逐条验收见 `docs/PRD-v0.7.0.md` §4。项目更名(多平台定位)经评估后撤回,维持 wx-kit,理由见该 PRD 非目标。
+- 暂无排期。v0.7.0 收集期留的候选(Windows CLI stdout 正解、npm 包 Linux 实测、文库虚拟滚动万篇级、项目更名)需要时单议。
 
 候选(需要时单议):
 

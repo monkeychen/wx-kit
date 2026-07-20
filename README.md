@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.6.0-released-success.svg)
+![Status](https://img.shields.io/badge/v0.7.0-released-success.svg)
 
 <!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
@@ -22,11 +22,11 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**最新版本 v0.6.0(Agent 自动化闭环)**:
+**最新版本 v0.7.0(磨平「下载 → 创作」链路)**:
 
-- **命令行安装**:`brew install --cask monkeychen/wx-kit/wx-kit` 或 `npm i -g @simiam/wx-kit`,agent 检测未装即可自动安装。
-- **登录态跨机迁移**:`session export`/`import`,headless 服务器也能用需登录的能力(爬取/订阅)。
-- **专属 skill**:`agent/wx-kit-skill/` 让 agent 自学自用全部原子能力;文库默认发布时间降序+排序记忆、检查日志入口、CLI 帮助大改。
+- **Markdown 表格保真**:含表格的文章存成 md 不再散架,转出标准 GFM 表,阅读器直接渲染成真表格。
+- **导出素材一键递给 agent**:文库选文 → 导出 → 复制一段可直接粘进 Claude Code 的指令(含清单路径与用法),省掉找路径、拼提示词。
+- **应用内版本号 + 干净标题栏**:设置页「关于」显示版本与更新入口;原生标题栏不再重复「wx-kit」。
 
 历史版本亮点见下方[「项目状态」](#项目状态)与 [`ROADMAP.md`](ROADMAP.md) 发布史,逐版发布说明在 `docs/releases/`。
 
@@ -74,8 +74,8 @@ wx-kit --version
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.6.0:`wx-kit-0.6.0-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.6.0.dmg`(Intel) / `wx-kit Setup 0.6.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.7.0:`wx-kit-0.7.0-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.7.0.dmg`(Intel) / `wx-kit Setup 0.7.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -179,7 +179,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 – v0.6.0 均已发布**(最新 **v0.6.0**:Agent 自动化闭环)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 – v0.7.0 均已发布**(最新 **v0.7.0**:磨平「下载 → 创作」链路)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -235,6 +235,10 @@ wx-kit auth-status
 - ✅ M26 — 安装通道:brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包(`wx-kit`),发版规约同步扩展
 - ✅ M27 — 登录态跨机迁移:`session export`/`import`(0600 + 结构校验 + 导入即真探测),headless 环境闭环
 - ✅ M28 — agent skill:`agent/wx-kit-skill/`(安装/登录态/能力速查/组合范例,样例逐条实测)
+
+**v0.7.0 · 磨平「下载 → 创作」链路(2026-07-20)**
+- ✅ M29 — 保真与外观:Markdown 导出保留 GFM 表格(自写规则 + 微信 `<section>` 单元格压平)、应用内版本号(设置页「关于」)、原生标题栏文案去重
+- ✅ M30 — 创作工作流:导出素材后 Modal 就地显示路径 + 一键复制「给 agent 的指令」(调研后否决「直接唤起 Claude Code」,理由见计划)
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 
