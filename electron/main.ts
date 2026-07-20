@@ -41,7 +41,9 @@ async function main() {
 
   const createWindow = () => {
     const win = new BrowserWindow({
-      width: 1200, height: 800, title: 'wx-kit',
+      // 标题留空:应用内刊头已有品牌区,原生标题栏再写一次「wx-kit」是信息重复。
+      // 注意 index.html 的 <title> 也必须为空,否则页面加载后会把它顶回来。
+      width: 1200, height: 800, title: '',
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
     })
     const devUrl = process.env.VITE_DEV_SERVER_URL
