@@ -69,6 +69,21 @@ export function buildManifest(articles: ArticleMeta[]): MaterialManifest {
   }
 }
 
+/**
+ * 生成一段可直接粘给任意 agent 的自然语言指令。
+ * 存在的理由：导出后用户原本要「找路径 → 拼提示词 → 切工具」三步，这段文本把前两步吃掉。
+ * 刻意不绑定某个 agent（Claude Code / Codex / 网页版都能用），也刻意让 agent 先读清单再确认选题，
+ * 免得它拿到素材就开写。
+ */
+export function buildAgentPrompt(manifestPath: string, count: number): string {
+  return [
+    `我用 wx-kit 导出了 ${count} 篇微信公众号文章作为写作素材。`,
+    `素材清单：${manifestPath}`,
+    '清单里每篇的正文在其 contentPath 字段指向的 content.md（Markdown，含标题、公众号、发布时间等元信息）。',
+    '请先读清单、通读正文，再跟我确认选题和角度，确认后再动笔。',
+  ].join('\n')
+}
+
 /** exports 文件名：本地时区 YYYYMMDD-HHMMSS.json。 */
 export function exportFileName(now: Date): string {
   const p = (n: number) => String(n).padStart(2, '0')
