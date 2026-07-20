@@ -14,7 +14,6 @@ const NAV = [
 
 export default function MainLayout() {
   const [newCount, setNewCount] = useState(0)
-
   useEffect(() => {
     const refresh = async () => {
       try { const s = await api.subscriptionsList(); setNewCount(s.accounts.reduce((n, a) => n + a.newRefs.length, 0)) }
@@ -30,7 +29,6 @@ export default function MainLayout() {
         <div className="brand">
           <span className="brand-title">微信百宝箱</span>
           <span className="brand-mark">wx-kit</span>
-          
         </div>
         <nav className="nav">
           {NAV.map((n) => (
