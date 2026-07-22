@@ -46,7 +46,7 @@
 
 ## 3. 里程碑拆分
 
-(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步、R3 = library CLI 排序;R2 体量最大,大概率独立成里程碑,R1/R3 可合并。)
+(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步、R3 = library CLI 排序、R4 = -h 加仓库地址;R2 体量最大独立里程碑,R1/R3/R4 可合并。)
 
 ### R2 · 文库「同步」到个人站点(2026-07-21 安哥)
 
@@ -130,6 +130,25 @@
 - [ ] CLI 与 GUI 走同一 `sortArticles`(core 层),无重复逻辑;既有 GUI 排序行为零变化(单测 + e2e)。
 - [ ] `library search` 同样默认 publishTime 降序;`--account` 过滤与排序可组合。
 - [ ] skill `commands.md` 含 `--sort`/`--order`,recipes 含「每天最近文章清单」范例。
+
+### R4 · `wx-kit -h` 帮助增加 GitHub 仓库地址(2026-07-22 安哥)
+
+**原始需求 / 场景**:`wx-kit -h` 回显里加项目 GitHub 仓库地址,便于 agent 在需要时进一步去仓库读 `README.md`、issues、releases 等深入文档(skill 没覆盖到时自助查)。
+
+**现状核实(2026-07-22)**:`src/cli/index.ts` 顶层 `program` 有 `description`(双模式 + 输出契约)+ `addHelpText('after')`(常用示例 + 库默认位置 + 「各命令详情:wx-kit help <命令>」)。**无仓库 URL**。`package.json` 有 `homepage: https://github.com/monkeychen/wx-kit`。
+
+**细化方案**:
+
+- 在 `addHelpText('after')` 末尾(「各命令详情」之后)追加一行:`仓库:https://github.com/monkeychen/wx-kit(可读 README.md / issues / releases 深入了解)`。
+- **硬编码 URL 常量**(不动态读 `package.json` homepage):仓库地址永不变;运行时 cwd 不定、打包后 package.json 路径更复杂,为一个稳定常量做动态读取不划算。
+- 只加在顶层 `-h`;子命令 help(`wx-kit help download`)不加——agent 从顶层 `-h` 拿到 URL 一次即可,子命令 help 重复 URL 是冗余。
+- agent 用法:跑 `-h` 看能力概览 + 仓库 URL → 遇到 skill 没覆盖的细节,fetch 仓库 README/issues 自助。
+
+**验收(草)**:
+
+- [ ] `wx-kit -h` 输出含仓库 URL `https://github.com/monkeychen/wx-kit` 与「可读 README/issues/releases」提示;出现在示例/help 指引之后。
+- [ ] 子命令 help(`wx-kit help <命令>`)不含该行(只在顶层)。
+- [ ] (可选)SKILL.md「第一步」附近顺手提一句 `-h 含仓库地址可自助深入」。
 
 ## 4. 非目标
 
