@@ -228,9 +228,9 @@ export function registerIpc(settings: SettingsService): void {
     catch { /* 留痕失败不阻断检查主流程 */ }
   }
 
-  // 共享 in-flight:自动检查与手动「检查更新」重叠时并入同一次运行(防重入的第二道闸,第一道在 scheduler tick)
+  // 共享 in-flight:自动检查与手动「检查更新」/行内单号检查重叠时并入同一次运行(防重入的第二道闸,第一道在 scheduler tick)
   let checkInFlight: Promise<void> | null = null
-  const runSubscriptionCheck = (trigger: 'auto' | 'manual'): Promise<void> => {
+  const runSubscriptionCheck = (trigger: 'auto' | 'manual', fakeids?: string[]): Promise<void> => {
     if (checkInFlight) return checkInFlight
     checkInFlight = (async () => {
       const subs = await subsFor()
@@ -240,6 +240,7 @@ export function registerIpc(settings: SettingsService): void {
         subs, settings: s, session: session ? { token: session.token } : null,
         mpFetch: session ? makeMpFetch(session) : null,
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
+        ...(fakeids ? { fakeids } : {}),
       })
       if (result.note !== 'no-accounts') subsAuthExpired = result.authExpired
     })().finally(() => { checkInFlight = null })
@@ -272,7 +273,7 @@ export function registerIpc(settings: SettingsService): void {
     }
     emitSubsUpdated()
   })
-  ipcMain.handle('subscriptions:checkNow', async () => { await runSubscriptionCheck('manual') })
+  ipcMain.handle('subscriptions:checkNow', async (_e, fakeids?: string[]) => { await runSubscriptionCheck('manual', fakeids) })
   ipcMain.handle('subscriptions:downloadNew', async (event, fakeid: string) => {
     const subs = await subsFor()
     const acc = (await subs.list()).find((a) => a.fakeid === fakeid)

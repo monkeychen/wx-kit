@@ -59,10 +59,12 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 | 搜公众号拿 fakeid | `wx-kit search <名称>` |
 | 批量爬取最近 N 篇 | `wx-kit crawl <名称> --count 10 --formats md,meta` |
 | 爬取 + 标题关键词筛选 | `wx-kit crawl <名称> --count 30 --include "AI,大模型" [--exclude "广告"]` |
-| 列文库 | `wx-kit library list > lib.json`(JSON 可能很大,重定向到文件再解析) |
+| 列文库(默认发布时间降序) | `wx-kit library list > lib.json`(JSON 可能很大,重定向到文件再解析) |
+| 最近文章清单 | `wx-kit library list`(默认 `--sort publish --order desc`,取前 N 条即最近 N 篇) |
 | 搜文库 | `wx-kit library search <关键词>` |
 | 导出素材清单 | `wx-kit library export --ids <id,id>` |
 | 订阅号列表/立即检查 | `wx-kit subscription list` / `wx-kit subscription check-now` |
+| 只检查某几个号 | `wx-kit subscription check-now --accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取) |
 | 读/写设置 | `wx-kit settings get libraryRoot` / `wx-kit settings set libraryRoot <dir>` |
 
 格式可选 `cover,md,html,pdf,meta`;文章落盘在库根(默认 `~/Documents/wx-kit`)按公众号分目录,每篇一个文件夹(含 `content.md`/`meta.json` 等)。

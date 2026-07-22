@@ -17,6 +17,8 @@ export interface RunCheckDeps {
   log: (entry: CheckLogEntry) => Promise<void>
   onEmit?: () => void
   check?: typeof checkSubscriptions
+  /** 部分检查(R1):只查这些 fakeid,不传 = 全量。核心 checkSubscriptions 本就按 accounts 数组查,这里只做选料过滤。 */
+  fakeids?: string[]
 }
 export interface RunCheckResult { accounts: number; newFound: number; failed: number; failures?: CheckFailure[]; note?: string; authExpired: boolean }
 
@@ -31,6 +33,7 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
     emit(); return { accounts: 0, newFound: 0, failed: 0, note: 'no-session', authExpired: true }
   }
   const accounts = (await subs.list()).filter((a) => a.subscribed)
+    .filter((a) => (deps.fakeids ? deps.fakeids.includes(a.fakeid) : true))
   if (!accounts.length) {
     await subs.setLastRunAt(now())
     await deps.log({ time: now(), trigger, accounts: 0, newFound: 0, failed: 0, note: 'no-accounts' })

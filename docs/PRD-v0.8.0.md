@@ -37,12 +37,12 @@
 
 **验收(草)**:
 
-- [ ] 订阅页每行有「检查」动作;点单号只查该号,水位推进、新文章按设置处理;未查的号不动。
-- [ ] 顶部按钮文案为「检查全部」,语义与行内单号对照;全量行为与改动前一致。
-- [ ] 正在跑检查时(无论全量还是单号),行内 [检查] 与顶部 [检查全部] 均置灰;结束后自动解禁并刷新。
-- [ ] CLI `wx-kit subscription check-now --accounts <fakeid,fakeid>` 只查指定号,输出 JSON 的 accounts 数为指定数;skill 文档同步。
-- [ ] 单号检查命中频控时,日志/弹窗如实记失败原因(与全量频控分支一致)。
-- [ ] 既有全量检查、自动检查、订阅下载全链路不受影响(单测 + e2e 全绿)。
+- [x] 订阅页每行有「检查」动作;点单号只查该号,水位推进、新文章按设置处理;未查的号不动。
+- [x] 顶部按钮文案为「检查全部」,语义与行内单号对照;全量行为与改动前一致。
+- [x] 正在跑检查时(无论全量还是单号),行内 [检查] 与顶部 [检查全部] 均置灰;结束后自动解禁并刷新。
+- [x] CLI `wx-kit subscription check-now --accounts <fakeid,fakeid>` 只查指定号,输出 JSON 的 accounts 数为指定数;skill 文档同步。
+- [x] 单号检查命中频控时,日志/弹窗如实记失败原因(与全量频控分支一致)。
+- [x] 既有全量检查、自动检查、订阅下载全链路不受影响(单测 + e2e 全绿)。
 
 ## 3. 里程碑拆分
 
@@ -125,11 +125,11 @@
 
 **验收(草)**:
 
-- [ ] `wx-kit library list` 默认按 publishTime 降序(最近在前);`--sort download` / `--sort title` / `--order asc` 均生效。
-- [ ] 空 publishTime 的条目在升降序下都排在最后(单测覆盖,与 GUI 同一断言)。
-- [ ] CLI 与 GUI 走同一 `sortArticles`(core 层),无重复逻辑;既有 GUI 排序行为零变化(单测 + e2e)。
-- [ ] `library search` 同样默认 publishTime 降序;`--account` 过滤与排序可组合。
-- [ ] skill `commands.md` 含 `--sort`/`--order`,recipes 含「每天最近文章清单」范例。
+- [x] `wx-kit library list` 默认按 publishTime 降序(最近在前);`--sort download` / `--sort title` / `--order asc` 均生效。
+- [x] 空 publishTime 的条目在升降序下都排在最后(单测覆盖,与 GUI 同一断言)。
+- [x] CLI 与 GUI 走同一 `sortArticles`(core 层),无重复逻辑;既有 GUI 排序行为零变化(单测 + e2e)。
+- [x] `library search` 同样默认 publishTime 降序;`--account` 过滤与排序可组合。
+- [x] skill `commands.md` 含 `--sort`/`--order`,recipes 含「每天最近文章清单」范例。
 
 ### R4 · `wx-kit -h` 帮助增加 GitHub 仓库地址(2026-07-22 安哥)
 
@@ -146,9 +146,9 @@
 
 **验收(草)**:
 
-- [ ] `wx-kit -h` 输出含仓库 URL `https://github.com/monkeychen/wx-kit` 与「可读 README/issues/releases」提示;出现在示例/help 指引之后。
-- [ ] 子命令 help(`wx-kit help <命令>`)不含该行(只在顶层)。
-- [ ] (可选)SKILL.md「第一步」附近顺手提一句 `-h 含仓库地址可自助深入」。
+- [x] `wx-kit -h` 输出含仓库 URL `https://github.com/monkeychen/wx-kit` 与「可读 README/issues/releases」提示;出现在示例/help 指引之后。
+- [x] 子命令 help(`wx-kit help <命令>`)不含该行(只在顶层)。
+- [x] (可选)SKILL.md「第一步」附近顺手提一句 `-h 含仓库地址可自助深入」。
 
 ### R5 · 修 macOS 下 CLI 命令在程序坞冒独立图标(bug,2026-07-22 安哥)
 
@@ -162,9 +162,9 @@
 
 **验收(草)**:
 
-- [ ] mac 真机:连续跑 `wx-kit library list` / `wx-kit download ...` 多次,程序坞全程不出现 wx-kit 图标;`wx-kit.app` 无参 GUI 启动 dock 图标正常显示。
-- [ ] win/linux CLI 不受 `app.dock?.hide()` 影响(可选链 no-op,回归测试)。
-- [ ] CLI 的 PDF 离屏窗口照常工作(dock.hide 不影响 BrowserWindow)。
+- [x] mac 真机:连续跑 `wx-kit library list` / `wx-kit download ...` 多次,程序坞全程不出现 wx-kit 图标;`wx-kit.app` 无参 GUI 启动 dock 图标正常显示。
+- [x] win/linux CLI 不受 `app.dock?.hide()` 影响(可选链 no-op,回归测试)。
+- [x] CLI 的 PDF 离屏窗口照常工作(dock.hide 不影响 BrowserWindow)。
 
 ## 4. 非目标
 

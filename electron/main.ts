@@ -21,6 +21,10 @@ async function main() {
   const args = userArgs()
 
   if (isCliInvocation(args)) {
+    // mac 上 Electron 是 GUI 子系统进程,启动即在程序坞冒图标——CLI 命令不该冒头,
+    // 跑一次冒一个、跑 N 次堆 N 个。dock.hide 压在 whenReady 前(app.dock 仅 mac 存在,
+    // win/linux 为 undefined,可选链 no-op)。GUI 分支不调,正常显示。
+    if (app.dock) app.dock.hide()
     // PDF export opens a transient offscreen BrowserWindow. Without this
     // no-op handler, Electron's default "quit when all windows close"
     // fires when that window is destroyed and races the process to exit

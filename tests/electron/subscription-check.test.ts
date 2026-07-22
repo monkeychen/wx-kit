@@ -89,4 +89,34 @@ describe('runSubscriptionCheck', () => {
     expect(r).toMatchObject({ note: 'auth-expired', authExpired: true, failed: 1 })
     expect(downloadRefs).not.toHaveBeenCalled()
   })
+
+  it('fakeids 过滤:只查选中的号,未选中号不动(R1 部分检查)', async () => {
+    const subs = await newSubs([
+      { fakeid: 'f1', nickname: 'A', watermark: 100 },
+      { fakeid: 'f2', nickname: 'B', watermark: 100 },
+    ])
+    const check = vi.fn(async (accounts: { fakeid: string }[]) =>
+      accounts.map((a) => ({ fakeid: a.fakeid, ok: true, latest: 100, newRefs: [] })))
+    const r = await runSubscriptionCheck('manual', {
+      subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      check: check as never, fakeids: ['f2'],
+    })
+    expect(check).toHaveBeenCalledOnce()
+    const checked = check.mock.calls[0][0] as { fakeid: string }[]
+    expect(checked.map((a) => a.fakeid)).toEqual(['f2'])
+    expect(r).toMatchObject({ accounts: 1 })
+  })
+
+  it('fakeids 选中的号均已退订 → note no-accounts', async () => {
+    const subs = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 0 }])
+    const check = vi.fn()
+    const r = await runSubscriptionCheck('manual', {
+      subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      check: check as never, fakeids: ['not-subscribed'],
+    })
+    expect(r).toMatchObject({ note: 'no-accounts', accounts: 0 })
+    expect(check).not.toHaveBeenCalled()
+  })
 })

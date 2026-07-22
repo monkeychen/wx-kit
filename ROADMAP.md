@@ -10,7 +10,7 @@
 
 ## 里程碑目录
 
-**M1–M30 已随 v0.1.0–v0.7.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M30 已随 v0.1.0–v0.7.0 发布;M31 已完成待随 v0.8.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -46,6 +46,7 @@
 
 | **M29** ✅ | v0.7.0 | 保真与外观:markdown GFM 表格(自写规则+微信单元格压平)、应用内版本号(刊头+设置页关于)、原生标题栏文案去重(2026-07-20 完成,真实文章 3 张表端到端验证) | `plans/2026-07-20-m29.md` |
 | **M30** ✅ | v0.7.0 | 创作工作流:导出素材后 Modal 就地显示路径 + 一键复制「给 agent 的指令」(2026-07-20 完成;调研后否决「直接唤起 Claude Code」,理由见计划) | `plans/2026-07-20-m30.md` |
+| **M31** ✅ | v0.8.0 | CLI/订阅增强与 bug 修复:R1 订阅部分检查(行内「检查」+ CLI `--accounts`)+ R3 library 排序(默认 publishTime desc,sortArticles 抽 core 共享)+ R4 `-h` 加仓库 URL + R5 修 mac CLI 程序坞冒图标(2026-07-22 完成) | `plans/2026-07-22-m31.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`(逐条验收看各 §4)。
 
@@ -68,7 +69,7 @@
 
 ## 下一步 / 候选
 
-- **v0.8.0 需求收集中**(2026-07-21 安哥开启):R1 订阅页支持单独检查某个公众号(行内单号「检查」按钮 + 顶部「检查全部」;核心 `checkSubscriptions` 已支持子集,只开编排/IPC/UI/CLI 口子);R2 文库「同步到个人站点」(按 site 的 Astro 规范生成 `content/posts/YYYY-MM-DD-slug/` 批量写入,纯本地零网络;设置开关默认关 + 目标目录;GUI 批量填 slug + CLI `wx-kit site sync` 供 agent;架构选 A=wx-kit 自实现转换逻辑,与 site 双份维护的取舍已记);R3 library CLI 加排序、默认 publishTime 降序(支撑「agent 每天拉最近文章清单」;sortArticles 抽到 core 供 CLI/GUI 共享;分页/字段选择/补过滤口径暂缓——YAGNI);R4 `wx-kit -h` 帮助加 GitHub 仓库地址(供 agent 自助读 README/issues);R5 修 mac 下 CLI 命令在程序坞冒独立图标的 bug(`app.dock?.hide()`,agent 零影响)。逐条需求/验收见 `docs/PRD-v0.8.0.md`;**等安哥宣布启动再写实现计划开工**。
+- **v0.8.0 迭代中**(2026-07-22 安哥启动):**M31 已完成**(R1 订阅部分检查 + R3 library 排序 + R4 -h 仓库 URL + R5 mac CLI dock bug,314 单测 + e2e 全绿、真机验证过 dock/order/行内检查);**M32 进行中**(R2 文库同步到个人站点,体量大独立)。逐条需求/验收见 `docs/PRD-v0.8.0.md`。
 
 候选(需要时单议):
 
