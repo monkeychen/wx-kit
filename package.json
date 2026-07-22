@@ -83,7 +83,10 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "extendInfo": {
+        "LSUIElement": true
+      }
     },
     "win": {
       "target": [

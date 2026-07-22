@@ -21,10 +21,11 @@ async function main() {
   const args = userArgs()
 
   if (isCliInvocation(args)) {
-    // mac 上 Electron 是 GUI 子系统进程,启动即在程序坞冒图标——CLI 命令不该冒头,
-    // 跑一次冒一个、跑 N 次堆 N 个。dock.hide 压在 whenReady 前(app.dock 仅 mac 存在,
-    // win/linux 为 undefined,可选链 no-op)。GUI 分支不调,正常显示。
-    if (app.dock) app.dock.hide()
+    // mac 程序坞图标:靠 Info.plist 的 LSUIElement=true 压住(见 package.json build.mac.extendInfo),
+    // 进程启动即 accessory,不给图标出现的机会。
+    // 曾用 app.dock.hide() 修,无效——dock API 要等 app ready 才生效,而 AppKit 在 ready 前
+    // 就已把进程注册成 Foreground 并画了图标(v0.8.0 实测:-h 期间状态序列
+    // NULL→Foreground→UIElement)。图标是 JS 执行前画的,只能在 plist 层解决。
     // PDF export opens a transient offscreen BrowserWindow. Without this
     // no-op handler, Electron's default "quit when all windows close"
     // fires when that window is destroyed and races the process to exit
@@ -38,6 +39,10 @@ async function main() {
 
   // GUI 模式
   await app.whenReady()
+
+  // LSUIElement=true 让进程启动即无程序坞图标(为了 CLI,见上方 CLI 分支注释),
+  // GUI 模式要把图标要回来;accessory 应用的窗口不会自动抢焦点,故一并 focus。
+  if (app.dock) { app.dock.show(); app.focus({ steal: true }) }
 
   const settings = new SettingsService(app.getPath('userData'), join(app.getPath('documents'), 'wx-kit'))
   handleWxfileProtocol(async () => (await settings.get()).libraryRoot)
