@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.7.0-released-success.svg)
+![Status](https://img.shields.io/badge/v0.8.0-released-success.svg)
 
 <!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
@@ -22,11 +22,11 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**最新版本 v0.7.0(磨平「下载 → 创作」链路)**:
+**最新版本 v0.8.0(让内容流到该去的地方)**:
 
-- **Markdown 表格保真**:含表格的文章存成 md 不再散架,转出标准 GFM 表,阅读器直接渲染成真表格。
-- **导出素材一键递给 agent**:文库选文 → 导出 → 复制一段可直接粘进 Claude Code 的指令(含清单路径与用法),省掉找路径、拼提示词。
-- **应用内版本号 + 干净标题栏**:设置页「关于」显示版本与更新入口;原生标题栏不再重复「wx-kit」。
+- **同步到个人站点**:文库选文一键按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(图片摊平同目录、目录级原子写入、slug 冲突不覆盖);默认隐藏,设置页开关开启,CLI 同样可用。
+- **订阅按号点检**:订阅页每行一个「检查」,不必每次全量;CLI `check-now --accounts <fakeid,...>` 同步支持,频控纪律不变。
+- **列表默认按发布时间降序**:`library list` / `search` 新增 `--sort`/`--order`,默认最近在前,agent 取前 N 条即最近 N 篇。
 
 历史版本亮点见下方[「项目状态」](#项目状态)与 [`ROADMAP.md`](ROADMAP.md) 发布史,逐版发布说明在 `docs/releases/`。
 
@@ -74,8 +74,8 @@ wx-kit --version
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.7.0:`wx-kit-0.7.0-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.7.0.dmg`(Intel) / `wx-kit Setup 0.7.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.8.0:`wx-kit-0.8.0-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.8.0.dmg`(Intel) / `wx-kit Setup 0.8.0.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -179,7 +179,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 – v0.7.0 均已发布**(最新 **v0.7.0**:磨平「下载 → 创作」链路)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 – v0.8.0 均已发布**(最新 **v0.8.0**:让内容流到该去的地方)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -239,6 +239,10 @@ wx-kit auth-status
 **v0.7.0 · 磨平「下载 → 创作」链路(2026-07-20)**
 - ✅ M29 — 保真与外观:Markdown 导出保留 GFM 表格(自写规则 + 微信 `<section>` 单元格压平)、应用内版本号(设置页「关于」)、原生标题栏文案去重
 - ✅ M30 — 创作工作流:导出素材后 Modal 就地显示路径 + 一键复制「给 agent 的指令」(调研后否决「直接唤起 Claude Code」,理由见计划)
+
+**v0.8.0 · 让内容流到该去的地方(2026-07-22)**
+- ✅ M31 — CLI/订阅增强与 bug 修复:订阅按号点检(行内「检查」+ CLI `--accounts`)、`library list`/`search` 默认按发布时间降序(`--sort`/`--order`,排序逻辑抽 core 与 GUI 共享)、`-h` 附仓库地址、修 mac CLI 堆程序坞图标
+- ✅ M32 — 站点同步:文库/CLI 按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平);设置开关默认关;产物过真实站点 `npm run check`
 
 详见 [`ROADMAP.md`](ROADMAP.md) 与 [`docs/devlog/wx-kit-vibe-coding.md`](docs/devlog/wx-kit-vibe-coding.md)(逐里程碑的决策/踩坑/方法论)。
 

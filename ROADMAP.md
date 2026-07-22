@@ -5,12 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.7.0(2026-07-20,磨平「下载 → 创作」链路)** —— tag `v0.7.0` + GitHub Release(三平台包,标 Latest)+ brew tap(npm 按需)。范围:M29 保真与外观(markdown GFM 表格/应用内版本号/标题栏去重)、M30 创作工作流(导出素材一键复制 agent 指令)。需求/验收 `docs/PRD-v0.7.0.md`,发布说明 `docs/releases/v0.7.0.md`。
+- **最新发布:v0.8.0(2026-07-22,让内容流到该去的地方)** —— tag `v0.8.0` + GitHub Release(三平台包,标 Latest)+ brew tap(npm 按需)。范围:M31 CLI/订阅增强与 bug 修复(订阅按号点检、library 默认发布时间降序、`-h` 附仓库地址、修 mac CLI 堆 dock 图标)、M32 站点同步(文库/CLI 按 Astro 站点规范生成文章目录)。需求/验收 `docs/PRD-v0.8.0.md`,发布说明 `docs/releases/v0.8.0.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M30 已随 v0.1.0–v0.7.0 发布;M31–M32 已完成待随 v0.8.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M32 已随 v0.1.0–v0.8.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -53,6 +53,7 @@
 
 ## 版本发布史(最新在前)
 
+- **v0.8.0 · 2026-07-22 · 让内容流到该去的地方** —— 两条主线:让 agent 用 CLI 用得更顺 + 让文章流进个人站点。M31 订阅按号点检(核心 `checkSubscriptions` 本就按 accounts 数组查,只需在编排层开子集口子;与全量共享 in-flight 守卫)+ `library list`/`search` 默认 publishTime 降序(`sortArticles` 从 renderer 抽到 core 共享,默认序变更属轻度 breaking 已显式标注)+ `-h` 附仓库地址(agent 自助读 README)+ 修 mac CLI 堆程序坞图标(Electron 是 GUI 子系统进程,CLI 分支须主动 `app.dock.hide()`);M32 站点同步(目录级原子写入不复用只能单文件的 `atomic-write`;slug 冲突不覆盖;产物落进真实站点跑 `npm run check` 作为跨项目验收,验完清理不留痕;`site` 漏登 `CLI_COMMANDS` 白名单曾导致命令静默启 GUI 挂起)。发布说明 `docs/releases/v0.8.0.md`,复盘 devlog §36。
 - **v0.7.0 · 2026-07-20 · 磨平「下载 → 创作」链路** —— 不铺新平台、不改架构,只磨四处毛刺:M29 markdown 导出保留 GFM 表格(自写规则 + 微信 `<section>` 单元格压平,不引 turndown-plugin-gfm——插件产出非法 GFM 要修等于重写)+ 应用内版本号(设置页「关于」,刊头版本号上线即按反馈撤回)+ 原生标题栏文案去重(title + index.html 同改空);M30 导出素材 Modal 就地显示路径 + 一键复制「给 agent 的指令」(调研后否决「直接唤起 Claude Code」:CLI 虽能带 prompt 起会话,但唤起的是新终端陌生 cwd 的新会话,不如粘进用户已开着的会话)。发布说明 `docs/releases/v0.7.0.md`。
 - **v0.6.0 · 2026-07-19 · Agent 自动化闭环** —— 四个里程碑一版打通「agent 不碰鼠标用起 wx-kit」:M25 文库默认发布时间降序+排序跨会话记忆、检查日志入口、CLI 帮助大改;M26 brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包双安装通道(发版规约⑦⑧);M27 `session export/import` 打通 headless 登录态(0600+结构校验+导入即真探测);M28 `agent/wx-kit-skill/` 能力说明书(样例逐条实测,全新 agent 四步端到端零人工)。发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
 - **v0.5.5 · 2026-07-18 · 文库目录化导航 + 关键词筛选下载** —— M23 治「滚动好久」:分组默认收起为公众号目录(一屏尽览、展开记忆、粘性组头、回顶),实测千篇量级 `content-visibility` 后滚动 23→52fps,虚拟滚动推迟万篇级;M24 落地 issue #1:标题关键词筛选(GUI 互斥下拉,初版双输入框被安哥纠正——互斥要靠结构;CLI 双 flag 可组合),列出→下载之间过滤零额外请求。发布说明 `docs/releases/v0.5.5.md`,复盘 devlog §33。
@@ -69,8 +70,6 @@
 - **v0.1.0 · 2026-06-07 · 第一阶段首发** —— M1 核心+CLI 五格式 + M2 GUI + M3 登录/爬取(CLI)+ M3.5 批量 GUI + M4 打包。发布说明 `docs/releases/v0.1.0.md`,复盘 devlog §1–§9。
 
 ## 下一步 / 候选
-
-- **v0.8.0 开发完成、待发版**(2026-07-22):M31(R1/R3/R4/R5)+ M32(R2 站点同步)均已合入 main,330 单测 + lint + tsc + e2e 全绿;站点同步产物已在真实 dreamble/site 跑通 `npm run check`(0 errors,验后清理不留痕)。发版前按规约刷 README+ROADMAP、出三平台包、GitHub Release + brew tap。
 
 候选(需要时单议):
 
