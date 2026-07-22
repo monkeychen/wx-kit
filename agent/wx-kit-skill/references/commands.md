@@ -59,6 +59,23 @@ wx-kit library export --ids <id,id>            # {"ok":true,"count":N,"articles"
 ArticleMeta 字段:`id, title, author, account, publishTime, sourceUrl, digest, coverUrl, downloadTime, formats, dir`。
 `library export` 直接在 stdout 输出素材清单,每篇含 `contentPath`(content.md 绝对路径),供下游创作/分析直接读文件(GUI 的「导出选中为素材」才是落盘成清单文件)。
 
+## site — 个人站点同步(纯本地,不联网)
+
+把文库文章按 Astro 静态站规范生成为 `content/posts/<YYYY-MM-DD>-<slug>/index.md` + 同目录图片。
+目录日期取自文章发布时间;slug 必须由调用方指定(只能小写字母/数字/连字符,站内唯一)。
+
+```sh
+# 选料同 library export:--ids / --since / --account / --all
+wx-kit site sync --ids <id> --slug my-post                    # 单篇(仅选中 1 篇时可用)
+wx-kit site sync --ids <id1>,<id2> --slugs <id1>=a,<id2>=b    # 批量:id=slug 映射(不靠位置对应)
+wx-kit site sync --account 某公众号 --slugs-file slugs.txt     # 每行 "<id> <slug>"
+wx-kit site sync ... --posts-dir <dir>                        # 覆盖设置里的 siteSyncPostsDir
+```
+
+输出 `{"ok":bool,"postsRoot","succeeded":N,"failed":N,"results":[{id,title,slug,ok,dir|error}]}`;
+有失败退出码 1(单篇失败不阻断其他篇),缺 slug/无选料器退出码 2。
+**slug 冲突不覆盖**:目标目录已存在即报错,保护已发布内容。同步后需到站点侧预览/发布(wx-kit 不代跑)。
+
 ## subscription — 订阅(check-now 需登录)
 
 ```sh

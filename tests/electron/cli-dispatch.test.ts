@@ -3,7 +3,7 @@ import { isCliInvocation } from '../../electron/cli-dispatch'
 
 describe('isCliInvocation', () => {
   it('subcommands are CLI', () => {
-    for (const c of ['download', 'crawl', 'search', 'login', 'auth-status', 'library', 'subscription', 'settings', 'session', 'help', 'version'])
+    for (const c of ['download', 'crawl', 'search', 'login', 'auth-status', 'library', 'subscription', 'settings', 'session', 'site', 'help', 'version'])
       expect(isCliInvocation([c])).toBe(true)
   })
   it('help/version flags are CLI even as first arg', () => {

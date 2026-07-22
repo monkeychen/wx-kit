@@ -66,6 +66,7 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 | 订阅号列表/立即检查 | `wx-kit subscription list` / `wx-kit subscription check-now` |
 | 只检查某几个号 | `wx-kit subscription check-now --accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取) |
 | 读/写设置 | `wx-kit settings get libraryRoot` / `wx-kit settings set libraryRoot <dir>` |
+| 同步到个人站点 | `wx-kit site sync --ids <id> --slug <slug>`(按 Astro 站点规范生成目录,纯本地) |
 
 格式可选 `cover,md,html,pdf,meta`;文章落盘在库根(默认 `~/Documents/wx-kit`)按公众号分目录,每篇一个文件夹(含 `content.md`/`meta.json` 等)。
 
