@@ -1,6 +1,6 @@
 # wx-kit v0.8.0 产品需求文档(迭代 PRD)
 
-> **状态:已发布**(v0.8.0,2026-07-22;R1–R5 全部完成并真机验证)。发布说明 `docs/releases/v0.8.0.md`。
+> **状态:已发布**(v0.8.0,2026-07-22)。R1–R4 完成并真机验证;**R5 当时判为完成实为误判,真正修复在 v0.8.1**(见下方 R5 的更正说明与 `docs/PRD-v0.8.1.md`)。发布说明 `docs/releases/v0.8.0.md`。
 > 实现计划:`docs/plans/2026-07-22-m31.md`、`docs/plans/2026-07-22-m32.md`;状态/进度:`ROADMAP.md`。
 
 ## 1. 一句话定义
@@ -158,9 +158,16 @@
 
 **验收(草)**:
 
-- [x] mac 真机:连续跑 `wx-kit library list` / `wx-kit download ...` 多次,程序坞全程不出现 wx-kit 图标;`wx-kit.app` 无参 GUI 启动 dock 图标正常显示。
-- [x] win/linux CLI 不受影响——`if (app.dock) app.dock.hide()` 的存在性判定使非 mac 平台天然 no-op(`app.dock` 仅 mac 存在)。**无自动化测试**:`main.ts` 的启动分流在 app 生命周期里跑,单测环境构造不出;靠代码形态 + mac 真机验证保证,win/linux 侧属推论未实测。
-- [x] CLI 的 PDF 离屏窗口照常工作(dock.hide 不影响 BrowserWindow)。
+> ⚠️ **本条验收在 v0.8.0 是错的,已于 v0.8.1 修正**(2026-07-22 安哥用正式版跑 `wx-kit -h` 当场复现)。
+> `app.dock.hide()` 在 `whenReady()` 前调用**不生效**——AppKit 在 ready 前已把进程注册成 `Foreground` 并画了图标,
+> 实测 `-h` 期间状态序列为 `NULL → Foreground → UIElement`(先出现、后隐藏)。
+> 当时的验证用了跑 2–3 秒的 `download` 且延迟 2 秒才首次采样,**跳过了启动瞬间的窗口期**,是假阴性。
+> 真正的修复(`LSUIElement` plist 层)与完整证据见 `docs/PRD-v0.8.1.md` R1。
+
+- [~] mac 真机:连续跑 CLI 多次程序坞不出现图标 —— **v0.8.0 未达成**(图标先闪现后隐藏),v0.8.1 达成。
+- [x] `wx-kit.app` 无参 GUI 启动 dock 图标正常显示。
+- [x] win/linux CLI 不受影响(`app.dock` 仅 mac 存在)。**无自动化测试**:`main.ts` 的启动分流在 app 生命周期里跑,单测环境构造不出。
+- [x] CLI 的 PDF 离屏窗口照常工作(dock 策略不影响 BrowserWindow)。
 
 ## 3. 里程碑拆分
 

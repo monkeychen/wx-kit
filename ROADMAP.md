@@ -5,12 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.8.0(2026-07-22,让内容流到该去的地方)** —— tag `v0.8.0` + GitHub Release(三平台包,标 Latest)+ brew tap(npm 按需)。范围:M31 CLI/订阅增强与 bug 修复(订阅按号点检、library 默认发布时间降序、`-h` 附仓库地址、修 mac CLI 堆 dock 图标)、M32 站点同步(文库/CLI 按 Astro 站点规范生成文章目录)。需求/验收 `docs/PRD-v0.8.0.md`,发布说明 `docs/releases/v0.8.0.md`。
+- **最新发布:v0.8.1(2026-07-22,补丁)** —— tag `v0.8.1` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M33 真正修掉 mac CLI 程序坞图标(`LSUIElement`;v0.8.0 的 `dock.hide()` 修法无效,详见 `docs/PRD-v0.8.1.md`)+ 设置页「站点同步」hover 建站指引。上一功能版 v0.8.0(2026-07-22,让内容流到该去的地方):M31 CLI/订阅增强、M32 站点同步,需求/验收 `docs/PRD-v0.8.0.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M32 已随 v0.1.0–v0.8.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M33 已随 v0.1.0–v0.8.1 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -48,11 +48,13 @@
 | **M30** ✅ | v0.7.0 | 创作工作流:导出素材后 Modal 就地显示路径 + 一键复制「给 agent 的指令」(2026-07-20 完成;调研后否决「直接唤起 Claude Code」,理由见计划) | `plans/2026-07-20-m30.md` |
 | **M31** ✅ | v0.8.0 | CLI/订阅增强与 bug 修复:R1 订阅部分检查(行内「检查」+ CLI `--accounts`)+ R3 library 排序(默认 publishTime desc,sortArticles 抽 core 共享)+ R4 `-h` 加仓库 URL + R5 修 mac CLI 程序坞冒图标(2026-07-22 完成) | `plans/2026-07-22-m31.md` |
 | **M32** ✅ | v0.8.0 | 站点同步:文库/CLI 把文章按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平同目录);设置开关默认关;产物过真实站点 `npm run check`(2026-07-22 完成) | `plans/2026-07-22-m32.md` |
+| **M33** ✅ | v0.8.1 | 补丁:真正修掉 mac CLI 程序坞图标(`LSUIElement` 在 plist 层压住——`app.dock.hide()` 在 `whenReady` 前不生效,AppKit 已先画图标)+ 设置页「站点同步」hover 建站指引(2026-07-22 完成,打包态采样验证) | `PRD-v0.8.1.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
+- **v0.8.1 · 2026-07-22 · 补丁:dock 图标真修复** —— v0.8.0 宣称修好的 R5 实为误判,安哥用正式版跑 `wx-kit -h` 当场复现。根因:`app.dock.hide()` 在 `whenReady()` 前调用**不生效**,AppKit 在 ready 前已把进程注册成 `Foreground` 并画了图标(实测 `-h` 期间状态序列 `NULL→Foreground→UIElement`);当时的验证用跑 2–3 秒的 `download` 且延迟 2 秒才采样,**跳过启动瞬间**,是假阴性。改由 `LSUIElement`(mac Info.plist)在进程启动时定为 accessory,GUI 分支 ready 后 `dock.show()` + `focus` 要回图标与焦点。另加设置页「站点同步」的 `?` hover 指引(指向 dreamble 站点源码)。发布说明 `docs/releases/v0.8.1.md`。
 - **v0.8.0 · 2026-07-22 · 让内容流到该去的地方** —— 两条主线:让 agent 用 CLI 用得更顺 + 让文章流进个人站点。M31 订阅按号点检(核心 `checkSubscriptions` 本就按 accounts 数组查,只需在编排层开子集口子;与全量共享 in-flight 守卫)+ `library list`/`search` 默认 publishTime 降序(`sortArticles` 从 renderer 抽到 core 共享,默认序变更属轻度 breaking 已显式标注)+ `-h` 附仓库地址(agent 自助读 README)+ 修 mac CLI 堆程序坞图标(Electron 是 GUI 子系统进程,CLI 分支须主动 `app.dock.hide()`);M32 站点同步(目录级原子写入不复用只能单文件的 `atomic-write`;slug 冲突不覆盖;产物落进真实站点跑 `npm run check` 作为跨项目验收,验完清理不留痕;`site` 漏登 `CLI_COMMANDS` 白名单曾导致命令静默启 GUI 挂起)。发布说明 `docs/releases/v0.8.0.md`,复盘 devlog §36。
 - **v0.7.0 · 2026-07-20 · 磨平「下载 → 创作」链路** —— 不铺新平台、不改架构,只磨四处毛刺:M29 markdown 导出保留 GFM 表格(自写规则 + 微信 `<section>` 单元格压平,不引 turndown-plugin-gfm——插件产出非法 GFM 要修等于重写)+ 应用内版本号(设置页「关于」,刊头版本号上线即按反馈撤回)+ 原生标题栏文案去重(title + index.html 同改空);M30 导出素材 Modal 就地显示路径 + 一键复制「给 agent 的指令」(调研后否决「直接唤起 Claude Code」:CLI 虽能带 prompt 起会话,但唤起的是新终端陌生 cwd 的新会话,不如粘进用户已开着的会话)。发布说明 `docs/releases/v0.7.0.md`。
 - **v0.6.0 · 2026-07-19 · Agent 自动化闭环** —— 四个里程碑一版打通「agent 不碰鼠标用起 wx-kit」:M25 文库默认发布时间降序+排序跨会话记忆、检查日志入口、CLI 帮助大改;M26 brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包双安装通道(发版规约⑦⑧);M27 `session export/import` 打通 headless 登录态(0600+结构校验+导入即真探测);M28 `agent/wx-kit-skill/` 能力说明书(样例逐条实测,全新 agent 四步端到端零人工)。发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
