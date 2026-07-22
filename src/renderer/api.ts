@@ -56,7 +56,7 @@ export interface WxApi {
   subscriptionsList(): Promise<SubscriptionsState>
   subscriptionsAddAccount(fakeid: string, nickname: string): Promise<void>
   subscriptionsSetSubscribed(fakeid: string, nickname: string, subscribed: boolean): Promise<void>
-  subscriptionsCheckNow(): Promise<void>
+  subscriptionsCheckNow(fakeids?: string[]): Promise<void>
   subscriptionsDownloadNew(fakeid: string): Promise<void>
   subscriptionsDismissNew(fakeid: string): Promise<void>
   subscriptionsOpenLog(): Promise<void>

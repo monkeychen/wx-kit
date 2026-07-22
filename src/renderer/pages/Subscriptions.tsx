@@ -52,6 +52,12 @@ export default function Subscriptions() {
     try { await api.subscriptionsCheckNow(); await load() }
     finally { setChecking(false) }
   }
+  // R1 部分检查:只查这一个号(in-flight 共享:正在跑时全入口置灰并入同一次运行)
+  const checkOne = async (a: SubscribedAccount) => {
+    setChecking(true)
+    try { await api.subscriptionsCheckNow([a.fakeid]); await load() }
+    finally { setChecking(false) }
+  }
   const downloadNew = async (a: SubscribedAccount) => {
     const n = a.newRefs.length
     setDl({ fakeid: a.fakeid, total: n, done: 0 })
@@ -99,7 +105,7 @@ export default function Subscriptions() {
             onPressEnter={search} style={{ width: 280 }} data-testid="subs-search-input" allowClear />
           <Button onClick={search} data-testid="subs-search-btn">搜索</Button>
           <div style={{ flex: 1 }} />
-          <Button type="primary" loading={checking} disabled={dl !== null} onClick={checkNow} data-testid="subs-check-now">检查更新</Button>
+          <Button type="primary" loading={checking} disabled={dl !== null} onClick={checkNow} data-testid="subs-check-now">检查全部</Button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 13 }} className="faint">
@@ -127,8 +133,12 @@ export default function Subscriptions() {
             <List dataSource={accounts} data-testid="subs-list" renderItem={(a) => {
               const busy = dl !== null
               const downloadingThis = dl?.fakeid === a.fakeid
+              // R1:每行「检查」单号;与顶部「检查全部」共享 in-flight(checking/dl 时全置灰并入同一次运行)
+              const checkEl = checking || busy
+                ? <span key="ck" className="faint" data-testid="subs-check-one">检查</span>
+                : <a key="ck" data-testid="subs-check-one" onClick={() => checkOne(a)}>检查</a>
               const actions = downloadingThis
-                ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>]
+                ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>, checkEl]
                 : a.newRefs.length > 0
                   ? [
                       busy
@@ -137,8 +147,9 @@ export default function Subscriptions() {
                       busy
                         ? <span key="ig" className="faint">忽略</span>
                         : <a key="ig" onClick={() => dismiss(a)}>忽略</a>,
+                      checkEl,
                     ]
-                  : [<span key="none" className="faint">无新文章</span>]
+                  : [<span key="none" className="faint">无新文章</span>, checkEl]
               return (
               <List.Item data-testid="subs-row" actions={actions}>
                 <List.Item.Meta

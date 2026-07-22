@@ -18,6 +18,7 @@ import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
 import { rebuildLibrary } from '../core/rebuild-library'
 import { selectArticles, buildManifest } from '../core/material-export'
+import { sortArticles } from '../core/library-sort'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
 import { History, eventFromSummary, type HistorySource } from '../core/download-history'
@@ -63,7 +64,9 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   wx-kit settings get libraryRoot
 
 文章库默认在 ~/Documents/wx-kit(可用 settings set libraryRoot <dir> 修改)。
-各命令详情:wx-kit help <命令>`)
+各命令详情:wx-kit help <命令>
+
+仓库:https://github.com/monkeychen/wx-kit(可读 README.md / issues / releases 深入了解)`)
 
   // opts.userDataDir 由 main.ts 注入真实 app.getPath('userData')，与 GUI 同源；
   // '.wx-kit' 仅为 opts 缺省时的安全兜底，实际运行不会用到
@@ -224,27 +227,31 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   const library = program.command('library').description('文章库(子命令:list / search / remove / rebuild / export)')
   library
     .command('list')
-    .description('列出已下载文章')
+    .description('列出已下载文章（默认按发布时间降序，最近在前）')
     .option('--account <name>', '按公众号过滤')
+    .option('--sort <field>', '排序字段:publish(发布时间) / download(下载时间) / title', 'publish')
+    .option('--order <dir>', '升降序:desc / asc', 'desc')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
       const all = await new Library(await resolveRoot(opts.out)).list()
       const items = opts.account ? all.filter((a) => a.account === opts.account) : all
-      outJson({ ok: true, items })
+      outJson({ ok: true, items: sortArticles(items, opts.sort, opts.order) })
       exitCode = 0
     })
 
   library
     .command('search')
-    .description('按标题关键词搜索文库')
+    .description('按标题关键词搜索文库（默认按发布时间降序）')
     .argument('<keyword>', '标题关键词（空字符串表示不按标题过滤）')
     .option('--account <name>', '再按公众号名过滤')
+    .option('--sort <field>', '排序字段:publish / download / title', 'publish')
+    .option('--order <dir>', '升降序:desc / asc', 'desc')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (keyword: string, opts) => {
       const lib = new Library(await resolveRoot(opts.out))
       const hits = await lib.search(keyword)
       const items = opts.account ? hits.filter((a) => a.account === opts.account) : hits
-      outJson({ ok: true, items })
+      outJson({ ok: true, items: sortArticles(items, opts.sort, opts.order) })
       exitCode = 0
     })
 
@@ -319,6 +326,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   subscription
     .command('check-now')
     .description('立即检查一次订阅更新（频控不重试）')
+    .option('--accounts <csv>', '只检查指定公众号(逗号分隔 fakeid,默认全部;fakeid 从 subscription list 取)')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
       const s = await settingsFor().get()
@@ -326,6 +334,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const subs = new Subscriptions(root)
       const session = getSession()
       const logFilePath = join(userDataDir, 'subscriptions-check.log')
+      const fakeids = opts.accounts ? String(opts.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : undefined
       const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
         const library = new Library(root)
         const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
@@ -334,6 +343,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
       }
       const result = await runSubscriptionCheck('manual', {
+        ...(fakeids ? { fakeids } : {}),
         subs, settings: s, session: session ? { token: session.token } : null,
         mpFetch: session ? makeMpFetch(session) : null, downloadRefs,
         log: async (e) => {

@@ -49,6 +49,22 @@ jq '{newFound, failed, failures}' check.json
 # 想直接落库,把设置改成自动下载:wx-kit settings set subscriptionNewArticleAction download
 ```
 
+只检查某几个号(不全量,省频控):
+
+```sh
+wx-kit subscription list | jq -r '.accounts[] | select(.subscribed) | "\(.nickname) \(.fakeid)"'
+wx-kit subscription check-now --accounts <fakeid1>,<fakeid2>   # 只查指定号
+```
+
+## 5. 每天拉所有公众号最近文章清单(默认排序即用)
+
+```sh
+wx-kit library list > lib.json        # 默认 --sort publish --order desc,最近发表在最前
+jq '.items[:10] | map({title, account, publishTime, sourceUrl})' lib.json   # 取最近 10 篇
+# 想按下载时间或升序:加 --sort download / --order asc
+# 想筛选某号:--account <名>(配合 --sort 取该号最近 N 篇)
+```
+
 ## 失败处理速查
 
 | 现象 | 含义 | 动作 |

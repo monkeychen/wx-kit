@@ -48,7 +48,9 @@ wx-kit crawl <名称|--fakeid <id>> (--count <n> | --from YYYY-MM-DD --to YYYY-M
 
 ```sh
 wx-kit library list [--out <dir>]              # {"ok":true,"items":[ArticleMeta...]}
-wx-kit library search <关键词> [--account <名>] # 同上,按标题过滤
+# 排序(默认 --sort publish --order desc,即发布时间降序、最近在前;空 publishTime 恒置末尾)
+wx-kit library list --sort publish|download|title --order asc|desc [--account <名>]
+wx-kit library search <关键词> [--account <名>] # 同上,按标题过滤(同样支持 --sort/--order,默认发布降序)
 wx-kit library remove --ids <id,id>            # 删文章(文件+索引+历史联动)
 wx-kit library rebuild                         # 从各篇 meta.json 重建索引(library.json 损坏时)
 wx-kit library export --ids <id,id>            # {"ok":true,"count":N,"articles":[{...,"contentPath"}]}
@@ -62,6 +64,7 @@ ArticleMeta 字段:`id, title, author, account, publishTime, sourceUrl, digest, 
 ```sh
 wx-kit subscription list        # {"ok":true,"accounts":[{fakeid,nickname,subscribed,watermark,lastCheckedAt,newRefs}],"lastRunAt","nextCheckAt"}
 wx-kit subscription check-now   # {"ok":true,"accounts":N,"newFound":N,"failed":N,"failures"?:[{nickname,error}]}
+wx-kit subscription check-now --accounts <fakeid,fakeid>  # 只检查指定号(部分检查;fakeid 从 subscription list 取),不传=全部
 ```
 
 `failures` 逐号给失败原因(如「微信频率限制(200013)」)。检查同时落盘日志与历史,与 GUI 同源。

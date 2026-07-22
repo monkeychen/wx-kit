@@ -286,7 +286,13 @@ async function main() {
     // 账号模式抓过的号会经历史派生到订阅页；无 session 时为空态。两者都算页面健康渲染。
     const subsRendered = (await win.locator('[data-testid="subs-list"], .empty-state').count()) >= 1
     assert(subsRendered, 'subscriptions page renders a list or empty-state')
-    assert((await win.locator('[data-testid="subs-check-now"]').count()) === 1, 'subscriptions page offers 检查更新')
+    assert((await win.locator('[data-testid="subs-check-now"]').count()) === 1, 'subscriptions page offers 检查全部')
+    // R1:每个订阅行有行内「检查」(部分检查);无订阅号时无行,跳过
+    const subsRows = await win.locator('[data-testid="subs-row"]').count()
+    if (subsRows > 0) {
+      const checkOnes = await win.locator('[data-testid="subs-check-one"]').count()
+      assert(checkOnes === subsRows, `each subscription row has inline check (rows=${subsRows}, checkOnes=${checkOnes})`)
+    }
     // M12: 可观测性元素
     assert((await win.locator('[data-testid="subs-next-check"]').count()) === 1, 'subscriptions page shows next-check line')
     assert((await win.locator('[data-testid="subs-open-log"]').count()) === 1, 'subscriptions page offers open-log link')
