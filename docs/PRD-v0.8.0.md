@@ -46,7 +46,7 @@
 
 ## 3. 里程碑拆分
 
-(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步、R3 = library CLI 排序、R4 = -h 加仓库地址;R2 体量最大独立里程碑,R1/R3/R4 可合并。)
+(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步、R3 = library CLI 排序、R4 = -h 加仓库地址、R5 = 修 CLI 程序坞图标 bug;R2 体量最大独立里程碑,R1/R3/R4/R5 可合并。)
 
 ### R2 · 文库「同步」到个人站点(2026-07-21 安哥)
 
@@ -149,6 +149,22 @@
 - [ ] `wx-kit -h` 输出含仓库 URL `https://github.com/monkeychen/wx-kit` 与「可读 README/issues/releases」提示;出现在示例/help 指引之后。
 - [ ] 子命令 help(`wx-kit help <命令>`)不含该行(只在顶层)。
 - [ ] (可选)SKILL.md「第一步」附近顺手提一句 `-h 含仓库地址可自助深入」。
+
+### R5 · 修 macOS 下 CLI 命令在程序坞冒独立图标(bug,2026-07-22 安哥)
+
+**原始需求 / 现象**:macOS 上执行 wx-kit CLI 命令,程序坞出现一个独立应用图标,执行 N 次出现 N 个图标,「没法接受」。
+
+**根因(2026-07-22 回源核实)**:`electron/main.ts` 第 23-33 行 CLI 分支——Electron 在 mac 是 GUI 子系统应用,进程一启动就在程序坞冒头(即使不开窗口)。CLI 分支复用了 Electron 进程(`downloadArticle` 的 PDF/fetch 依赖 BrowserWindow),**未调 `app.dock.hide()`**,所以每次 CLI 调用都冒一个 dock 图标,直到 `app.exit(code)` 进程退出才消失。GUI 分支正常(GUI 本就该在 dock 显示)。
+
+**修复方案**:`main.ts` CLI 分支顶部(`isCliInvocation` 判定后、`app.whenReady()` 前)加 `app.dock?.hide()`。`app.dock` 只在 mac 存在,win/linux 是 `undefined`,可选链安全 no-op。放 `whenReady` 前是为了在 dock 图标完全显示前压住。GUI 分支零改动。
+
+**影响面**:只影响**手动**在 mac 跑 CLI 的体验(dock 美观);**agent 自动化零影响**(agent 不看 dock);win/linux CLI 无此问题。
+
+**验收(草)**:
+
+- [ ] mac 真机:连续跑 `wx-kit library list` / `wx-kit download ...` 多次,程序坞全程不出现 wx-kit 图标;`wx-kit.app` 无参 GUI 启动 dock 图标正常显示。
+- [ ] win/linux CLI 不受 `app.dock?.hide()` 影响(可选链 no-op,回归测试)。
+- [ ] CLI 的 PDF 离屏窗口照常工作(dock.hide 不影响 BrowserWindow)。
 
 ## 4. 非目标
 
