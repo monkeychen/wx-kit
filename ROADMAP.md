@@ -10,7 +10,7 @@
 
 ## 里程碑目录
 
-**M1–M30 已随 v0.1.0–v0.7.0 发布;M31 已完成待随 v0.8.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M30 已随 v0.1.0–v0.7.0 发布;M31–M32 已完成待随 v0.8.0 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -47,6 +47,7 @@
 | **M29** ✅ | v0.7.0 | 保真与外观:markdown GFM 表格(自写规则+微信单元格压平)、应用内版本号(刊头+设置页关于)、原生标题栏文案去重(2026-07-20 完成,真实文章 3 张表端到端验证) | `plans/2026-07-20-m29.md` |
 | **M30** ✅ | v0.7.0 | 创作工作流:导出素材后 Modal 就地显示路径 + 一键复制「给 agent 的指令」(2026-07-20 完成;调研后否决「直接唤起 Claude Code」,理由见计划) | `plans/2026-07-20-m30.md` |
 | **M31** ✅ | v0.8.0 | CLI/订阅增强与 bug 修复:R1 订阅部分检查(行内「检查」+ CLI `--accounts`)+ R3 library 排序(默认 publishTime desc,sortArticles 抽 core 共享)+ R4 `-h` 加仓库 URL + R5 修 mac CLI 程序坞冒图标(2026-07-22 完成) | `plans/2026-07-22-m31.md` |
+| **M32** ✅ | v0.8.0 | 站点同步:文库/CLI 把文章按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平同目录);设置开关默认关;产物过真实站点 `npm run check`(2026-07-22 完成) | `plans/2026-07-22-m32.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`(逐条验收看各 §4)。
 
@@ -69,7 +70,7 @@
 
 ## 下一步 / 候选
 
-- **v0.8.0 迭代中**(2026-07-22 安哥启动):**M31 已完成**(R1 订阅部分检查 + R3 library 排序 + R4 -h 仓库 URL + R5 mac CLI dock bug,314 单测 + e2e 全绿、真机验证过 dock/order/行内检查);**M32 进行中**(R2 文库同步到个人站点,体量大独立)。逐条需求/验收见 `docs/PRD-v0.8.0.md`。
+- **v0.8.0 开发完成、待发版**(2026-07-22):M31(R1/R3/R4/R5)+ M32(R2 站点同步)均已合入 main,330 单测 + lint + tsc + e2e 全绿;站点同步产物已在真实 dreamble/site 跑通 `npm run check`(0 errors,验后清理不留痕)。发版前按规约刷 README+ROADMAP、出三平台包、GitHub Release + brew tap。
 
 候选(需要时单议):
 

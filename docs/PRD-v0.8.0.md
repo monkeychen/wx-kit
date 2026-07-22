@@ -1,11 +1,11 @@
 # wx-kit v0.8.0 产品需求文档(迭代 PRD)
 
-> **状态:收集中**(2026-07-21 安哥开启收集)。收齐确认后才写实现计划、开工。
-> 实现计划(启动后):`docs/plans/`;状态/进度:`ROADMAP.md`。
+> **状态:已实现,待发版**(R1–R5 全部完成并真机验证,2026-07-22)。
+> 实现计划:`docs/plans/2026-07-22-m31.md`、`docs/plans/2026-07-22-m32.md`;状态/进度:`ROADMAP.md`。
 
 ## 1. 一句话定义
 
-(待收齐后凝练。)
+**让 agent 用得更顺、让内容流到该去的地方**——订阅可按号点检(R1)、文库一键同步到个人站点(R2)、CLI 列表按发布时间排好序(R3)、`-h` 给出仓库地址(R4),外加修掉 mac CLI 堆 dock 图标的老毛病(R5)。
 
 ## 2. 需求清单
 
@@ -43,10 +43,6 @@
 - [x] CLI `wx-kit subscription check-now --accounts <fakeid,fakeid>` 只查指定号,输出 JSON 的 accounts 数为指定数;skill 文档同步。
 - [x] 单号检查命中频控时,日志/弹窗如实记失败原因(与全量频控分支一致)。
 - [x] 既有全量检查、自动检查、订阅下载全链路不受影响(单测 + e2e 全绿)。
-
-## 3. 里程碑拆分
-
-(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步、R3 = library CLI 排序、R4 = -h 加仓库地址、R5 = 修 CLI 程序坞图标 bug;R2 体量最大独立里程碑,R1/R3/R4/R5 可合并。)
 
 ### R2 · 文库「同步」到个人站点(2026-07-21 安哥)
 
@@ -93,16 +89,16 @@
 
 **验收(草)**:
 
-- [ ] 设置页有「站点同步」开关(默认关)+ 目标目录(默认值正确);开关关时文库 batch bar 无「同步」按钮,开时出现。
-- [ ] 选 1 篇 → 填 slug → 同步:目标目录生成 `YYYY-MM-DD-<slug>/index.md`(frontmatter 仅 title/date/source,正文无重复 H1、图片引用为 `./img-*`)+ 图片复制到同目录。
-- [ ] 选 N 篇 → 逐行填 slug → 同步:批量串行生成,结果汇总准;slug 批量内重复 / 与已有目录冲突 / 格式非法 → 对应行标红报原因、不写入、不阻断其他篇。
-- [ ] 写入原子:模拟中途失败(如目标目录不可写),不留半成品目录(对齐 site 规范)。
-- [ ] 目录日期 = 文章 publishTime 的日期 = frontmatter date(三者一致,过 site `validate-content`)。
-- [ ] 生成的文章能过 site `npm run check`(schema strict + 目录日期一致 + slug 唯一)——**真机把同步产物落进 site 跑一次 `npm --prefix site run check`** 作为端到端验收。
-- [ ] CLI `wx-kit site sync --ids <id> --slug <slug>` 单篇生成目录(产物与 GUI 同);批量 `--slugs id1=s1,id2=s2`(或 `--slugs-file`)串行生成,stdout JSON 汇总准、退出码正确(全成 0 / 部分 1)。
-- [ ] CLI `site sync --account <name> --all` 等选料器与 `library export` 语义一致;slug 冲突/非法 → 该篇 error、退出码 1、不阻断其他篇。
-- [ ] `agent/wx-kit-skill/` 含 `site sync` 命令 + 批量同步范例(SKILL 速查表 / commands.md / recipes.md 三处)。
-- [ ] 既有文库/导出/阅读链路不受影响(单测 + e2e 全绿)。
+- [x] 设置页有「站点同步」开关(默认关)+ 目标目录(默认值正确);开关关时文库 batch bar 无「同步」按钮,开时出现。
+- [x] 选 1 篇 → 填 slug → 同步:目标目录生成 `YYYY-MM-DD-<slug>/index.md`(frontmatter 仅 title/date/source,正文无重复 H1、图片引用为 `./img-*`)+ 图片复制到同目录。
+- [x] 选 N 篇 → 逐行填 slug → 同步:批量串行生成,结果汇总准;slug 批量内重复 / 与已有目录冲突 / 格式非法 → 对应行标红报原因、不写入、不阻断其他篇。
+- [x] 写入原子:模拟中途失败(如目标目录不可写),不留半成品目录(对齐 site 规范)。
+- [x] 目录日期 = 文章 publishTime 的日期 = frontmatter date(三者一致,过 site `validate-content`)。
+- [x] 生成的文章能过 site `npm run check`(schema strict + 目录日期一致 + slug 唯一)——**真机把同步产物落进 site 跑一次 `npm --prefix site run check`** 作为端到端验收。
+- [x] CLI `wx-kit site sync --ids <id> --slug <slug>` 单篇生成目录(产物与 GUI 同);批量 `--slugs id1=s1,id2=s2`(或 `--slugs-file`)串行生成,stdout JSON 汇总准、退出码正确(全成 0 / 部分 1)。
+- [x] CLI `site sync --account <name> --all` 等选料器与 `library export` 语义一致;slug 冲突/非法 → 该篇 error、退出码 1、不阻断其他篇。
+- [x] `agent/wx-kit-skill/` 含 `site sync` 命令 + 批量同步范例(SKILL 速查表 / commands.md / recipes.md 三处)。
+- [x] 既有文库/导出/阅读链路不受影响(单测 + e2e 全绿)。
 
 ### R3 · library CLI 增加排序(默认 publishTime 降序)(2026-07-22 安哥)
 
@@ -165,6 +161,13 @@
 - [x] mac 真机:连续跑 `wx-kit library list` / `wx-kit download ...` 多次,程序坞全程不出现 wx-kit 图标;`wx-kit.app` 无参 GUI 启动 dock 图标正常显示。
 - [x] win/linux CLI 不受 `app.dock?.hide()` 影响(可选链 no-op,回归测试)。
 - [x] CLI 的 PDF 离屏窗口照常工作(dock.hide 不影响 BrowserWindow)。
+
+## 3. 里程碑拆分
+
+| 里程碑 | 范围 | 状态 |
+|--------|------|------|
+| **M31** | CLI/订阅增强与 bug 修复:R1 订阅部分检查 + R3 library 排序 + R4 `-h` 仓库 URL + R5 mac CLI dock 图标 | ✅ 2026-07-22 |
+| **M32** | 站点同步:R2 文库「同步到站点」(core/site-sync + 设置开关 + GUI 批量 Modal + CLI `site sync`) | ✅ 2026-07-22 |
 
 ## 4. 非目标
 

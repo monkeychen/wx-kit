@@ -15,6 +15,7 @@ const api: WxApi = {
   libraryRemoveMany: (ids) => ipcRenderer.invoke('library:removeMany', ids),
   libraryRebuild: () => ipcRenderer.invoke('library:rebuild'),
   libraryExportMaterial: (ids) => ipcRenderer.invoke('library:exportMaterial', ids),
+  librarySyncToSite: (items, postsDir) => ipcRenderer.invoke('library:syncToSite', { items, postsDir }),
   coverName: (dir) => ipcRenderer.invoke('library:coverName', dir),
   readContent: (dir, kind) => ipcRenderer.invoke('library:readContent', { dir, kind }),
   getSettings: () => ipcRenderer.invoke('settings:get'),

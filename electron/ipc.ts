@@ -20,6 +20,7 @@ import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
 import { rebuildLibrary } from '../src/core/rebuild-library'
 import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } from '../src/core/material-export'
+import { syncToSite } from '../src/core/site-sync'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
@@ -60,6 +61,17 @@ export function registerIpc(settings: SettingsService): void {
     const path = await writeMaterialExport(root, manifest)
     // prompt 一并返回:渲染层直接拿去复制,不必重复拼串(拼串逻辑在 core 里有单测)
     return { path, count: manifest.count, prompt: buildAgentPrompt(path, manifest.count) }
+  })
+
+  // M32 站点同步:按 id 取 meta → 逐篇按站点规范落盘(纯本地,无网络)
+  ipcMain.handle('library:syncToSite', async (_e, { items, postsDir }: { items: { id: string; slug: string }[]; postsDir?: string }) => {
+    const s = await settings.get()
+    const all = await new Library(s.libraryRoot).list()
+    const byId = new Map(all.map((m) => [m.id, m]))
+    const picked = items
+      .filter((i) => byId.has(i.id))
+      .map((i) => ({ meta: byId.get(i.id)!, slug: i.slug.trim() }))
+    return syncToSite(picked, postsDir ?? s.siteSyncPostsDir)
   })
 
   ipcMain.handle('history:list', async (_e, { offset, limit }: { offset: number; limit: number }) =>

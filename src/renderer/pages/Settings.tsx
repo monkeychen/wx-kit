@@ -139,6 +139,30 @@ export default function Settings() {
             </Space>
           </div>
 
+          <div className="setting-block">
+            <div className="setting-label">站点同步</div>
+            <div className="setting-hint">
+              开启后，文库选中文章时会多出「同步到站点」——按个人站点的发布规范生成
+              <code>YYYY-MM-DD-slug/index.md</code> 与同目录图片。纯本地文件操作，不联网。
+            </div>
+            <Space align="center" style={{ marginTop: 8 }}>
+              <Switch checked={s.siteSyncEnabled} data-testid="set-site-sync"
+                onChange={(v) => setS({ ...s, siteSyncEnabled: v })} />
+              <span>{s.siteSyncEnabled ? '已开启' : '已关闭'}</span>
+            </Space>
+            {s.siteSyncEnabled && (
+              <Space.Compact style={{ width: '100%', marginTop: 10 }}>
+                <Input value={s.siteSyncPostsDir} data-testid="set-site-sync-dir"
+                  onChange={(e) => setS({ ...s, siteSyncPostsDir: e.target.value })}
+                  placeholder="站点 content/posts 目录" />
+                <Button icon={<FolderOpenOutlined />} onClick={async () => {
+                  const dir = await api.chooseDir()
+                  if (dir) setS({ ...s, siteSyncPostsDir: dir })
+                }}>选择目录</Button>
+              </Space.Compact>
+            )}
+          </div>
+
           {cliLink?.supported && (
             <div className="setting-block">
               <div className="setting-label">命令行快捷方式</div>

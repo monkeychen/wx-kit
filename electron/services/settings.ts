@@ -19,6 +19,8 @@ export interface AppSettings {
   cliLinkPrompted: boolean
   libraryExpandedGroups: string[]        // 文库分组视图的展开集(M23;默认空=全部收起)
   librarySort: LibrarySort               // 文库排序选择(M25;跨会话记忆,默认发布时间降序)
+  siteSyncEnabled: boolean               // 站点同步(M32):默认关,开启后文库批量栏才出现「同步到站点」
+  siteSyncPostsDir: string               // 站点 content/posts 目录(同步产物的落点)
 }
 
 // 与 renderer 的 library-view 排序键/方向一致;定义在此避免主进程 import renderer
@@ -44,6 +46,8 @@ export class SettingsService {
       cliLinkPrompted: false,
       libraryExpandedGroups: [],
       librarySort: { key: 'publish', dir: 'desc' },
+      siteSyncEnabled: false,
+      siteSyncPostsDir: '/Users/chenzhian/workspace/ai/dreamble/site/content/posts',
     }
   }
 

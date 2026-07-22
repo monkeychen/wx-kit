@@ -5,6 +5,7 @@ import type { ReadableKind } from '../core/read-article'
 import type { MpAccount, CrawlSummary, CrawlItemStatus } from '../core/mp-types'
 import type { HistoryEvent } from '../core/download-history'
 import type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
+import type { SyncSummary } from '../core/site-sync'
 
 export type { HistoryEvent } from '../core/download-history'
 export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
@@ -31,6 +32,7 @@ export interface WxApi {
   libraryRemoveMany(ids: string[]): Promise<void>
   libraryRebuild(): Promise<{ scanned: number; rebuilt: number; skipped: number }>
   libraryExportMaterial(ids: string[]): Promise<{ path: string; count: number; prompt: string }>
+  librarySyncToSite(items: { id: string; slug: string }[], postsDir?: string): Promise<SyncSummary>
   /** 返回文章目录内封面文件名（cover.<ext>），无则 null。用于书架缩略图。 */
   coverName(dir: string): Promise<string | null>
   readContent(dir: string, kind: ReadableKind): Promise<string>

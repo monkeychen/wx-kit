@@ -29,6 +29,12 @@ export default function Library() {
   const [sel, setSel] = useState<Set<string>>(new Set())
   // 导出结果就地可见(M30):路径 + 一键复制给 agent 的指令,省掉「去 Finder 找路径、自己拼提示词」
   const [exported, setExported] = useState<{ path: string; count: number; prompt: string } | null>(null)
+  // M32 站点同步:开关默认关(关时不渲染按钮);Modal 内逐篇填 slug
+  const [siteSync, setSiteSync] = useState<{ enabled: boolean; postsDir: string }>({ enabled: false, postsDir: '' })
+  const [syncOpen, setSyncOpen] = useState(false)
+  const [slugs, setSlugs] = useState<Record<string, string>>({})
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<import('../../core/site-sync').SyncSummary | null>(null)
   // 分组展开集(M23):默认空 = 全部收起,文库首屏即公众号目录;持久化到设置,跨会话保持
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [widths, setWidths] = useState<ListColumnWidths>(DEFAULT_LIST_WIDTHS)
@@ -43,6 +49,7 @@ export default function Library() {
       setAll(list); setRoot(s.libraryRoot); setWidths(s.listColumnWidths ?? DEFAULT_LIST_WIDTHS)
       setExpanded(new Set(s.libraryExpandedGroups ?? []))
       if (s.librarySort) { setSortKey(s.librarySort.key); setSortDir(s.librarySort.dir) }
+      setSiteSync({ enabled: !!s.siteSyncEnabled, postsDir: s.siteSyncPostsDir ?? '' })
     } catch (e) {
       message.error('加载失败：' + (e as Error).message)
     } finally {
@@ -121,6 +128,20 @@ export default function Library() {
     } catch (e) { message.error('导出失败：' + (e as Error).message) }
   }
 
+  const openSync = () => { setSlugs({}); setSyncResult(null); setSyncOpen(true) }
+  const runSync = async () => {
+    const items = [...sel].map((id) => ({ id, slug: (slugs[id] ?? '').trim() }))
+    setSyncing(true)
+    try {
+      const r = await api.librarySyncToSite(items)
+      setSyncResult(r)
+      if (r.succeeded > 0) message.success(`已同步 ${r.succeeded} 篇到站点`)
+      if (r.failed > 0) message.warning(`${r.failed} 篇未同步,见下方原因`)
+    } catch (e) {
+      message.error('同步失败：' + (e as Error).message)
+    } finally { setSyncing(false) }
+  }
+
   const renderCards = (items: ArticleMeta[]) => (
     <div className="shelf">
       {items.map((m, i) => (
@@ -170,6 +191,7 @@ export default function Library() {
             <span className="n">已选 {sel.size} 篇</span>
             <a onClick={selectAll}>全选</a><a onClick={clearSel}>清除</a>
             <a data-testid="batch-export" onClick={exportMaterial}>📤 导出为素材</a>
+            {siteSync.enabled && <a data-testid="batch-sync" onClick={openSync}>⤴ 同步到站点</a>}
             <Popconfirm title={`删除选中的 ${sel.size} 篇？`} description="磁盘文件将一并删除，不可恢复。"
               okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={batchDelete}>
               <span className="del" data-testid="batch-delete">🗑 批量删除</span>
@@ -261,6 +283,57 @@ export default function Library() {
               onClick={async () => { await api.copyText(exported!.path); message.success('路径已复制') }}>复制路径</Button>
             <Button data-testid="export-reveal" onClick={() => api.reveal(exported!.path)}>打开文件夹</Button>
           </Space>
+        </Modal>
+
+        <Modal open={syncOpen} onCancel={() => setSyncOpen(false)} width={720} data-testid="sync-modal"
+          title={`同步 ${sel.size} 篇到站点`}
+          footer={syncResult ? [
+            <Button key="close" onClick={() => { setSyncOpen(false); setSyncResult(null) }}>关闭</Button>,
+          ] : [
+            <Button key="cancel" onClick={() => setSyncOpen(false)}>取消</Button>,
+            <Button key="ok" type="primary" loading={syncing} data-testid="sync-submit" onClick={runSync}>开始同步</Button>,
+          ]}>
+          {!syncResult ? (
+            <>
+              <div className="setting-hint" style={{ marginBottom: 12 }}>
+                目标目录：<code style={{ wordBreak: 'break-all' }}>{siteSync.postsDir}</code>
+                <div style={{ marginTop: 6 }}>
+                  每篇需指定 slug(站点 URL 的一部分)：只能用小写字母、数字和连字符，且站内唯一。
+                </div>
+              </div>
+              {[...sel].map((id) => {
+                const m = all.find((x) => x.id === id)
+                if (!m) return null
+                return (
+                  <div key={id} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.title}</div>
+                      <div className="faint" style={{ fontSize: 12 }}>{m.publishTime || '无发布时间'}</div>
+                    </div>
+                    <Input style={{ width: 260 }} placeholder="例如 nanxin-tech-analysis"
+                      data-testid="sync-slug-input" value={slugs[id] ?? ''}
+                      onChange={(e) => setSlugs({ ...slugs, [id]: e.target.value })} />
+                  </div>
+                )
+              })}
+            </>
+          ) : (
+            <div data-testid="sync-result">
+              <div style={{ marginBottom: 10 }}>成功 {syncResult.succeeded} 篇，失败 {syncResult.failed} 篇。</div>
+              {syncResult.results.map((r) => (
+                <div key={r.id} style={{ marginBottom: 6, fontSize: 13 }}>
+                  {r.ok
+                    ? <span>✅ {r.title} → <code>{r.dir?.split('/').pop()}</code></span>
+                    : <span style={{ color: 'var(--cinnabar)' }}>❌ {r.title}：{r.error}</span>}
+                </div>
+              ))}
+              {syncResult.succeeded > 0 && (
+                <div className="setting-hint" style={{ marginTop: 12 }}>
+                  下一步：到站点目录跑 <code>npm run dev</code> 预览确认，再按站点流程发布。
+                </div>
+              )}
+            </div>
+          )}
         </Modal>
       </div>
     </div>

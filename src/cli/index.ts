@@ -19,6 +19,7 @@ import { MpAuthExpired } from '../core/mp-errors'
 import { rebuildLibrary } from '../core/rebuild-library'
 import { selectArticles, buildManifest } from '../core/material-export'
 import { sortArticles } from '../core/library-sort'
+import { syncToSite } from '../core/site-sync'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
 import { History, eventFromSummary, type HistorySource } from '../core/download-history'
@@ -62,6 +63,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   wx-kit library list
   wx-kit library export --ids <id,id>
   wx-kit settings get libraryRoot
+  wx-kit site sync --ids <id> --slug my-post        # 同步到个人站点(需先配 siteSyncPostsDir)
 
 文章库默认在 ~/Documents/wx-kit(可用 settings set libraryRoot <dir> 修改)。
 各命令详情:wx-kit help <命令>
@@ -353,6 +355,75 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       })
       outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, ...(result.failures ? { failures: result.failures } : {}), ...(result.note ? { note: result.note } : {}) })
       exitCode = 0
+    })
+
+  const site = program.command('site').description('个人站点同步(子命令:sync)')
+  site
+    .command('sync')
+    .description('把文库文章按站点发布规范生成到 content/posts(纯本地,不联网)')
+    .option('--ids <csv>', '按文章 id 选(逗号分隔;id 从 library list 取)')
+    .option('--since <date>', '按下载日期选:YYYY-MM-DD 及之后')
+    .option('--account <name>', '按公众号名选(大小写不敏感包含匹配)')
+    .option('--all', '选择全库(无选料器时必须显式指定)')
+    .option('--slug <slug>', '单篇的 slug(仅当选中恰好 1 篇时可用)')
+    .option('--slugs <csv>', '批量 slug 映射:<id>=<slug>,<id>=<slug>')
+    .option('--slugs-file <file>', '每行 "<id> <slug>" 的文件(# 开头为注释)')
+    .option('--posts-dir <dir>', '站点 content/posts 目录(默认取设置 siteSyncPostsDir)')
+    .option('-o, --out <dir>', '文章库根目录(默认取设置中的库位置)')
+    .action(async (opts) => {
+      const ids = opts.ids ? String(opts.ids).split(',').map((x: string) => x.trim()).filter(Boolean) : undefined
+      if (!ids && !opts.since && !opts.account && !opts.all) {
+        outJson({ ok: false, error: { code: 'NO_SELECTOR', message: '需指定 --ids / --since / --account 之一,或 --all' } })
+        exitCode = 2; return
+      }
+      const s = await settingsFor().get()
+      const postsRoot = opts.postsDir ?? s.siteSyncPostsDir
+      if (!postsRoot) {
+        outJson({ ok: false, error: { code: 'CLI_ERROR', message: '未配置站点目录:用 --posts-dir 指定,或 settings set siteSyncPostsDir <dir>' } })
+        exitCode = 2; return
+      }
+      const all = await new Library(await resolveRoot(opts.out)).list()
+      const picked = selectArticles(all, { ids, since: opts.since, account: opts.account, all: opts.all })
+      if (!picked.length) {
+        outJson({ ok: false, error: { code: 'NOT_FOUND', message: '选料结果为空' } }); exitCode = 1; return
+      }
+
+      // slug 来源:--slug(单篇) / --slugs(id=slug 映射) / --slugs-file(每行 "<id> <slug>")
+      const slugMap = new Map<string, string>()
+      if (opts.slugsFile) {
+        for (const line of readFileSync(opts.slugsFile, 'utf-8').split(/\r?\n/)) {
+          const t = line.trim()
+          if (!t || t.startsWith('#')) continue
+          const [id, slug] = t.split(/\s+/)
+          if (id && slug) slugMap.set(id, slug)
+        }
+      }
+      if (opts.slugs) {
+        for (const pair of String(opts.slugs).split(',')) {
+          const [id, slug] = pair.split('=').map((x: string) => x.trim())
+          if (id && slug) slugMap.set(id, slug)
+        }
+      }
+      if (opts.slug) {
+        if (picked.length !== 1) {
+          outJson({ ok: false, error: { code: 'CLI_ERROR', message: `--slug 仅适用于选中 1 篇的情况(当前 ${picked.length} 篇),请用 --slugs 或 --slugs-file` } })
+          exitCode = 2; return
+        }
+        slugMap.set(picked[0].id, String(opts.slug))
+      }
+      const missing = picked.filter((m) => !slugMap.get(m.id))
+      if (missing.length) {
+        outJson({ ok: false, error: {
+          code: 'CLI_ERROR',
+          message: `${missing.length} 篇缺少 slug,请用 --slugs <id>=<slug> 或 --slugs-file 提供`,
+          missing: missing.map((m) => ({ id: m.id, title: m.title })),
+        } })
+        exitCode = 2; return
+      }
+
+      const summary = await syncToSite(picked.map((m) => ({ meta: m, slug: slugMap.get(m.id)! })), postsRoot)
+      outJson({ ok: summary.failed === 0, ...summary })
+      exitCode = summary.failed === 0 ? 0 : 1
     })
 
   const settings = program.command('settings').description('读写应用设置(子命令:get / set)')
