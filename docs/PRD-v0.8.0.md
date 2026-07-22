@@ -46,7 +46,7 @@
 
 ## 3. 里程碑拆分
 
-(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步;R2 体量明显大于 R1,大概率独立成里程碑。)
+(待收齐后拆。当前 R1 = 订阅部分检查、R2 = 站点同步、R3 = library CLI 排序;R2 体量最大,大概率独立成里程碑,R1/R3 可合并。)
 
 ### R2 · 文库「同步」到个人站点(2026-07-21 安哥)
 
@@ -103,6 +103,33 @@
 - [ ] CLI `site sync --account <name> --all` 等选料器与 `library export` 语义一致;slug 冲突/非法 → 该篇 error、退出码 1、不阻断其他篇。
 - [ ] `agent/wx-kit-skill/` 含 `site sync` 命令 + 批量同步范例(SKILL 速查表 / commands.md / recipes.md 三处)。
 - [ ] 既有文库/导出/阅读链路不受影响(单测 + e2e 全绿)。
+
+### R3 · library CLI 增加排序(默认 publishTime 降序)(2026-07-22 安哥)
+
+**原始需求 / 场景**:有一个 agent 场景是「每天获取所有公众号最近发布的文章清单」。随着文章增多,`library list` 等返回越来越大,需要让 agent 能拿到按发布时间排好的列表(最近在前),直接取前 N 篇即「最近文章」。
+
+**现状核实(2026-07-22)**:`library list` / `library search` 当前**无排序参数**,返回的是索引顺序(`library.list()` 读 library.json 的写入序,不确定性,agent 本不该依赖)。GUI 早有完整排序(`src/renderer/library-view.ts` 的 `sortArticles`:`SortKey='download'|'publish'|'title'` + `SortDir='asc'|'desc'`,纯函数,含「空 publishTime 恒置末尾」边界),但**只在渲染层**,CLI 复制一份会双份维护。
+
+**评估过程**:与安哥论证了「分页 / 过滤 / 字段选择 / 排序」四条——分页(limit/offset)投错对象(CLI 消费者是 agent,不翻页,要的是精准一次取够);字段选择(`--fields`)价值最高但当前规模 YAGNI;过滤已有一大半(`list --account` / `search <kw> --account` / `export --ids/--since/--account`)。**安哥定:本版只加排序(默认 publishTime desc)**,其余暂缓(`--top N` / `--fields` / 补过滤口径留待真痛时再议,非目标)。
+
+**细化方案**:
+
+- **抽共享**:`sortArticles` + `SortKey`/`SortDir` 从 `src/renderer/library-view.ts` 移到 `src/core/`(新建 `src/core/library-sort.ts`,或并入 `library.ts`)。`library-view.ts` 改从 core 引(re-export 保持渲染层 import 兼容)。**CLI 与 GUI 同一份排序逻辑**,不双份。属领域排序(非视图编排),放 core 更贴分层(`accountsOf`/`filterByAccount`/`groupByAccount` 是视图编排,留 renderer)。
+- **CLI 参数**(`library list` 与 `library search` 都加,口径一致):
+  - `--sort <publish|download|title>`:默认 `publish`(对应 `publishTime` 字段;短名对齐 GUI `SortKey`)。
+  - `--order <asc|desc>`:默认 `desc`(安哥要的「最近在前」)。
+  - 默认值即 `--sort publish --order desc`,agent 直接 `library list` 就是按发布时间降序,不必带 flag。
+- **空 publishTime 恒置末尾**:与 GUI 一致——没发布时间的条目无论升降序都在最后(避免空值冒头)。CLI 复用同一函数天然对齐。
+- **默认顺序变更(轻度 breaking)**:`library list` / `search` 的输出从「索引顺序」改为「publishTime 降序」。现状的索引顺序本身不确定、agent 不应依赖;新默认更可预期。PRD 显式标注,skill 文档与 recipes 同步说明。
+- **skill 同步刷新**(工作流第 7 条):`list`/`search` 新增 `--sort`/`--order`,刷 `agent/wx-kit-skill/references/commands.md`;recipes 增「每天拉取所有公众号最近文章清单」范例(`library list` 取前 N 条)。
+
+**验收(草)**:
+
+- [ ] `wx-kit library list` 默认按 publishTime 降序(最近在前);`--sort download` / `--sort title` / `--order asc` 均生效。
+- [ ] 空 publishTime 的条目在升降序下都排在最后(单测覆盖,与 GUI 同一断言)。
+- [ ] CLI 与 GUI 走同一 `sortArticles`(core 层),无重复逻辑;既有 GUI 排序行为零变化(单测 + e2e)。
+- [ ] `library search` 同样默认 publishTime 降序;`--account` 过滤与排序可组合。
+- [ ] skill `commands.md` 含 `--sort`/`--order`,recipes 含「每天最近文章清单」范例。
 
 ## 4. 非目标
 
