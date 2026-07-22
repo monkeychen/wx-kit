@@ -224,6 +224,217 @@ describe('CLI subscription check-now', () => {
   })
 })
 
+describe('CLI subscription check-now --accounts (v0.8.0 R1)', () => {
+  // 有 session 时全量检查会真发网络请求，故用「指定一个不存在的 fakeid」来验证透传：
+  // fakeids 若没接上，f1/f2 会被选中并走到真实 check；返回 no-accounts 即证明过滤生效。
+  const seedSubs = () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-acc-'))
+    writeFileSync(join(root, 'subscriptions.json'), JSON.stringify({
+      version: 1, lastRunAt: null, checkLog: [],
+      accounts: [
+        { fakeid: 'f1', nickname: 'A', subscribed: true, watermark: 10, lastCheckedAt: null, newRefs: [] },
+        { fakeid: 'f2', nickname: 'B', subscribed: true, watermark: 10, lastCheckedAt: null, newRefs: [] },
+      ],
+    }))
+    ;(auth.getSession as ReturnType<typeof vi.fn>).mockReturnValue({ token: 't', cookies: [], timestamp: Date.now() })
+    return root
+  }
+
+  it('--accounts 过滤掉未指定的号：指定不存在的 fakeid → no-accounts，不触碰 f1/f2', async () => {
+    const root = seedSubs()
+    const code = await runCli(['subscription', 'check-now', '--accounts', 'nope', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, accounts: 0, note: 'no-accounts' })
+  })
+
+  it('--accounts 的 csv 去空格后解析(" nope , nope2 " 同样只匹配这两个)', async () => {
+    const root = seedSubs()
+    const code = await runCli(['subscription', 'check-now', '--accounts', ' nope , nope2 ', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, accounts: 0, note: 'no-accounts' })
+  })
+
+  it('无 session 时带 --accounts 仍走 no-session 分支，不崩', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-acc0-'))
+    const code = await runCli(['subscription', 'check-now', '--accounts', 'f1', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session' })
+  })
+})
+
+describe('CLI library sort (v0.8.0 R3)', () => {
+  // publishTime 刻意与索引顺序、downloadTime、标题序都不一致，才能区分是哪一种排序生效
+  const seedSorted = () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-sort-'))
+    const art = (id: string, title: string, publishTime: string, downloadTime: string) => ({
+      id, title, author: '', account: 'acc', publishTime, sourceUrl: '', digest: '', coverUrl: '',
+      downloadTime, formats: ['md'], dir: join(root, 'acc', id),
+    })
+    writeFileSync(join(root, 'library.json'), JSON.stringify({
+      version: 1,
+      articles: [
+        art('mid', 'B 中', '2026-06-02 10:00', '2026-06-30T00:00:00.000Z'),
+        art('old', 'C 旧', '2026-06-01 10:00', '2026-06-10T00:00:00.000Z'),
+        art('new', 'A 新', '2026-06-03 10:00', '2026-06-20T00:00:00.000Z'),
+        art('none', 'D 无', '', '2026-06-05T00:00:00.000Z'),
+      ],
+    }))
+    return root
+  }
+  const ids = () => JSON.parse(stdout).items.map((a: { id: string }) => a.id)
+
+  it('list 默认按 publishTime 降序（最近在前），空 publishTime 置末', async () => {
+    expect(await runCli(['library', 'list', '--out', seedSorted()])).toBe(0)
+    expect(ids()).toEqual(['new', 'mid', 'old', 'none'])
+  })
+
+  it('list --order asc 反转，空 publishTime 仍在末尾', async () => {
+    expect(await runCli(['library', 'list', '--order', 'asc', '--out', seedSorted()])).toBe(0)
+    expect(ids()).toEqual(['old', 'mid', 'new', 'none'])
+  })
+
+  // 注意：「空值置末」只针对 publishTime；download 排序下 none 有 downloadTime，照常参与比较
+  it('list --sort download 按下载时间，与 publish 序不同', async () => {
+    expect(await runCli(['library', 'list', '--sort', 'download', '--out', seedSorted()])).toBe(0)
+    expect(ids()).toEqual(['mid', 'new', 'old', 'none'])
+  })
+
+  it('list --sort title --order asc 按标题', async () => {
+    expect(await runCli(['library', 'list', '--sort', 'title', '--order', 'asc', '--out', seedSorted()])).toBe(0)
+    expect(ids()).toEqual(['new', 'mid', 'old', 'none'])
+  })
+
+  it('search 同样默认 publishTime 降序，且可与 --account 组合', async () => {
+    expect(await runCli(['library', 'search', '', '--account', 'acc', '--out', seedSorted()])).toBe(0)
+    expect(ids()).toEqual(['new', 'mid', 'old', 'none'])
+  })
+})
+
+describe('CLI site sync (v0.8.0 R2)', () => {
+  const CONTENT_MD = (title: string) => `---
+title: "${title}"
+account: "acc"
+publishTime: "2026-06-01 09:30"
+---
+# ${title}
+
+正文。
+
+![](images/img-1.png)
+`
+  /** 造一个真实形态的库：每篇有 meta 索引 + content.md + 一张图 */
+  const seedSite = (articles: Array<{ id: string; title: string; publishTime: string }>) => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-site-lib-'))
+    const postsRoot = mkdtempSync(join(tmpdir(), 'wxk-cli-site-posts-'))
+    const metas = articles.map(({ id, title, publishTime }) => {
+      const dir = join(root, 'acc', id)
+      _mkdirSync(join(dir, 'images'), { recursive: true })
+      _writeFileSync(join(dir, 'content.md'), CONTENT_MD(title))
+      _writeFileSync(join(dir, 'images', 'img-1.png'), 'PNG')
+      return { id, title, author: '', account: 'acc', publishTime, sourceUrl: '', digest: '', coverUrl: '', downloadTime: '2026-06-20T00:00:00.000Z', formats: ['md'], dir }
+    })
+    writeFileSync(join(root, 'library.json'), JSON.stringify({ version: 1, articles: metas }))
+    return { root, postsRoot }
+  }
+  const one = () => seedSite([{ id: 'a1', title: '第一篇', publishTime: '2026-06-01 09:30' }])
+  const two = () => seedSite([
+    { id: 'a1', title: '第一篇', publishTime: '2026-06-01 09:30' },
+    { id: 'a2', title: '第二篇', publishTime: '2026-06-02 09:30' },
+  ])
+
+  it('无选料器 → NO_SELECTOR, exit 2', async () => {
+    const { root, postsRoot } = one()
+    const code = await runCli(['site', 'sync', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SELECTOR' } })
+  })
+
+  it('单篇 --slug：生成 <date>-<slug>/index.md 与同目录图片，exit 0', async () => {
+    const { root, postsRoot } = one()
+    const code = await runCli(['site', 'sync', '--ids', 'a1', '--slug', 'first-post', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, succeeded: 1, failed: 0 })
+    const dir = join(postsRoot, '2026-06-01-first-post')
+    const md = readFileSync(join(dir, 'index.md'), 'utf-8')
+    expect(md).toContain('source: wechat')
+    expect(md).toContain('](./img-1.png)')     // 图片摊平为同目录引用
+    expect(md).not.toContain('# 第一篇')        // 与 frontmatter title 重复的 H1 已去掉
+    expect(readFileSync(join(dir, 'img-1.png'), 'utf-8')).toBe('PNG')
+  })
+
+  it('--slugs 按 id 映射（不靠位置对应），批量两篇都落对目录', async () => {
+    const { root, postsRoot } = two()
+    // 故意让映射顺序与选料顺序相反，位置对应的话就会张冠李戴
+    const code = await runCli(['site', 'sync', '--ids', 'a1,a2', '--slugs', 'a2=second,a1=first', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, succeeded: 2, failed: 0 })
+    expect(readFileSync(join(postsRoot, '2026-06-01-first', 'index.md'), 'utf-8')).toContain('第一篇')
+    expect(readFileSync(join(postsRoot, '2026-06-02-second', 'index.md'), 'utf-8')).toContain('第二篇')
+  })
+
+  it('--slugs-file 每行 "<id> <slug>"，# 注释与空行忽略', async () => {
+    const { root, postsRoot } = two()
+    const f = join(mkdtempSync(join(tmpdir(), 'wxk-slugs-')), 'slugs.txt')
+    writeFileSync(f, '# 注释行\n\na1 first\na2 second\n')
+    const code = await runCli(['site', 'sync', '--all', '--slugs-file', f, '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, succeeded: 2 })
+  })
+
+  it('--slug 用在多篇上 → CLI_ERROR, exit 2（引导改用 --slugs）', async () => {
+    const { root, postsRoot } = two()
+    const code = await runCli(['site', 'sync', '--all', '--slug', 'x', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(2)
+    const out = JSON.parse(stdout)
+    expect(out).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+    expect(out.error.message).toContain('--slugs')
+  })
+
+  it('缺 slug → exit 2，并列出缺哪几篇', async () => {
+    const { root, postsRoot } = two()
+    const code = await runCli(['site', 'sync', '--all', '--slugs', 'a1=first', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(2)
+    const out = JSON.parse(stdout)
+    expect(out).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+    expect(out.error.missing).toEqual([{ id: 'a2', title: '第二篇' }])
+  })
+
+  it('非法 slug 不阻断其他篇：部分失败 → exit 1，成功篇照常落盘', async () => {
+    const { root, postsRoot } = two()
+    const code = await runCli(['site', 'sync', '--all', '--slugs', 'a1=Bad_Slug,a2=second', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(1)
+    const out = JSON.parse(stdout)
+    expect(out).toMatchObject({ ok: false, succeeded: 1, failed: 1 })
+    expect(readFileSync(join(postsRoot, '2026-06-02-second', 'index.md'), 'utf-8')).toContain('第二篇')
+  })
+
+  it('slug 与站点已有目录冲突 → 该篇失败、不覆盖，exit 1', async () => {
+    const { root, postsRoot } = one()
+    _mkdirSync(join(postsRoot, '2026-05-01-first-post'), { recursive: true })
+    _writeFileSync(join(postsRoot, '2026-05-01-first-post', 'index.md'), '原有内容')
+    const code = await runCli(['site', 'sync', '--ids', 'a1', '--slug', 'first-post', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(1)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, succeeded: 0, failed: 1 })
+    expect(readFileSync(join(postsRoot, '2026-05-01-first-post', 'index.md'), 'utf-8')).toBe('原有内容')
+  })
+
+  it('选料结果为空 → NOT_FOUND, exit 1', async () => {
+    const { root, postsRoot } = one()
+    const code = await runCli(['site', 'sync', '--ids', 'zzz', '--slug', 'x', '--posts-dir', postsRoot, '--out', root])
+    expect(code).toBe(1)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+  })
+
+  it('--posts-dir 缺省时回落 settings.siteSyncPostsDir', async () => {
+    const { root, postsRoot } = one()
+    const ud = mkdtempSync(join(tmpdir(), 'wxk-site-ud-'))
+    await new SettingsService(ud, '/unused').save({ siteSyncPostsDir: postsRoot })
+    const code = await runCli(['site', 'sync', '--ids', 'a1', '--slug', 'from-settings', '--out', root], { userDataDir: ud })
+    expect(code).toBe(0)
+    expect(readFileSync(join(postsRoot, '2026-06-01-from-settings', 'index.md'), 'utf-8')).toContain('第一篇')
+  })
+})
+
 describe('CLI settings get unknown key', () => {
   it('get <unknown-key> → exit 2, CLI_ERROR', async () => {
     const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli-unk-'))
@@ -268,6 +479,20 @@ describe('CLI top-level help (M25 R3)', () => {
     expect(stdout).toContain('子命令:get / set')
     expect(stdout).toContain('常用示例')
     expect(stdout).toContain('~/Documents/wx-kit')
+  })
+
+  // v0.8.0 R4：agent 从顶层 -h 拿到仓库地址即可自助读 README/issues，子命令 help 不重复
+  it('-h 含 GitHub 仓库地址与自助提示', async () => {
+    const code = await runCli(['-h'])
+    expect(code).toBe(0)
+    expect(stdout).toContain('https://github.com/monkeychen/wx-kit')
+    expect(stdout).toContain('README')
+  })
+
+  it('子命令 help 不含仓库地址（只在顶层给一次）', async () => {
+    const code = await runCli(['help', 'library'])
+    expect(code).toBe(0)
+    expect(stdout).not.toContain('https://github.com/monkeychen/wx-kit')
   })
 })
 

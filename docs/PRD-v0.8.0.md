@@ -159,7 +159,7 @@
 **验收(草)**:
 
 - [x] mac 真机:连续跑 `wx-kit library list` / `wx-kit download ...` 多次,程序坞全程不出现 wx-kit 图标;`wx-kit.app` 无参 GUI 启动 dock 图标正常显示。
-- [x] win/linux CLI 不受 `app.dock?.hide()` 影响(可选链 no-op,回归测试)。
+- [x] win/linux CLI 不受影响——`if (app.dock) app.dock.hide()` 的存在性判定使非 mac 平台天然 no-op(`app.dock` 仅 mac 存在)。**无自动化测试**:`main.ts` 的启动分流在 app 生命周期里跑,单测环境构造不出;靠代码形态 + mac 真机验证保证,win/linux 侧属推论未实测。
 - [x] CLI 的 PDF 离屏窗口照常工作(dock.hide 不影响 BrowserWindow)。
 
 ## 3. 里程碑拆分
