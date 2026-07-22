@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmented, message } from 'antd'
-import { FolderOpenOutlined } from '@ant-design/icons'
+import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmented, Tooltip, message } from 'antd'
+import { FolderOpenOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
 import type { AppSettings } from '../../../electron/services/settings'
@@ -140,7 +140,26 @@ export default function Settings() {
           </div>
 
           <div className="setting-block">
-            <div className="setting-label">站点同步</div>
+            <div className="setting-label">
+              站点同步
+              {/* 建站指引藏在 ? 后面:只有「也想搭个站」的人才需要,常驻正文是噪音 */}
+              <Tooltip
+                placement="right"
+                styles={{ root: { maxWidth: 360 } }}
+                title={
+                  <span>
+                    同步目标是一个 Astro 静态站。我的开源项目 <b>dreamble</b> 的 <code>site/</code> 子目录
+                    就是这个站点的完整源码——主题、发文规范、构建脚本都在里面,想自建个人站可直接取用。
+                    <br />
+                    <a onClick={() => api.openExternal('https://github.com/monkeychen/dreamble')}
+                      style={{ color: '#8ecbff' }}>github.com/monkeychen/dreamble</a>
+                  </span>
+                }
+              >
+                <QuestionCircleOutlined data-testid="site-sync-help"
+                  style={{ marginLeft: 6, fontSize: 13, opacity: 0.5, cursor: 'help' }} />
+              </Tooltip>
+            </div>
             <div className="setting-hint">
               开启后，文库选中文章时会多出「同步到站点」——按个人站点的发布规范生成
               <code>YYYY-MM-DD-slug/index.md</code> 与同目录图片。纯本地文件操作，不联网。

@@ -310,6 +310,12 @@ async function main() {
     assert((await win.locator('[data-testid="set-subs-interval"]').count()) === 1, 'switching to interval mode shows the hours control')
     // M25 R2: 设置页有「打开检查日志」入口
     assert((await win.locator('[data-testid="set-open-checklog"]').count()) === 1, 'M25: settings offers open-check-log entry')
+    // v0.8.1: 「站点同步」旁的 ? hover 出建站指引(含 dreamble 仓库链接)
+    assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings offers site-sync help icon')
+    await win.locator('[data-testid="site-sync-help"]').hover()
+    await win.waitForSelector('.ant-tooltip-container', { timeout: 5000 })
+    const tipText = await win.locator('.ant-tooltip-container').innerText()
+    assert(tipText.includes('dreamble'), `site-sync tooltip mentions the dreamble repo (saw: ${tipText.slice(0, 40)})`)
 
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
