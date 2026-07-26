@@ -1,7 +1,7 @@
 # wx-kit v0.8.2 产品需求文档(迭代 PRD)
 
 > **状态:需求收集中**(2026-07-22 起,安哥逐条报)。收齐并确认后再拆里程碑、写实现计划。
-> 已收:R1、R2。
+> 已收:R1、R2、R3。
 
 ## 1. 一句话定义
 
@@ -104,6 +104,74 @@
 - [ ] 视频下载失败(网络/超时):话术清晰、不阻断其他格式;可整篇重下。
 - [ ] CLI `--formats video` 与 GUI 一致;meta.json 含 videos 明细;skill 文档同步。
 - [ ] 既有 cover/md/html/pdf/meta 全链路不受影响(单测 + e2e 全绿)。
+
+### R3 · 支持自动在线升级(2026-07-26 安哥)
+
+**原始需求**:支持自动在线升级。
+
+**现状核实(2026-07-26,回源实测)**:
+
+| 项 | 现状 |
+|---|---|
+| `electron-updater` 依赖 | **无** |
+| `package.json` 的 `build.publish` | `null`(未配 provider) |
+| 已发布 Release 资产 | 只有 3 个安装包,**无 `latest.yml` / `latest-mac.yml`**(electron-updater 的更新元数据) |
+| **app 代码签名** | **`Signature=adhoc`、`TeamIdentifier=not set`**(`codesign -dv` 实测)← 决定性约束 |
+| 设置页「关于」 | 已显示当前版本(`api.appVersion()`,与 `wx-kit --version` 同源);有个「查看新版本」按钮,但只是 `openExternal` 打开 releases 网页——**不检查、不告诉你有没有新版** |
+
+**硬约束:mac 上的「真·静默自动升级」当前做不到,且与 brew 渠道冲突。**
+
+1. **签名**:electron-updater 在 mac 走 Squirrel.Mac,会校验新旧包属同一 Developer ID。我们是 adhoc 签名(正因如此装完要 `xattr -cr`),校验必然失败。
+2. **包格式/体积**:Squirrel.Mac 只吃 zip,现在只出 dmg——要另加 zip target,每版多传 ~280MB(国内直连传 GitHub 已在卡死边缘,见 AGENTS.md 网络规约)。
+3. **与 brew 打架**:brew 是必做渠道,brew 用户的正确升级路径就是 `brew upgrade`。app 自己替换二进制会让 brew 的版本账本对不上,下次 `brew upgrade` 又覆盖一遍。**静默自更新在 brew 渠道上不是「技术难」,是「设计错」**。
+4. Windows 的 NSIS 更新反倒不需要签名,技术上可行。
+
+**选型(2026-07-26 安哥定)**:
+
+- **做「检查更新 + 按安装渠道引导升级」**,不做静默自更新。理由:真痛点是「不知道有新版」+「不知道该怎么升」,这两件事零成本 100% 可解;静默替换二进制的价值增量不值 $99/年 + 每次打包走公证 + 每版多传 280MB,还要跟 brew 账本打架。
+- **已否掉(勿再议)**:① 买 Apple Developer Program 做真静默升级——成本与收益不成比例;② 「Win 真自动 + mac 引导」——双端行为不一致,而主用平台(mac)反而是弱的那个。
+- **检查时机:启动静默检查 + 不打扰提示**。启动后延迟几秒查一次(不阻塞启动、失败无声);有新版才在侧边栏/设置页出小标记,**不弹窗、不打断**;设置页可手动点「检查更新」;每天最多查一次;可在设置里关掉。
+
+**细化方案(次要决策为 agent 按项目惯例所定,安哥可推翻)**:
+
+- **核心层**(`src/core/`,UI 无关、可 TDD):
+  - `check-update.ts`:请求 `https://api.github.com/repos/monkeychen/wx-kit/releases/latest`,取 `tag_name`(版本)、`body`(更新说明)、`assets`(下载地址)。**超时 8s、失败静默返回 null、不重试轰炸**;注入 fetch 便于单测。
+  - **版本比较自己写**(约 20 行 `compareVersion`),不引依赖——字符串比会把 `0.8.10` 判成小于 `0.8.9`。纯逻辑,单测钉死含 `0.8.9 < 0.8.10`、`v` 前缀、位数不等等边界。
+  - **网络:走 Node `fetch`,天然不读 `http_proxy` 环境变量 → 天然直连**,正好符合项目「访问 github 一律不走代理」的规约(本机 8118 代理连 github 会卡)。**不得引入任何读系统代理的取包方式**。
+- **安装渠道识别**(「系统承担复杂性」的关键——同一句「有新版」对不同渠道的用户该给不同动作):
+  - **brew cask**:查 `/opt/homebrew/Caskroom/wx-kit`(Apple Silicon)或 `/usr/local/Caskroom/wx-kit`(Intel)是否存在——查目录即可,不必 fork `brew list`(慢且依赖 shell 环境)。
+  - **手动 dmg**:mac 且无 Caskroom 记录。
+  - **Windows NSIS**:平台判定。
+  - npm 渠道(可选渠道)若能低成本识别就识别,否则归入通用引导。
+- **升级动作(按渠道给)**:
+  - **brew**:给出完整命令,一键复制 / 在终端打开执行,**命令必须带 `brew update` 和 `xattr -cr`**:
+    `brew update && brew upgrade --cask wx-kit && xattr -cr /Applications/wx-kit.app`
+    ——这两段都是我们自己踩过的坑(tap 是本地 clone,不 update 会读到旧 cask;quarantine 连纯 CLI 都拦,见 AGENTS.md brew 陷阱①②)。**把踩过的坑固化成一键命令,是本需求最实的价值**。
+    **不在应用内静默代跑 brew**:brew 是先卸载再安装,正在运行的 app 被删除后行为不可预期;引导到终端执行 + 提示「完成后重启应用」。
+  - **手动 dmg**:按当前架构(arm64/x64)选对应资产,应用内下载(140MB,**要有进度条**,复用现有 fetchBinary + 进度回调),下完 `shell.openPath` 打开 dmg 自动挂载,并给出「拖到 Applications 覆盖 → 执行 `xattr -cr`」的两步提示(命令可一键复制)。
+  - **Windows**:下载 Setup exe,下完直接打开安装。
+- **渲染层**:侧边栏小圆点(有新版才出) + 设置页「关于」区变为「发现新版 vX.Y.Z」+ 更新说明(Release body) + 按渠道的一键动作;「查看新版本」按钮升级为真正的「检查更新」(点了立即查,有反馈:检查中/已是最新/发现新版)。设置项加「启动时检查更新」开关(默认开)。
+- **状态**:`lastUpdateCheckAt` 存进 settings,实现「每天最多查一次」。
+- **CLI 一致性**(工作流第 7 条):
+  - `version` 命令**默认不联网**(保持现有速度与纯净输出);新增显式的更新检查(`wx-kit update --check` 或 `version --check-update`,实现时定),输出 `{ current, latest, updateAvailable, upgradeCommand }`——**agent 也需要知道「怎么升」,给它可直接执行的命令字符串**。
+  - **若新增 `update` 命令组,必须同步加进 `electron/cli-dispatch.ts` 的 `CLI_COMMANDS`**——漏登不报错,症状是开窗口后挂起(v0.8.0 `site` 命令组实录,AGENTS.md 已列为陷阱)。
+  - 输出结构变更后刷 `agent/wx-kit-skill/`。
+- **隐私**:只对 GitHub API 发纯 GET,不上传任何用户数据;检查行为可在设置里关闭。需在设置项旁一句话说明(让「应用自己联网」这件事对用户可见)。
+- **频控**:与微信抓取无关,不涉及频控纪律。
+
+**验收(草)**:
+
+- [ ] 启动后不阻塞、无感;无新版时界面完全无变化,无任何提示。
+- [ ] 有新版时:侧边栏出现小标记,设置页「关于」显示新版本号 + 更新说明,**不弹窗**。
+- [ ] 设置页「检查更新」手动点击有明确反馈:检查中 / 已是最新 / 发现新版 vX.Y.Z。
+- [ ] brew 装的实例:给出的命令含 `brew update` 与 `xattr -cr`,可一键复制;照着跑能真升到新版。
+- [ ] 手动 dmg 装的实例:能按当前架构下对包(带进度),下完自动打开 dmg,并给出覆盖 + `xattr -cr` 指引。
+- [ ] 断网 / GitHub 不可达 / API 限流:静默失败,不报错弹窗、不拖慢启动(超时 ≤8s);手动检查时给出「暂时查不到」的明确话术。
+- [ ] 版本比较正确:`0.8.9 < 0.8.10`、`v` 前缀、位数不等均判对(单测钉死);当前版本 ≥ 最新版时不提示。
+- [ ] 「启动时检查更新」开关可关,关掉后启动不发任何网络请求;每天最多自动查一次。
+- [ ] 检查更新的网络请求**不经系统代理**(直连),与项目 github 访问规约一致。
+- [ ] CLI:`version` 默认不联网、输出与现状一致;显式检查命令输出含 `updateAvailable` 与可执行的 `upgradeCommand`;新命令组已登记 `CLI_COMMANDS`(回归测试钉住)。
+- [ ] skill 文档同步;既有链路不受影响(单测 + e2e 全绿)。
 
 ## 3. 里程碑拆分
 
