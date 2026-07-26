@@ -6,11 +6,12 @@
 ## 当前状态
 
 - **最新发布:v0.8.1(2026-07-22,补丁)** —— tag `v0.8.1` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M33 真正修掉 mac CLI 程序坞图标(`LSUIElement`;v0.8.0 的 `dock.hide()` 修法无效,详见 `docs/PRD-v0.8.1.md`)+ 设置页「站点同步」hover 建站指引。上一功能版 v0.8.0(2026-07-22,让内容流到该去的地方):M31 CLI/订阅增强、M32 站点同步,需求/验收 `docs/PRD-v0.8.0.md`。
+- **开发中:v0.8.2「不让用户猜」(2026-07-26 启动)** —— 补三处「系统知道却没告诉用户」的盲区:M34 订阅检查反馈(自动下载全程静默是准 bug)、M35 含视频文章下载(mpvideo 内嵌视频)、M36 更新检查 + 按渠道引导升级。需求/验收 `docs/PRD-v0.8.2.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M33 已随 v0.1.0–v0.8.1 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M33 已随 v0.1.0–v0.8.1 发布**;**M34–M36 为开发中的 v0.8.2**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -49,8 +50,11 @@
 | **M31** ✅ | v0.8.0 | CLI/订阅增强与 bug 修复:R1 订阅部分检查(行内「检查」+ CLI `--accounts`)+ R3 library 排序(默认 publishTime desc,sortArticles 抽 core 共享)+ R4 `-h` 加仓库 URL + R5 修 mac CLI 程序坞冒图标(2026-07-22 完成) | `plans/2026-07-22-m31.md` |
 | **M32** ✅ | v0.8.0 | 站点同步:文库/CLI 把文章按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平同目录);设置开关默认关;产物过真实站点 `npm run check`(2026-07-22 完成) | `plans/2026-07-22-m32.md` |
 | **M33** ✅ | v0.8.1 | 补丁:真正修掉 mac CLI 程序坞图标(`LSUIElement` 在 plist 层压住——`app.dock.hide()` 在 `whenReady` 前不生效,AppKit 已先画图标)+ 设置页「站点同步」hover 建站指引(2026-07-22 完成,打包态采样验证) | `PRD-v0.8.1.md` |
+| **M34** 🚧 | v0.8.2 | 订阅检查反馈:`RunCheckResult` 加逐号明细 + 修掉 IPC 丢返回值 + 自动下载进度广播 + 行内结果态/「去看看」+ 策略常驻可见 + CLI `results` | `plans/2026-07-26-m34.md` |
+| **M35** 🚧 | v0.8.2 | 含视频文章下载:新格式 `video`(不进默认)、mpvideo 直链择最高清、解析即下(auth_key 有时效)、md/html 正文引用改写、视频号内容 meta 标注 | `plans/2026-07-26-m35.md` |
+| **M36** 🚧 | v0.8.2 | 更新检查 + 按渠道引导升级:GitHub API 查最新版、自写版本比较、识别 brew/dmg/nsis 渠道给一键动作、启动静默检查 + 不打扰提示 | `plans/2026-07-26-m36.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`(开发中)(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
