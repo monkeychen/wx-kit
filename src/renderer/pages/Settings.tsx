@@ -83,6 +83,19 @@ export default function Settings() {
           </div>
 
           <div className="setting-block">
+            <div className="setting-label">文中视频</div>
+            <div className="setting-hint">
+              文章里带视频时一并下载（和图片一样，属于文章内容，无需在格式里勾选）。
+              单个视频可达上百 MB——按公众号批量抓取前想省流量可以关掉。
+            </div>
+            <Space align="center">
+              <Switch checked={s.downloadVideos} data-testid="set-download-videos"
+                onChange={(v) => setS({ ...s, downloadVideos: v })} />
+              <span className="faint">{s.downloadVideos ? '有视频就下载' : '跳过视频（正文会注明"含视频未下载"）'}</span>
+            </Space>
+          </div>
+
+          <div className="setting-block">
             <div className="setting-label">下载历史</div>
             <div className="setting-hint">仅保留下载「动作」的记录，超期自动清理。清空或超期<b>只删记录，不会删除已下载的文件</b>。</div>
             <Space align="center" wrap>

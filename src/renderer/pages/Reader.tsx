@@ -4,7 +4,7 @@ import { Segmented, Button, Spin, Empty } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { ClassAttributes, ImgHTMLAttributes } from 'react'
+import type { AnchorHTMLAttributes, ClassAttributes, ImgHTMLAttributes } from 'react'
 import type { ExtraProps } from 'react-markdown'
 import { api } from '../api'
 import { toWxfileBase, wxfileJoin } from '../wxfile'
@@ -13,6 +13,7 @@ import { stripLeadingTitle } from '../strip-leading-title'
 import type { ArticleMeta } from '../../core/types'
 
 type ImgProps = ClassAttributes<HTMLImageElement> & ImgHTMLAttributes<HTMLImageElement> & ExtraProps
+type AnchorProps = ClassAttributes<HTMLAnchorElement> & AnchorHTMLAttributes<HTMLAnchorElement> & ExtraProps
 
 export default function Reader() {
   const { id } = useParams()
@@ -75,6 +76,18 @@ export default function Reader() {
                   img: ({ src = '', ...rest }: ImgProps) => {
                     const resolved = src.startsWith('images/') ? wxfileJoin(base, src) : src
                     return <img src={resolved} alt={rest.alt ?? ''} />
+                  },
+                  // 指向库内视频的链接直接渲染成播放器——与 img 同构（md 里的 ![](images/…) 也是渲染成 <img>）。
+                  // 否则它是个普通相对链接，点下去会把 hash 路由带偏、被路由兜底扔回下载页。
+                  a: ({ href = '', children, ...rest }: AnchorProps) => {
+                    if (href.startsWith('videos/')) {
+                      return <video controls preload="metadata" style={{ width: '100%' }} src={wxfileJoin(base, href)} />
+                    }
+                    // 站外链接交给系统浏览器：应用内导航过去就出不来了
+                    if (/^https?:/.test(href)) {
+                      return <a href={href} onClick={(e) => { e.preventDefault(); api.openExternal(href) }} {...rest}>{children}</a>
+                    }
+                    return <a href={href} {...rest}>{children}</a>
                   },
                 }}>
                 {stripLeadingTitle(md, meta.title)}

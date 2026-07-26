@@ -12,6 +12,8 @@ export interface DownloadArticleDeps extends ExportDeps {
   fetchHtml: (url: string) => Promise<string>
   library: Library
   libraryRoot: string
+  /** 是否下载文中视频（设置项，默认 true）。视频是内容不是格式，故不走 formats。 */
+  downloadVideos?: boolean
 }
 
 export async function downloadArticle(
@@ -40,7 +42,7 @@ export async function downloadArticle(
 
   // 视频这类非致命失败要浮到调用方（CLI JSON / GUI 结果区），否则只剩 ok:true 在误导
   const warnings: string[] = []
-  const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats },
+  const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats, downloadVideos: deps.downloadVideos },
     { ...deps, onWarning: (m) => { warnings.push(m); deps.onWarning?.(m) } })
   await deps.library.add(meta)
 

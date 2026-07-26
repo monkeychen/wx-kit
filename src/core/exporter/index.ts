@@ -28,11 +28,13 @@ export interface ExportInput {
   sourceUrl: string
   dir: string
   formats: DownloadFormat[]
+  /** 是否下载文中视频（内容的一部分，不是格式）。缺省视为 true。 */
+  downloadVideos?: boolean
 }
 
 /** 按所选格式导出一篇文章，返回最终 meta。调用方保证 dir 尚不存在或可写。 */
 export async function exportArticle(input: ExportInput, deps: ExportDeps): Promise<ArticleMeta> {
-  const { parsed, id, sourceUrl, dir, formats } = input
+  const { parsed, id, sourceUrl, dir, formats, downloadVideos: wantVideo = true } = input
   await mkdir(dir, { recursive: true })
 
   const needImages = formats.includes('md') || formats.includes('html') || formats.includes('pdf')
@@ -63,7 +65,7 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
   // 视频：必须在写 md/html 之前（正文要引用它），且必须在本次流程内下完
   // ——直链带 auth_key/dis_t 签名有时效，存下来隔次再下必然失效。
   const { records: videoRecords, htmlSuffix, mdSuffix, warnings } = await downloadVideos(
-    parsed.videos, dir, formats.includes('video'), deps.fetchBinary, deps.onVideoProgress,
+    parsed.videos, dir, wantVideo, deps.fetchBinary, deps.onVideoProgress,
   )
   if (videoRecords.length) meta.videos = videoRecords
   for (const w of warnings) deps.onWarning?.(w)
