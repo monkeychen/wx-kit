@@ -14,6 +14,7 @@ const NAV = [
 
 export default function MainLayout() {
   const [newCount, setNewCount] = useState(0)
+  const [hasUpdate, setHasUpdate] = useState(false)
   useEffect(() => {
     const refresh = async () => {
       try { const s = await api.subscriptionsList(); setNewCount(s.accounts.reduce((n, a) => n + a.newRefs.length, 0)) }
@@ -21,6 +22,17 @@ export default function MainLayout() {
     }
     refresh()
     return api.onSubscriptionsUpdated(refresh)
+  }, [])
+
+  // 启动静默检查(M37):延迟几秒、不阻塞首屏,查不到就当没发生 —— 只在有新版时
+  // 于「设置」上点一个小圆点,**不弹窗不 toast**(打断用户是最差的告知方式)。
+  useEffect(() => {
+    const t = setTimeout(() => {
+      api.updateCheck({ silent: true })
+        .then((r) => { if (r?.hasUpdate) setHasUpdate(true) })
+        .catch(() => { /* 静默失败:更新提示不该给启动流程添噪 */ })
+    }, 3000)
+    return () => clearTimeout(t)
   }, [])
 
   return (
@@ -37,6 +49,9 @@ export default function MainLayout() {
               data-testid={`nav-${n.label}`}>
               {n.label}
               {n.to === '/subscriptions' && newCount > 0 && <span className="nav-badge" data-testid="subs-nav-badge">{newCount}</span>}
+              {n.to === '/settings' && hasUpdate && (
+                <span className="nav-dot" data-testid="update-nav-dot" title="有新版本可用" />
+              )}
             </NavLink>
           ))}
         </nav>

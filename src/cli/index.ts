@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { readFileSync, appendFileSync } from 'node:fs'
+import { readFileSync, appendFileSync, existsSync } from 'node:fs'
 import type { DownloadFormat, DownloadSummary } from '../core/types'
 import { ALL_FORMATS } from '../core/types'
 import { fetchHtml, fetchBinary } from '../core/fetch-html'
@@ -17,6 +17,8 @@ import { searchAccount } from '../core/mp-client'
 import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
 import { rebuildLibrary } from '../core/rebuild-library'
+import { checkUpdate } from '../core/check-update'
+import { detectChannel, upgradeCommand } from '../core/install-channel'
 import { selectArticles, buildManifest } from '../core/material-export'
 import { sortArticles } from '../core/library-sort'
 import { syncToSite } from '../core/site-sync'
@@ -364,6 +366,28 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       })
       // results 是逐号明细(M34):agent 同样需要知道「哪个号新增了几篇、下了几篇」,而不只是总数
       outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, results: result.results, ...(result.failures ? { failures: result.failures } : {}), ...(result.note ? { note: result.note } : {}) })
+      exitCode = 0
+    })
+
+  program
+    .command('update')
+    .description('检查是否有新版本(只检查,不自动升级;给出按安装渠道的升级命令)')
+    .option('--check', '查询最新版本(默认行为,写出来更明确)')
+    .action(async () => {
+      const current = opts.version ?? '0.0.0-dev'
+      const info = await checkUpdate(current)
+      if (!info) {
+        outJson({ ok: false, error: { code: 'UPDATE_CHECK_FAILED', message: '查询失败(网络不可达或 GitHub 限流)' } })
+        exitCode = 1
+        return
+      }
+      const channel = detectChannel({ platform: process.platform, existsSync })
+      outJson({
+        ok: true, current: info.current, latest: info.latest, updateAvailable: info.hasUpdate,
+        channel, upgradeCommand: upgradeCommand(channel),
+        publishedAt: info.publishedAt,
+        ...(info.hasUpdate ? { assets: info.assets.map((a) => a.name) } : {}),
+      })
       exitCode = 0
     })
 

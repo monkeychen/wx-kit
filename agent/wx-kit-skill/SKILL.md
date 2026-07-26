@@ -64,6 +64,7 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 | 搜文库 | `wx-kit library search <关键词>` |
 | 导出素材清单 | `wx-kit library export --ids <id,id>` |
 | 订阅号列表/立即检查 | `wx-kit subscription list` / `wx-kit subscription check-now` |
+| 检查有无新版本 | `wx-kit update --check`(只检查;`upgradeCommand` 按安装渠道给,`version` 命令不联网) |
 | 只检查某几个号 | `wx-kit subscription check-now --accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取) |
 
 **两件默认行为**(v0.8.2 起,不需要额外参数):

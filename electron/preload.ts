@@ -55,6 +55,14 @@ const api: WxApi = {
     ipcRenderer.on('subscriptions:download:progress', listener)
     return () => { ipcRenderer.removeListener('subscriptions:download:progress', listener) }
   },
+  updateCheck: (opts) => ipcRenderer.invoke('update:check', opts),
+  updateChannel: () => ipcRenderer.invoke('update:channel'),
+  updateDownload: (assets) => ipcRenderer.invoke('update:downloadAsset', assets),
+  onUpdateProgress: (cb) => {
+    const h = (_e: unknown, p: unknown) => cb(p as never)
+    ipcRenderer.on('update:progress', h)
+    return () => ipcRenderer.removeListener('update:progress', h)
+  },
   cliLinkStatus: () => ipcRenderer.invoke('cliLink:status'),
   cliLinkCreate: (force) => ipcRenderer.invoke('cliLink:create', force),
   cliLinkAddToPath: () => ipcRenderer.invoke('cliLink:addToPath'),

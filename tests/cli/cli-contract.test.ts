@@ -531,3 +531,39 @@ describe('CLI session export/import (M27)', () => {
     expect(JSON.parse(readFileSync(join(dir, 'mp-session.json'), 'utf-8'))).toMatchObject({ token: '42' })
   })
 })
+
+describe('CLI update(M37)', () => {
+  it('输出契约:current/latest/updateAvailable/channel/upgradeCommand', async () => {
+    const code = await runCli(['update', '--check'])
+    const out = JSON.parse(stdout)
+    if (out.ok) {
+      // 真联网时:字段齐全,且 channel 是四种之一
+      expect(out).toMatchObject({ ok: true })
+      expect(typeof out.current).toBe('string')
+      expect(typeof out.latest).toBe('string')
+      expect(typeof out.updateAvailable).toBe('boolean')
+      expect(['brew', 'dmg', 'nsis', 'unknown']).toContain(out.channel)
+      expect(code).toBe(0)
+    } else {
+      // 网络不可达时:明确的错误码 + 退出码 1(agent 可判别,不会把失败当成「已是最新」)
+      expect(out.error.code).toBe('UPDATE_CHECK_FAILED')
+      expect(code).toBe(1)
+    }
+  })
+
+  it('brew 渠道给出的命令三段齐全(少一段就会踩坑)', async () => {
+    await runCli(['update', '--check'])
+    const out = JSON.parse(stdout)
+    if (out.ok && out.channel === 'brew') {
+      expect(out.upgradeCommand).toContain('brew update')
+      expect(out.upgradeCommand).toContain('brew upgrade --cask wx-kit')
+      expect(out.upgradeCommand).toContain('xattr -cr')
+    }
+  })
+
+  it('version 命令不联网 —— 保持原有速度与纯净输出', async () => {
+    const code = await runCli(['version'])
+    expect(code).toBe(0)
+    expect(stdout.trim()).not.toContain('{')   // 纯版本号,不是 JSON
+  })
+})

@@ -12,6 +12,10 @@ export interface AppSettings {
   /** 下载文中内嵌视频(M35):默认开。视频是内容不是格式,故不进 defaultFormats;
    *  留开关是给批量抓取兜底——按公众号抓 200 篇时可能撞上多个视频消息,单个就上百 MB。 */
   downloadVideos: boolean
+  /** 启动时静默检查新版本(M37):默认开。只请求 GitHub 的 releases/latest,不上传任何数据 */
+  updateCheckEnabled: boolean
+  /** 上次检查更新的时刻,用于「每天最多自动查一次」 */
+  lastUpdateCheckAt: number | null
   historyRetentionDays: number
   listColumnWidths: ListColumnWidths
   subscriptionAutoCheck: boolean
@@ -40,6 +44,8 @@ export class SettingsService {
       libraryRoot: this.defaultLibraryRoot,
       defaultFormats: ['md', 'html', 'meta'],
       downloadVideos: true,
+      updateCheckEnabled: true,
+      lastUpdateCheckAt: null,
       historyRetentionDays: 365,
       listColumnWidths: { account: 132, publish: 150, download: 110 },
       subscriptionAutoCheck: false,
