@@ -99,6 +99,12 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - **`wxfile://` 协议**：阅读器读本地图片用，路径严格限制在库根内（`electron/protocol.ts` 的 `resolveWxfilePath`，含编码 `..` 穿越防护）。
 - **HTML 阅读器 iframe** 用 `sandbox`（无 `allow-scripts`）：安全，但意味着 Playwright 无法在其内部执行脚本——e2e 里 HTML 视图只断言 iframe src，图片渲染由 md 视图的 `naturalWidth>0` 等价证明。
 - **e2e 只能在主会话/本地跑**：子 agent 的沙箱解析不了 electron 二进制。Antd v6 会在两个汉字按钮文本间自动插空格（"阅 读"），写选择器时注意。
+- **commit message 含反引号/`$`/`!` 时必须用 `git commit -F <文件>`,不能用 `-m "…"`**(2026-07-26 实录):
+  双引号里的反引号会被 shell 当**命令替换真的执行**。当时 message 里写了 `` `brew update` ``/`` `brew list` ``
+  作说明,结果**真跑了 `brew update`**(把本机 Homebrew 从旧版升到 6.0.12、更新 4 个 tap),
+  `brew list` 的输出还被塞进了 message。**写技术说明的 commit message 几乎必然含反引号**,
+  所以规则是:message 一律写进临时文件再 `-F`(本项目的 message 都带代码标识,风险恒在)。
+  单引号 heredoc(`<<'EOF'`)同样安全。若已污染:未 push 的历史可 `reset --hard` + `cherry-pick -n` 重做。
 - **npm/依赖下载优先国内镜像，代理是最后兜底**：所有 npm 相关操作**尽量不依赖系统环境变量里的 `http_proxy`/`https_proxy`**。包优先走 `.npmrc` 指定的国内镜像（registry=`registry.npmmirror.com`）；npm 包国内镜像找不到才退官方 registry。二进制（electron 等）走国内镜像并给镜像域名加 `no_proxy`（让其直连）：`ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/`、`ELECTRON_CUSTOM_DIR=v{{ version }}`、`ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/`、`no_proxy=npmmirror.com,.npmmirror.com,cdn.npmmirror.com,registry.npmmirror.com`。**本机 8118 代理对 github 大文件（100MB+）上传/下载都会卡死/截断**，所以：`gh` 命令（release 上传、API）与 `git push` 到 github 一律**把 `http_proxy`/`https_proxy` unset 掉直连**（实测直连稳、走代理挂）；电脑能直连 github 时，代理别掺和。仅当某个国外资源**直连真的网络不可达**才临时用代理兜底，但大文件优先找国内镜像。（坑：本机无 `timeout` 命令，用 `curl --max-time`。详见 `docs/plans/2026-06-09-deps-audit.md` Round 2。）
 
 ---
