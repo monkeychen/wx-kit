@@ -5,8 +5,19 @@ const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/124.0 Safari/537.36'
 
-/** 单个请求的硬上限（毫秒）。用 AbortSignal 兜底，覆盖连接/代理握手阶段。 */
-export const FETCH_TIMEOUT_MS = 20000
+/**
+ * 单个请求的硬上限（毫秒）。用 AbortSignal 兜底，覆盖连接/代理握手阶段。
+ *
+ * 按资源实际体量分档 —— 一个固定值同时服务「几十 KB 的图」和「几 MB 的页面」必然有一头不合适:
+ *   · 文章页可以很大:视频消息页实测 2.4MB,20 秒等于要求跑满 120KB/s,慢一点就整篇失败
+ *     (M35/M36 真实抓取时遇到过一次这样的偶发失败)
+ *   · 图片通常几百 KB,给 30 秒已很宽松;而且一篇文章的图是**串行**下载的,
+ *     单张超时值放太大会让「整篇图都拉不动」的情况卡上几十分钟
+ *   · 视频动辄上百 MB,固定值根本没意义 → 按体积算,见 exporter/export-video.ts 的 videoTimeoutMs
+ */
+export const FETCH_TIMEOUT_MS = 30000
+/** 文章页:2.4MB 的页面在 40KB/s 下也能下完 */
+export const HTML_TIMEOUT_MS = 60000
 
 /**
  * 把请求异常归一化。axios 的 `timeout` 只在 socket 连上之后才计时，
@@ -25,20 +36,20 @@ export function wrapFetchError(e: unknown, url: string, timeoutMs = FETCH_TIMEOU
 export async function fetchHtml(url: string): Promise<string> {
   try {
     const res = await axios.get<string>(url, {
-      timeout: FETCH_TIMEOUT_MS,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      timeout: HTML_TIMEOUT_MS,
+      signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
       responseType: 'text',
       headers: { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' },
     })
     return res.data
   } catch (e) {
-    throw wrapFetchError(e, url)
+    throw wrapFetchError(e, url, HTML_TIMEOUT_MS)
   }
 }
 
 /**
  * 下载二进制资源（图片/封面/视频），返回 buffer 与内容类型。
- * `timeoutMs` 可覆盖默认值：20 秒对图片够用，但**视频完全不够**——
+ * `timeoutMs` 可覆盖默认值：默认档对图片够用，但**视频完全不够**——
  * 实测 133MB 的视频在 2.66MB/s 下要 50 秒，用默认超时必然 abort（M35 踩过：
  * CLI 报 ok 但 videos 目录空的，21 秒结束正是 20 秒超时）。视频的超时按体积算，
  * 见 exporter/export-video.ts 的 videoTimeoutMs。
