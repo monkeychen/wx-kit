@@ -80,7 +80,8 @@ wx-kit site sync ... --posts-dir <dir>                        # 覆盖设置里�
 
 ```sh
 wx-kit subscription list        # {"ok":true,"accounts":[{fakeid,nickname,subscribed,watermark,lastCheckedAt,newRefs}],"lastRunAt","nextCheckAt"}
-wx-kit subscription check-now   # {"ok":true,"accounts":N,"newFound":N,"failed":N,"failures"?:[{nickname,error}]}
+wx-kit subscription check-now   # {"ok":true,"accounts":N,"newFound":N,"failed":N,"results":[{fakeid,nickname,ok,newFound,downloaded,error?}],"failures"?:[{nickname,error}]}
+                                # results 是逐号明细:newFound=发现几篇,downloaded=其中自动下载了几篇(策略为 notify 时恒为 0)
 wx-kit subscription check-now --accounts <fakeid,fakeid>  # 只检查指定号(部分检查;fakeid 从 subscription list 取),不传=全部
 ```
 

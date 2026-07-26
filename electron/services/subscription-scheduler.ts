@@ -7,7 +7,8 @@ import type { SettingsService } from './settings'
 export interface SchedulerDeps {
   settings: SettingsService
   subsFor: () => Promise<Subscriptions>
-  runCheck: () => Promise<void>
+  /** 返回值 scheduler 不关心(M34 起检查会回传逐号明细,给手动检查的行内反馈用) */
+  runCheck: () => Promise<unknown>
   now?: () => number
 }
 

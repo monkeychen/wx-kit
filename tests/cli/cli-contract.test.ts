@@ -214,6 +214,12 @@ describe('CLI subscription check-now', () => {
     expect(code).toBe(0)
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session', newFound: 0 })
   })
+  it('输出含 results 逐号明细字段(M34;无 session 时为空数组,agent 可无脑遍历)', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-chkres-'))
+    const code = await runCli(['subscription', 'check-now', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, results: [] })
+  })
   it('check-now persists no-session entry to subscriptions-check.log under userDataDir', async () => {
     const root = mkdtempSync(join(tmpdir(), 'wxk-cli-chk2-'))
     const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-cli-ud-'))

@@ -293,6 +293,17 @@ async function main() {
       const checkOnes = await win.locator('[data-testid="subs-check-one"]').count()
       assert(checkOnes === subsRows, `each subscription row has inline check (rows=${subsRows}, checkOnes=${checkOnes})`)
     }
+    // M34: 「发现新文章时」策略常驻可见(点检查时不必回忆几天前设了什么)
+    assert((await win.locator('[data-testid="subs-policy"]').count()) === 1, 'M34: subscriptions page shows the new-article policy inline')
+    const policyText = await win.locator('[data-testid="subs-policy"]').innerText()
+    assert(/自动下载|仅提示/.test(policyText), `M34: policy text names the current strategy (got: ${policyText})`)
+    // M34: 单号检查后那一行必须有反馈(无登录态时是「需重新登录」类文案,同样算说了话)
+    if (subsRows > 0) {
+      await win.locator('[data-testid="subs-check-one"]').first().click()
+      await win.waitForSelector('[data-testid="subs-row-result"]', { timeout: 20000 })
+      const rowRes = await win.locator('[data-testid="subs-row-result"]').first().innerText()
+      assert(rowRes.trim().length > 1, `M34: inline check result is non-empty (got: ${rowRes})`)
+    }
     // M12: 可观测性元素
     assert((await win.locator('[data-testid="subs-next-check"]').count()) === 1, 'subscriptions page shows next-check line')
     assert((await win.locator('[data-testid="subs-open-log"]').count()) === 1, 'subscriptions page offers open-log link')

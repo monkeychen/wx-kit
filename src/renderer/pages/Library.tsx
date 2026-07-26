@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Input, Select, Segmented, Spin, Popconfirm, FloatButton, Modal, Button, Space, message } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import ArticleRow from '../components/ArticleRow'
@@ -25,7 +25,11 @@ export default function Library() {
   // 排序选择跨会话记忆(M25):初始值来自 settings(默认发布时间降序),变更即持久化
   const [sortKey, setSortKey] = useState<SortKey>('publish')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [account, setAccount] = useState<string | null>(null)
+  // 从订阅页「去看看」带过来的公众号筛选(M34):一次性消费,读完清掉 query
+  const [sp, setSp] = useSearchParams()
+  const [account, setAccount] = useState<string | null>(sp.get('account'))
+  // 消费掉即清:否则用户手动切了筛选后一刷新又被 URL 参数拽回去
+  useEffect(() => { if (sp.get('account')) setSp({}, { replace: true }) }, [sp, setSp])
   const [sel, setSel] = useState<Set<string>>(new Set())
   // 导出结果就地可见(M30):路径 + 一键复制给 agent 的指令,省掉「去 Finder 找路径、自己拼提示词」
   const [exported, setExported] = useState<{ path: string; count: number; prompt: string } | null>(null)
