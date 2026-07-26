@@ -69,3 +69,42 @@ describe('DownloadQueue cancel', () => {
     expect(summary.total).toBe(3)
   })
 })
+
+describe('队列条目可带文章主键(M36)', () => {
+  // 短链认不出与长链是同一篇,判重要靠列表给的 appmsgid/itemidx —— 队列必须把它透传下去
+  it('传对象形态时,hint 透传给 downloadOne', async () => {
+    const seen: Array<{ url: string; hint?: unknown }> = []
+    const q = new DownloadQueue(async (url, hint) => {
+      seen.push({ url, hint })
+      return { url, ok: true }
+    })
+    await q.run([
+      { url: 'https://mp.weixin.qq.com/s/AAA', appmsgid: 100, itemidx: 1 },
+      { url: 'https://mp.weixin.qq.com/s/BBB', appmsgid: 101, itemidx: 2 },
+    ])
+    expect(seen).toEqual([
+      { url: 'https://mp.weixin.qq.com/s/AAA', hint: { appmsgid: 100, itemidx: 1 } },
+      { url: 'https://mp.weixin.qq.com/s/BBB', hint: { appmsgid: 101, itemidx: 2 } },
+    ])
+  })
+
+  it('传字符串数组仍然可用(向后兼容,老调用方不必改)', async () => {
+    const seen: unknown[] = []
+    const q = new DownloadQueue(async (url, hint) => { seen.push(hint); return { url, ok: true } })
+    const s = await q.run(['a', 'b'])
+    expect(s.succeeded).toBe(2)
+    expect(seen).toEqual([{}, {}])   // 没有主键就是空 hint,不是 undefined 混着 object
+  })
+
+  it('字符串与对象混用不报错', async () => {
+    const q = new DownloadQueue(async (url) => ({ url, ok: true }))
+    const s = await q.run(['a', { url: 'b', appmsgid: 1, itemidx: 1 }])
+    expect(s).toMatchObject({ ok: true, total: 2, succeeded: 2 })
+  })
+
+  it('带主键的条目失败时,错误里仍带正确的 url', async () => {
+    const q = new DownloadQueue(async () => { throw new Error('boom') })
+    const s = await q.run([{ url: 'https://x/AAA', appmsgid: 1, itemidx: 1 }])
+    expect(s.items[0]).toMatchObject({ url: 'https://x/AAA', ok: false })
+  })
+})

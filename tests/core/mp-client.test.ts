@@ -50,7 +50,7 @@ function publishFetch(groups: ReturnType<typeof mkGroup>[], pageSize = 20): MpFe
     }) } as never
   }
 }
-/** 每组一篇（大多数情况），沿用旧测试的语义 */
+/** 每组一篇（大多数情况）；一组多篇的展开在下方 appmsgpublish 用例里单独覆盖 */
 function realPagedFetch(items: Article[]): MpFetch {
   return publishFetch(items.map((i) => mkGroup([i])))
 }
@@ -76,8 +76,9 @@ describe('listArticles count mode', () => {
     expect(refs.map((r) => r.url)).toEqual(['u0'])
   })
 
-  it('walks contiguously when the API returns fewer per page than requested (real WeChat)', async () => {
-    // count=20 请求，但每页只回 5 篇。游标若按固定 20 推进会跳过中间 15 篇。
+  it('接口返回少于请求数时游标仍连续 —— 按固定步长推进会跳内容', async () => {
+    // 请求 count=20 但每页只回 5 组（旧的 appmsg 接口一贯如此；换 appmsgpublish 后
+    // 常规每页给满 20，但「回得比要的少」始终可能发生，游标必须按实际返回数推进）。
     const items = Array.from({ length: 12 }, (_, i) => mk(i))
     const refs = await listArticles(pagedFetch(items, 5), 'T', 'FID', { count: 7 }, noSleep)
     expect(refs.map((r) => r.url)).toEqual(['u0', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6'])
@@ -161,8 +162,9 @@ describe('listArticles date mode', () => {
     expect(refs.map((r) => r.title)).toEqual(['2026-02-26', '2026-02-25'])
   })
 
-  it('finds the window even when it sits in the per-page gap (real WeChat, 5/page)', async () => {
-    // 复现「猫笔刀 0 篇」：每页只回 5 篇，窗口文章落在按 20 跳页会被跳过的缺口里。
+  it('日期窗口落在分页缺口里也能找到', async () => {
+    // 历史故障「猫笔刀 0 篇」的回归测试：每页只回 5 条时，
+    // 若按固定 20 跳页，窗口内的文章正好落在被跳过的缺口里。
     const days = Array.from({ length: 25 }, (_, i) => {
       const d = new Date(Date.UTC(2026, 5, 8) - i * 86_400_000) // 06-08 倒推
       return item(d.toISOString().slice(0, 10))
