@@ -65,6 +65,12 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 | 导出素材清单 | `wx-kit library export --ids <id,id>` |
 | 订阅号列表/立即检查 | `wx-kit subscription list` / `wx-kit subscription check-now` |
 | 只检查某几个号 | `wx-kit subscription check-now --accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取) |
+
+**两件默认行为**(v0.8.2 起,不需要额外参数):
+- **文中视频会一并下载**(视频是内容不是格式,`--formats` 里没有它);单个可达上百 MB,批量抓取想省流量加 `--no-video`。
+- **各种消息类型都能抓**(图文 / 文字消息 / 视频消息 / 图文消息),`meta.json` 的 `itemShowType` 标明类型;
+  遇到没适配的新类型会按图文兜底并在该篇 `warnings[]` 里说明——**批处理时值得 `jq` 扫一眼 `warnings`**,
+  它是「下到了但可能不对」的唯一信号。
 | 读/写设置 | `wx-kit settings get libraryRoot` / `wx-kit settings set libraryRoot <dir>` |
 | 同步到个人站点 | `wx-kit site sync --ids <id> --slug <slug>`(按 Astro 站点规范生成目录,纯本地) |
 
