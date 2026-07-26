@@ -17,7 +17,13 @@ export class DownloadQueue {
 
     for (let i = 0; i < total; i++) {
       if (shouldContinue && !shouldContinue()) break
-      const { url, ...hint } = queue[i]
+      const item = queue[i]
+      const { url } = item
+      // 只取判重需要的主键：用 rest 展开会把 ArticleRef 的 title/createTime 一并塞进 hint，
+      // 以后给 ArticleRef 加字段就会莫名多出参数（隐性耦合）
+      const hint = item.appmsgid != null && item.itemidx != null
+        ? { appmsgid: item.appmsgid, itemidx: item.itemidx }
+        : {}
       this.onProgress({ total, completed: i, currentUrl: url, phase: 'fetch' })
       try {
         const r = await this.downloadOne(url, hint)

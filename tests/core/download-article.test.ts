@@ -101,3 +101,39 @@ describe('downloadArticle', () => {
     expect(fetchCalled).toBe(false)
   })
 })
+
+describe('用列表主键判重(M36)', () => {
+  it('有 hint 时用 mid_idx 作 id —— 短链也能算出稳定标识', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-hint-')), VALID_HTML)
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/ShortCode123', ['meta'], deps,
+      { appmsgid: 2247494971, itemidx: 1 })
+    expect(r.id).toBe('2247494971_1')
+    expect((await deps.library.get('2247494971_1'))?.id).toBe('2247494971_1')
+  })
+
+  it('库里是老格式(mid_idx_sn)时,短链重抓会跳过而不是重下', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-hint2-')), VALID_HTML)
+    // 模拟老版本用长链下过这篇
+    await deps.library.add({
+      id: '2247494971_1_6ce948b6802fa74b8e4fd21386e8e487', title: '旧记录', author: 'a', account: 'acc',
+      publishTime: '2026-07-22 10:00', sourceUrl: 'http://mp.weixin.qq.com/s?mid=2247494971&idx=1&sn=6ce948b6802fa74b8e4fd21386e8e487',
+      digest: '', coverUrl: '', downloadTime: '2026-07-22T00:00:00Z', formats: ['md'], dir: '/tmp/old',
+    })
+    let fetched = false
+    const spy = { ...deps, fetchHtml: async (u: string) => { fetched = true; return deps.fetchHtml(u) } }
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/ShortCode123', ['meta'], spy,
+      { appmsgid: 2247494971, itemidx: 1 })
+    expect(r.skipped).toBe(true)
+    expect(r.title).toBe('旧记录')
+    expect(fetched).toBe(false)      // 判重必须发生在请求页面之前
+  })
+
+  it('解析告警汇集到结果的 warnings(未识别类型这类问题不能只躺在文件里)', async () => {
+    // 页面带一个没适配的 item_show_type → parseArticle 产出告警 → 应浮到 DownloadItemResult
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-hint3-')),
+      '<h1 id="activity-name">标题</h1><div id="js_content"><p>正文</p></div>' +
+      "<script>item_show_type: '77' * 1,</script>")
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/X', ['meta'], deps)
+    expect(r.warnings?.join()).toContain('未识别的消息类型 77')
+  })
+})

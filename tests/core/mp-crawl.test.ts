@@ -185,3 +185,24 @@ describe('crawlAccount with keywords', () => {
     expect(out).not.toHaveProperty('filteredOut')
   })
 })
+
+describe('文章主键透传给下载(M36)', () => {
+  it('downloadOne 收到列表给的 appmsgid/itemidx —— 否则短链判不了重', async () => {
+    const seen: Array<{ url: string; hint?: unknown }> = []
+    const refs = [
+      { url: 'https://mp.weixin.qq.com/s/AAA', title: 'a', createTime: 2, appmsgid: 100, itemidx: 1 },
+      { url: 'https://mp.weixin.qq.com/s/BBB', title: 'b', createTime: 1, appmsgid: 101, itemidx: 2 },
+    ]
+    await crawlAccount('FID', { count: 2 }, {
+      mpFetch: (async () => ({})) as never, token: 'T',
+      downloadOne: async (url: string, hint?: unknown) => { seen.push({ url, hint }); return { url, ok: true } },
+      listFn: async () => refs,
+      sleep: async () => {},
+    } as never)
+    // hint 只含主键，不该夹带 title/createTime 之类
+    expect(seen.map((s) => s.hint)).toEqual([
+      { appmsgid: 100, itemidx: 1 },
+      { appmsgid: 101, itemidx: 2 },
+    ])
+  })
+})
