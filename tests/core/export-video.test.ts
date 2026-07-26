@@ -19,7 +19,7 @@ const parsedWithVideo = (): ParsedArticle => ({
   title: '带视频的文章', author: '作者', account: '某号',
   publishTime: '2026-07-12 13:20', digest: '摘要', coverUrl: '',
   contentHtml: '<p>视频的描述文字。</p>',
-  imageUrls: [], videos: [VIDEO],
+  imageUrls: [], videos: [VIDEO], itemShowType: 0, warnings: []
 })
 
 const run = async (formats: DownloadFormat[], opts: { downloadVideos?: boolean; fetchBinary?: ExportDeps['fetchBinary'] } = {}) => {

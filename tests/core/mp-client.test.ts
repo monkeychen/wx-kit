@@ -1,5 +1,7 @@
 // tests/core/mp-client.test.ts
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { searchAccount, listArticles, listArticlesSince } from '../../src/core/mp-client'
 import { MpAuthExpired, MpRateLimited, MpApiError } from '../../src/core/mp-errors'
 import type { MpFetch } from '../../src/core/mp-types'
@@ -33,22 +35,27 @@ describe('searchAccount', () => {
 })
 
 const noSleep = { sleep: async () => {} }
-const mk = (n: number) => ({ link: `u${n}`, title: `t${n}`, create_time: 1700000000 - n })
+const mk = (n: number) => ({ link: `u${n}`, title: `t${n}`, create_time: 1700000000 - n, item_show_type: 0, itemidx: 1 })
 
-// 模拟真实分页：count=20/页，begin 为偏移；total 控制有几页。
-function realPagedFetch(items: ReturnType<typeof mk>[]): MpFetch {
+// appmsgpublish 的响应形状：三层嵌套，中间两层是 JSON 字符串，
+// 且 begin/count 按「群发组」计（一组可能多篇）。测试 helper 必须照这个形状造，
+// 否则测的是一个不存在的接口。
+type Article = ReturnType<typeof mk>
+const mkGroup = (arts: Article[]) => ({ publish_type: 1, publish_info: JSON.stringify({ type: 9, appmsgex: arts }) })
+function publishFetch(groups: ReturnType<typeof mkGroup>[], pageSize = 20): MpFetch {
   return async (_endpoint, params) => {
     const begin = Number(params.begin)
-    return { base_resp: { ret: 0 }, app_msg_cnt: items.length, app_msg_list: items.slice(begin, begin + 20) } as never
+    return { base_resp: { ret: 0 }, publish_page: JSON.stringify({
+      total_count: groups.length, publish_list: groups.slice(begin, begin + pageSize),
+    }) } as never
   }
 }
-
-// 贴近真实微信：请求 count=20，但每页只回 pageSize 篇（实测 5）。begin 是文章偏移。
-function pagedFetch(items: ReturnType<typeof mk>[], pageSize: number): MpFetch {
-  return async (_endpoint, params) => {
-    const begin = Number(params.begin)
-    return { base_resp: { ret: 0 }, app_msg_cnt: items.length, app_msg_list: items.slice(begin, begin + pageSize) } as never
-  }
+/** 每组一篇（大多数情况），沿用旧测试的语义 */
+function realPagedFetch(items: Article[]): MpFetch {
+  return publishFetch(items.map((i) => mkGroup([i])))
+}
+function pagedFetch(items: Article[], pageSize: number): MpFetch {
+  return publishFetch(items.map((i) => mkGroup([i])), pageSize)
 }
 
 describe('listArticles count mode', () => {
@@ -77,10 +84,10 @@ describe('listArticles count mode', () => {
   })
 
   it('skips items without a link', async () => {
-    const fetch: MpFetch = async () => ({
-      base_resp: { ret: 0 }, app_msg_cnt: 2,
-      app_msg_list: [{ title: 'no-link', create_time: 1 }, { link: 'u1', title: 't', create_time: 2 }],
-    }) as never
+    const fetch = publishFetch([mkGroup([
+      { title: 'no-link', create_time: 1, item_show_type: 0, itemidx: 1 } as never,
+      { link: 'u1', title: 't', create_time: 2, item_show_type: 0, itemidx: 1 },
+    ])])
     const refs = await listArticles(fetch, 'T', 'FID', { count: 10 }, noSleep)
     expect(refs.map((r) => r.url)).toEqual(['u1'])
   })
@@ -95,7 +102,10 @@ describe('listArticlesSince (订阅检查:翻到水位为止)', () => {
     const fetch: MpFetch = async (_e, params) => {
       calls++
       const begin = Number(params.begin)
-      return { base_resp: { ret: 0 }, app_msg_cnt: items.length, app_msg_list: items.slice(begin, begin + 5) } as never
+      return { base_resp: { ret: 0 }, publish_page: JSON.stringify({
+        total_count: items.length,
+        publish_list: items.slice(begin, begin + 5).map((i) => mkGroup([i as never])),
+      }) } as never
     }
     return { fetch, calls: () => calls }
   }
@@ -141,13 +151,12 @@ describe('listArticlesSince (订阅检查:翻到水位为止)', () => {
 describe('listArticles date mode', () => {
   // unix 秒，UTC 正午避免时区翻日
   const ts = (d: string) => Date.parse(`${d}T12:00:00`) / 1000
-  const item = (d: string) => ({ link: `u${d}`, title: d, create_time: ts(d) })
+  const item = (d: string) => ({ link: `u${d}`, title: d, create_time: ts(d), item_show_type: 0, itemidx: 1 })
 
   it('keeps only items within [from,to], newest-first', async () => {
-    const fetch: MpFetch = async () => ({
-      base_resp: { ret: 0 }, app_msg_cnt: 4,
-      app_msg_list: [item('2026-02-27'), item('2026-02-26'), item('2026-02-25'), item('2026-02-24')],
-    }) as never
+    const fetch = publishFetch(
+      [item('2026-02-27'), item('2026-02-26'), item('2026-02-25'), item('2026-02-24')]
+        .map((i) => mkGroup([i as never])))
     const refs = await listArticles(fetch, 'T', 'FID', { from: '2026-02-25', to: '2026-02-26' }, { sleep: async () => {} })
     expect(refs.map((r) => r.title)).toEqual(['2026-02-26', '2026-02-25'])
   })
@@ -160,5 +169,58 @@ describe('listArticles date mode', () => {
     })
     const refs = await listArticles(pagedFetch(days, 5), 'T', 'FID', { from: '2026-05-24', to: '2026-05-27' }, { sleep: async () => {} })
     expect(refs.map((r) => r.title)).toEqual(['2026-05-27', '2026-05-26', '2026-05-25', '2026-05-24'])
+  })
+})
+
+// ── M36:列表接口换成 appmsgpublish(旧的 appmsg?type=9 只返回图文素材) ──
+describe('appmsgpublish 列表解析(M36)', () => {
+  const fixture = JSON.parse(
+    readFileSync(join(__dirname, '../fixtures/appmsgpublish.json'), 'utf-8'),
+  ) as Record<string, unknown>
+  const fixtureGroups = JSON.parse(String(fixture.publish_page)).publish_list as ReturnType<typeof mkGroup>[]
+  // 必须按 begin 真分页:fetch 无视 begin 一直返回同一页的话,调用方会一直翻下去、重复累积
+  const fixtureFetch = publishFetch(fixtureGroups)
+
+  it('全部消息类型都进列表,并带出 itemShowType', async () => {
+    const refs = await listArticles(fixtureFetch, 'T', 'FID', { count: 50 }, noSleep)
+    const kinds = [...new Set(refs.map((r) => r.itemShowType))].sort((a, b) => Number(a) - Number(b))
+    // 旧接口只会给 0;这里必须同时看到文字(10)、视频(5)、图文消息(8)
+    expect(kinds).toEqual([0, 5, 8, 10])
+  })
+
+  it('一次群发多篇全部展开,按 itemidx 顺序', async () => {
+    const refs = await listArticles(fixtureFetch, 'T', 'FID', { count: 50 }, noSleep)
+    const multi = refs.filter((r) => r.title.startsWith('一次群发'))
+    expect(multi.map((r) => r.title)).toEqual(['一次群发·头条', '一次群发·次条'])
+  })
+
+  it('已删除的文章不进列表', async () => {
+    const refs = await listArticles(fixtureFetch, 'T', 'FID', { count: 50 }, noSleep)
+    expect(refs.some((r) => r.title.includes('已删除'))).toBe(false)
+  })
+
+  it('游标按「组数」推进 —— 一组多篇时不能按文章数推进,否则会跳组', async () => {
+    // 6 组共 7 篇(含 1 组两篇、1 条已删除);每页 2 组
+    const seen: number[] = []
+    const spy: MpFetch = async (endpoint, params) => {
+      seen.push(Number(params.begin))
+      const pp = JSON.parse(String((fixture as { publish_page: string }).publish_page))
+      const begin = Number(params.begin)
+      return { base_resp: { ret: 0 }, publish_page: JSON.stringify({
+        total_count: pp.publish_list.length, publish_list: pp.publish_list.slice(begin, begin + 2),
+      }) } as never
+    }
+    await listArticles(spy, 'T', 'FID', { count: 99 }, noSleep)
+    expect(seen).toEqual([0, 2, 4])   // 按组数 +2,不是按文章数
+  })
+
+  it('脏数据不炸整次抓取:publish_page 不是合法 JSON 时返回空页', async () => {
+    const bad: MpFetch = async () => ({ base_resp: { ret: 0 }, publish_page: '{oops' }) as never
+    await expect(listArticles(bad, 'T', 'FID', { count: 5 }, noSleep)).resolves.toEqual([])
+  })
+
+  it('频控/登录态判定不受影响(仍在解析之前)', async () => {
+    const limited: MpFetch = async () => ({ base_resp: { ret: 200013 } }) as never
+    await expect(listArticles(limited, 'T', 'FID', { count: 5 }, noSleep)).rejects.toBeInstanceOf(MpRateLimited)
   })
 })

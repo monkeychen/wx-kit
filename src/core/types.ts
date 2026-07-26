@@ -18,6 +18,8 @@ export interface ParsedArticle {
   contentHtml: string   // 清洗后的正文 HTML
   imageUrls: string[]   // 正文中出现的图片 URL（去重、按出现顺序）
   videos: MpVideoSource[] // 内嵌上传视频（mpvideo，已择最高清档）；无视频为 []
+  itemShowType: number | null  // 消息类型（0 图文 / 5 视频 / 8 图文消息 / 10 文字 / …）；读不到为 null
+  warnings: string[]           // 解析期的非致命问题（未识别类型、正文疑似脚本等）
 }
 
 /** 落盘后一篇文章的元信息，存入 library.json */
@@ -33,6 +35,8 @@ export interface ArticleMeta {
   downloadTime: string        // ISO 8601
   formats: DownloadFormat[]   // 实际生成的格式
   dir: string                 // 文章文件夹绝对路径
+  /** 消息类型（M36）：让「这篇是什么」可查、可筛，也便于日后适配新类型时定位存量 */
+  itemShowType?: number
   /**
    * 内嵌视频明细（有视频才写）。**不存 url**——直链带 auth_key/dis_t 签名有时效，
    * 存下来隔次就失效，只会误导。`path` 为库内相对路径，未下载（没选 video 格式）时缺省。

@@ -2,6 +2,7 @@
 import * as cheerio from 'cheerio'
 import type { ParsedArticle } from './types'
 import { extractMpVideos } from './parse-video'
+import { kindOf, readItemShowType, unknownKindWarning, type MessageKind } from './message-kind'
 
 function meta($: cheerio.CheerioAPI, prop: string): string {
   return $(`meta[property="${prop}"]`).attr('content')?.trim() ?? ''
@@ -106,17 +107,6 @@ function extractContentNoencode(html: string): string {
   return c ? unescapeJsString(c[1]).trim() : ''
 }
 
-/**
- * 视频消息（appmsg_type 10002 / item_show_type 5）：整页内容 = 标题 + 描述 + 视频，
- * 没有 rich_media_content。**陷阱**：这类页面有 #js_content，但那是「分享提示」空壳
- * （`share_notice_wrp`，里面是大段内联 script），非空 → 「#js_content 为空才走脚本变量」
- * 的分流会被跳过，那个壳被当成正文（曾产出 21.8 万字符的 JavaScript）。
- * 故视频消息必须**在读 #js_content 之前**判定，不能等分流。
- */
-function isVideoMessage(html: string): boolean {
-  return /window\.appmsg_type\s*=\s*'10002'/.test(html) || /item_show_type:\s*'5'\s*\*/.test(html)
-}
-
 function extractPictureMessage(html: string): { content: string; imageUrls: string[] } {
   const imageUrls: string[] = []
   const start = html.indexOf('window.picture_page_info_list')
@@ -142,7 +132,13 @@ export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
   const digest = cleanMetaText(meta($, 'og:description'))
   const coverUrl = meta($, 'og:image')
 
+  // 视频与类型无关:它是附加内容(和图片同级),有就取——
+  // 例如「文字消息(10) + 带视频」的混合体,正文按文字消息取,视频照样要下。
   const videos = extractMpVideos(html)
+
+  const itemShowType = readItemShowType(html)
+  const kind = kindOf(itemShowType)
+  const warnings: string[] = []
 
   const $content = $('#js_content')
   // 微信图片真实地址在 data-src
@@ -151,25 +147,53 @@ export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
     const src = $(el).attr('data-src') || $(el).attr('src')
     if (src && !imageUrls.includes(src)) imageUrls.push(src)
   })
-  // 视频消息页的 #js_content 是分享提示壳，不可信 —— 直接判定，不进后面的分流
-  let contentHtml = isVideoMessage(html) ? textToParagraphs(extractContentNoencode(html)) : ($content.html() ?? '')
 
-  // 非标准消息类型：无 #js_content（页面前端渲染），正文/图片藏在脚本变量里
-  if (!contentHtml.trim() && !isVideoMessage(html)) {
+  // 按类型取正文。不认识的类型走 article 兜底,但**必须出声**——
+  // 静默兜底正是「21.8 万字符 JS 当正文」那个 bug 能一路绿灯的原因。
+  let contentHtml = ''
+  const fromJsContent = () => {
+    const h = $content.html() ?? ''
+    // 类型判对了但页面结构变了也要能发现:正文里出现大段脚本就是信号
+    if (h.includes('<script') && h.length > 20000) {
+      warnings.push('正文疑似包含页面脚本(可能是未适配的消息类型),建议核对该篇 content.md。')
+    }
+    return h
+  }
+  const fromTextMessage = (): string => {
     const text = extractTextMessageContent(html)
-    if (text) {
-      // 文字消息：无标题，og:title 被塞入整篇正文 → 从正文首行生成短标题
-      contentHtml = textToParagraphs(text)
-      title = titleFromText(text)
-    } else {
-      const pic = extractPictureMessage(html)
-      if (pic.imageUrls.length) {
-        // 图文消息：文字段落 + 逐张主图（data-src 形态，走既有图片本地化管线）
-        contentHtml = [textToParagraphs(pic.content), ...pic.imageUrls.map((u) => `<p><img data-src="${u}"></p>`)]
-          .filter(Boolean)
-          .join('\n')
-        imageUrls.push(...pic.imageUrls)
-      }
+    if (!text) return ''
+    // 文字消息无标题,og:title 被塞入整篇正文 → 从正文首行生成短标题
+    title = titleFromText(text)
+    return textToParagraphs(text)
+  }
+  const fromPictureMessage = (): string => {
+    const pic = extractPictureMessage(html)
+    if (!pic.imageUrls.length) return ''
+    imageUrls.push(...pic.imageUrls)
+    return [textToParagraphs(pic.content), ...pic.imageUrls.map((u) => `<p><img data-src="${u}"></p>`)]
+      .filter(Boolean).join('\n')
+  }
+  const byKind: Record<MessageKind, () => string> = {
+    article: fromJsContent,
+    text: fromTextMessage,
+    picture: fromPictureMessage,
+    video: () => textToParagraphs(extractContentNoencode(html)),
+    unknown: fromJsContent,
+  }
+  contentHtml = byKind[kind]()
+  // 告警要挑准时机,否则会变成噪音、被无视:
+  //  · 认不出的**具体类型号** → 一定说(我们确实没适配它)
+  //  · 压根读不到类型,但 #js_content 有正常正文 → 不说(按图文处理本来就对)
+  if (kind === 'unknown' && (itemShowType != null || !contentHtml.trim())) {
+    warnings.push(unknownKindWarning(itemShowType))
+  }
+
+  // 认识的类型也可能取空(页面改版/字段挪位):退回旧的启发式链兜底,同样出声
+  if (!contentHtml.trim() && kind !== 'article') {
+    const fallback = fromTextMessage() || fromPictureMessage() || fromJsContent()
+    if (fallback.trim()) {
+      warnings.push(`消息类型 ${itemShowType} 的常规解析取不到正文,已用兜底方式提取,建议核对。`)
+      contentHtml = fallback
     }
   }
 
@@ -183,5 +207,7 @@ export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
     contentHtml,
     imageUrls,
     videos,
+    itemShowType,
+    warnings,
   }
 }

@@ -175,3 +175,46 @@ describe('parseArticle video message (appmsg_type 10002)', () => {
     expect(parseArticle(plain, 'x').videos).toEqual([])
   })
 })
+
+describe('parseArticle 按消息类型分发(M36)', () => {
+  const videoHtml = readFileSync(join(__dirname, '../fixtures/video-message.html'), 'utf-8')
+
+  it('带出 itemShowType,普通文章无告警', () => {
+    const a = parseArticle(readFileSync(join(__dirname, '../fixtures/sample-article.html'), 'utf-8'), 'x')
+    expect(a.warnings).toEqual([])
+  })
+
+  it('未识别的类型:按图文兜底,但必须出声(不能静默产出垃圾)', () => {
+    const html = "<html><body><div id=\"js_content\"><p>正文</p></div>" +
+      "<script>item_show_type: '77' * 1,</script></body></html>"
+    const a = parseArticle(html, 'x')
+    expect(a.itemShowType).toBe(77)
+    expect(a.contentHtml).toContain('正文')          // 兜底仍要出内容
+    expect(a.warnings.join()).toContain('未识别的消息类型 77')
+  })
+
+  it('读不到类型但正文正常 → 不告警(按图文处理本来就对,报了只是噪音)', () => {
+    const a = parseArticle('<html><body><div id="js_content"><p>正文</p></div></body></html>', 'x')
+    expect(a.itemShowType).toBeNull()
+    expect(a.warnings).toEqual([])
+  })
+
+  it('读不到类型且正文也空 → 告警(这才是真的不知道怎么办)', () => {
+    const a = parseArticle('<html><body><div id="js_content"></div></body></html>', 'x')
+    expect(a.warnings.join()).toContain('没有读到消息类型')
+  })
+
+  it('正文疑似整页脚本时告警(类型判对但页面改版的信号)', () => {
+    const junk = '<script>' + 'x'.repeat(25000) + '</script>'
+    const html = `<html><body><div id="js_content">${junk}</div><script>item_show_type: '0' * 1,</script></body></html>`
+    expect(parseArticle(html, 'x').warnings.join()).toContain('正文疑似包含页面脚本')
+  })
+
+  it('视频消息(5)照旧走描述文字,不回归', () => {
+    const a = parseArticle(videoHtml, 'x')
+    expect(a.itemShowType).toBe(5)
+    expect(a.contentHtml).not.toContain('<script')
+    expect(a.videos).toHaveLength(1)
+    expect(a.warnings).toEqual([])
+  })
+})

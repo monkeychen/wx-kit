@@ -26,6 +26,7 @@ export function buildMeta(input: BuildMetaInput): ArticleMeta {
     downloadTime: now,
     formats,
     dir,
+    ...(parsed.itemShowType != null ? { itemShowType: parsed.itemShowType } : {}),
   }
 }
 

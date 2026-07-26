@@ -16,7 +16,13 @@ export type MpFetch = (endpoint: string, params: Record<string, string>) => Prom
 export interface MpAccount { fakeid: string; nickname: string; alias: string; signature: string }
 
 /** 列表阶段对一篇文章的最小描述。下载会重新解析文章页拿全量元信息。 */
-export interface ArticleRef { url: string; title: string; createTime: number } // createTime: unix 秒
+export interface ArticleRef {
+  url: string
+  title: string
+  createTime: number      // unix 秒
+  /** 消息类型(M36):0 图文 / 5 视频 / 8 图文消息 / 10 文字 / 11…;列表接口直接给,不必猜 */
+  itemShowType?: number
+}
 
 export type CrawlRange = { count: number } | { from: string; to: string }
 

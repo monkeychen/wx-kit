@@ -3,7 +3,14 @@ import type { MpFetch, MpAccount, ArticleRef, CrawlRange, MpJson } from './mp-ty
 import { MpRateLimited, MpAuthExpired, MpApiError } from './mp-errors'
 
 const SEARCHBIZ = 'https://mp.weixin.qq.com/cgi-bin/searchbiz'
-const APPMSG = 'https://mp.weixin.qq.com/cgi-bin/appmsg'
+/**
+ * 「已发表」列表。**不要换回 `cgi-bin/appmsg?type=9`** —— 那个拉的是「图文素材」,
+ * 只返回 item_show_type=0 的图文:实测某号 appmsg 给 370 篇、最新卡在 2026-07-17,
+ * 而本接口给 770 篇、最新 2026-07-25,文字消息(10)与视频消息(5)全在里面。
+ * 旧接口没有「取全部类型」的开关(type 换任何值都 ret=200002),只能换接口。
+ * 后果不只是批量抓取少几篇:订阅检查共用这条链路,曾长期静默漏检整类消息。
+ */
+const APPMSG_PUBLISH = 'https://mp.weixin.qq.com/cgi-bin/appmsgpublish'
 const PAGE = 20
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -35,26 +42,55 @@ export async function searchAccount(mpFetch: MpFetch, token: string, name: strin
 
 export interface ListOpts { sleep?: (ms: number) => Promise<void> }
 
+/** 中间两层是 JSON 字符串;脏数据不该炸掉整次抓取,解析失败按空处理 */
+function parseJsonSafe<T>(raw: unknown): T | null {
+  if (typeof raw !== 'string') return null
+  try { return JSON.parse(raw) as T } catch { return null }
+}
+
+interface PublishGroup { publish_info?: string }
+interface PublishPage { total_count?: number; publish_list?: PublishGroup[] }
+interface AppMsgEx {
+  link?: string; title?: string; create_time?: number
+  item_show_type?: number; itemidx?: number; is_deleted?: boolean
+}
+
+/**
+ * 拉一页「已发表」记录。
+ * 结构:`publish_page`(JSON 串)→ `publish_list[]` → 每组的 `publish_info`(JSON 串)→ `appmsgex[]`。
+ * **begin/count 按「群发组」计,不是文章数**——一次群发多篇时一组含多项,
+ * 故 pageLen 返回组数;按文章数推进游标会整组跳过(旧接口踩过同类坑,见下方 listArticles 注释)。
+ */
 async function fetchPage(
   mpFetch: MpFetch, token: string, fakeid: string, begin: number,
 ): Promise<{ items: ArticleRef[]; total: number; pageLen: number }> {
-  const json = await mpFetch(APPMSG, {
-    action: 'list_ex', begin: String(begin), count: String(PAGE), fakeid,
-    token, lang: 'zh_CN', f: 'json', ajax: '1', type: '9', query: '',
+  const json = await mpFetch(APPMSG_PUBLISH, {
+    sub: 'list', sub_action: 'list_ex', begin: String(begin), count: String(PAGE), fakeid,
+    type: '101_1', free_publish_type: '1', search_field: 'null', query: '',
+    token, lang: 'zh_CN', f: 'json', ajax: '1',
   })
   checkRet(json)
-  const raw = (json.app_msg_list as Record<string, unknown>[]) ?? []
-  const items: ArticleRef[] = raw
-    .filter((i) => i.link)
-    .map((i) => ({ url: String(i.link), title: String(i.title ?? ''), createTime: Number(i.create_time ?? 0) }))
-  // pageLen = 原始返回条数（含无链接项）；begin 是原始列表偏移，必须按它推进。
-  return { items, total: Number(json.app_msg_cnt ?? 0), pageLen: raw.length }
+  const page = parseJsonSafe<PublishPage>((json as Record<string, unknown>).publish_page)
+  const groups = page?.publish_list ?? []
+  const items: ArticleRef[] = []
+  for (const g of groups) {
+    const info = parseJsonSafe<{ appmsgex?: AppMsgEx[] }>(g.publish_info)
+    for (const a of info?.appmsgex ?? []) {
+      if (!a.link || a.is_deleted) continue
+      items.push({
+        url: String(a.link), title: String(a.title ?? ''), createTime: Number(a.create_time ?? 0),
+        ...(a.item_show_type != null ? { itemShowType: Number(a.item_show_type) } : {}),
+      })
+    }
+  }
+  return { items, total: Number(page?.total_count ?? 0), pageLen: groups.length }
 }
 
 /**
  * 订阅检查专用:从最新往回翻,直到看见 ≤sinceTs 的已读文章为止,封顶 cap 篇。
- * 日常(水位就在第一页内)恒 1 次请求——微信每页实回 ~5 篇,固定取 20 要翻 4 页,
- * 对「日更最多一篇」的订阅号是纯浪费;空窗多日后整页全新才继续翻深,不漏文章。
+ * 日常(水位就在第一页内)恒 1 次请求;空窗多日后整页全新才继续翻深,不漏文章。
+ * (M36 前的旧接口每页实回 ~5 条,这条「翻到水位为止」的逻辑正是为它做的补偿;
+ *  换 appmsgpublish 后每页 20 组,一次请求覆盖更深,逻辑不变但触发翻页的机会少多了。)
  * 返回值含扫到的旧文章,新旧判定留给调用方(checkSubscriptions 按水位过滤)。
  */
 export async function listArticlesSince(
@@ -98,8 +134,8 @@ export async function listArticles(
         out.push(it)
       }
     }
-    // 微信实际每页常少于请求的 count（实测 5）；游标必须按「原始返回篇数」推进，
-    // 否则按固定步长会跳过中间文章（曾导致日期范围/最近 N 篇漏抓，见 mp-client.test）。
+    // 游标必须按「本页实际返回的组数」推进：微信常少于请求的 count，
+    // 且一组可能含多篇；按固定步长或按文章数推进都会跳内容（见 mp-client.test）。
     begin += pageLen
     if (begin >= total) break
   }
