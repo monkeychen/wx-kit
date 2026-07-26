@@ -5,13 +5,12 @@
 
 ## 当前状态
 
-- **最新发布:v0.8.1(2026-07-22,补丁)** —— tag `v0.8.1` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M33 真正修掉 mac CLI 程序坞图标(`LSUIElement`;v0.8.0 的 `dock.hide()` 修法无效,详见 `docs/PRD-v0.8.1.md`)+ 设置页「站点同步」hover 建站指引。上一功能版 v0.8.0(2026-07-22,让内容流到该去的地方):M31 CLI/订阅增强、M32 站点同步,需求/验收 `docs/PRD-v0.8.0.md`。
-- **开发中:v0.8.2「不让用户猜」(2026-07-26 启动)** —— 补三处「系统知道却没告诉用户」的盲区:M34 订阅检查反馈、M35 含视频文章下载、M36 列表接口修正+消息类型一等公民(旧接口漏掉文字/视频消息,订阅一直静默漏检)、M37 更新检查。需求/验收 `docs/PRD-v0.8.2.md`。
+- **最新发布:v0.8.2(2026-07-26,不让用户猜)** —— tag `v0.8.2` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M34 订阅检查反馈、M35 含视频文章下载、M36 列表接口修正 + 消息类型一等公民(旧接口只返回图文素材,订阅一直静默漏检整类消息)、M37 更新检查 + 按渠道引导升级。需求/验收 `docs/PRD-v0.8.2.md`,发布说明 `docs/releases/v0.8.2.md`,复盘 devlog §37。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
 
-**M1–M33 已随 v0.1.0–v0.8.1 发布**;**M34–M37 为开发中的 v0.8.2**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M37 已随 v0.1.0–v0.8.2 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -55,10 +54,11 @@
 | **M36** ✅ | v0.8.2 | **列表接口修正 + 消息类型一等公民**:`appmsg?type=9`(370 篇/只有图文/最新卡在 7-17)换成 `appmsgpublish`(770 篇/全类型/每页 20);解析改按 `item_show_type` 显式分发,未知类型进 `warnings` 不再静默产出垃圾(2026-07-26 完成:实测最近 10 篇里 9 篇是旧接口看不见的;订阅检查补回 6 篇漏检) | `plans/2026-07-26-m36.md` |
 | **M37** ✅ | v0.8.2 | 更新检查 + 按渠道引导升级:GitHub API 查最新版、自写版本比较(不引 semver)、识别 brew/dmg/nsis 渠道给对应动作(brew 给三段命令一键复制)、启动静默检查 + 只点一个圆点不打扰(2026-07-26 完成,真机识别 brew + 两条路径实测) | `plans/2026-07-26-m37.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`(开发中)(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
+- **v0.8.2 · 2026-07-26 · 不让用户猜** —— 四条需求的共同点是「系统知道却没告诉用户」。M34 订阅检查反馈(IPC 层丢了返回值→渲染层想提示也无从提示;自动下载那条路径连进度事件都不发;顺带修 `lastCheckedAt` 只在一条分支写导致「尚未检查」与结果并列矛盾)。M35 含视频文章下载(**视频是内容不是格式**——安哥试用后纠正,已从格式选项降级为「有就下」+ 设置开关;择档按分辨率,`format_id` 与画质无关且方向相反;`auth_key` 有时效故解析即下、URL 不入库;顺带修掉视频消息页把 21.8 万字符内联 JS 当正文的 bug)。M36 列表接口修正(`appmsg?type=9` 只给图文素材:370 篇/最新卡在 7-17,换 `appmsgpublish` 得 770 篇/全类型;**订阅检查共用同一链路,此前一直静默漏检整类消息**;解析改按 `item_show_type` 分发,未知类型进 `warnings` 不再静默产出垃圾;`appmsg_type` 与 `item_show_type` 正交,10002 出现在没有视频的文字消息上)。换接口连带的去重回归(短链 vs 长链算出两个 id → 重复下载)用微信自己的文章主键 + canonical 匹配修好,老库不必迁移。M37 更新检查(不做静默自更新:adhoc 签名下 Squirrel 必败且与 brew 账本打架;告知强度刻意压到最低——只点一个圆点;按渠道给动作,brew 那条命令把踩过的两个坑固化进去)。发布说明 `docs/releases/v0.8.2.md`,复盘 devlog §37。
 - **v0.8.1 · 2026-07-22 · 补丁:dock 图标真修复** —— v0.8.0 宣称修好的 R5 实为误判,安哥用正式版跑 `wx-kit -h` 当场复现。根因:`app.dock.hide()` 在 `whenReady()` 前调用**不生效**,AppKit 在 ready 前已把进程注册成 `Foreground` 并画了图标(实测 `-h` 期间状态序列 `NULL→Foreground→UIElement`);当时的验证用跑 2–3 秒的 `download` 且延迟 2 秒才采样,**跳过启动瞬间**,是假阴性。改由 `LSUIElement`(mac Info.plist)在进程启动时定为 accessory,GUI 分支 ready 后 `dock.show()` + `focus` 要回图标与焦点。另加设置页「站点同步」的 `?` hover 指引(指向 dreamble 站点源码)。发布说明 `docs/releases/v0.8.1.md`。
 - **v0.8.0 · 2026-07-22 · 让内容流到该去的地方** —— 两条主线:让 agent 用 CLI 用得更顺 + 让文章流进个人站点。M31 订阅按号点检(核心 `checkSubscriptions` 本就按 accounts 数组查,只需在编排层开子集口子;与全量共享 in-flight 守卫)+ `library list`/`search` 默认 publishTime 降序(`sortArticles` 从 renderer 抽到 core 共享,默认序变更属轻度 breaking 已显式标注)+ `-h` 附仓库地址(agent 自助读 README)+ 修 mac CLI 堆程序坞图标(Electron 是 GUI 子系统进程,CLI 分支须主动 `app.dock.hide()`);M32 站点同步(目录级原子写入不复用只能单文件的 `atomic-write`;slug 冲突不覆盖;产物落进真实站点跑 `npm run check` 作为跨项目验收,验完清理不留痕;`site` 漏登 `CLI_COMMANDS` 白名单曾导致命令静默启 GUI 挂起)。发布说明 `docs/releases/v0.8.0.md`,复盘 devlog §36。
 - **v0.7.0 · 2026-07-20 · 磨平「下载 → 创作」链路** —— 不铺新平台、不改架构,只磨四处毛刺:M29 markdown 导出保留 GFM 表格(自写规则 + 微信 `<section>` 单元格压平,不引 turndown-plugin-gfm——插件产出非法 GFM 要修等于重写)+ 应用内版本号(设置页「关于」,刊头版本号上线即按反馈撤回)+ 原生标题栏文案去重(title + index.html 同改空);M30 导出素材 Modal 就地显示路径 + 一键复制「给 agent 的指令」(调研后否决「直接唤起 Claude Code」:CLI 虽能带 prompt 起会话,但唤起的是新终端陌生 cwd 的新会话,不如粘进用户已开着的会话)。发布说明 `docs/releases/v0.7.0.md`。
