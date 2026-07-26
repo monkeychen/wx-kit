@@ -22,6 +22,13 @@ export interface ArticleRef {
   createTime: number      // unix 秒
   /** 消息类型(M36):0 图文 / 5 视频 / 8 图文消息 / 10 文字 / 11…;列表接口直接给,不必猜 */
   itemShowType?: number
+  /**
+   * 微信自己的文章主键(= 长链里的 mid / idx)。列表接口直接给,**是跨 URL 形态稳定的去重依据**:
+   * 同一篇文章,旧接口给长链 `s?__biz=..&mid=..&idx=..&sn=..`、新接口给短链 `s/XXXX`,
+   * 光看 URL 认不出是同一篇(M36 换接口后重复下载的根因)。
+   */
+  appmsgid?: number
+  itemidx?: number
 }
 
 export type CrawlRange = { count: number } | { from: string; to: string }

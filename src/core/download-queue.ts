@@ -1,22 +1,26 @@
 // src/core/download-queue.ts
 import type { DownloadItemResult, DownloadSummary, ProgressEvent } from './types'
+import type { ArticleIdHint } from './article-id'
 
-export type DownloadOne = (url: string) => Promise<DownloadItemResult>
+/** 队列条目：光有 URL 时无法判重（短链认不出与长链是同一篇），故允许带上列表给的主键 */
+export type QueueItem = string | ({ url: string } & ArticleIdHint)
+export type DownloadOne = (url: string, hint?: ArticleIdHint) => Promise<DownloadItemResult>
 export type OnProgress = (e: ProgressEvent) => void
 
 export class DownloadQueue {
   constructor(private downloadOne: DownloadOne, private onProgress: OnProgress = () => {}) {}
 
-  async run(urls: string[], shouldContinue?: () => boolean): Promise<DownloadSummary> {
+  async run(input: QueueItem[], shouldContinue?: () => boolean): Promise<DownloadSummary> {
     const items: DownloadItemResult[] = []
-    const total = urls.length
+    const queue = input.map((i) => (typeof i === 'string' ? { url: i } : i))
+    const total = queue.length
 
     for (let i = 0; i < total; i++) {
       if (shouldContinue && !shouldContinue()) break
-      const url = urls[i]
+      const { url, ...hint } = queue[i]
       this.onProgress({ total, completed: i, currentUrl: url, phase: 'fetch' })
       try {
-        const r = await this.downloadOne(url)
+        const r = await this.downloadOne(url, hint)
         items.push(r)
         this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'save' })
       } catch (err) {

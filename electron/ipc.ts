@@ -207,7 +207,7 @@ export function registerIpc(settings: SettingsService): void {
     try {
       const summary = await crawlAccount(fakeid, range, {
         mpFetch: makeMpFetch(session), token: session.token, keywords,
-        downloadOne: (url) => downloadArticle(url, formats, ddeps),
+        downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
         onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
         onItem: (ev) => send({ kind: 'item', ...ev }),
         onBackoff: (ev) => send({ kind: 'backoff', ...ev }),
@@ -248,7 +248,7 @@ export function registerIpc(settings: SettingsService): void {
     const { libraryRoot, downloadVideos } = await settings.get()
     const library = new Library(libraryRoot)
     const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot, downloadVideos }
-    const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps), onProgress)
+    const queue = new DownloadQueue((url, hint) => downloadArticle(url, formats, ddeps, hint), onProgress)
     const summary = await queue.run(refs.map((r) => r.url))
     await recordHistory(source, formats, summary)
   }

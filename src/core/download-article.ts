@@ -2,7 +2,7 @@
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import type { DownloadFormat, DownloadItemResult } from './types'
-import { articleId } from './article-id'
+import { articleId, type ArticleIdHint } from './article-id'
 import { articleDirName, dedupeDirName, sanitizeName } from './paths'
 import { parseArticle } from './parse-article'
 import { exportArticle, type ExportDeps } from './exporter'
@@ -20,8 +20,10 @@ export async function downloadArticle(
   url: string,
   formats: DownloadFormat[],
   deps: DownloadArticleDeps,
+  /** 列表给的文章主键；缺省时只能从 URL 推断（短链推不出，见 articleId） */
+  hint?: ArticleIdHint,
 ): Promise<DownloadItemResult> {
-  const id = articleId(url)
+  const id = articleId(url, hint)
   if (await deps.library.has(id)) {
     const existing = await deps.library.get(id)
     return { url, ok: true, id, skipped: true, title: existing?.title, dir: existing?.dir }

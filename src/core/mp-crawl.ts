@@ -26,7 +26,7 @@ export function filterRefsByTitle(refs: ArticleRef[], f?: KeywordFilter): Articl
 export interface CrawlDeps {
   mpFetch: MpFetch
   token: string
-  downloadOne: (url: string) => Promise<DownloadItemResult>
+  downloadOne: (url: string, hint?: { appmsgid?: number; itemidx?: number }) => Promise<DownloadItemResult>
   /** 标题关键词过滤(列表后、下载前应用;见 filterRefsByTitle)。 */
   keywords?: KeywordFilter
   sleep?: (ms: number) => Promise<void>
@@ -79,12 +79,12 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
   // 下载阶段：复用 DownloadQueue（串行 + 单篇失败不中断 + 汇总）。
   // 逐篇上报「下载中→结果」，延迟在每篇前；index 经闭包计数（串行，顺序稳定）。
   let index = -1
-  const wrapped = async (url: string) => {
+  const wrapped = async (url: string, hint?: { appmsgid?: number; itemidx?: number }) => {
     const i = ++index
     deps.onItem?.({ index: i, status: 'downloading' })
     await sleep(randMs(2000, 5000))
     try {
-      const r = await deps.downloadOne(url)
+      const r = await deps.downloadOne(url, hint)
       deps.onItem?.({ index: i, status: r.skipped ? 'skipped' : 'ok' })
       return r
     } catch (e) {
@@ -93,7 +93,8 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
     }
   }
   const queue = new DownloadQueue(wrapped, deps.onProgress)
-  const s = await queue.run(refs.map((r) => r.url), deps.shouldContinue)
+  // 传 refs 而不是 urls：主键(appmsgid/itemidx)要跟着走，否则短链判不了重
+  const s = await queue.run(refs, deps.shouldContinue)
 
   // 取消时队列在第 s.items.length 篇处停下，其后的文章未尝试下载。把它们补登记为 cancelled
   // （列表阶段已有标题），让历史诚实列出「还有几篇没下」并支持单篇补下。串行下载保证 items 与 refs 同序。

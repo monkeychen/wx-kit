@@ -181,7 +181,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         const summary = await crawlAccount(fakeid, range, {
           mpFetch, token: session.token,
           ...(include || exclude ? { keywords: { include, exclude } } : {}),
-          downloadOne: (url) => downloadArticle(url, formats, ddeps),
+          downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
           onProgress: (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}\n`),
         })
         outJson(summary)
@@ -349,7 +349,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         const library = new Library(root)
         // 订阅检查没有 --no-video 开关，按设置走（与 GUI 的定时检查一致）
         const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: s.downloadVideos }
-        const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps))
+        const queue = new DownloadQueue((url, hint) => downloadArticle(url, formats, ddeps, hint))
         const summary = await queue.run(refs.map((r) => r.url))
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
       }

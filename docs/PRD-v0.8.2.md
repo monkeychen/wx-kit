@@ -231,6 +231,21 @@ isVideoMessage(html) ?          → content_noencode
 - [x] `appmsg_type` 与 `item_show_type` 不再混用:只读后者,`isVideoMessage()` 已删除。
 - [x] 既有链路不回归(单测 394 + e2e 全绿,e2e 含真实抓取)。
 
+**修复后暴露的回归(安哥试用当场发现,2026-07-26)**:换接口后**已下载过的文章会被重下**。
+根因是我引入的:`articleId` 对长链用 `mid_idx_sn`、对短链回退到路径哈希,
+而**同一篇文章两个接口给的 URL 形态不同**(旧接口长链 `s?__biz=..&mid=..&idx=..&sn=..`,
+新接口短链 `s/XXXX`)→ 算出两个 id → 去重失效。安哥库里因此多了 4 条重复(宝玉AI 的 4 篇)。
+
+修法:
+- **`ArticleRef` 带上列表已给的 `appmsgid`/`itemidx`**(= 长链里的 mid/idx,微信自己的文章主键),
+  经 `DownloadQueue`(改为可接受 ref,传字符串数组的调用方不受影响)透传给 `downloadArticle`。
+  这样短链也能算出与长链一致的标识。
+- **id 去掉 sn**:`sn` 是防伪/追踪参数,同一篇文章在不同分享链接里会变,含它反而会把同一篇当两篇。
+- **`canonicalId` 归一 + `Library.get` 按归一形式查**:老库的 `mid_idx_sn` 与新的 `mid_idx` 认作同一篇,
+  **不必迁移 library.json**(真实库 247 篇里 234 篇是老格式,实测匹配命中)。
+- **不能按标题去重**——真实库里「招财大师姐·下周策略」「腾讯研究院·AI每周关键词Top50」都是
+  周更同名但 mid 不同的**不同文章**,按标题去重会误删。
+
 **顺带纠正的一处误判**:R4 初稿说安哥举证那篇「确实带 `mp_video_trans_info`」——错了,
 只查了字段名存在、没查值。该篇 `mp_video_trans_info` 是**空数组**、`mpvideo.qpic.cn` 出现 0 次,
 根本没有视频。`video_page_info: {}` / `mp_video_trans_info: []` 是**所有文章页都有的空壳**,
