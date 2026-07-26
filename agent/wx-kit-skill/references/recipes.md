@@ -90,16 +90,22 @@ jq '{succeeded, failed, results}' sync.json
 | download 某篇 failed(标题空) | 文章已被删除 | 跳过即可,非环境问题 |
 | `AMBIGUOUS` + candidates | 公众号重名 | 从 candidates 取 fakeid 用 `--fakeid` |
 
-## 下载含视频的文章
+## 含视频的文章
 
-视频消息(公众号发的视频)与正文内嵌视频都走同一条路:加 `video` 格式。
+**不用做任何事**——文章带视频就会一并下载(视频是内容,和图片一样,不在 `--formats` 里选)。
 
 ```sh
-wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html,meta,video --out ./out
+wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html,meta --out ./out
 # 视频落在 <文章目录>/videos/video-N.mp4(自动取最高清档),md 里是可点链接,html 里是可播 <video>
 jq -r '.items[] | "\(.title): \(.warnings // ["无告警"] | join("; "))"' out.json
 ```
 
+批量抓取想省流量时关掉:
+
+```sh
+wx-kit crawl "某公众号" --count 200 --no-video --out ./out
+```
+
 **注意**:单个视频可达上百 MB(实测 1572×1080 一档 133MB,约 1 分钟下完)。
-不需要视频就别写 `video` —— 不写时正文仍会注明「本文含 N 个视频(未下载)」,信息不丢。
+`--no-video` 时正文仍会注明「本文含 N 个视频(未下载)」,信息不丢。
 

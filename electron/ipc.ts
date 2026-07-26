@@ -139,11 +139,11 @@ export function registerIpc(settings: SettingsService): void {
   })
 
   ipcMain.handle('download', async (event, { urls, formats }: { urls: string[]; formats: DownloadFormat[] }) => {
-    const { libraryRoot } = await settings.get()
+    const { libraryRoot, downloadVideos } = await settings.get()
     const library = new Library(libraryRoot)
     const deps = {
       fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
-      now: () => new Date().toISOString(), library, libraryRoot,
+      now: () => new Date().toISOString(), library, libraryRoot, downloadVideos,
     }
     const sendProgress = (ev: import('../src/core/types').ProgressEvent) => {
       if (!event.sender.isDestroyed()) event.sender.send('download:progress', ev)
@@ -194,12 +194,12 @@ export function registerIpc(settings: SettingsService): void {
     crawlAbort = abort
     const session = getSession()
     if (!session) throw new Error('AUTH_REQUIRED')
-    const { libraryRoot } = await settings.get()
+    const { libraryRoot, downloadVideos } = await settings.get()
     const library = new Library(libraryRoot)
     const send = (ev: unknown) => { if (!event.sender.isDestroyed()) event.sender.send('mp:crawl:progress', ev) }
     const ddeps = {
       fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
-      now: () => new Date().toISOString(), library, libraryRoot,
+      now: () => new Date().toISOString(), library, libraryRoot, downloadVideos,
       // 批量里选了视频格式时，逐篇的视频下载也要出声（同 URL 模式）
       onVideoProgress: (e: { index: number; total: number; video: { filesize: number; width: number; height: number } }) =>
         send({ kind: 'note', message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB）` }),
@@ -245,9 +245,9 @@ export function registerIpc(settings: SettingsService): void {
   }
 
   const downloadRefs = async (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource, onProgress?: (e: import('../src/core/types').ProgressEvent) => void) => {
-    const { libraryRoot } = await settings.get()
+    const { libraryRoot, downloadVideos } = await settings.get()
     const library = new Library(libraryRoot)
-    const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot }
+    const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot, downloadVideos }
     const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps), onProgress)
     const summary = await queue.run(refs.map((r) => r.url))
     await recordHistory(source, formats, summary)

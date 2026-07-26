@@ -9,6 +9,9 @@ export type NewArticleAction = 'notify' | 'download'
 export interface AppSettings {
   libraryRoot: string
   defaultFormats: DownloadFormat[]
+  /** 下载文中内嵌视频(M35):默认开。视频是内容不是格式,故不进 defaultFormats;
+   *  留开关是给批量抓取兜底——按公众号抓 200 篇时可能撞上多个视频消息,单个就上百 MB。 */
+  downloadVideos: boolean
   historyRetentionDays: number
   listColumnWidths: ListColumnWidths
   subscriptionAutoCheck: boolean
@@ -36,6 +39,7 @@ export class SettingsService {
     return {
       libraryRoot: this.defaultLibraryRoot,
       defaultFormats: ['md', 'html', 'meta'],
+      downloadVideos: true,
       historyRetentionDays: 365,
       listColumnWidths: { account: 132, publish: 150, download: 110 },
       subscriptionAutoCheck: false,

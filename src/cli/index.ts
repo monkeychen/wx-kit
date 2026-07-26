@@ -87,7 +87,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .description('下载一个或多个微信文章 URL')
     .option('-u, --url <url...>', '文章 URL（可多次）', [])
     .option('-f, --urls-file <file>', '每行一个 URL 的文件')
-    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta,video（video 可达上百 MB，默认不下）', 'md,html,meta')
+    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
+    .option('--no-video', '不下载文中内嵌视频（默认会下；单个视频可达上百 MB）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
       const urls: string[] = [...(opts.url ?? [])].map((s: string) => s.trim()).filter(Boolean)
@@ -98,7 +99,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const formats = parseFormats(opts.formats)
       const root = await resolveRoot(opts.out)
       const library = new Library(root)
-      const deps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
+      // commander 的 --no-video 把 opts.video 置 false；缺省为 true
+      const deps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
 
       const queue = new DownloadQueue(
         (url) => downloadArticle(url, formats, {
@@ -148,7 +150,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .option('--count <n>', '最近 N 篇')
     .option('--from <date>', '起始日期 YYYY-MM-DD')
     .option('--to <date>', '结束日期 YYYY-MM-DD')
-    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta,video（video 可达上百 MB，默认不下）', 'md,html,meta')
+    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
+    .option('--no-video', '不下载文中内嵌视频（默认会下；单个视频可达上百 MB）')
     .option('--include <csv>', '仅下载标题含任一关键词的文章（逗号分隔）')
     .option('--exclude <csv>', '排除标题含任一关键词的文章（逗号分隔，优先于 --include）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
@@ -172,7 +175,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         const formats = parseFormats(opts.formats)
         const root = await resolveRoot(opts.out)
         const library = new Library(root)
-        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
+        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
         const parseKws = (csv?: string) => csv ? String(csv).split(',').map((s) => s.trim()).filter(Boolean) : undefined
         const include = parseKws(opts.include), exclude = parseKws(opts.exclude)
         const summary = await crawlAccount(fakeid, range, {
@@ -344,7 +347,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const fakeids = opts.accounts ? String(opts.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : undefined
       const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
         const library = new Library(root)
-        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
+        // 订阅检查没有 --no-video 开关，按设置走（与 GUI 的定时检查一致）
+        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: s.downloadVideos }
         const queue = new DownloadQueue((url) => downloadArticle(url, formats, ddeps))
         const summary = await queue.run(refs.map((r) => r.url))
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }

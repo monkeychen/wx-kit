@@ -65,7 +65,7 @@ export async function downloadVideos(
 
   if (!download) {
     // 不静默丢弃:说清有几个、多大、怎么才能拿到
-    const note = `📹 本文含 ${videos.length} 个视频（未下载；${videos.map(spec).join('；')}）。下载时勾选「视频」格式即可保存。`
+    const note = `📹 本文含 ${videos.length} 个视频（未下载；${videos.map(spec).join('；')}）。在设置里打开「文中视频」后重新下载即可保存。`
     return { records, htmlSuffix: `<p>${note}</p>`, mdSuffix: note, warnings: [] }
   }
 

@@ -1,10 +1,11 @@
 // src/core/types.ts
 import type { MpVideoSource } from './parse-video'
-export type DownloadFormat = 'cover' | 'md' | 'html' | 'pdf' | 'meta' | 'video'
+export type DownloadFormat = 'cover' | 'md' | 'html' | 'pdf' | 'meta'
 
-// 可选格式全集（用于 CLI/设置校验）。**video 刻意不进 settings 的 defaultFormats**：
-// 单个视频实测可达 133MB，默认下会拖垮批量抓取，必须由用户/agent 显式选择。
-export const ALL_FORMATS: readonly DownloadFormat[] = ['cover', 'md', 'html', 'pdf', 'meta', 'video']
+// 格式 = 同一份内容的不同**表现形式**。视频不在其列：它是内容的一部分（和图片一样），
+// 有就下、没有就没有——做成格式选项的话，链接是普通文章时那个选项纯属噪音。
+// 是否下载视频由设置 downloadVideos 控制（默认开），见 M35 后续修正。
+export const ALL_FORMATS: readonly DownloadFormat[] = ['cover', 'md', 'html', 'pdf', 'meta']
 
 /** 解析微信文章页得到的结构（纯解析产物，未落盘） */
 export interface ParsedArticle {
