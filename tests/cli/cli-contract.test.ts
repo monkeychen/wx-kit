@@ -532,35 +532,14 @@ describe('CLI session export/import (M27)', () => {
   })
 })
 
-describe('CLI update(M37)', () => {
-  it('输出契约:current/latest/updateAvailable/channel/upgradeCommand', async () => {
-    const code = await runCli(['update', '--check'])
-    const out = JSON.parse(stdout)
-    if (out.ok) {
-      // 真联网时:字段齐全,且 channel 是四种之一
-      expect(out).toMatchObject({ ok: true })
-      expect(typeof out.current).toBe('string')
-      expect(typeof out.latest).toBe('string')
-      expect(typeof out.updateAvailable).toBe('boolean')
-      expect(['brew', 'dmg', 'nsis', 'unknown']).toContain(out.channel)
-      expect(code).toBe(0)
-    } else {
-      // 网络不可达时:明确的错误码 + 退出码 1(agent 可判别,不会把失败当成「已是最新」)
-      expect(out.error.code).toBe('UPDATE_CHECK_FAILED')
-      expect(code).toBe(1)
-    }
-  })
-
-  it('brew 渠道给出的命令三段齐全(少一段就会踩坑)', async () => {
-    await runCli(['update', '--check'])
-    const out = JSON.parse(stdout)
-    if (out.ok && out.channel === 'brew') {
-      expect(out.upgradeCommand).toContain('brew update')
-      expect(out.upgradeCommand).toContain('brew upgrade --cask wx-kit')
-      expect(out.upgradeCommand).toContain('xattr -cr')
-    }
-  })
-
+// CLI 的 update 命令**不做联网单测**:它内部 8 秒才超时,而 vitest 默认 5 秒就判失败,
+// GitHub 稍慢就必然变红(实测 4 轮里红 1 轮,5009ms)。放宽 vitest 超时只会让套件更慢更飘,
+// 而单测套件的价值恰恰在「快且确定」。这一层的实际覆盖:
+//   · checkUpdate 的逻辑与全部失败路径 → tests/core/check-update.test.ts(注入 fetch,9 条)
+//   · 渠道识别与三段命令               → tests/core/install-channel.test.ts(10 条)
+//   · update 已登记 CLI_COMMANDS       → tests/electron/cli-dispatch.test.ts
+//   · 真实输出契约                     → 真机跑 `electron . update --check` 验证(见 M37 计划)
+describe('CLI version(不联网)', () => {
   it('version 命令不联网 —— 保持原有速度与纯净输出', async () => {
     const code = await runCli(['version'])
     expect(code).toBe(0)

@@ -336,6 +336,10 @@ isVideoMessage(html) ?          → content_noencode
       `{ok, current, latest, updateAvailable, channel, upgradeCommand}`,实测 `channel: "brew"`;
       失败给 `UPDATE_CHECK_FAILED` + 退出码 1(**agent 不会把失败当成「已是最新」**)。
       `update` 已登记 `CLI_COMMANDS` 并有回归测试(漏登的症状是挂起不是报错)。
+      **CLI 这一层不做联网单测**:命令内部 8 秒才超时而 vitest 默认 5 秒判失败,GitHub 稍慢必红
+      (实测 4 轮红 1 轮);放宽超时只会让套件更慢更飘,而单测的价值就在「快且确定」。
+      改由 core 层注入测试(check-update 9 条 + install-channel 10 条)+ 真机跑
+      `electron . update --check` 覆盖,实测 `channel: "brew"`、三段命令齐全。
 - [x] skill 文档同步(commands.md 输出契约 + SKILL.md 速查表);单测 447 + e2e 全绿。
 
 **实现中的一处调整**:计划里说发布说明「markdown 渲染或纯文本预格式化,看观感定」。
