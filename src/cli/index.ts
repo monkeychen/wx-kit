@@ -87,7 +87,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .description('下载一个或多个微信文章 URL')
     .option('-u, --url <url...>', '文章 URL（可多次）', [])
     .option('-f, --urls-file <file>', '每行一个 URL 的文件')
-    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
+    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta,video（video 可达上百 MB，默认不下）', 'md,html,meta')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
       const urls: string[] = [...(opts.url ?? [])].map((s: string) => s.trim()).filter(Boolean)
@@ -101,8 +101,13 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const deps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root }
 
       const queue = new DownloadQueue(
-        (url) => downloadArticle(url, formats, deps),
-        (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}\n`),
+        (url) => downloadArticle(url, formats, {
+          ...deps,
+          // 视频动辄上百 MB、单个一分多钟：stderr 上要说一声，否则看着像挂了
+          onVideoProgress: (e) => process.stderr.write(
+            `  ↓ 视频 ${e.index}/${e.total}：${(e.video.filesize / 1048576).toFixed(1)}MB ${e.video.width}×${e.video.height}\n`),
+        }),
+        (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}${e.message ? ' ' + e.message : ''}\n`),
       )
       const summary = await queue.run(urls)
       out(summary)
@@ -143,7 +148,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .option('--count <n>', '最近 N 篇')
     .option('--from <date>', '起始日期 YYYY-MM-DD')
     .option('--to <date>', '结束日期 YYYY-MM-DD')
-    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta', 'md,html,meta')
+    .option('--formats <csv>', '逗号分隔：cover,md,html,pdf,meta,video（video 可达上百 MB，默认不下）', 'md,html,meta')
     .option('--include <csv>', '仅下载标题含任一关键词的文章（逗号分隔）')
     .option('--exclude <csv>', '排除标题含任一关键词的文章（逗号分隔，优先于 --include）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')

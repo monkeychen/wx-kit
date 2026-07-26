@@ -143,3 +143,35 @@ describe('parseArticle account fallback', () => {
     expect(parseArticle(html, 'x').account).toBe('实时账号')
   })
 })
+
+describe('parseArticle video message (appmsg_type 10002)', () => {
+  // 视频消息页：整页内容 = 标题 + 描述 + 视频，没有 rich_media_content。
+  // 陷阱：这类页面**有** #js_content，但它是「分享提示」空壳（含大段内联 script），
+  // 于是 M19 建立的「#js_content 为空才走脚本变量」分流被跳过，
+  // 旧实现直接把那个壳当正文 → contentHtml 是 21.8 万字符的 JavaScript。
+  const html = readFileSync(join(__dirname, '../fixtures/video-message.html'), 'utf-8')
+  const a = parseArticle(html, 'https://mp.weixin.qq.com/s/bXUTSRQ_zIvyigWiqw3UfA')
+
+  it('正文不再是内联脚本垃圾', () => {
+    expect(a.contentHtml).not.toContain('<script')
+    expect(a.contentHtml).not.toContain('__INLINE_SCRIPT__')
+    expect(a.contentHtml.length).toBeLessThan(2000)
+  })
+  it('正文取 content_noencode 的描述文字，段落形态', () => {
+    expect(a.contentHtml).toContain('<p>Anthropic Claude 平台的三位负责人聊了 Agent 基础设施的最新变化')
+  })
+  it('标题/公众号/时间/封面不回归', () => {
+    expect(a.title).toBe('构建未来的 Agent 基础设施')
+    expect(a.account).toBe('宝玉AI')
+    expect(a.publishTime).toBe('2026-07-12 13:20')
+    expect(a.coverUrl).toContain('mmbiz.qpic.cn')
+  })
+  it('带出视频源（择最高清档）', () => {
+    expect(a.videos).toHaveLength(1)
+    expect(a.videos[0].formatId).toBe('10002')
+  })
+  it('普通文章的 videos 是空数组', () => {
+    const plain = readFileSync(join(__dirname, '../fixtures/sample-article.html'), 'utf-8')
+    expect(parseArticle(plain, 'x').videos).toEqual([])
+  })
+})

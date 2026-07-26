@@ -45,6 +45,8 @@ export default function ArticleCard({ meta, libraryRoot, index, selected, onTogg
       <div className="article-body">
         <div className="article-title" title={meta.title}>{meta.title || '(无标题)'}</div>
         <div className="article-meta">
+          {/* 含视频的文章值得一眼看出来（视频是最占空间也最容易被忽略的部分） */}
+          {meta.videos?.length ? <span data-testid="card-has-video" title={`含 ${meta.videos.length} 个视频`}>📹 </span> : null}
           {meta.account || '未知公众号'}
           {meta.publishTime ? ` · ${relativeTime(meta.publishTime)}` : ''}
         </div>
