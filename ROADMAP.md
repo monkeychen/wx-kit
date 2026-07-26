@@ -50,7 +50,7 @@
 | **M31** ✅ | v0.8.0 | CLI/订阅增强与 bug 修复:R1 订阅部分检查(行内「检查」+ CLI `--accounts`)+ R3 library 排序(默认 publishTime desc,sortArticles 抽 core 共享)+ R4 `-h` 加仓库 URL + R5 修 mac CLI 程序坞冒图标(2026-07-22 完成) | `plans/2026-07-22-m31.md` |
 | **M32** ✅ | v0.8.0 | 站点同步:文库/CLI 把文章按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平同目录);设置开关默认关;产物过真实站点 `npm run check`(2026-07-22 完成) | `plans/2026-07-22-m32.md` |
 | **M33** ✅ | v0.8.1 | 补丁:真正修掉 mac CLI 程序坞图标(`LSUIElement` 在 plist 层压住——`app.dock.hide()` 在 `whenReady` 前不生效,AppKit 已先画图标)+ 设置页「站点同步」hover 建站指引(2026-07-22 完成,打包态采样验证) | `PRD-v0.8.1.md` |
-| **M34** 🚧 | v0.8.2 | 订阅检查反馈:`RunCheckResult` 加逐号明细 + 修掉 IPC 丢返回值 + 自动下载进度广播 + 行内结果态/「去看看」+ 策略常驻可见 + CLI `results` | `plans/2026-07-26-m34.md` |
+| **M34** ✅ | v0.8.2 | 订阅检查反馈:`RunCheckResult` 加逐号明细 + 修掉 IPC 丢返回值 + 自动下载进度广播 + 行内结果态/「去看看」+ 策略常驻可见 + CLI `results`;顺带修 `lastCheckedAt` 只在一条分支写导致「尚未检查」与结果矛盾(2026-07-26 完成,真实 session 端到端验过自动下载路径) | `plans/2026-07-26-m34.md` |
 | **M35** 🚧 | v0.8.2 | 含视频文章下载:新格式 `video`(不进默认)、mpvideo 直链择最高清、解析即下(auth_key 有时效)、md/html 正文引用改写、视频号内容 meta 标注 | `plans/2026-07-26-m35.md` |
 | **M36** 🚧 | v0.8.2 | 更新检查 + 按渠道引导升级:GitHub API 查最新版、自写版本比较、识别 brew/dmg/nsis 渠道给一键动作、启动静默检查 + 不打扰提示 | `plans/2026-07-26-m36.md` |
 

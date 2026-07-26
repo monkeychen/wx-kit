@@ -45,6 +45,8 @@ wx-kit library export --ids "$IDS" > material.json   # articles[].contentPath �
 ```sh
 wx-kit subscription check-now > check.json
 jq '{newFound, failed, failures}' check.json
+# 想知道「哪个号新增了几篇、下了几篇」看 results(逐号明细):
+jq -r '.results[] | "\(.nickname): 新 \(.newFound) 篇, 已下载 \(.downloaded) 篇\(if .ok then "" else " [失败: \(.error)]" end)"' check.json
 # newFound>0 且设置为「仅提示」时,新文章在 subscription list 各号的 newRefs 里;
 # 想直接落库,把设置改成自动下载:wx-kit settings set subscriptionNewArticleAction download
 ```

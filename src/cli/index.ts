@@ -353,7 +353,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
           process.stderr.write(formatCheckLogLine(e) + '\n')
         },
       })
-      outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, ...(result.failures ? { failures: result.failures } : {}), ...(result.note ? { note: result.note } : {}) })
+      // results 是逐号明细(M34):agent 同样需要知道「哪个号新增了几篇、下了几篇」,而不只是总数
+      outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, results: result.results, ...(result.failures ? { failures: result.failures } : {}), ...(result.note ? { note: result.note } : {}) })
       exitCode = 0
     })
 

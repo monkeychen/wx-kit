@@ -101,8 +101,14 @@ export class Subscriptions {
   async setSubscribed(fakeid: string, subscribed: boolean): Promise<void> {
     await this.mutate((d) => { const a = this.find(d, fakeid); if (a) a.subscribed = subscribed })
   }
+  /**
+   * 检查成功后推进水位，并一并记下「这个号什么时候查过」。
+   * 水位只在检查成功时推进，故这里就是「已成功检查」的唯一时点；
+   * 此前 lastCheckedAt 只在 setNewRefs 里写 → 自动下载模式和「无新文章」永远不写，
+   * 页面于是显示「尚未检查」而右边同时显示检查结果，自相矛盾（M34 修）。
+   */
   async updateWatermark(fakeid: string, watermark: number): Promise<void> {
-    await this.mutate((d) => { const a = this.find(d, fakeid); if (a) a.watermark = watermark })
+    await this.mutate((d) => { const a = this.find(d, fakeid); if (a) { a.watermark = watermark; a.lastCheckedAt = Date.now() } })
   }
   async setNewRefs(fakeid: string, refs: ArticleRef[]): Promise<void> {
     await this.mutate((d) => { const a = this.find(d, fakeid); if (a) { a.newRefs = refs; a.lastCheckedAt = Date.now() } })

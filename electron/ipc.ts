@@ -26,6 +26,7 @@ import { nextCheckAt } from '../src/core/subscription-schedule'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
+import type { RunCheckResult } from './services/subscription-check'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
@@ -213,6 +214,11 @@ export function registerIpc(settings: SettingsService): void {
   const emitSubsUpdated = () => {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('subscriptions:updated')
   }
+  // M34:自动下载(检查里触发的)进度。定时检查没有 event.sender,只能广播;
+  // 复用手动下载的同一 channel,渲染层不必区分来源。
+  const broadcastDlProgress = (e: { fakeid: string; total: number; done: number; phase: string }) => {
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('subscriptions:download:progress', e)
+  }
   let subsAuthExpired = false
 
   // 订阅/新订阅一刻确定水位：能取到最新一篇就用其 createTime，否则用「现在」（秒），避免存量被当新文章
@@ -241,8 +247,8 @@ export function registerIpc(settings: SettingsService): void {
   }
 
   // 共享 in-flight:自动检查与手动「检查更新」/行内单号检查重叠时并入同一次运行(防重入的第二道闸,第一道在 scheduler tick)
-  let checkInFlight: Promise<void> | null = null
-  const runSubscriptionCheck = (trigger: 'auto' | 'manual', fakeids?: string[]): Promise<void> => {
+  let checkInFlight: Promise<RunCheckResult> | null = null
+  const runSubscriptionCheck = (trigger: 'auto' | 'manual', fakeids?: string[]): Promise<RunCheckResult> => {
     if (checkInFlight) return checkInFlight
     checkInFlight = (async () => {
       const subs = await subsFor()
@@ -252,9 +258,11 @@ export function registerIpc(settings: SettingsService): void {
         subs, settings: s, session: session ? { token: session.token } : null,
         mpFetch: session ? makeMpFetch(session) : null,
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
+        onDownloadProgress: broadcastDlProgress,
         ...(fakeids ? { fakeids } : {}),
       })
       if (result.note !== 'no-accounts') subsAuthExpired = result.authExpired
+      return result
     })().finally(() => { checkInFlight = null })
     return checkInFlight
   }
@@ -285,7 +293,7 @@ export function registerIpc(settings: SettingsService): void {
     }
     emitSubsUpdated()
   })
-  ipcMain.handle('subscriptions:checkNow', async (_e, fakeids?: string[]) => { await runSubscriptionCheck('manual', fakeids) })
+  ipcMain.handle('subscriptions:checkNow', (_e, fakeids?: string[]) => runSubscriptionCheck('manual', fakeids))
   ipcMain.handle('subscriptions:downloadNew', async (event, fakeid: string) => {
     const subs = await subsFor()
     const acc = (await subs.list()).find((a) => a.fakeid === fakeid)

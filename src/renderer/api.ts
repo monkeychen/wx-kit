@@ -6,9 +6,11 @@ import type { MpAccount, CrawlSummary, CrawlItemStatus } from '../core/mp-types'
 import type { HistoryEvent } from '../core/download-history'
 import type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 import type { SyncSummary } from '../core/site-sync'
+import type { RunCheckResult } from '../../electron/services/subscription-check'
 
 export type { HistoryEvent } from '../core/download-history'
 export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
+export type { RunCheckResult, PerAccountResult } from '../../electron/services/subscription-check'
 
 export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null; checkLog: CheckLogEntry[]; nextCheckAt: number | null }
 export interface SubscriptionDownloadProgress { fakeid: string; total: number; done: number; phase: string }
@@ -58,7 +60,8 @@ export interface WxApi {
   subscriptionsList(): Promise<SubscriptionsState>
   subscriptionsAddAccount(fakeid: string, nickname: string): Promise<void>
   subscriptionsSetSubscribed(fakeid: string, nickname: string, subscribed: boolean): Promise<void>
-  subscriptionsCheckNow(fakeids?: string[]): Promise<void>
+  /** M34:返回逐号明细(此前 IPC 把返回值丢了,渲染层想提示也无从提示) */
+  subscriptionsCheckNow(fakeids?: string[]): Promise<RunCheckResult>
   subscriptionsDownloadNew(fakeid: string): Promise<void>
   subscriptionsDismissNew(fakeid: string): Promise<void>
   subscriptionsOpenLog(): Promise<void>
