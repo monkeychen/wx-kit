@@ -70,10 +70,12 @@ function frontmatter(m: ArticleMeta): string {
   ].join('\n')
 }
 
-export function buildMarkdown(meta: ArticleMeta, contentHtml: string): string {
-  return frontmatter(meta) + `# ${meta.title}\n\n` + td.turndown(contentHtml) + '\n'
+/** `appendix` 用于 turndown 转不出来的东西（如视频链接：<video> 不是 turndown 认识的标签） */
+export function buildMarkdown(meta: ArticleMeta, contentHtml: string, appendix = ''): string {
+  const body = td.turndown(contentHtml)
+  return frontmatter(meta) + `# ${meta.title}\n\n` + body + (appendix ? `\n\n${appendix}\n` : '\n')
 }
 
-export async function writeMarkdown(dir: string, meta: ArticleMeta, contentHtml: string): Promise<void> {
-  await writeFile(join(dir, 'content.md'), buildMarkdown(meta, contentHtml), 'utf-8')
+export async function writeMarkdown(dir: string, meta: ArticleMeta, contentHtml: string, appendix = ''): Promise<void> {
+  await writeFile(join(dir, 'content.md'), buildMarkdown(meta, contentHtml, appendix), 'utf-8')
 }

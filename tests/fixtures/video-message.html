@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<!-- tests/fixtures/video-message.html
+     真实视频消息页(appmsg_type 10002)裁剪样本,取自
+     https://mp.weixin.qq.com/s/bXUTSRQ_zIvyigWiqw3UfA (2026-07-12 宝玉AI)。
+     刻意保留三处「原样」,改动即失去测试价值:
+       ① #js_content 是「分享提示」空壳且含内联 script —— 视频页解析 bug 的现场;
+       ② mp_video_trans_info 四档完整 —— 钉死「择档按分辨率,不按 format_id」;
+       ③ 直链里的 \x26amp; 转义 —— 钉死 URL 解码。
+     auth_key/dis_t 已过期(有时效),仅用于解析测试,不用于真实下载。 -->
+<html><head>
+<meta property="og:title" content="构建未来的 Agent 基础设施" />
+<meta property="og:description" content="Anthropic Claude 平台的三位负责人聊了 Agent 基础设施的最新变化：随着模型推理能力增强，过去复杂脆弱的流程“脚手架”正在变薄，重点转向让多个 Agent 竞争、互相挑错或在卡住时求助。企业判断 Agent 是否值得投入，也不必先规划上百个自动化流程，而应从个人开始，看工作速度和产出提升了多少，再推广到团队。工程团队的人员构成变化不大，但更多人开始参与架构决策，再指挥 Claude 执行，Shopify 的 River 甚至覆盖了从需求到测试的完整开发流程。不过，个体能力变强不等于团队协作自然变好；缺少统一方向，产品反而可能无序扩张。" />
+<meta property="og:image" content="http://mmbiz.qpic.cn/mmbiz_jpg/ZlwY8rlDcFOZnvLIyibAOw9SKQmdhqQx4pCvDaZfBODhow073GWfE16ZUeXicx11HjxeocDlNgy6WffZwMk56kO7x3WFA4X8IG585PqMp6uUs/0?wx_fmt=jpeg" />
+<title>构建未来的 Agent 基础设施</title>
+</head><body>
+<div class="rich_media_area_primary video_channel">
+  <div class="js_video_channel_container">
+    <div id="js_mpvedio" class="mpvideo_wrp"></div>
+  </div>
+</div>
+<h1 class="rich_media_title js_video_channel_title" id="js_video_page_title">构建未来的 Agent 基础设施</h1>
+<div class="share_global_info" id="video_share_global_info">
+<div id="js_content" class="share_notice_wrp"><div class="share_notice" id="js_common_share_desc_wrap"
+                      ><div class="weui-ellipsis__text__wrp"><span id="js_common_share_desc" class="weui-ellipsis__text"></span></div>
+         <script type="text/javascript" nonce="571872511" reportloaderror>var __INLINE_SCRIPT__ = (function () {
+    'use strict';
+
+    
+    
+    var Device = {};
+    function detect(ua) {
+      var MQQBrowser = ua.match(/MQQBrowser\/(\d+\.\d+)/i);
+      var MQQClient = ua.match(/QQ\/(\d+\.(\d+)\.(\d+)\.(\d+))/i) || ua.match(/V1_AND_SQ_([\d\.]+)/);
+      var WeChat = ua.match(/MicroMessenger\/((\d+)\.(\d+))\.(\d+)/) || ua.match(/MicroMessenger\/((\d+)\.(\d+))/);
+      var MacOS = ua.match(/Mac\sOS\sX\s(\d+[\.|_]\d+)/);
+      var WinOS = ua.match(/Windows(\s+\w+)?\s+?(\d+\.\d+)/);
+      var Linux = ua.match(/Linux\s/);
+      var MiuiBrowser = ua.match(/MiuiBrowser\/(\d+\.\d+)/i);
+      var M1 = ua.match(/MI-ONE/);
+      var MIPAD = ua.match(/MI PAD/);
+      var UC = ua.match(/UCBrowser\/(\d+\.\d+(\.\d+\.\d+)?)/) || ua.match(/\sUC\s/);
+      var IEMobile = ua.match(/IEMobile(\/|\s+)(\d+\.\d+)/) || ua.match(/WPDesktop/);
+      var ipod = ua.match(/(ipod).*\s([\d_]+)/i);
+      var ipad = ua.match(/(ipad).*\s([\d_]+)/i);
+      var iphone = ua.match(/(iphone)\sos\s([\d_]+)/i);
+      var Chrome = ua.match(/Chrome\/(\d+\.\d+)/);
+      var AndriodBrowser = ua.match(/Mozilla.*Linux.*Android.*AppleWebKit.*Mobile Safari/);
+      var android = ua.match(/(android)\s([\d\.]+)/i);
+      var harmony = ua.match(/(OpenHarmony)\s([\d\.]+)/i);
+      Device.browser = Device.browser || {}, Device.os = Device.os || {};
+      Device.os.type = -1;
+      Device.os.unifiedPC = ua.match(/UnifiedPC/);
+      Device.os.unifiedMac = /UnifiedPCMac/i.test(ua);
+      Device.os.unifiedWindows = /UnifiedPCWindows/i.test(ua);
+      if (window.ActiveXObject) {
+        var vie = 6;
+        (window.XMLHttpRequest || ua.indexOf('MSIE 7.0') > -1) && (vie = 7);
+        (window.XDomainRequest || ua.indexOf('Trident/4.0') > -1) && (vie = 8);
+        ua.indexOf('Trident/5.0') > -1 && (vie = 9);
+        ua.indexOf('Trident/6.0') > -1 && (vie = 10);
+        Device.browser.ie = true, Device.browser.version = vie;
+      } else if (ua.indexOf('Trident/7.0') > -1) {
+        Device.browser.ie = true, Device.browser.version = 11;
+      }
+      if (android) {
+        Device.os.android = true;
+        Device.os.version = android[2];
+        Device.os.type = 2;
+      }
+      if (harmony) {
+        Device.os.harmony = true;
+        Device.os.version = harmony[2];
+        Device.o
+</script></div></div>
+</div>
+<span id="js_name"></span><em id="publish_time"></em>
+<script nonce="1">
+  window.appmsg_type = '10002' || '';
+  d.nick_name = (xml ? getXmlValue('nick_name.DATA') : '宝玉AI').html(false);
+  window.ct = '1783833643' || '';
+  window.cgiDataNew = {
+    content_noencode: 'Anthropic Claude 平台的三位负责人聊了 Agent 基础设施的最新变化：随着模型推理能力增强，过去复杂脆弱的流程“脚手架”正在变薄，重点转向让多个 Agent 竞争、互相挑错或在卡住时求助。企业判断 Agent 是否值得投入，也不必先规划上百个自动化流程，而应从个人开始，看工作速度和产出提升了多少，再推广到团队。工程团队的人员构成变化不大，但更多人开始参与架构决策，再指挥 Claude 执行，Shopify 的 River 甚至覆盖了从需求到测试的完整开发流程。不过，个体能力变强不等于团队协作自然变好；缺少统一方向，产品反而可能无序扩张。',
+    item_show_type: '5' * 1,
+    video_page_info: {
+                           video_id: 'wxv_4601001312020021250',
+                                      openid: 'oDdoCt4qgb-hTWM-kY6p615m67QI',
+                                                  ori_status: '3' * 1,
+                                                                                                  is_mp_video: '1' * 1,
+                                                              is_mp_video_delete: '0' * 1,
+                                      is_mp_video_forbid: '0' * 1,
+                                                                                    mp_video_trans_info: [
+                            {
+                                  format_id: '10002' * 1,
+                                                  width: '1572' * 1,
+                                                  height: '1080' * 1,
+                                                  aDuration: '992' * 1,
+                                                  vDuration: '992' * 1,
+                                                  duration: '992' * 1,
+                                                  duration_ms: '992000' * 1,
+                                                  filesize: '139984916',
+                                                  url: 'http://mpvideo.qpic.cn/0bc37yaccaaadeaagzktqbvfb7wdeh7aaiia.f10002.mp4?dis_k=28f5f965858c88dbc76db21a5f111a63\x26amp;dis_t=1785044618\x26amp;play_scene=10120\x26amp;auth_info=W/KS+vQqFFEYyNKbog5fFXE9RghJfHw8CDtIH2JXcm9mFkU7YhE+YjQYMzwcOUkEeWhCCEpuTkJTe0QWNgxvOH0c\x26amp;auth_key=12e824f41570177d554d5fb6a629d3da',
+                                                  video_quality_level: '3' * 1,
+                                                  video_quality_wording: '超清',
+                                              },
+                            {
+                                  format_id: '10004' * 1,
+                                                  width: '698' * 1,
+                                                  height: '480' * 1,
+                                                  aDuration: '992' * 1,
+                                                  vDuration: '992' * 1,
+                                                  duration: '992' * 1,
+                                                  duration_ms: '992000' * 1,
+                                                  filesize: '39388335',
+                                                  url: 'http://mpvideo.qpic.cn/0bc37yaccaaadeaagzktqbvfb7wdeh7aaiia.f10004.mp4?dis_k=2bb75d6f9e85cfcad2adfe6e9e510a56\x26amp;dis_t=1785044618\x26amp;play_scene=10120\x26amp;auth_info=W9iLgqcpE1RPyNbMpQpTFnU9RwhKeXxmDDkbQmIEcz9mQB5lZRI5Z2MYN2sbPUUHfWhDCElrThhXeRdLNl9uaH1K\x26amp;auth_key=dffd25540396921f03f4104657ae8b2e',
+                                                  video_quality_level: '1' * 1,
+                                                  video_quality_wording: '流畅',
+                                              },
+                            {
+                                  format_id: '10102' * 1,
+                                                  width: '1080' * 1,
+                                                  height: '740' * 1,
+                                                  aDuration: '992' * 1,
+                                                  vDuration: '992' * 1,
+                                                  duration: '992' * 1,
+                                                  duration_ms: '992000' * 1,
+                                                  filesize: '41462262',
+                                                  url: 'http://mpvideo.qpic.cn/0bc37yaccaaadeaagzktqbvfb7wdeh7aaiia.f10102.mp4?dis_k=2a28199661cff3e784e40f36d1086443\x26amp;dis_t=1785044618\x26amp;play_scene=10120\x26amp;auth_info=AICV4uV7T1JLmIDPoFkOQnA0QV1LfHxlXDYfH21UfGs9ExswY0RlYWdIYWgebhhTeGFFXUhuThsHdhMWOQ9hPCYZ\x26amp;auth_key=7aede9e652af8c8db2ed51e5b4e78120',
+                                                  video_quality_level: '3' * 1,
+                                                  video_quality_wording: '超清',
+                                              },
+                            {
+                                  format_id: '10104' * 1,
+                                                  width: '480' * 1,
+                                                  height: '328' * 1,
+                                                  aDuration: '992' * 1,
+                                                  vDuration: '992' * 1,
+                                                  duration: '992' * 1,
+                                                  duration_ms: '992000' * 1,
+                                                  filesize: '13534675',
+                                                  url: 'http://mpvideo.qpic.cn/0bc37yaccaaadeaagzktqbvfb7wdeh7aaiia.f10104.mp4?dis_k=f969aff01e7e3b1199863d9d96b6bf42\x26amp;dis_t=1785044618\x26amp;play_scene=10120\x26amp;auth_info=cMvTwDxGXxeUhpr3Vg5Kdm5BCxl7fGJXOBdHMgR6aztCGDBkQmxsO0RnPUlhGFt+O0ULGmlOHAx4G05mX2c8IEg=\x26amp;auth_key=fc4dd163d572bfe32d73144b5a8e89ff',
+                                                  video_quality_level: '1' * 1,
+                                                  video_quality_wording: '流畅',
+                                              },
+                          ],
+},
+  };
+</script>
+</body></html>

@@ -1,6 +1,7 @@
 // src/core/parse-article.ts
 import * as cheerio from 'cheerio'
 import type { ParsedArticle } from './types'
+import { extractMpVideos } from './parse-video'
 
 function meta($: cheerio.CheerioAPI, prop: string): string {
   return $(`meta[property="${prop}"]`).attr('content')?.trim() ?? ''
@@ -100,6 +101,22 @@ function extractTextMessageContent(html: string): string {
  * watermark_info/share_cover 的字段顺序不同，天然被排除。cgiDataNew 段里有零散
  * 空 URL 三连干扰，故必须先截取 window.picture_page_info_list 所在 script 段再匹配。
  */
+function extractContentNoencode(html: string): string {
+  const c = html.match(new RegExp(`content_noencode:\\s*'${JS_STR}'`))
+  return c ? unescapeJsString(c[1]).trim() : ''
+}
+
+/**
+ * 视频消息（appmsg_type 10002 / item_show_type 5）：整页内容 = 标题 + 描述 + 视频，
+ * 没有 rich_media_content。**陷阱**：这类页面有 #js_content，但那是「分享提示」空壳
+ * （`share_notice_wrp`，里面是大段内联 script），非空 → 「#js_content 为空才走脚本变量」
+ * 的分流会被跳过，那个壳被当成正文（曾产出 21.8 万字符的 JavaScript）。
+ * 故视频消息必须**在读 #js_content 之前**判定，不能等分流。
+ */
+function isVideoMessage(html: string): boolean {
+  return /window\.appmsg_type\s*=\s*'10002'/.test(html) || /item_show_type:\s*'5'\s*\*/.test(html)
+}
+
 function extractPictureMessage(html: string): { content: string; imageUrls: string[] } {
   const imageUrls: string[] = []
   const start = html.indexOf('window.picture_page_info_list')
@@ -112,8 +129,7 @@ function extractPictureMessage(html: string): { content: string; imageUrls: stri
     }
   }
   if (!imageUrls.length) return { content: '', imageUrls }
-  const c = html.match(new RegExp(`content_noencode:\\s*'${JS_STR}'`))
-  return { content: c ? unescapeJsString(c[1]).trim() : '', imageUrls }
+  return { content: extractContentNoencode(html), imageUrls }
 }
 
 export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
@@ -126,6 +142,8 @@ export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
   const digest = cleanMetaText(meta($, 'og:description'))
   const coverUrl = meta($, 'og:image')
 
+  const videos = extractMpVideos(html)
+
   const $content = $('#js_content')
   // 微信图片真实地址在 data-src
   const imageUrls: string[] = []
@@ -133,10 +151,11 @@ export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
     const src = $(el).attr('data-src') || $(el).attr('src')
     if (src && !imageUrls.includes(src)) imageUrls.push(src)
   })
-  let contentHtml = $content.html() ?? ''
+  // 视频消息页的 #js_content 是分享提示壳，不可信 —— 直接判定，不进后面的分流
+  let contentHtml = isVideoMessage(html) ? textToParagraphs(extractContentNoencode(html)) : ($content.html() ?? '')
 
   // 非标准消息类型：无 #js_content（页面前端渲染），正文/图片藏在脚本变量里
-  if (!contentHtml.trim()) {
+  if (!contentHtml.trim() && !isVideoMessage(html)) {
     const text = extractTextMessageContent(html)
     if (text) {
       // 文字消息：无标题，og:title 被塞入整篇正文 → 从正文首行生成短标题
@@ -163,5 +182,6 @@ export function parseArticle(html: string, _sourceUrl: string): ParsedArticle {
     coverUrl,
     contentHtml,
     imageUrls,
+    videos,
   }
 }

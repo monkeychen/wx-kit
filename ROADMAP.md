@@ -51,7 +51,7 @@
 | **M32** ✅ | v0.8.0 | 站点同步:文库/CLI 把文章按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平同目录);设置开关默认关;产物过真实站点 `npm run check`(2026-07-22 完成) | `plans/2026-07-22-m32.md` |
 | **M33** ✅ | v0.8.1 | 补丁:真正修掉 mac CLI 程序坞图标(`LSUIElement` 在 plist 层压住——`app.dock.hide()` 在 `whenReady` 前不生效,AppKit 已先画图标)+ 设置页「站点同步」hover 建站指引(2026-07-22 完成,打包态采样验证) | `PRD-v0.8.1.md` |
 | **M34** ✅ | v0.8.2 | 订阅检查反馈:`RunCheckResult` 加逐号明细 + 修掉 IPC 丢返回值 + 自动下载进度广播 + 行内结果态/「去看看」+ 策略常驻可见 + CLI `results`;顺带修 `lastCheckedAt` 只在一条分支写导致「尚未检查」与结果矛盾(2026-07-26 完成,真实 session 端到端验过自动下载路径) | `plans/2026-07-26-m34.md` |
-| **M35** 🚧 | v0.8.2 | 含视频文章下载:新格式 `video`(不进默认)、mpvideo 直链择最高清、解析即下(auth_key 有时效)、md/html 正文引用改写、视频号内容 meta 标注 | `plans/2026-07-26-m35.md` |
+| **M35** ✅ | v0.8.2 | 含视频文章下载:新格式 `video`(不进默认)+ **修掉视频消息页(10002)正文是 21.8 万字符内联 JS 的 bug** + 择档按分辨率(format_id 与画质无关)+ 按体积算超时(20 秒对 133MB 必超时)+ 失败进 `warnings[]` 不静默(2026-07-26 完成,真实 133MB 视频端到端 + 阅读器可播验证) | `plans/2026-07-26-m35.md` |
 | **M36** 🚧 | v0.8.2 | 更新检查 + 按渠道引导升级:GitHub API 查最新版、自写版本比较、识别 brew/dmg/nsis 渠道给一键动作、启动静默检查 + 不打扰提示 | `plans/2026-07-26-m36.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`(开发中)(逐条验收看各 §4)。

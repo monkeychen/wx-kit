@@ -88,7 +88,8 @@ export default function UrlMode({ onDone, prefill }: Props) {
       {running && progress && (
           <div className="surface progress-card fade-in" style={{ marginTop: 28 }}>
             <div className="progress-head">
-              <span className="progress-phase">{PHASE_LABEL[progress.phase]}</span>
+              {/* message 比 phase 标签有信息量（如「正在下载视频 1/1（133.5MB）」）——有就优先显示 */}
+              <span className="progress-phase">{progress.message ?? PHASE_LABEL[progress.phase]}</span>
               <span className="progress-count">{progress.completed} / {progress.total}</span>
             </div>
             <div className="progress-track"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>

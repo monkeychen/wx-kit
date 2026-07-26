@@ -145,9 +145,19 @@ export function registerIpc(settings: SettingsService): void {
       fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
       now: () => new Date().toISOString(), library, libraryRoot,
     }
+    const sendProgress = (ev: import('../src/core/types').ProgressEvent) => {
+      if (!event.sender.isDestroyed()) event.sender.send('download:progress', ev)
+    }
     const queue = new DownloadQueue(
-      (url) => downloadArticle(url, formats, deps),
-      (ev) => { if (!event.sender.isDestroyed()) event.sender.send('download:progress', ev) },
+      (url) => downloadArticle(url, formats, {
+        ...deps,
+        // 视频可达上百 MB、单个要下一分多钟：不报进度的话界面一动不动，看着像卡死
+        onVideoProgress: (e) => sendProgress({
+          total: urls.length, completed: 0, currentUrl: url, phase: 'images',
+          message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB，${e.video.width}×${e.video.height}）`,
+        }),
+      }),
+      sendProgress,
     )
     const summary = await queue.run(urls)
     await recordHistory({ kind: 'url', count: urls.length }, formats, summary)
@@ -186,11 +196,14 @@ export function registerIpc(settings: SettingsService): void {
     if (!session) throw new Error('AUTH_REQUIRED')
     const { libraryRoot } = await settings.get()
     const library = new Library(libraryRoot)
+    const send = (ev: unknown) => { if (!event.sender.isDestroyed()) event.sender.send('mp:crawl:progress', ev) }
     const ddeps = {
       fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
       now: () => new Date().toISOString(), library, libraryRoot,
+      // 批量里选了视频格式时，逐篇的视频下载也要出声（同 URL 模式）
+      onVideoProgress: (e: { index: number; total: number; video: { filesize: number; width: number; height: number } }) =>
+        send({ kind: 'note', message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB）` }),
     }
-    const send = (ev: unknown) => { if (!event.sender.isDestroyed()) event.sender.send('mp:crawl:progress', ev) }
     try {
       const summary = await crawlAccount(fakeid, range, {
         mpFetch: makeMpFetch(session), token: session.token, keywords,

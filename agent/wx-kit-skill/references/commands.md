@@ -6,10 +6,13 @@
 ## download — 下载文章(免登录)
 
 ```sh
-wx-kit download --url <u> [--url <u2> ...] [--urls-file <file>] [--formats cover,md,html,pdf,meta] [--out <dir>]
+wx-kit download --url <u> [--url <u2> ...] [--urls-file <file>] [--formats cover,md,html,pdf,meta,video] [--out <dir>]
 ```
 
 - `--formats` 默认 `md,html,meta`;`--out` 缺省用设置里的库根。
+- **`video`(内嵌视频)默认不下**:单个视频实测可达 133MB,显式写进 `--formats` 才下载,落到 `videos/video-N.mp4`(取最高清档)。
+  没选 `video` 时正文会留一行「本文含 N 个视频(未下载)」,不会静默丢弃。视频下载失败时文章其余部分照常产出,
+  失败原因出现在该篇的 `warnings[]` 里(`ok` 仍为 true——文章本体是成功的)。
 - 输出:`{"ok":true,"total":1,"succeeded":1,"failed":0,"skipped":1?,"items":[{"url","ok","id","title","dir"?,"skipped"?,"error"?}]}`
 - 已在库中的文章自动跳过(`skipped`);解析不到标题的(已删除文章)记 failed。
 - 支持常规图文、纯文字消息、图文消息/小绿书三类页面。
@@ -56,7 +59,9 @@ wx-kit library rebuild                         # 从各篇 meta.json 重建索�
 wx-kit library export --ids <id,id>            # {"ok":true,"count":N,"articles":[{...,"contentPath"}]}
 ```
 
-ArticleMeta 字段:`id, title, author, account, publishTime, sourceUrl, digest, coverUrl, downloadTime, formats, dir`。
+ArticleMeta 字段:`id, title, author, account, publishTime, sourceUrl, digest, coverUrl, downloadTime, formats, dir`;
+含视频的文章另有 `videos: [{videoId, formatId, width, height, filesize, durationMs, path?}]`
+(**没有 url**——直链带时效签名,存下来隔次即失效;`path` 缺省表示没下到)。
 `library export` 直接在 stdout 输出素材清单,每篇含 `contentPath`(content.md 绝对路径),供下游创作/分析直接读文件(GUI 的「导出选中为素材」才是落盘成清单文件)。
 
 ## site — 个人站点同步(纯本地,不联网)

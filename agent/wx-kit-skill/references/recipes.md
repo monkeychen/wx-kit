@@ -89,3 +89,17 @@ jq '{succeeded, failed, results}' sync.json
 | `error` 含「频率限制(200013)」 | 微信频控 | 等 5–10 分钟再试,勿立即重试 |
 | download 某篇 failed(标题空) | 文章已被删除 | 跳过即可,非环境问题 |
 | `AMBIGUOUS` + candidates | 公众号重名 | 从 candidates 取 fakeid 用 `--fakeid` |
+
+## 下载含视频的文章
+
+视频消息(公众号发的视频)与正文内嵌视频都走同一条路:加 `video` 格式。
+
+```sh
+wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html,meta,video --out ./out
+# 视频落在 <文章目录>/videos/video-N.mp4(自动取最高清档),md 里是可点链接,html 里是可播 <video>
+jq -r '.items[] | "\(.title): \(.warnings // ["无告警"] | join("; "))"' out.json
+```
+
+**注意**:单个视频可达上百 MB(实测 1572×1080 一档 133MB,约 1 分钟下完)。
+不需要视频就别写 `video` —— 不写时正文仍会注明「本文含 N 个视频(未下载)」,信息不丢。
+

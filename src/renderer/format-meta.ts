@@ -13,4 +13,5 @@ export const FORMAT_INFOS: FormatInfo[] = [
   { value: 'pdf', name: 'PDF', desc: '便于打印与离线归档' },
   { value: 'cover', name: '封面图', desc: '单独保存文章头图' },
   { value: 'meta', name: '元信息', desc: '标题 / 作者 / 时间等 JSON' },
+  { value: 'video', name: '视频', desc: '下载文中内嵌视频（最高清，可达上百 MB）' },
 ]

@@ -38,8 +38,11 @@ export async function downloadArticle(
   const dirName = dedupeDirName(base, name => existsSync(join(accountDir, name)))
   const dir = join(accountDir, dirName)
 
-  const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats }, deps)
+  // 视频这类非致命失败要浮到调用方（CLI JSON / GUI 结果区），否则只剩 ok:true 在误导
+  const warnings: string[] = []
+  const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats },
+    { ...deps, onWarning: (m) => { warnings.push(m); deps.onWarning?.(m) } })
   await deps.library.add(meta)
 
-  return { url, ok: true, id, dir, formats: meta.formats, title: meta.title }
+  return { url, ok: true, id, dir, formats: meta.formats, title: meta.title, ...(warnings.length ? { warnings } : {}) }
 }
