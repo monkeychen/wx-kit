@@ -22,7 +22,7 @@ describe('exportArticle: failed-image data-src strip', () => {
       digest: 'Test digest',
       coverUrl: '',
       contentHtml: `<p><img data-src="${successUrl}" /></p><p><img data-src="${failUrl}" /></p>`,
-      imageUrls: [successUrl, failUrl], videos: []
+      imageUrls: [successUrl, failUrl], videos: [], itemShowType: 0, warnings: []
     }
 
     const deps: ExportDeps = {

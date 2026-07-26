@@ -334,6 +334,12 @@ body {
   min-height: 2.7em;
 }
 .article-meta { font-size: 12.5px; color: var(--ink-soft); margin-top: auto; }
+/* 消息类型标（M36）：只在非普通图文时出现，弱化处理——是补充信息不是主角 */
+.kind-tag {
+  display: inline-block; padding: 0 5px; margin-right: 2px;
+  border: 1px solid var(--line); border-radius: 3px;
+  font-size: 11px; line-height: 16px; color: var(--ink-soft);
+}
 .card-actions {
   display: flex;
   gap: 4px;

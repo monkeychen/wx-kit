@@ -60,6 +60,8 @@ wx-kit library export --ids <id,id>            # {"ok":true,"count":N,"articles"
 ```
 
 ArticleMeta 字段:`id, title, author, account, publishTime, sourceUrl, digest, coverUrl, downloadTime, formats, dir`;
+另有 `itemShowType`(消息类型:`0` 普通图文 / `5` 视频消息 / `8` 图文消息(小绿书) / `10` 文字消息 / `11` 发布通告;
+**这是开放集合**,遇到没适配的类型会按图文兜底并在 `warnings[]` 里报出来)。
 含视频的文章另有 `videos: [{videoId, formatId, width, height, filesize, durationMs, path?}]`
 (**没有 url**——直链带时效签名,存下来隔次即失效;`path` 缺省表示没下到)。
 `library export` 直接在 stdout 输出素材清单,每篇含 `contentPath`(content.md 绝对路径),供下游创作/分析直接读文件(GUI 的「导出选中为素材」才是落盘成清单文件)。

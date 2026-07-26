@@ -37,6 +37,10 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
   const { parsed, id, sourceUrl, dir, formats, downloadVideos: wantVideo = true } = input
   await mkdir(dir, { recursive: true })
 
+  // 解析期的告警（未识别消息类型、正文疑似脚本…）走与视频失败同一条通路，
+  // 最终出现在 DownloadItemResult.warnings —— 不让问题只躺在文件里
+  for (const w of parsed.warnings) deps.onWarning?.(w)
+
   const needImages = formats.includes('md') || formats.includes('html') || formats.includes('pdf')
   let contentHtml = parsed.contentHtml
 

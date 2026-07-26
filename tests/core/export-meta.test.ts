@@ -5,7 +5,7 @@ import type { ParsedArticle } from '../../src/core/types'
 
 const parsed: ParsedArticle = {
   title: 'T', author: 'A', account: 'A', publishTime: '2026-02-25 08:00',
-  digest: 'D', coverUrl: 'https://x/c', contentHtml: '<p>x</p>', imageUrls: [], videos: []
+  digest: 'D', coverUrl: 'https://x/c', contentHtml: '<p>x</p>', imageUrls: [], videos: [], itemShowType: 0, warnings: []
 }
 
 describe('buildMeta', () => {
