@@ -104,3 +104,18 @@ wx-kit settings set <键> <值>   # 常用键:libraryRoot、defaultFormats(逗�
 ## 退出码
 
 `0` 成功(含 valid:false 这类「如实回答」);`1` 业务失败(下载失败/无 session 可导出);`2` 用法错误或需要登录(`AUTH_REQUIRED`/`CANCELLED`/`CLI_ERROR`)。
+
+## update — 检查新版本
+
+```sh
+wx-kit update --check
+# {"ok":true,"current":"0.8.1","latest":"0.9.0","updateAvailable":true,
+#  "channel":"brew","upgradeCommand":"brew update && brew upgrade --cask wx-kit && xattr -cr /Applications/wx-kit.app",
+#  "publishedAt":"...","assets":["wx-kit-0.9.0-arm64.dmg","wx-kit-0.9.0.dmg","wx-kit.Setup.0.9.0.exe"]}
+```
+
+- **只检查,不自动升级**:输出里的 `upgradeCommand` 是给人执行的(brew 渠道才有);其它渠道为 `null`,让用户去 `assets` 里下对应包。
+- `channel` 为 `brew` / `dmg` / `nsis` / `unknown`——按安装方式给不同的升级路径,别一律叫用户去下 dmg。
+- 查不到(网络不可达/GitHub 限流)→ `{"ok":false,"error":{"code":"UPDATE_CHECK_FAILED"}}` + 退出码 1。
+  **别把失败当成「已是最新」**:只有 `ok:true` 且 `updateAvailable:false` 才是已最新。
+- `version` 命令**不联网**,要查新版必须用这个命令。

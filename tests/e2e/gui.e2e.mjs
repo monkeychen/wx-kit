@@ -322,6 +322,9 @@ async function main() {
     // M25 R2: 设置页有「打开检查日志」入口
     assert((await win.locator('[data-testid="set-open-checklog"]').count()) === 1, 'M25: settings offers open-check-log entry')
     // v0.8.1: 「站点同步」旁的 ? hover 出建站指引(含 dreamble 仓库链接)
+    // M37: 更新检查入口 + 开关(真实联网结果不在 e2e 里断言,只保证入口在)
+    assert((await win.locator('[data-testid="about-check-update"]').count()) === 1, 'M37: settings offers a check-update button')
+    assert((await win.locator('[data-testid="set-update-check"]').count()) === 1, 'M37: settings has the startup-check toggle')
     assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings offers site-sync help icon')
     await win.locator('[data-testid="site-sync-help"]').hover()
     await win.waitForSelector('.ant-tooltip-container', { timeout: 5000 })

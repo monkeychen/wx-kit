@@ -7,10 +7,17 @@ import type { HistoryEvent } from '../core/download-history'
 import type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 import type { SyncSummary } from '../core/site-sync'
 import type { RunCheckResult } from '../../electron/services/subscription-check'
+import type { UpdateInfo, UpdateAsset } from '../core/check-update'
+import type { InstallChannel } from '../core/install-channel'
 
 export type { HistoryEvent } from '../core/download-history'
 export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 export type { RunCheckResult, PerAccountResult } from '../../electron/services/subscription-check'
+export type { UpdateInfo, UpdateAsset } from '../core/check-update'
+export type { InstallChannel } from '../core/install-channel'
+
+export interface UpdateChannelInfo { channel: InstallChannel; command: string | null; platform: string; arch: string }
+export interface UpdateProgress { name: string; done: number; total: number }
 
 export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null; checkLog: CheckLogEntry[]; nextCheckAt: number | null }
 export interface SubscriptionDownloadProgress { fakeid: string; total: number; done: number; phase: string }
@@ -68,6 +75,12 @@ export interface WxApi {
   onSubscriptionsUpdated(cb: () => void): () => void
   onSubscriptionDownloadProgress(cb: (e: SubscriptionDownloadProgress) => void): () => void
   // —— M18 命令行软链 ——
+  /** M37:查最新版。silent=true 时受设置开关与「每天一次」约束,查不到返回 null */
+  updateCheck(opts?: { silent?: boolean }): Promise<UpdateInfo | null>
+  updateChannel(): Promise<UpdateChannelInfo>
+  updateDownload(assets: UpdateAsset[]): Promise<{ ok: boolean; path?: string; error?: string }>
+  onUpdateProgress(cb: (p: UpdateProgress) => void): () => void
+
   cliLinkStatus(): Promise<CliLinkInfo>
   cliLinkCreate(force: boolean): Promise<{ status: CliLinkStatus }>
   cliLinkAddToPath(): Promise<{ profilePath: string; result: 'added' | 'present' }>

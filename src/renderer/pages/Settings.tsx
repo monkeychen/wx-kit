@@ -3,7 +3,11 @@ import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmente
 import { FolderOpenOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
+import type { UpdateInfo, UpdateChannelInfo } from '../api'
+import { DMG_POST_INSTALL_HINT } from '../../core/install-channel'
 import type { DownloadFormat } from '../../core/types'
 
 export default function Settings() {
@@ -11,10 +15,32 @@ export default function Settings() {
   const [cliLink, setCliLink] = useState<Awaited<ReturnType<typeof api.cliLinkStatus>> | null>(null)
 
   const [ver, setVer] = useState('')
+  // M37 更新检查:三态(未查 / 查询中 / 有结果),查不到用 'failed' 与「已是最新」区分开
+  const [upd, setUpd] = useState<UpdateInfo | null>(null)
+  const [updState, setUpdState] = useState<'idle' | 'checking' | 'done' | 'failed'>('idle')
+  const [chan, setChan] = useState<UpdateChannelInfo | null>(null)
+  const [dl, setDl] = useState<{ done: number; total: number } | null>(null)
 
   useEffect(() => { api.getSettings().then(setS) }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
   useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不阻塞设置页 */ }) }, [])
+  useEffect(() => { api.updateChannel().then(setChan).catch(() => { /* 渠道识别失败就退回通用引导 */ }) }, [])
+  useEffect(() => api.onUpdateProgress((p) => setDl({ done: p.done, total: p.total })), [])
+
+  const checkUpdateNow = async () => {
+    setUpdState('checking')
+    // 手动点击不受「每天一次」和开关约束 —— 用户主动问就该真去查
+    const r = await api.updateCheck().catch(() => null)
+    setUpd(r); setUpdState(r ? 'done' : 'failed')
+  }
+  const downloadUpdate = async () => {
+    if (!upd) return
+    setDl({ done: 0, total: 0 })
+    const r = await api.updateDownload(upd.assets)
+    setDl(null)
+    if (r.ok) message.success('安装包已下载并打开')
+    else message.warning(r.error === 'no-matching-asset' ? '没有匹配当前系统的安装包,请到发布页手动下载' : '下载失败:' + r.error)
+  }
 
   const choose = async () => {
     const dir = await api.chooseDir()
@@ -214,12 +240,92 @@ export default function Settings() {
               wx-kit（微信百宝箱）当前版本 <strong data-testid="about-version">v{ver || '—'}</strong>
               ——与命令行 <code>wx-kit --version</code> 同源。
             </div>
-            <Space style={{ marginTop: 8 }}>
+            <Space style={{ marginTop: 8 }} wrap>
               <Button size="small" data-testid="about-homepage"
                 onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit')}>项目主页</Button>
-              <Button size="small" data-testid="about-releases"
-                onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit/releases')}>查看新版本</Button>
+              <Button size="small" data-testid="about-check-update" loading={updState === 'checking'}
+                onClick={checkUpdateNow}>检查更新</Button>
+              {updState === 'done' && upd && !upd.hasUpdate && (
+                <span className="faint" data-testid="about-up-to-date">已是最新 v{upd.latest}</span>
+              )}
+              {updState === 'failed' && (
+                <span className="faint" data-testid="about-check-failed">暂时查不到(网络问题),稍后再试</span>
+              )}
             </Space>
+
+            {/* 有新版才展开:版本号 + 发布说明 + 按渠道给一键动作 */}
+            {upd?.hasUpdate && (
+              <div className="update-box" data-testid="about-update-box">
+                <div className="update-head">
+                  发现新版 <strong>v{upd.latest}</strong>
+                  {upd.publishedAt && <span className="faint">（{upd.publishedAt.slice(0, 10)} 发布）</span>}
+                </div>
+                {/* 发布说明是给人读的:裸着 markdown 标记(# / ** / -)只会添噪。
+                    react-markdown 阅读器已在用,渲染它不引任何新依赖。 */}
+                {upd.notes && (
+                  <div className="update-notes" data-testid="update-notes">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}
+                      components={{
+                        // release body 的 h1/h2 在这个小框里当小标题就够,别撑成页面级标题
+                        h1: ({ children }) => <div className="un-h">{children}</div>,
+                        h2: ({ children }) => <div className="un-h">{children}</div>,
+                        h3: ({ children }) => <div className="un-h">{children}</div>,
+                        a: ({ href = '', children }) => (
+                          <a onClick={() => api.openExternal(href)} style={{ cursor: 'pointer' }}>{children}</a>
+                        ),
+                      }}>
+                      {upd.notes.trim()}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                {chan?.command ? (
+                  <>
+                    <div className="setting-hint">
+                      你是用 Homebrew 安装的。到终端执行下面这条命令即可升级（<b>三段都需要</b>：
+                      不 <code>brew update</code> 会读到旧版本信息，不 <code>xattr</code> 应用会被系统拦住）：
+                    </div>
+                    <pre className="update-cmd" data-testid="update-command">{chan.command}</pre>
+                    <Space>
+                      <Button size="small" type="primary" data-testid="update-copy-cmd"
+                        onClick={() => { api.copyText(chan.command!); message.success('命令已复制，到终端粘贴执行') }}>
+                        复制命令
+                      </Button>
+                      <span className="faint">升级完成后重启应用</span>
+                    </Space>
+                  </>
+                ) : (
+                  <>
+                    <div className="setting-hint">
+                      下载后把 wx-kit 拖进「应用程序」覆盖，再执行 <code>{DMG_POST_INSTALL_HINT}</code>
+                      （未签名应用需要这一步，否则会被系统拦住）。
+                    </div>
+                    <Space wrap>
+                      <Button size="small" type="primary" data-testid="update-download"
+                        loading={dl !== null} onClick={downloadUpdate}>
+                        {dl ? `下载中 ${dl.total ? Math.round((dl.done / dl.total) * 100) : 0}%` : '下载并打开安装包'}
+                      </Button>
+                      <Button size="small" data-testid="update-copy-hint"
+                        onClick={() => { api.copyText(DMG_POST_INSTALL_HINT); message.success('命令已复制') }}>
+                        复制 xattr 命令
+                      </Button>
+                      <Button size="small" data-testid="about-releases"
+                        onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit/releases')}>打开发布页</Button>
+                    </Space>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div style={{ marginTop: 12 }}>
+              <Space align="center">
+                <Switch checked={s.updateCheckEnabled} data-testid="set-update-check"
+                  onChange={(v) => setS({ ...s, updateCheckEnabled: v })} />
+                <span>启动时检查更新</span>
+              </Space>
+              <div className="setting-hint" style={{ marginTop: 4 }}>
+                每天最多查一次，只向 GitHub 请求版本信息，<b>不上传任何数据</b>；关掉后仅在你点「检查更新」时联网。
+              </div>
+            </div>
           </div>
         </div>
 
