@@ -2,6 +2,7 @@
 import { readFile, mkdir, rm } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import type { ArticleMeta } from './types'
+import { canonicalId } from './article-id'
 import { atomicWriteFile } from './atomic-write'
 import { withPathLock } from './path-lock'
 
@@ -32,11 +33,16 @@ export class Library {
   }
 
   async has(id: string): Promise<boolean> {
-    return (await this.read()).articles.some(a => a.id === id)
+    return (await this.get(id)) !== undefined
   }
 
+  /**
+   * 按 canonical 形式查，不是字面相等：老库里的 id 是 `mid_idx_sn`，现在是 `mid_idx`，
+   * 字面比会把同一篇文章当成两篇重下（M36 换列表接口后的实际故障）。
+   */
   async get(id: string): Promise<ArticleMeta | undefined> {
-    return (await this.read()).articles.find(a => a.id === id)
+    const key = canonicalId(id)
+    return (await this.read()).articles.find(a => a.id === id || canonicalId(a.id) === key)
   }
 
   async add(meta: ArticleMeta): Promise<void> {

@@ -53,6 +53,7 @@ interface PublishPage { total_count?: number; publish_list?: PublishGroup[] }
 interface AppMsgEx {
   link?: string; title?: string; create_time?: number
   item_show_type?: number; itemidx?: number; is_deleted?: boolean
+  appmsgid?: number
 }
 
 /**
@@ -80,6 +81,9 @@ async function fetchPage(
       items.push({
         url: String(a.link), title: String(a.title ?? ''), createTime: Number(a.create_time ?? 0),
         ...(a.item_show_type != null ? { itemShowType: Number(a.item_show_type) } : {}),
+        // 去重要用:本接口给短链,认不出与长链是同一篇,得靠 mid/idx
+        ...(a.appmsgid != null ? { appmsgid: Number(a.appmsgid) } : {}),
+        ...(a.itemidx != null ? { itemidx: Number(a.itemidx) } : {}),
       })
     }
   }
