@@ -352,8 +352,10 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         // 订阅检查没有 --no-video 开关，按设置走（与 GUI 的定时检查一致）
         const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: s.downloadVideos }
         const queue = new DownloadQueue((url, hint) => downloadArticle(url, formats, ddeps, hint))
-        const summary = await queue.run(refs.map((r) => r.url))
+        // 透传列表给的文章主键:订阅拿到的是短链,没 hint 会退化成哈希 id → 与「按公众号」抓的同一篇算两篇
+        const summary = await queue.run(refs.map((r) => ({ url: r.url, appmsgid: r.appmsgid, itemidx: r.itemidx })))
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
+        return summary
       }
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),

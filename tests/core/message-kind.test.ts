@@ -1,6 +1,6 @@
 // tests/core/message-kind.test.ts
 import { describe, it, expect } from 'vitest'
-import { readItemShowType, kindOf, unknownKindWarning } from '../../src/core/message-kind'
+import { readItemShowType, kindOf, kindTag, unknownKindWarning } from '../../src/core/message-kind'
 
 describe('readItemShowType', () => {
   it('从脚本变量读出类型', () => {
@@ -36,5 +36,30 @@ describe('unknownKindWarning', () => {
     expect(unknownKindWarning(99)).toContain('99')
     expect(unknownKindWarning(99)).toContain('按普通图文解析')
     expect(unknownKindWarning(null)).toContain('没有读到消息类型')
+  })
+})
+
+describe('kindTag（卡片上的类型标识）', () => {
+  it('普通图文与发布通告不标——默认形态标了等于没标', () => {
+    expect(kindTag(0)).toBeNull()
+    expect(kindTag(11)).toBeNull()
+  })
+
+  it('老文章没有 itemShowType 时不标，不能让存量文库一片警示', () => {
+    expect(kindTag(null)).toBeNull()
+    expect(kindTag(undefined)).toBeNull()
+  })
+
+  it('8 标「图片」而不是与默认类型同名的「图文」', () => {
+    expect(kindTag(8)).toEqual({ text: '图片', warn: false })
+  })
+
+  it('视频与文字消息照常标', () => {
+    expect(kindTag(5)).toEqual({ text: '视频', warn: false })
+    expect(kindTag(10)).toEqual({ text: '文字', warn: false })
+  })
+
+  it('未知类型标警示态——它走的是兜底解析，最该让人看见', () => {
+    expect(kindTag(99)).toEqual({ text: '未知类型', warn: true })
   })
 })

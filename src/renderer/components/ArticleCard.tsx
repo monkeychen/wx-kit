@@ -4,6 +4,7 @@ import type { ArticleMeta } from '../../core/types'
 import { api } from '../api'
 import { toWxfileBase, wxfileJoin } from '../wxfile'
 import { relativeTime } from '../time'
+import { kindTag } from '../../core/message-kind'
 
 interface Props {
   meta: ArticleMeta
@@ -18,14 +19,12 @@ interface Props {
 
 // 书架上的一篇文章：封面缩略图（无则朱砂首字占位）+ 衬线标题 + 公众号/时间。
 // 单击=选中（切换），双击=阅读；hover 浮出操作。内容人脑子里是「封面+标题」，不是表格行。
-/** 只标非普通图文——0/11 是默认形态，标了等于没标 */
-function kindLabel(t?: number): string {
-  return t === 5 ? '视频' : t === 10 ? '文字' : t === 8 ? '图文' : ''
-}
+// 类型文案在 core/message-kind（M40 上提）：订阅页的待处理列表也要用同一份，两处各写一份必然漂。
 
 export default function ArticleCard({ meta, libraryRoot, index, selected, onToggleSelect, onRead, onReveal, onDelete }: Props) {
   const [cover, setCover] = useState<string | null>(null)
   const readable = meta.formats.includes('md') || meta.formats.includes('html')
+  const tag = kindTag(meta.itemShowType)
 
   useEffect(() => {
     let alive = true
@@ -53,9 +52,14 @@ export default function ArticleCard({ meta, libraryRoot, index, selected, onTogg
           {/* 含视频的文章值得一眼看出来（视频是最占空间也最容易被忽略的部分） */}
           {meta.videos?.length ? <span data-testid="card-has-video" title={`含 ${meta.videos.length} 个视频`}>📹 </span> : null}
           {/* 非普通图文标出类型：同一个文库里混着文字消息/视频消息，形态差别很大 */}
-          {kindLabel(meta.itemShowType) && (
-            <span data-testid="card-kind" className="kind-tag">{kindLabel(meta.itemShowType)} </span>
+          {tag && (
+            <span data-testid="card-kind" className={`kind-tag${tag.warn ? ' warn' : ''}`}
+              title={tag.warn ? `未识别的消息类型 ${meta.itemShowType}，正文是兜底提取的，建议核对` : undefined}>{tag.text} </span>
           )}
+          {/* 「下到了但可能不对」的唯一信号：不显眼，但必须找得到（M40 起写进 meta.json） */}
+          {meta.warnings?.length ? (
+            <span data-testid="card-warnings" className="kind-tag warn" title={meta.warnings.join('\n')}>⚠ </span>
+          ) : null}
           {meta.account || '未知公众号'}
           {meta.publishTime ? ` · ${relativeTime(meta.publishTime)}` : ''}
         </div>

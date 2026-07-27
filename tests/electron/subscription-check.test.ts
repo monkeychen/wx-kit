@@ -6,6 +6,13 @@ import { join } from 'node:path'
 import { Subscriptions } from '../../src/core/subscriptions'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 import { MpAuthExpired } from '../../src/core/mp-errors'
+import type { DownloadSummary } from '../../src/core/types'
+
+/** downloadRefs 的桩:默认全部成功 */
+const okSummary = (refs: { url: string }[] = [{ url: 'u' }]): DownloadSummary => ({
+  ok: true, total: refs.length, succeeded: refs.length, failed: 0, skipped: 0,
+  items: refs.map((r) => ({ url: r.url, ok: true })),
+})
 
 const newSubs = async (accs: Array<{ fakeid: string; nickname: string; watermark: number }>) => {
   const subs = new Subscriptions(mkdtempSync(join(tmpdir(), 'wxk-subchk-')))
@@ -41,7 +48,7 @@ describe('runSubscriptionCheck', () => {
   it('download mode calls downloadRefs and clears newRefs', async () => {
     const subs = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 100 }])
     const check = vi.fn(async () => [{ fakeid: 'f1', ok: true, latest: 200, newRefs: [{ title: 'n', url: 'u', createTime: 200 }] }])
-    const downloadRefs = vi.fn(async () => {})
+    const downloadRefs = vi.fn(async (refs: { url: string }[]) => okSummary(refs))
     const r = await runSubscriptionCheck('manual', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
       session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs, log: vi.fn(), check: check as never,
@@ -49,6 +56,33 @@ describe('runSubscriptionCheck', () => {
     expect(r).toMatchObject({ newFound: 1 })
     expect(downloadRefs).toHaveBeenCalledOnce()
     expect((await subs.list())[0].newRefs).toEqual([])
+  })
+
+  it('自动下载失败的文章留在待处理里等重试——此前无脑清空，失败的那篇就此消失', async () => {
+    const subs = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 100 }])
+    const refs = [
+      { title: '下成功的', url: 'ok', createTime: 300 },
+      { title: '网络失败的', url: 'boom', createTime: 200 },
+      { title: '读者打不开的', url: 'gone', createTime: 100 },
+    ]
+    const check = vi.fn(async () => [{ fakeid: 'f1', ok: true, latest: 300, newRefs: refs }])
+    const downloadRefs = vi.fn(async (): Promise<DownloadSummary> => ({
+      ok: false, total: 3, succeeded: 1, failed: 2, skipped: 0, unavailable: 1,
+      items: [
+        { url: 'ok', ok: true },
+        { url: 'boom', ok: false, error: { code: 'DOWNLOAD_FAILED', message: '网络错误' } },
+        { url: 'gone', ok: false, unavailable: true },
+      ],
+    }))
+    const r = await runSubscriptionCheck('manual', {
+      subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
+      session: { token: 't' }, mpFetch: (async () => ({})) as never,
+      downloadRefs, log: vi.fn(), check: check as never,
+    })
+    expect(r.results[0].downloaded).toBe(1)                    // 报实际下成的篇数，不是「发现几篇就算下几篇」
+    const left = (await subs.list())[0].newRefs
+    // 真故障留着可重试；读者本就打不开的不留（重试无用，留着是永远清不掉的红点）
+    expect(left.map((x) => x.title)).toEqual(['网络失败的'])
   })
 
   it('failed accounts carry per-account failure details (nickname + error) into log and result', async () => {
@@ -60,7 +94,7 @@ describe('runSubscriptionCheck', () => {
     const log = vi.fn()
     const r = await runSubscriptionCheck('auto', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log, check: check as never,
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log, check: check as never,
     })
     const expected = [{ nickname: '猫笔刀', error: '微信频率限制（200013）' }]
     expect(r).toMatchObject({ failed: 1, failures: expected })
@@ -73,7 +107,7 @@ describe('runSubscriptionCheck', () => {
     const log = vi.fn()
     await runSubscriptionCheck('auto', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log, check: check as never,
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log, check: check as never,
     })
     expect(log.mock.calls[0][0]).not.toHaveProperty('failures')
   })
@@ -99,7 +133,7 @@ describe('runSubscriptionCheck', () => {
       accounts.map((a) => ({ fakeid: a.fakeid, ok: true, latest: 100, newRefs: [] })))
     const r = await runSubscriptionCheck('manual', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
       check: check as never, fakeids: ['f2'],
     })
     expect(check).toHaveBeenCalledOnce()
@@ -113,7 +147,7 @@ describe('runSubscriptionCheck', () => {
     const check = vi.fn()
     const r = await runSubscriptionCheck('manual', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
       check: check as never, fakeids: ['not-subscribed'],
     })
     expect(r).toMatchObject({ note: 'no-accounts', accounts: 0 })
@@ -135,7 +169,7 @@ describe('runSubscriptionCheck', () => {
     ])
     const r = await runSubscriptionCheck('manual', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(), check: check as never,
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(), check: check as never,
     })
     expect(r.results).toEqual([
       { fakeid: 'f1', nickname: '甲', ok: true, newFound: 2, downloaded: 0 },
@@ -150,7 +184,7 @@ describe('runSubscriptionCheck', () => {
       { title: 'c', url: 'uc', createTime: 198 }] }])
     const r = await runSubscriptionCheck('manual', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async () => {}), log: vi.fn(), check: check as never,
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(), check: check as never,
     })
     expect(r.results).toEqual([{ fakeid: 'f1', nickname: '甲', ok: true, newFound: 3, downloaded: 3 }])
   })
@@ -166,7 +200,7 @@ describe('runSubscriptionCheck', () => {
     ])
     const r = await runSubscriptionCheck('manual', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(), check: check as never,
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(), check: check as never,
     })
     expect(r).toMatchObject({ failed: 1, failures: [{ nickname: '猫笔刀', error: '微信频率限制（200013）' }] })
     expect(r.results).toEqual([
@@ -181,14 +215,14 @@ describe('runSubscriptionCheck', () => {
     const r1 = await runSubscriptionCheck('manual', {
       subs: await mk([{ fakeid: 'f1', nickname: 'A', watermark: 0 }]),
       settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: null, mpFetch: null, downloadRefs: vi.fn(), log: vi.fn(),
+      session: null, mpFetch: null, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
     })
     expect(r1.results).toEqual([])
     // no-accounts
     const r2 = await runSubscriptionCheck('manual', {
       subs: await mk([{ fakeid: 'f1', nickname: 'A', watermark: 0 }]),
       settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
       check: vi.fn() as never, fakeids: ['nope'],
     })
     expect(r2.results).toEqual([])
@@ -196,7 +230,7 @@ describe('runSubscriptionCheck', () => {
     const r3 = await runSubscriptionCheck('manual', {
       subs: await mk([{ fakeid: 'f1', nickname: 'A', watermark: 0 }]),
       settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
       check: (async () => { throw new MpAuthExpired('登录态失效') }) as never,
     })
     expect(r3.results).toEqual([])
@@ -207,8 +241,9 @@ describe('runSubscriptionCheck', () => {
     const check = vi.fn(async () => [{ fakeid: 'f1', ok: true, latest: 200, newRefs: [
       { title: 'a', url: 'ua', createTime: 200 }, { title: 'b', url: 'ub', createTime: 199 }] }])
     // 模拟 downloadRefs 下完第一篇时回调一次进度
-    const downloadRefs = vi.fn(async (_refs, _fmts, _src, onProgress?: (e: { completed: number; phase: string }) => void) => {
+    const downloadRefs = vi.fn(async (refs: { url: string }[], _fmts, _src, onProgress?: (e: { completed: number; phase: string }) => void) => {
       onProgress?.({ completed: 1, phase: 'saved' })
+      return okSummary(refs)
     })
     const onDownloadProgress = vi.fn()
     await runSubscriptionCheck('manual', {
@@ -228,7 +263,7 @@ describe('runSubscriptionCheck', () => {
     const s1 = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 100 }])
     await runSubscriptionCheck('manual', {
       subs: s1, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
       check: (async () => [{ fakeid: 'f1', ok: true, latest: 100, newRefs: [] }]) as never,
     })
     expect((await s1.list())[0].lastCheckedAt).toBeTypeOf('number')
@@ -236,7 +271,7 @@ describe('runSubscriptionCheck', () => {
     const s2 = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 100 }])
     await runSubscriptionCheck('manual', {
       subs: s2, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async () => {}), log: vi.fn(),
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
       check: (async () => [{ fakeid: 'f1', ok: true, latest: 200, newRefs: [{ title: 'a', url: 'ua', createTime: 200 }] }]) as never,
     })
     expect((await s2.list())[0].lastCheckedAt).toBeTypeOf('number')
@@ -244,7 +279,7 @@ describe('runSubscriptionCheck', () => {
     const s3 = await newSubs([{ fakeid: 'f1', nickname: 'A', watermark: 100 }])
     await runSubscriptionCheck('manual', {
       subs: s3, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
-      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(), log: vi.fn(),
+      session: { token: 't' }, mpFetch: (async () => ({})) as never, downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(),
       check: (async () => [{ fakeid: 'f1', ok: false, latest: 100, newRefs: [], error: '频控' }]) as never,
     })
     expect((await s3.list())[0].lastCheckedAt).toBeNull()
@@ -257,7 +292,7 @@ describe('runSubscriptionCheck', () => {
     await runSubscriptionCheck('manual', {
       subs, settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
       session: { token: 't' }, mpFetch: (async () => ({})) as never,
-      downloadRefs: vi.fn(), log: vi.fn(), check: check as never, onDownloadProgress,
+      downloadRefs: vi.fn(async (refs: { url: string }[]) => okSummary(refs)), log: vi.fn(), check: check as never, onDownloadProgress,
     })
     expect(onDownloadProgress).not.toHaveBeenCalled()
   })

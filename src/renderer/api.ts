@@ -69,8 +69,12 @@ export interface WxApi {
   subscriptionsSetSubscribed(fakeid: string, nickname: string, subscribed: boolean): Promise<void>
   /** M34:返回逐号明细(此前 IPC 把返回值丢了,渲染层想提示也无从提示) */
   subscriptionsCheckNow(fakeids?: string[]): Promise<RunCheckResult>
-  subscriptionsDownloadNew(fakeid: string): Promise<void>
-  subscriptionsDismissNew(fakeid: string): Promise<void>
+  /**
+   * M40:ids 省略 = 全部待处理;给了就只下这几篇,其余仍留在待处理里。
+   * 返回值里的 `kept` 是**没下成、仍留在待处理里等重试**的篇数——失败不该静默消失。
+   */
+  subscriptionsDownloadNew(fakeid: string, ids?: string[]): Promise<{ downloaded: number; skipped: number; failed: number; kept: number } | undefined>
+  subscriptionsDismissNew(fakeid: string, ids?: string[]): Promise<void>
   subscriptionsOpenLog(): Promise<void>
   onSubscriptionsUpdated(cb: () => void): () => void
   onSubscriptionDownloadProgress(cb: (e: SubscriptionDownloadProgress) => void): () => void

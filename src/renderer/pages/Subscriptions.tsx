@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Switch, Button, Spin, Alert, message, List, Tag, Modal } from 'antd'
+import { Input, Switch, Button, Spin, Alert, message, List, Tag, Modal, Checkbox } from 'antd'
 import { LoadingOutlined, SettingOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import type { SubscribedAccount, CheckLogEntry, PerAccountResult, RunCheckResult } from '../api'
 import type { NewArticleAction } from '../../../electron/services/settings'
 import type { MpAccount } from '../../core/mp-types'
+import { refId } from '../../core/subscription-refs'
+import { kindTag } from '../../core/message-kind'
 
 /** 下载进度按 fakeid 存:手动下载与检查里的自动下载共用同一套 UI（M34） */
 interface DlState { total: number; done: number; phase: string }
@@ -25,6 +27,9 @@ export default function Subscriptions() {
   const [dls, setDls] = useState<Record<string, DlState>>({})
   const [rowRes, setRowRes] = useState<Record<string, PerAccountResult>>({})
   const [policy, setPolicy] = useState<NewArticleAction | null>(null)
+  // 展开/勾选按 fakeid 存:收起再展开不该丢掉刚才的选择
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [selected, setSelected] = useState<Record<string, string[]>>({})
   // 下载进度：无条件按 fakeid 记账。此前只认「自己触发的那个号」，自动下载（无本地 dl 记录）的进度被整个丢弃。
   useEffect(() => api.onSubscriptionDownloadProgress((e) => {
     setDls((prev) => ({ ...prev, [e.fakeid]: { total: e.total, done: e.done, phase: e.phase } }))
@@ -101,12 +106,28 @@ export default function Subscriptions() {
       if (note) setRowRes((prev) => ({ ...prev, [a.fakeid]: { fakeid: a.fakeid, nickname: a.nickname, ok: false, newFound: 0, downloaded: 0, error: note } }))
     } finally { setChecking(false) }
   }
+  /**
+   * 当前选中的待处理文章。**收起时选择即全部**——所以行内动作永远只有一个含义，
+   * 不必并列摆「下载全部」和「下载所选」两套按钮（展开后文案自己会变）。
+   */
+  const pickedIds = (a: SubscribedAccount): string[] => {
+    const all = a.newRefs.map(refId)
+    if (!expanded[a.fakeid]) return all
+    const sel = selected[a.fakeid]
+    return sel ? all.filter((id) => sel.includes(id)) : all
+  }
   const downloadNew = async (a: SubscribedAccount) => {
-    const n = a.newRefs.length
-    setDls((prev) => ({ ...prev, [a.fakeid]: { total: n, done: 0, phase: 'start' } }))
+    const ids = pickedIds(a)
+    if (!ids.length) return
+    setDls((prev) => ({ ...prev, [a.fakeid]: { total: ids.length, done: 0, phase: 'start' } }))
     try {
-      await api.subscriptionsDownloadNew(a.fakeid)
-      message.success(`已下载「${a.nickname}」${n} 篇新文章`)
+      const r = await api.subscriptionsDownloadNew(a.fakeid, ids)
+      // 报实际结果而不是「点了几篇就说下了几篇」;没下成的仍在待处理里,顺带告诉用户可以重试
+      const kept = r?.kept ?? 0
+      const head = `「${a.nickname}」已下载 ${r?.downloaded ?? ids.length} 篇`
+      const skip = r?.skipped ? `，${r.skipped} 篇已在库中` : ''
+      if (kept > 0) message.warning(`${head}${skip}，${kept} 篇未成功（仍在待处理里，可再试一次）`)
+      else message.success(head + skip)
       await load()
     } catch (e) {
       message.error('下载失败：' + (e as Error).message)
@@ -114,8 +135,50 @@ export default function Subscriptions() {
       setDls((prev) => { const next = { ...prev }; delete next[a.fakeid]; return next })
     }
   }
-  const dismiss = async (a: SubscribedAccount) => { await api.subscriptionsDismissNew(a.fakeid); await load() }
+  const dismiss = async (a: SubscribedAccount) => {
+    const ids = pickedIds(a)
+    if (!ids.length) return
+    await api.subscriptionsDismissNew(a.fakeid, ids); await load()
+  }
   const busy = Object.keys(dls).length > 0
+
+  const toggleExpand = (a: SubscribedAccount) => {
+    setExpanded((prev) => ({ ...prev, [a.fakeid]: !prev[a.fakeid] }))
+    // 默认全选：最常见的路径仍是一键下全部，默认不选会把「全下」从 1 次点击变成 N+1 次
+    setSelected((prev) => prev[a.fakeid] ? prev : { ...prev, [a.fakeid]: a.newRefs.map(refId) })
+  }
+  const toggleOne = (fakeid: string, id: string, all: string[]) => {
+    setSelected((prev) => {
+      const cur = prev[fakeid] ?? all
+      return { ...prev, [fakeid]: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] }
+    })
+  }
+
+  /** 待处理文章明细（M40）：标题/时间/类型——这些数据早就存在本地，此前只显示了一个数字 */
+  const pendingPanel = (a: SubscribedAccount) => {
+    if (!expanded[a.fakeid] || !a.newRefs.length) return null
+    const all = a.newRefs.map(refId)
+    const sel = selected[a.fakeid] ?? all
+    return (
+      <div className="subs-pending" data-testid="subs-pending">
+        {a.newRefs.map((r) => {
+          const id = refId(r)
+          const tag = kindTag(r.itemShowType)
+          return (
+            <div key={id} className="subs-pending-item" data-testid="subs-pending-item">
+              <Checkbox checked={sel.includes(id)} disabled={busy}
+                onChange={() => toggleOne(a.fakeid, id, all)} data-testid="subs-pending-check" />
+              {/* 光看标题常判断不了值不值得下——点开原文再决定，这是「有选择」能成立的前提 */}
+              <a className="subs-pending-title" onClick={() => api.openExternal(r.url)}
+                title="在浏览器打开原文" data-testid="subs-pending-title">{r.title || '(无标题)'}</a>
+              {tag && <span className={`kind-tag${tag.warn ? ' warn' : ''}`} data-testid="subs-pending-kind">{tag.text}</span>}
+              <span className="faint subs-pending-time">{new Date(r.createTime * 1000).toLocaleString()}</span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   /** 行内结果:检查完这一行到底发生了什么。此前自动下载全程零反馈，点完像什么都没发生。 */
   const rowResultEl = (fakeid: string, nickname: string) => {
@@ -208,16 +271,23 @@ export default function Subscriptions() {
               const checkEl = checking || busy
                 ? <span key="ck" className="faint" data-testid="subs-check-one">检查</span>
                 : <a key="ck" data-testid="subs-check-one" onClick={() => checkOne(a)}>检查</a>
+              // 行内动作作用于「当前选择」：收起时选择即全部，展开后随勾选变化。
+              // 一次只有一个含义，不并列摆「下载全部」与「下载所选」两套按钮。
+              const open = !!expanded[a.fakeid]
+              const picked = pickedIds(a).length
+              const dlLabel = open ? `下载所选 ${picked} 篇` : `下载 ${a.newRefs.length} 篇新文章`
+              const igLabel = open ? `忽略所选 ${picked} 篇` : '忽略'
+              const idle = !busy && picked > 0
               const actions = downloadingThis
                 ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>, checkEl]
                 : a.newRefs.length > 0
                   ? [
-                      busy
-                        ? <span key="dl" className="faint" data-testid="subs-download-new">下载 {a.newRefs.length} 篇新文章</span>
-                        : <a key="dl" data-testid="subs-download-new" onClick={() => downloadNew(a)}>下载 {a.newRefs.length} 篇新文章</a>,
-                      busy
-                        ? <span key="ig" className="faint">忽略</span>
-                        : <a key="ig" onClick={() => dismiss(a)}>忽略</a>,
+                      idle
+                        ? <a key="dl" data-testid="subs-download-new" onClick={() => downloadNew(a)}>{dlLabel}</a>
+                        : <span key="dl" className="faint" data-testid="subs-download-new">{dlLabel}</span>,
+                      idle
+                        ? <a key="ig" data-testid="subs-dismiss-new" onClick={() => dismiss(a)}>{igLabel}</a>
+                        : <span key="ig" className="faint" data-testid="subs-dismiss-new">{igLabel}</span>,
                       checkEl,
                     ]
                   // 刚检查完这一行时,行内结果态已经把话说清了;再挂个「无新文章」会和
@@ -228,12 +298,25 @@ export default function Subscriptions() {
               return (
               <List.Item data-testid="subs-row" actions={actions}>
                 <List.Item.Meta
-                  title={<span>{a.nickname} {a.newRefs.length > 0 && <Tag color="red">{a.newRefs.length} 新</Tag>}</span>}
-                  description={
+                  title={
                     <span>
-                      {a.lastCheckedAt ? `上次检查 ${new Date(a.lastCheckedAt).toLocaleString()}` : '尚未检查'}
-                      {rowResultEl(a.fakeid, a.nickname)}
+                      {a.nickname}
+                      {/* 数字点得开:标题早就存在本地,此前只让人看见一个计数(M40) */}
+                      {a.newRefs.length > 0 && (
+                        <a onClick={() => toggleExpand(a)} data-testid="subs-expand" title="查看具体是哪几篇">
+                          <Tag color="red" style={{ cursor: 'pointer' }}>{open ? '▾' : '▸'} {a.newRefs.length} 新</Tag>
+                        </a>
+                      )}
                     </span>
+                  }
+                  description={
+                    <>
+                      <span>
+                        {a.lastCheckedAt ? `上次检查 ${new Date(a.lastCheckedAt).toLocaleString()}` : '尚未检查'}
+                        {rowResultEl(a.fakeid, a.nickname)}
+                      </span>
+                      {pendingPanel(a)}
+                    </>
                   } />
                 <Switch checked={a.subscribed} onChange={(v) => toggle(a, v)} data-testid="subs-toggle"
                   disabled={busy} checkedChildren="已订阅" unCheckedChildren="未订阅" />

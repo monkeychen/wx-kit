@@ -74,6 +74,12 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
   if (videoRecords.length) meta.videos = videoRecords
   for (const w of warnings) deps.onWarning?.(w)
 
+  // 告警落进 meta(M40):此前它只经 onWarning 汇进 DownloadItemResult,**只有 CLI 看得到**——
+  // GUI 下载完就消失了,事后在文库里根本无从知道「这篇当时解析得可疑」。
+  // 视频告警在 buildMeta 之后才产生,所以要在写盘前合并,不能只用 parsed.warnings。
+  const allWarnings = [...parsed.warnings, ...warnings]
+  if (allWarnings.length) meta.warnings = allWarnings
+
   // html 与 md 的视频引用形态不同（html 能内联 <video>，md 只能给链接），
   // 且 turndown 不认识 <video> —— 所以分成两个 suffix，不能共用一份 contentHtml。
   const htmlBody = htmlSuffix ? `${contentHtml}\n${htmlSuffix}` : contentHtml

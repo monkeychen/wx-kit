@@ -26,6 +26,7 @@ import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } 
 import { syncToSite } from '../src/core/site-sync'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
+import { refId } from '../src/core/subscription-refs'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { UpdateScheduler } from './services/update-scheduler'
 import { SettingsService } from './services/settings'
@@ -253,8 +254,12 @@ export function registerIpc(settings: SettingsService): void {
     const library = new Library(libraryRoot)
     const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot, downloadVideos }
     const queue = new DownloadQueue((url, hint) => downloadArticle(url, formats, ddeps, hint), onProgress)
-    const summary = await queue.run(refs.map((r) => r.url))
+    // 必须把列表给的文章主键(mid/idx)透传下去:订阅拿到的是**短链** `s/XXXX`,
+    // 没有 hint 就只能退化成路径哈希 id,于是同一篇经「按公众号」抓时算另一篇 → 重复下载。
+    // 这正是 M36 为 crawl 修过的那个 bug,当时漏了这个调用点(真实库里已积下 32 篇哈希 id)。
+    const summary = await queue.run(refs.map((r) => ({ url: r.url, appmsgid: r.appmsgid, itemidx: r.itemidx })))
     await recordHistory(source, formats, summary)
+    return summary
   }
 
   const logPath = join(app.getPath('userData'), 'subscriptions-check.log')
@@ -311,27 +316,42 @@ export function registerIpc(settings: SettingsService): void {
     emitSubsUpdated()
   })
   ipcMain.handle('subscriptions:checkNow', (_e, fakeids?: string[]) => runSubscriptionCheck('manual', fakeids))
-  ipcMain.handle('subscriptions:downloadNew', async (event, fakeid: string) => {
+  /** M40:ids 省略 = 全部待处理(老调用方不变);给了就只动这几篇,其余留在列表里 */
+  const pickRefs = (acc: { newRefs: ArticleRef[] }, ids?: string[]) =>
+    ids?.length ? acc.newRefs.filter((r) => ids.includes(refId(r))) : acc.newRefs
+
+  ipcMain.handle('subscriptions:downloadNew', async (event, fakeid: string, ids?: string[]) => {
     const subs = await subsFor()
     const acc = (await subs.list()).find((a) => a.fakeid === fakeid)
     if (!acc || !acc.newRefs.length) return
-    const total = acc.newRefs.length
+    const picked = pickRefs(acc, ids)
+    if (!picked.length) return
+    const total = picked.length
     const emitProgress = (done: number, phase: string) => {
       if (!event.sender.isDestroyed()) event.sender.send('subscriptions:download:progress', { fakeid, total, done, phase })
     }
     emitProgress(0, 'start')
-    await downloadRefs(acc.newRefs, (await settings.get()).defaultFormats,
+    const summary = await downloadRefs(picked, (await settings.get()).defaultFormats,
       { kind: 'account', nickname: acc.nickname, fakeid, range: { count: total } },
       (e) => emitProgress(e.completed, e.phase))
-    await subs.clearNewRefs(fakeid)
+    // 只移除「处理完了」的:成功、已在库、以及读者本就打不开的(重试无用)。
+    // **真故障(网络/频控)留在待处理里等重试** —— 此前无脑清空,下载失败的那篇就此消失,
+    // 用户点了下载、失败了、列表里也没了,连重试的入口都没有。
+    const done = new Set(summary.items.filter((i) => i.ok || i.unavailable).map((i) => i.url))
+    await subs.removeNewRefs(fakeid, picked.filter((r) => done.has(r.url)).map(refId))
     emitProgress(total, 'done')
     emitSubsUpdated()
+    return { downloaded: summary.succeeded, skipped: summary.skipped, failed: summary.failed, kept: total - done.size }
   })
-  ipcMain.handle('subscriptions:dismissNew', async (_e, fakeid: string) => {
+  ipcMain.handle('subscriptions:dismissNew', async (_e, fakeid: string, ids?: string[]) => {
     const subs = await subsFor()
     const acc = (await subs.list()).find((a) => a.fakeid === fakeid)
-    if (acc) await subs.updateWatermark(fakeid, acc.newRefs.reduce((mx, r) => Math.max(mx, r.createTime), acc.watermark))
-    await subs.clearNewRefs(fakeid)
+    if (!acc) return
+    // 水位在检查时就已推过全部新文章(subscription-check.ts:83),这里推一次是 no-op,
+    // 留着只为「即使将来检查顺序变了也不会倒退」;**别以为忽略是靠推水位实现的**——
+    // 忽略就是把这几篇从待处理里拿掉,它们不会被重新发现是水位早就过了的缘故。
+    await subs.updateWatermark(fakeid, acc.newRefs.reduce((mx, r) => Math.max(mx, r.createTime), acc.watermark))
+    await subs.removeNewRefs(fakeid, pickRefs(acc, ids).map(refId))
     emitSubsUpdated()
   })
   ipcMain.handle('subscriptions:openLog', () => {
