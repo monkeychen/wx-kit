@@ -6,6 +6,7 @@
 ## 当前状态
 
 - **最新发布:v0.8.3(2026-07-27,补丁)** —— tag `v0.8.3` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M38 把「读者打不开的文章」与「下载失败」分开(错误页认出具体原因、汇总分两类、列表补齐 `checking`/`ban_flag` 过滤)。上一功能版 v0.8.2(2026-07-26,不让用户猜):M34–M37,需求/验收 `docs/PRD-v0.8.2.md`。
+- **进行中:v0.8.4「看得见,还能挑」** —— M39–M42,需求/验收 `docs/PRD-v0.8.4.md`。五条需求同一形状:系统手里已有信息,用户/agent 却用不上或用不准(更新检查被限流吞掉结论、订阅新文章只见数字不见标题、类型标签把「图片」标成默认类型的名字、agent 没有「某天发了什么」的入口、compose 落后 CLI 20 个里程碑)。**无一条需要新抓数据。**
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
@@ -54,8 +55,12 @@
 | **M36** ✅ | v0.8.2 | **列表接口修正 + 消息类型一等公民**:`appmsg?type=9`(370 篇/只有图文/最新卡在 7-17)换成 `appmsgpublish`(770 篇/全类型/每页 20);解析改按 `item_show_type` 显式分发,未知类型进 `warnings` 不再静默产出垃圾(2026-07-26 完成:实测最近 10 篇里 9 篇是旧接口看不见的;订阅检查补回 6 篇漏检) | `plans/2026-07-26-m36.md` |
 | **M37** ✅ | v0.8.2 | 更新检查 + 按渠道引导升级:GitHub API 查最新版、自写版本比较(不引 semver)、识别 brew/dmg/nsis 渠道给对应动作(brew 给三段命令一键复制)、启动静默检查 + 只点一个圆点不打扰(2026-07-26 完成,真机识别 brew + 两条路径实测) | `plans/2026-07-26-m37.md` |
 | **M38** ✅ | v0.8.3 | 过滤读者不可访问的文章:`checking`/`ban_flag` 与 `is_deleted` 同批过滤(此前漏读→必然失败的下载 + 笼统报错)、`--count N` 按可下条数补齐、提示只在结果不及预期时给、订阅水位不被卡住;**实现中发现列表在文章被拒后不再有标记**(`checking` 只在审核期间为 1),改为下载阶段认出错误页并把两类失败分开计数(2026-07-27 完成) | `plans/2026-07-27-m38.md` |
+| **M39** 🚧 | v0.8.4 | 更新检查在常开应用里几乎不生效:静默检查被「每天最多一次」限流直接 `return null`,**连上次查到的结论一起吞掉**;且唯一检查时机绑在启动上(桌面应用常年不重启)。改为缓存结论 + 低频 tick,请求频率仍由每天一次兜底 | `plans/2026-07-27-m39.md` |
+| **M40** 🚧 | v0.8.4 | 订阅新文章可见可挑(标题/时间/类型 + 勾选下载或忽略;**顺带修 `setNewRefs` 覆盖写导致留存的 pending 被下次检查冲掉**)+ 文库类型标识修正(`item_show_type 8` 标成「图文」与默认类型同名、未知类型无标识、warnings 在 GUI 不可见);类型文案上提 core 供两处共用 | `plans/2026-07-27-m40.md` |
+| **M41** 🚧 | v0.8.4 | CLI `subscription digest --date`:查已订阅号某一天发了什么(不下载、不写库、不推水位),输出带 `downloaded` 让 agent 分流;自然语言日期由 agent 换算,CLI 只认 `YYYY-MM-DD`/`today`/`yesterday`;**wx-kit-skill 三处同步是交付物不是附属** | `plans/2026-07-27-m41.md` |
+| **M42** 🚧 | v0.8.4 | `agent/wx-kit-compose` 跟上 CLI(最后改动停在 2026-06-23/v0.4.0):补上游 `digest` 选题入口、下游可选 `site sync`、中间 `library search`/`--sort`、素材质量信号 `itemShowType`/`warnings`;`agent/README.md` 一并核对。**依赖 M41** | `plans/2026-07-27-m42.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
