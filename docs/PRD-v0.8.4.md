@@ -124,9 +124,22 @@ if (opts?.silent) {
 - **不下载、不写库**:纯查询,不碰 library.json,不推进订阅水位(**与 `check-now` 语义分开**——
   这是「看看那天有什么」,不是「检查更新」,不该影响水位)。
 - **失败不阻断**:某号查失败(频控/登录态)记进 `failures`,其余照常返回。
-- **skill 同步**(工作流第 7 条):`agent/wx-kit-skill/` 写清楚
-  ①「用户说『昨天』时你自己换算成 `YYYY-MM-DD`」②`downloaded` 字段的用法
-  ③ 号多时耗时较长,可用 `--accounts` 缩范围。
+**skill 更新是本需求的交付物之一,不是文档附属**(2026-07-27 安哥特别强调):
+
+R2 与其它需求不同——**它本质上是一个给 agent 用的能力,而 skill 是它唯一的入口**。
+CLI 命令写好了但 skill 没写,agent 不会凭空知道有 `subscription digest`,这个功能对它**等于不存在**。
+所以 skill 条目与 CLI 实现同等重要,**未同步 = 需求未完成**。具体到文件:
+
+| 文件 | 要写什么 |
+|---|---|
+| `SKILL.md` 速查表 | 加一行命令(agent 先读这里,漏了等于没做);标明**日期由 agent 换算** |
+| `references/commands.md` | 完整输出契约(字段逐个说明,重点讲 `downloaded` 与 `id` 怎么用);`--accounts` 与耗时提示;非法日期会报错 |
+| `references/recipes.md` | 一条**完整链路**范例:「昨天各号发了什么」→ agent 自己算出日期 → `digest` → 按 `downloaded` 分流(已下的直接读 `content.md`,没下的 `download`)|
+
+**要写进 skill 的三件事**:
+① 用户说「昨天 / 前天 / 7月23日」时,**agent 自己换算成 `YYYY-MM-DD`** 再调用(CLI 不解析自然语言,传错会报错);
+② `downloaded` 字段决定下一步——已下载的直接读本地 `content.md`,未下载的才 `download`;
+③ 订阅号多时耗时较长(16 号约 30–60 秒),可用 `--accounts` 缩小范围。
 
 **验收(草)**:
 
@@ -138,7 +151,10 @@ if (opts?.silent) {
 - [ ] 某号失败不影响其余号;失败进 `failures`,退出码仍为 0(部分成功)。
 - [ ] **不写库、不推进水位**:跑完 `subscription list` 的水位与 `library.json` 均无变化。
 - [ ] stderr 有逐号进度;16 号场景不会长时间无输出。
-- [ ] skill 文档说明日期换算由 agent 负责,并给出 `downloaded` 的用法范例。
+- [ ] **skill 三个文件都已同步**(SKILL.md 速查表 / commands.md 输出契约 / recipes.md 完整链路范例)
+      —— 本需求的入口就是 skill,**未同步视为需求未完成**。
+- [ ] 用一个「干净」的 agent 会话验证:只读 skill 能否正确完成「看看昨天各号发了什么」
+      (含自己换算日期、按 `downloaded` 分流),不靠人补充说明。
 
 ## 3. 里程碑拆分
 
