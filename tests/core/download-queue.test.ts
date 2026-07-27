@@ -1,6 +1,7 @@
 // tests/core/download-queue.test.ts
 import { describe, it, expect } from 'vitest'
 import { DownloadQueue, type DownloadOne } from '../../src/core/download-queue'
+import { ArticleUnavailableError } from '../../src/core/download-article'
 import type { ProgressEvent } from '../../src/core/types'
 
 describe('DownloadQueue', () => {
@@ -106,5 +107,26 @@ describe('队列条目可带文章主键(M36)', () => {
     const q = new DownloadQueue(async () => { throw new Error('boom') })
     const s = await q.run([{ url: 'https://x/AAA', appmsgid: 1, itemidx: 1 }])
     expect(s.items[0]).toMatchObject({ url: 'https://x/AAA', ok: false })
+  })
+})
+
+describe('读者打不开 ≠ 下载失败(M38)', () => {
+  it('ArticleUnavailableError 单独计数,错误码也不同', async () => {
+    const q = new DownloadQueue(async (url) => {
+      if (url === 'gone') throw new ArticleUnavailableError('该文章审核未通过，读者不可见（无法下载）')
+      if (url === 'broken') throw new Error('socket hang up')
+      return { url, ok: true }
+    })
+    const s = await q.run(['ok1', 'gone', 'broken'])
+    expect(s).toMatchObject({ succeeded: 1, failed: 2, unavailable: 1 })
+    expect(s.items[1]).toMatchObject({ ok: false, unavailable: true, error: { code: 'ARTICLE_UNAVAILABLE' } })
+    // 真故障保持原样,不被误标
+    expect(s.items[2]).toMatchObject({ ok: false, error: { code: 'DOWNLOAD_FAILED' } })
+    expect(s.items[2].unavailable).toBeUndefined()
+  })
+
+  it('没有不可见文章时不带该字段(不给下游添噪)', async () => {
+    const q = new DownloadQueue(async (url) => ({ url, ok: true }))
+    expect((await q.run(['a'])).unavailable).toBeUndefined()
   })
 })

@@ -40,7 +40,14 @@ export async function searchAccount(mpFetch: MpFetch, token: string, name: strin
   }))
 }
 
-export interface ListOpts { sleep?: (ms: number) => Promise<void> }
+export interface ListOpts {
+  sleep?: (ms: number) => Promise<void>
+  /**
+   * 上报被过滤掉的「读者不可访问」篇数。做成回调而不是改返回类型:
+   * `listArticles` 的返回值被 crawl/ipc/cli 多处消费,改签名波及面大。
+   */
+  onHidden?: (n: number) => void
+}
 
 /** 中间两层是 JSON 字符串;脏数据不该炸掉整次抓取,解析失败按空处理 */
 function parseJsonSafe<T>(raw: unknown): T | null {
@@ -54,6 +61,20 @@ interface AppMsgEx {
   link?: string; title?: string; create_time?: number
   item_show_type?: number; itemidx?: number; is_deleted?: boolean
   appmsgid?: number
+  checking?: number; ban_flag?: number
+}
+
+/**
+ * 读者能否打开这篇文章。三个字段都来自后台列表,含义各不相同:
+ *   `is_deleted` —— 作者自己删了
+ *   `checking`   —— 审核不通过(**终态**,不是「审核中」;页面显示「此内容发送失败无法查看…涉嫌违规」)
+ *   `ban_flag`   —— 封禁标记(未见真实样本,按字面处理:非 0 即不可见)
+ *
+ * 这三种文章的页面都打不开(返回微信的错误页),列进结果只会产生**必然失败**的下载,
+ * 而且失败原因会退化成笼统的「no title parsed」——信号在列表里就有,不该拖到下载时才发现。
+ */
+function isReaderVisible(a: AppMsgEx): boolean {
+  return !a.is_deleted && !a.checking && !a.ban_flag
 }
 
 /**
@@ -64,7 +85,7 @@ interface AppMsgEx {
  */
 async function fetchPage(
   mpFetch: MpFetch, token: string, fakeid: string, begin: number,
-): Promise<{ items: ArticleRef[]; total: number; pageLen: number }> {
+): Promise<{ items: ArticleRef[]; total: number; pageLen: number; hidden: number }> {
   const json = await mpFetch(APPMSG_PUBLISH, {
     sub: 'list', sub_action: 'list_ex', begin: String(begin), count: String(PAGE), fakeid,
     type: '101_1', free_publish_type: '1', search_field: 'null', query: '',
@@ -74,10 +95,12 @@ async function fetchPage(
   const page = parseJsonSafe<PublishPage>((json as Record<string, unknown>).publish_page)
   const groups = page?.publish_list ?? []
   const items: ArticleRef[] = []
+  let hidden = 0
   for (const g of groups) {
     const info = parseJsonSafe<{ appmsgex?: AppMsgEx[] }>(g.publish_info)
     for (const a of info?.appmsgex ?? []) {
-      if (!a.link || a.is_deleted) continue
+      if (!a.link) continue
+      if (!isReaderVisible(a)) { hidden++; continue }
       items.push({
         url: String(a.link), title: String(a.title ?? ''), createTime: Number(a.create_time ?? 0),
         ...(a.item_show_type != null ? { itemShowType: Number(a.item_show_type) } : {}),
@@ -87,7 +110,7 @@ async function fetchPage(
       })
     }
   }
-  return { items, total: Number(page?.total_count ?? 0), pageLen: groups.length }
+  return { items, total: Number(page?.total_count ?? 0), pageLen: groups.length, hidden }
 }
 
 /**
@@ -105,7 +128,8 @@ export async function listArticlesSince(
   let begin = 0
   for (;;) {
     if (begin > 0) await sleepFn(randMs(1000, 3000))
-    const { items, total, pageLen } = await fetchPage(mpFetch, token, fakeid, begin)
+    const { items, total, pageLen, hidden } = await fetchPage(mpFetch, token, fakeid, begin)
+    if (hidden) opts.onHidden?.(hidden)
     if (!pageLen) break
     out.push(...items)
     if (items.some((i) => i.createTime <= sinceTs)) break   // 已翻到水位(本页含已读)
@@ -124,7 +148,8 @@ export async function listArticles(
   let begin = 0
   for (;;) {
     if (begin > 0) await sleepFn(randMs(1000, 3000))
-    const { items, total, pageLen } = await fetchPage(mpFetch, token, fakeid, begin)
+    const { items, total, pageLen, hidden } = await fetchPage(mpFetch, token, fakeid, begin)
+    if (hidden) opts.onHidden?.(hidden)
     if (!pageLen) break   // 这一页原始为空 = 没有更多文章
     if ('count' in range) {
       out.push(...items)

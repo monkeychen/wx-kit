@@ -104,7 +104,14 @@ export default function AccountMode({ onDone, prefill }: Props) {
       const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats, keywords)
       const cancelled = summary.total - summary.succeeded - summary.skipped - summary.failed
       const filtered = summary.filteredOut ? `，按关键词过滤 ${summary.filteredOut} 篇` : ''
-      const tail = `成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}${filtered}`
+      // 「读者打不开」不是下载故障，混在 failed 里会让人以为工具坏了。
+      // 补齐成功时不必解释（要 N 篇给了 N 篇）；不及预期时才说，并且说清是哪一类。
+      const unavail = summary.shortfall && summary.unavailable
+        ? `；另有 ${summary.unavailable} 篇作者发布失败或已下架，读者本就看不到（非下载故障）`
+        : ''
+      // failed 只报真故障，不可见的那些单独说
+      const realFailed = summary.realFailures ?? summary.failed
+      const tail = `成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${realFailed}${filtered}${unavail}`
       if (cancelled > 0) message.info(`已取消 · ${tail}，未下载 ${cancelled}（见下方历史，可单独补下）`)
       else if (summary.total === 0 && summary.filteredOut) message.info(`列出的 ${summary.filteredOut} 篇标题均不匹配关键词，没有可下载的文章`)
       else message.success(`完成 · ${tail}`)

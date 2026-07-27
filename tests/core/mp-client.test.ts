@@ -201,6 +201,71 @@ describe('appmsgpublish 列表解析(M36)', () => {
     expect(refs.some((r) => r.title.includes('已删除'))).toBe(false)
   })
 
+  // ── M38:读者打不开的文章一律不进列表 ──
+  // 它们的页面是微信的错误页(「此内容发送失败无法查看…涉嫌违规」),
+  // 列进来只会产生**必然失败**的下载,还把失败原因说成笼统的「no title parsed」。
+  it('审核不通过(checking)与被封禁(ban_flag)的文章都不进列表', async () => {
+    const refs = await listArticles(fixtureFetch, 'T', 'FID', { count: 50 }, noSleep)
+    expect(refs.some((r) => r.title.includes('审核不通过'))).toBe(false)
+    expect(refs.some((r) => r.title.includes('被封禁'))).toBe(false)
+    // 正常文章不受影响
+    expect(refs.length).toBeGreaterThan(0)
+    expect(refs.some((r) => r.title.includes('一次群发·头条'))).toBe(true)
+  })
+
+  it('被过滤的条数经 onHidden 上报(上层要据此判断结果是否不及预期)', async () => {
+    let hidden = 0
+    await listArticles(fixtureFetch, 'T', 'FID', { count: 50 },
+      { ...noSleep, onHidden: (n) => { hidden += n } })
+    expect(hidden).toBe(3)   // fixture 里 is_deleted / checking / ban_flag 各一条
+  })
+
+  it('count 模式会往前补齐 —— 要 N 篇就给 N 篇可下的', async () => {
+    // 前两组都不可见,若不补齐就只能拿到 1 篇
+    const mkA = (n: number, flags: Record<string, unknown> = {}) =>
+      mkGroup([{ link: `u${n}`, title: `t${n}`, create_time: 1700000000 - n, item_show_type: 0, itemidx: 1, ...flags } as never])
+    const groups = [
+      mkA(0, { checking: 1 }), mkA(1, { ban_flag: 1 }), mkA(2), mkA(3), mkA(4),
+    ]
+    const refs = await listArticles(publishFetch(groups, 2), 'T', 'FID', { count: 3 }, noSleep)
+    expect(refs.map((r) => r.title)).toEqual(['t2', 't3', 't4'])
+  })
+
+  it('全部不可见时不死循环,返回空', async () => {
+    const groups = [0, 1, 2, 3].map((n) =>
+      mkGroup([{ link: `u${n}`, title: `t${n}`, create_time: 1700000000 - n, item_show_type: 0, itemidx: 1, checking: 1 } as never]))
+    const refs = await listArticles(publishFetch(groups, 2), 'T', 'FID', { count: 5 }, noSleep)
+    expect(refs).toEqual([])
+  })
+
+  it('日期范围模式:窗口内的不可见文章被剔除,且不因剔除误判「已翻出窗口」', async () => {
+    const ts = (d: string) => Date.parse(`${d}T12:00:00`) / 1000
+    const mkD = (d: string, flags: Record<string, unknown> = {}) =>
+      mkGroup([{ link: `u${d}`, title: d, create_time: ts(d), item_show_type: 0, itemidx: 1, ...flags } as never])
+    const groups = [
+      mkD('2026-02-27'),                    // 窗口外(晚于 to)
+      mkD('2026-02-26', { checking: 1 }),   // 窗口内但不可见 → 剔除,且不得让循环提前结束
+      mkD('2026-02-25'),                    // 窗口内,必须拿到
+      mkD('2026-02-24'),                    // 窗口外(早于 from)→ 到此停止
+    ]
+    const refs = await listArticles(publishFetch(groups, 2), 'T', 'FID',
+      { from: '2026-02-25', to: '2026-02-26' }, noSleep)
+    expect(refs.map((r) => r.title)).toEqual(['2026-02-25'])
+  })
+
+  it('订阅检查:最新几篇都不可见时仍能翻到水位并停下(不无限翻)', async () => {
+    let calls = 0
+    const mkS = (n: number, flags: Record<string, unknown> = {}) =>
+      mkGroup([{ link: `u${n}`, title: `t${n}`, create_time: 1000 - n, item_show_type: 0, itemidx: 1, ...flags } as never])
+    const groups = [mkS(0, { checking: 1 }), mkS(1, { checking: 1 }), mkS(2), mkS(3)]
+    const fetch: MpFetch = async (e, p) => { calls++; return publishFetch(groups, 2)(e, p) }
+    const refs = await listArticlesSince(fetch, 'T', 'FID', 1000 - 2, noSleep)
+    // 第一页两条都不可见 → 不命中水位、继续翻;第二页命中即停。
+    // 返回值含扫到的旧文章(新旧判定由 checkSubscriptions 按水位做),故 t3 也在内。
+    expect(refs.map((r) => r.title)).toEqual(['t2', 't3'])
+    expect(calls).toBeLessThanOrEqual(2)   // 关键:没有因为整页被过滤就无限翻
+  })
+
   it('游标按「组数」推进 —— 一组多篇时不能按文章数推进,否则会跳组', async () => {
     // 6 组共 7 篇(含 1 组两篇、1 条已删除);每页 2 组
     const seen: number[] = []
@@ -213,7 +278,7 @@ describe('appmsgpublish 列表解析(M36)', () => {
       }) } as never
     }
     await listArticles(spy, 'T', 'FID', { count: 99 }, noSleep)
-    expect(seen).toEqual([0, 2, 4])   // 按组数 +2,不是按文章数
+    expect(seen).toEqual([0, 2, 4, 6])   // 按组数 +2,不是按文章数(fixture 现有 8 组)
   })
 
   it('脏数据不炸整次抓取:publish_page 不是合法 JSON 时返回空页', async () => {

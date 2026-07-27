@@ -72,6 +72,8 @@ export interface DownloadItemResult {
   cancelled?: boolean         // 因取消而未尝试下载（列表已知标题，可后续单篇补下）
   /** 非致命问题（如视频下载失败）：文章本体成功，但用户/agent 该知道少了什么 */
   warnings?: string[]
+  /** 文章本身读者就打不开（审核未通过/已删除/违规下架）——不是下载故障，重试无用 */
+  unavailable?: boolean
   error?: { code: string; message: string }
 }
 
@@ -81,5 +83,7 @@ export interface DownloadSummary {
   succeeded: number
   failed: number
   skipped: number
+  /** failed 中属于「读者本就打不开」的篇数;剩下的才是真故障 */
+  unavailable?: number
   items: DownloadItemResult[]
 }

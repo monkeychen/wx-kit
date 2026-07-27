@@ -137,3 +137,27 @@ describe('用列表主键判重(M36)', () => {
     expect(r.warnings?.join()).toContain('未识别的消息类型 77')
   })
 })
+
+describe('打不开的文章要说清原因(M38)', () => {
+  const page = (body: string) => `<!doctype html><html><head></head><body>${body}</body></html>`
+
+  it('审核未通过的错误页 → 说明是审核未通过,而不是 no title parsed', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-una1-')),
+      page('<div class="weui-msg__title">此内容发送失败无法查看</div>'))
+    await expect(downloadArticle('https://mp.weixin.qq.com/s/X', ['meta'], deps))
+      .rejects.toThrow(/审核未通过/)
+  })
+
+  it('作者删除的错误页 → 说明是被删除', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-una2-')),
+      page('<div>该内容已被发布者删除</div>'))
+    await expect(downloadArticle('https://mp.weixin.qq.com/s/X', ['meta'], deps))
+      .rejects.toThrow(/已被作者删除/)
+  })
+
+  it('认不出的空页面 → 退回原来的笼统说法(不硬猜)', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-una3-')), page('<div>页面不存在</div>'))
+    await expect(downloadArticle('https://mp.weixin.qq.com/s/X', ['meta'], deps))
+      .rejects.toThrow(/no title parsed/)
+  })
+})

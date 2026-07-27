@@ -16,6 +16,25 @@ export interface DownloadArticleDeps extends ExportDeps {
   downloadVideos?: boolean
 }
 
+/**
+ * 文章本身读者就打不开(审核未通过 / 已删除 / 违规下架),**不是下载故障**。
+ * 分成独立类型是因为两者对用户的含义完全不同:重试一百次也没用,
+ * 而把它混进 failed 会让人以为工具坏了。列表接口在文章被拒后不再有任何标记
+ * (`checking` 只在审核期间为 1,审核完就归零),所以只能在这一步认出来。
+ */
+export class ArticleUnavailableError extends Error {
+  constructor(message: string) { super(message); this.name = 'ArticleUnavailableError' }
+}
+
+/** 从微信的错误页里认出「为什么打不开」；认不出就退回原来的笼统说法 */
+export function describeUnavailable(html: string): { unavailable: boolean; message: string } {
+  if (html.includes('此内容发送失败无法查看')) return { unavailable: true, message: '该文章审核未通过，读者不可见（无法下载）' }
+  if (html.includes('已被发布者删除')) return { unavailable: true, message: '该文章已被作者删除（无法下载）' }
+  if (html.includes('内容违规') || html.includes('涉嫌违规')) return { unavailable: true, message: '该文章因违规被下架，读者不可见（无法下载）' }
+  // 认不出就别硬猜是「不可见」——可能真是解析出了问题，那属于故障
+  return { unavailable: false, message: 'invalid or unavailable article (no title parsed)' }
+}
+
 export async function downloadArticle(
   url: string,
   formats: DownloadFormat[],
@@ -33,7 +52,13 @@ export async function downloadArticle(
   const parsed = parseArticle(html, url)
 
   if (!parsed.title.trim()) {
-    throw new Error(`invalid or unavailable article (no title parsed): ${url}`)
+    // 判定逻辑不变（标题为空仍是手动粘链接时的唯一防线），但把原因说准:
+    // 微信对下架/违规文章返回 HTTP 200 的错误页，页面上写着具体缘由，
+    // 笼统地报「no title parsed」等于让用户去猜自己粘的链接哪里不对。
+    const { unavailable, message } = describeUnavailable(html)
+    throw unavailable
+      ? new ArticleUnavailableError(`${message}: ${url}`)
+      : new Error(`${message}: ${url}`)
   }
 
   const accountDir = join(deps.libraryRoot, sanitizeName(parsed.account || 'unknown'))
