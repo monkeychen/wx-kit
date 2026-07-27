@@ -26,13 +26,16 @@ export default function MainLayout() {
 
   // 启动静默检查(M37):延迟几秒、不阻塞首屏,查不到就当没发生 —— 只在有新版时
   // 于「设置」上点一个小圆点,**不弹窗不 toast**(打断用户是最差的告知方式)。
+  // M39:这一次多半走缓存(零请求),负责「开窗即知」;应用常开期间的复查由主进程 tick 负责
+  // ——窗口关掉后本 effect 就不跑了,把唯一时机绑在这里正是 R1 的根因之一。
   useEffect(() => {
     const t = setTimeout(() => {
       api.updateCheck({ silent: true })
         .then((r) => { if (r?.hasUpdate) setHasUpdate(true) })
         .catch(() => { /* 静默失败:更新提示不该给启动流程添噪 */ })
     }, 3000)
-    return () => clearTimeout(t)
+    const off = api.onUpdateAvailable((info) => { if (info.hasUpdate) setHasUpdate(true) })
+    return () => { clearTimeout(t); off() }
   }, [])
 
   return (

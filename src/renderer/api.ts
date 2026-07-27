@@ -75,8 +75,13 @@ export interface WxApi {
   onSubscriptionsUpdated(cb: () => void): () => void
   onSubscriptionDownloadProgress(cb: (e: SubscriptionDownloadProgress) => void): () => void
   // —— M18 命令行软链 ——
-  /** M37:查最新版。silent=true 时受设置开关与「每天一次」约束,查不到返回 null */
+  /**
+   * M37:查最新版。silent=true 时受设置开关与「每天一次」约束。
+   * M39 起被限流拦下时**返回上次查到的结论**(而不是 null),否则「有新版」会被限流一起吞掉。
+   */
   updateCheck(opts?: { silent?: boolean }): Promise<UpdateInfo | null>
+  /** M39:主进程低频 tick 查到新版时推送——关窗驻留时渲染层的 effect 早停了,只能靠主进程 */
+  onUpdateAvailable(cb: (info: UpdateInfo) => void): () => void
   updateChannel(): Promise<UpdateChannelInfo>
   updateDownload(assets: UpdateAsset[]): Promise<{ ok: boolean; path?: string; error?: string }>
   onUpdateProgress(cb: (p: UpdateProgress) => void): () => void
