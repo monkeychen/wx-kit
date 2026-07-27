@@ -2,6 +2,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DownloadFormat } from '../../src/core/types'
+import type { CachedRelease } from '../../src/core/update-gate'
 
 export interface ListColumnWidths { account: number; publish: number; download: number }
 export type NewArticleAction = 'notify' | 'download'
@@ -16,6 +17,12 @@ export interface AppSettings {
   updateCheckEnabled: boolean
   /** 上次检查更新的时刻,用于「每天最多自动查一次」 */
   lastUpdateCheckAt: number | null
+  /**
+   * 上次查到的 release(M39)。**存的是「查到了什么」,不是「要不要提示」**——
+   * `hasUpdate` 按当前版本实时算,所以升级后提示自动消失,不需要清理逻辑。
+   * 有了它,静默检查被每日限流拦下时才能给出上次的结论,而不是把结论一起吞掉。
+   */
+  lastKnownRelease: CachedRelease | null
   historyRetentionDays: number
   listColumnWidths: ListColumnWidths
   subscriptionAutoCheck: boolean
@@ -46,6 +53,7 @@ export class SettingsService {
       downloadVideos: true,
       updateCheckEnabled: true,
       lastUpdateCheckAt: null,
+      lastKnownRelease: null,
       historyRetentionDays: 365,
       listColumnWidths: { account: 132, publish: 150, download: 110 },
       subscriptionAutoCheck: false,

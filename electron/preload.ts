@@ -56,6 +56,11 @@ const api: WxApi = {
     return () => { ipcRenderer.removeListener('subscriptions:download:progress', listener) }
   },
   updateCheck: (opts) => ipcRenderer.invoke('update:check', opts),
+  onUpdateAvailable: (cb) => {
+    const listener = (_e: unknown, info: Parameters<typeof cb>[0]) => cb(info)
+    ipcRenderer.on('update:available', listener)
+    return () => { ipcRenderer.removeListener('update:available', listener) }
+  },
   updateChannel: () => ipcRenderer.invoke('update:channel'),
   updateDownload: (assets) => ipcRenderer.invoke('update:downloadAsset', assets),
   onUpdateProgress: (cb) => {

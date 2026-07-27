@@ -19,13 +19,15 @@ import { crawlAccount } from '../src/core/mp-crawl'
 import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
 import { rebuildLibrary } from '../src/core/rebuild-library'
-import { checkUpdate, type UpdateAsset } from '../src/core/check-update'
+import { checkUpdate, type UpdateAsset, type UpdateInfo } from '../src/core/check-update'
+import { resolveUpdateCheck } from '../src/core/update-gate'
 import { detectChannel, upgradeCommand, pickAsset } from '../src/core/install-channel'
 import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } from '../src/core/material-export'
 import { syncToSite } from '../src/core/site-sync'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
+import { UpdateScheduler } from './services/update-scheduler'
 import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 import type { RunCheckResult } from './services/subscription-check'
@@ -338,19 +340,17 @@ export function registerIpc(settings: SettingsService): void {
   })
 
   // —— M37 更新检查(只检查 + 按渠道引导,不做静默自更新;理由见 PRD-v0.8.2 R3)——
-  const DAY_MS = 24 * 60 * 60 * 1000
-  ipcMain.handle('update:check', async (_e, opts?: { silent?: boolean }) => {
+  // M39:门控决策移到 core 的 update-gate,IPC 与定时 tick 共用这一份实现
+  const runUpdateCheck = async (silent: boolean): Promise<UpdateInfo | null> => {
     const s = await settings.get()
-    // 静默检查受开关约束、且每天最多一次;手动点「检查更新」不受这两条限制
-    if (opts?.silent) {
-      if (!s.updateCheckEnabled) return null
-      if (s.lastUpdateCheckAt && Date.now() - s.lastUpdateCheckAt < DAY_MS) return null
-    }
-    const info = await checkUpdate(app.getVersion())
-    // 只有真发出去了才记时间,否则断网一次就要等一天才再查
-    if (info) await settings.save({ lastUpdateCheckAt: Date.now() })
-    return info
-  })
+    return resolveUpdateCheck({
+      silent, enabled: s.updateCheckEnabled, lastCheckedAt: s.lastUpdateCheckAt,
+      cached: s.lastKnownRelease, currentVersion: app.getVersion(), now: Date.now(),
+      check: checkUpdate,
+      save: (patch) => settings.save(patch).then(() => undefined),
+    })
+  }
+  ipcMain.handle('update:check', (_e, opts?: { silent?: boolean }) => runUpdateCheck(opts?.silent === true))
 
   ipcMain.handle('update:channel', () => {
     const channel = detectChannel({ platform: process.platform, existsSync })
@@ -379,4 +379,5 @@ export function registerIpc(settings: SettingsService): void {
   })
 
   new SubscriptionScheduler({ settings, subsFor, runCheck: () => runSubscriptionCheck('auto') }).start()
+  new UpdateScheduler({ check: runUpdateCheck, windows: () => BrowserWindow.getAllWindows() }).start()
 }
