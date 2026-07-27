@@ -94,6 +94,45 @@ wx-kit subscription check-now --accounts <fakeid,fakeid>  # 只检查指定号(�
 
 `failures` 逐号给失败原因(如「微信频率限制(200013)」)。检查同时落盘日志与历史,与 GUI 同源。
 
+### subscription digest — 某一天各订阅号发了什么(需登录)
+
+```sh
+wx-kit subscription digest --date 2026-07-23
+wx-kit subscription digest --date yesterday --accounts <fakeid,fakeid>
+```
+
+**日期由你(agent)换算**:命令只认 `YYYY-MM-DD` / `today` / `yesterday`。
+用户说「昨天」「前天」「7月23日」「上周三」时,**你先算出 `YYYY-MM-DD` 再调用**——
+传自然语言会报 `BAD_DATE`(退出码 2)。CLI 刻意不猜:猜错会静默给出另一天的结果。
+
+输出:
+
+```jsonc
+{ "ok": true, "date": "2026-07-23", "accounts": 3, "count": 2,
+  "articles": [
+    { "account": "数字生命卡兹克", "title": "…", "publishTime": "2026-07-27T03:29:23.000Z",
+      "url": "https://mp.weixin.qq.com/s/XXX", "itemShowType": 10,
+      "downloaded": false, "id": "2647684649_1" }
+  ],
+  "failures": [{ "nickname": "甲", "error": "微信频率限制(200013)" }] }
+```
+
+逐字段:
+
+| 字段 | 怎么用 |
+|---|---|
+| `downloaded` | **决定下一步**:`true` → 这篇已在库里,用 `library list`/`search` 拿 `dir` 直接读 `content.md`;`false` → 要内容就 `wx-kit download --url <url>` |
+| `id` | 与库内同源的文章主键(`mid_idx`),可直接与 `library list` 的 `id` 对账 |
+| `itemShowType` | `0` 图文 / `5` 视频消息 / `8` 图片消息 / `10` 文字消息。**视频与文字消息没有长正文**,当素材用途不同 |
+| `articles` | **跨号合并后按发布时间降序**,不按号分组 |
+| `failures` | 某号查失败(频控/登录态);**其余号照常返回,退出码仍 0**。一个号都没查成才是 `ok:false` + 退出码 1 |
+
+**只查询**:不下载、不写库、**不推进订阅水位**——可以反复查同一天,不会把「新文章」标记吃掉
+(这点与 `check-now` 不同,后者是按水位问「有没有新的」)。
+
+**耗时**:每个号一次请求 + 随机延迟,16 个号约 30–60 秒。**订阅号多时用 `--accounts` 缩小范围**;
+stderr 有逐号进度(`[3/16] 某号 … 2 篇`),别把它当成卡死。
+
 ## settings — 设置(免登录)
 
 ```sh

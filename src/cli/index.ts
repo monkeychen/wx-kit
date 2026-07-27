@@ -13,7 +13,8 @@ import { downloadArticle } from '../core/download-article'
 import { getSession, login } from '../../electron/services/mp-auth'
 import { exportSession, importSession } from '../../electron/services/session-transfer'
 import { makeMpFetch } from '../../electron/services/mp-fetch'
-import { searchAccount } from '../core/mp-client'
+import { searchAccount, listArticles } from '../core/mp-client'
+import { canonicalId } from '../core/article-id'
 import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
 import { rebuildLibrary } from '../core/rebuild-library'
@@ -27,6 +28,8 @@ import { parseSettingAssignment } from '../../electron/services/settings-cli'
 import { History, eventFromSummary, type HistorySource } from '../core/download-history'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine } from '../core/subscriptions'
 import { nextCheckAt } from '../core/subscription-schedule'
+import { resolveDigestDate } from '../core/digest-date'
+import { subscriptionDigest } from '../core/subscription-digest'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 
 function defaultLibraryRoot(): string {
@@ -317,7 +320,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       exitCode = 0
     })
 
-  const subscription = program.command('subscription').description('公众号订阅(子命令:list / check-now)')
+  const subscription = program.command('subscription').description('公众号订阅(子命令:list / check-now / digest)')
   subscription
     .command('list')
     .description('列出订阅账号、水位、上次/下次检查')
@@ -369,6 +372,51 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       // results 是逐号明细(M34):agent 同样需要知道「哪个号新增了几篇、下了几篇」,而不只是总数
       outJson({ ok: true, accounts: result.accounts, newFound: result.newFound, failed: result.failed, results: result.results, ...(result.failures ? { failures: result.failures } : {}), ...(result.note ? { note: result.note } : {}) })
       exitCode = 0
+    })
+
+  subscription
+    .command('digest')
+    .description('查已订阅公众号「某一天」发布了什么(只查询,不下载、不写库、不推水位)')
+    .requiredOption('--date <date>', 'YYYY-MM-DD / today / yesterday(「昨天」「7月23日」等表达请先自行换算)')
+    .option('--accounts <csv>', '只查指定公众号(逗号分隔 fakeid,默认全部已订阅;号多时耗时明显)')
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (o) => {
+      let when
+      try { when = resolveDigestDate(String(o.date)) }
+      catch (e) {
+        // 明确报错而不是猜:猜错会静默给出另一天的结果,用户根本不会发现
+        outJson({ ok: false, error: { code: 'BAD_DATE', message: (e as Error).message } })
+        exitCode = 2; return
+      }
+      const session = getSession()
+      if (!session) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login' } }); exitCode = 2; return }
+      const root = await resolveRoot(o.out)
+      const subs = new Subscriptions(root)
+      const library = new Library(root)
+      const mpFetch = makeMpFetch(session)
+      const only = o.accounts ? String(o.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : null
+      const accounts = (await subs.list())
+        .filter((a) => a.subscribed && (!only || only.includes(a.fakeid)))
+        .map((a) => ({ fakeid: a.fakeid, nickname: a.nickname }))
+
+      // 判「已下载」一次性把库读进内存:library.has 每次都重读文件,16 个号会读上百次。
+      // **除了 id 还要按 sourceUrl 兜一层**:v0.8.4 之前订阅下载没透传文章主键,
+      // 那批文章的 id 是路径哈希(真实库里 32/267 篇),光比 id 会把它们误报成「没下载」,
+      // 于是 agent 照着 downloaded:false 又下一遍 —— 正是 digest 最该避免的事。
+      const stored = await library.list()
+      const haveIds = new Set(stored.map((a) => canonicalId(a.id)))
+      const haveUrls = new Set(stored.map((a) => a.sourceUrl))
+
+      const result = await subscriptionDigest({
+        accounts, date: when.date, fromTs: when.fromTs, toTs: when.toTs,
+        listByDate: (fakeid) => listArticles(mpFetch, session.token, fakeid, { from: when.date, to: when.date }),
+        isDownloaded: async (id, url) => haveIds.has(canonicalId(id)) || haveUrls.has(url),
+        // 16 个号要跑半分钟,没有逐号输出会像卡死
+        onProgress: (e) => process.stderr.write(`[${e.index}/${e.total}] ${e.nickname} … ${e.count} 篇\n`),
+      })
+      outJson(result)
+      // 一个号都没查成不是「部分成功」,给非 0 退出码让 agent 能分辨
+      exitCode = result.ok ? 0 : 1
     })
 
   program

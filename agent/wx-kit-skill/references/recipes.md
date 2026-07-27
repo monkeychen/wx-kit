@@ -58,7 +58,37 @@ wx-kit subscription list | jq -r '.accounts[] | select(.subscribed) | "\(.nickna
 wx-kit subscription check-now --accounts <fakeid1>,<fakeid2>   # 只查指定号
 ```
 
-## 5. 每天拉所有公众号最近文章清单(默认排序即用)
+## 5. 「昨天各号发了什么?」→ 按需取内容(完整链路)
+
+用户问「昨天/前天/7月23日各订阅号发了什么」时走这条。**注意第一步是你自己算日期。**
+
+```sh
+# ① 你(agent)把「昨天」换算成具体日期。CLI 只认 YYYY-MM-DD / today / yesterday,
+#    传「昨天」「7月23日」会报 BAD_DATE —— 它刻意不猜,猜错是静默给错答案。
+DATE=$(date -v-1d +%F)        # macOS;Linux: date -d yesterday +%F。你也可以直接算好写死。
+
+# ② 查那天的发布清单(只查询,不下载、不写库、不推水位)
+wx-kit subscription digest --date "$DATE" > digest.json
+
+# ③ 先给用户看清单(这一步往往就够了)
+jq -r '.articles[] | "\(.account)｜\(.title)｜\(if .downloaded then "已在库" else "未下载" end)"' digest.json
+
+# ④ 要内容时按 downloaded 分流 —— 已下的读本地,别重复下载
+jq -r '.articles[] | select(.downloaded) | .id' digest.json      # → library list 里按 id 找 dir,读 dir/content.md
+jq -r '.articles[] | select(.downloaded | not) | .url' digest.json | while read -r u; do
+  wx-kit download --url "$u" --formats md,meta
+done
+```
+
+要点:
+
+- **订阅号多时先缩范围**:`--accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取)。
+  全量 16 个号约 30–60 秒,stderr 有逐号进度。
+- **`itemShowType` 影响能拿到什么**:`5` 视频消息 / `10` 文字消息**没有长正文**,
+  正文只是一段描述;当写作素材时价值与图文完全不同,挑素材前先看这个字段。
+- 某号失败进 `failures` 但**退出码仍是 0**(部分成功)——要判断是否完整,看 `failures` 而不是退出码。
+
+## 6. 每天拉所有公众号最近文章清单(默认排序即用)
 
 ```sh
 wx-kit library list > lib.json        # 默认 --sort publish --order desc,最近发表在最前
@@ -67,7 +97,7 @@ jq '.items[:10] | map({title, account, publishTime, sourceUrl})' lib.json   # �
 # 想筛选某号:--account <名>(配合 --sort 取该号最近 N 篇)
 ```
 
-## 6. 把文库文章同步到个人站点(需先配 siteSyncPostsDir)
+## 7. 把文库文章同步到个人站点(需先配 siteSyncPostsDir)
 
 ```sh
 wx-kit settings get siteSyncPostsDir                 # 确认站点 content/posts 目录已配置

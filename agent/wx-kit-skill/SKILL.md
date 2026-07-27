@@ -4,7 +4,7 @@ description: |
   wx-kit(微信百宝箱)的安装与使用教程:下载微信公众号文章(单篇/批量/关键词筛选)、
   管理本地文库、订阅公众号更新、导出创作素材——全部经 CLI 完成,输出纯 JSON,面向 agent 自动化。
   当需要「下载某篇/某公众号的微信文章」「批量爬取公众号历史文章」「检查订阅号有没有更新」
-  「把已下载文章导出为素材」时使用;发现 wx-kit 未安装时,本 skill 含自动安装路径。
+  「昨天/某天各订阅号发了什么」「把已下载文章导出为素材」时使用;发现 wx-kit 未安装时,本 skill 含自动安装路径。
   不用于:基于文库素材的写作编排(用 wx-kit-compose)。
 ---
 
@@ -64,18 +64,21 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 | 搜文库 | `wx-kit library search <关键词>` |
 | 导出素材清单 | `wx-kit library export --ids <id,id>` |
 | 订阅号列表/立即检查 | `wx-kit subscription list` / `wx-kit subscription check-now` |
-| 检查有无新版本 | `wx-kit update --check`(只检查;`upgradeCommand` 按安装渠道给,`version` 命令不联网) |
 | 只检查某几个号 | `wx-kit subscription check-now --accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取) |
-
-**两件默认行为**(v0.8.2 起,不需要额外参数):
-- **文中视频会一并下载**(视频是内容不是格式,`--formats` 里没有它);单个可达上百 MB,批量抓取想省流量加 `--no-video`。
-- **各种消息类型都能抓**(图文 / 文字消息 / 视频消息 / 图文消息),`meta.json` 的 `itemShowType` 标明类型;
-  遇到没适配的新类型会按图文兜底并在该篇 `warnings[]` 里说明——**批处理时值得 `jq` 扫一眼 `warnings`**,
-  它是「下到了但可能不对」的唯一信号。
+| **某一天各订阅号发了什么** | `wx-kit subscription digest --date <YYYY-MM-DD\|today\|yesterday>`(只查询不下载;**「昨天」「7月23日」这类说法由你换算成 YYYY-MM-DD**,CLI 不解析自然语言) |
 | 读/写设置 | `wx-kit settings get libraryRoot` / `wx-kit settings set libraryRoot <dir>` |
 | 同步到个人站点 | `wx-kit site sync --ids <id> --slug <slug>`(按 Astro 站点规范生成目录,纯本地) |
+| 检查有无新版本 | `wx-kit update --check`(只检查;`upgradeCommand` 按安装渠道给,`version` 命令不联网) |
 
 格式可选 `cover,md,html,pdf,meta`;文章落盘在库根(默认 `~/Documents/wx-kit`)按公众号分目录,每篇一个文件夹(含 `content.md`/`meta.json` 等)。
+
+**三件默认行为**(不需要额外参数):
+
+- **文中视频会一并下载**(视频是内容不是格式,`--formats` 里没有它);单个可达上百 MB,批量抓取想省流量加 `--no-video`。
+- **各种消息类型都能抓**(图文 / 文字消息 / 视频消息 / 图片消息),`meta.json` 的 `itemShowType` 标明类型;
+  遇到没适配的新类型会按图文兜底并在该篇 `warnings[]` 里说明——**批处理时值得 `jq` 扫一眼 `warnings`**,
+  它是「下到了但可能不对」的唯一信号。
+- **`digest` 的 `downloaded` 字段直接决定下一步**:`true` 就读本地 `content.md`,别重复下载。
 
 ## 频控纪律(重要)
 
