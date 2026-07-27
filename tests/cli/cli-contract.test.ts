@@ -192,6 +192,26 @@ describe('CLI library remove', () => {
   })
 })
 
+describe('CLI subscription digest', () => {
+  it('非法日期 → BAD_DATE，退出码 2（在鉴权之前就挡下，不猜也不空跑）', async () => {
+    const code = await runCli(['subscription', 'digest', '--date', '7月23日'])
+    expect(code).toBe(2)
+    const out = JSON.parse(stdout)
+    expect(out).toMatchObject({ ok: false, error: { code: 'BAD_DATE' } })
+    expect(out.error.message).toMatch(/YYYY-MM-DD/)      // 报错要给出正确写法
+  })
+
+  it('日期合法但没登录 → AUTH_REQUIRED，退出码 2', async () => {
+    const code = await runCli(['subscription', 'digest', '--date', 'yesterday'])
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
+  })
+
+  it('缺 --date → 用法错（退出码 2），不静默当成今天', async () => {
+    expect(await runCli(['subscription', 'digest'])).toBe(2)
+  })
+})
+
 describe('CLI subscription list', () => {
   it('lists accounts merged from subscriptions + history', async () => {
     const root = mkdtempSync(join(tmpdir(), 'wxk-cli-subs-'))

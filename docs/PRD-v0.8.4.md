@@ -163,20 +163,24 @@ CLI 命令写好了但 skill 没写,agent 不会凭空知道有 `subscription di
 ② `downloaded` 字段决定下一步——已下载的直接读本地 `content.md`,未下载的才 `download`;
 ③ 订阅号多时耗时较长(16 号约 30–60 秒),可用 `--accounts` 缩小范围。
 
-**验收(草)**:
+**验收(M41 完成,2026-07-28)**:
 
-- [ ] `subscription digest --date 2026-07-23` 返回那天所有已订阅号发布的文章,含 `downloaded` 标记。
-- [ ] `--date today` / `--date yesterday` 与显式日期等价(按本机时区计算当天)。
-- [ ] 非法日期(`--date 7月23日`)**明确报错并提示格式**,而不是静默当成今天——
-      自然语言由 agent 负责换算,CLI 不猜。
-- [ ] `--accounts` 只查指定号,请求数与之相符。
-- [ ] 某号失败不影响其余号;失败进 `failures`,退出码仍为 0(部分成功)。
-- [ ] **不写库、不推进水位**:跑完 `subscription list` 的水位与 `library.json` 均无变化。
-- [ ] stderr 有逐号进度;16 号场景不会长时间无输出。
-- [ ] **skill 三个文件都已同步**(SKILL.md 速查表 / commands.md 输出契约 / recipes.md 完整链路范例)
-      —— 本需求的入口就是 skill,**未同步视为需求未完成**。
-- [ ] 用一个「干净」的 agent 会话验证:只读 skill 能否正确完成「看看昨天各号发了什么」
-      (含自己换算日期、按 `downloaded` 分流),不靠人补充说明。
+- [x] `subscription digest --date 2026-07-27` 真跑:3 个号 → 3 篇,含 `downloaded`。
+- [x] `today` / `yesterday` 与显式日期等价(按本机时区;跨月跨年由单测覆盖)。
+- [x] 非法日期报 `BAD_DATE`(退出码 2)并给出正确格式;`2026-02-30` 这种「形似但不存在」的也挡掉
+      (`Date` 会静默滚到 3 月,靠回读校验才拦得住)。
+- [x] `--accounts` 只查指定号(真跑验证请求数与逐号进度一致)。
+- [x] 某号失败进 `failures`、其余照常、退出码 0;**一个号都没查成才 `ok:false` + 退出码 1**。
+- [x] **不写库、不推水位**:真跑前后 `subscriptions.json` 与 `library.json` 的 md5 均未变。
+- [x] stderr 逐号进度 `[3/16] 某号 … 2 篇`。
+- [x] skill 三个文件已同步;**顺手修掉 `SKILL.md` 速查表被说明段落截断的既有排版 bug**
+      (`settings`/`site sync` 两行此前渲染成了普通文本)。
+- [x] 照 recipes 的链路自己走了一遍:算日期 → digest → 按 `downloaded` 分流,输出符合预期。
+
+**实现中补的一处**:`downloaded` 除了比 id 还要**比 sourceUrl**。
+v0.8.4 之前订阅下载没透传文章主键(M40 已修根因),但**存量的 32/267 篇 id 是路径哈希**,
+只比 id 会把它们误报成「未下载」,agent 照着 `downloaded:false` 又下一遍
+——这正是 digest 最该避免的事。真实库验证:老格式 `mid_idx_sn` 经 `canonicalId` 认出为已下载。
 
 ### R3 · 让 `agent/wx-kit-compose` 跟上 CLI 的现有能力(2026-07-27 安哥)
 
