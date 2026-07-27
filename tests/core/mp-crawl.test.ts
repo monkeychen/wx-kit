@@ -1,6 +1,7 @@
 // tests/core/mp-crawl.test.ts
 import { describe, it, expect, vi } from 'vitest'
 import { crawlAccount, filterRefsByTitle } from '../../src/core/mp-crawl'
+import { ArticleUnavailableError } from '../../src/core/download-article'
 import { MpRateLimited } from '../../src/core/mp-errors'
 import type { ArticleRef, CrawlItemEvent } from '../../src/core/mp-types'
 import type { DownloadItemResult } from '../../src/core/types'
@@ -204,5 +205,64 @@ describe('文章主键透传给下载(M36)', () => {
       { appmsgid: 100, itemidx: 1 },
       { appmsgid: 101, itemidx: 2 },
     ])
+  })
+})
+
+describe('不可访问文章的上报(M38)', () => {
+  const refsOf = (n: number) => Array.from({ length: n }, (_, i) => ({
+    url: `u${i}`, title: `t${i}`, createTime: 1000 - i, appmsgid: 100 + i, itemidx: 1,
+  }))
+  const run = async (range: never, listed: number, hidden: number) => crawlAccount('FID', range, {
+    mpFetch: (async () => ({})) as never, token: 'T',
+    downloadOne: async (url: string) => ({ url, ok: true }),
+    listFn: async (_f: never, _t: never, _id: never, _r: never, opts?: { onHidden?: (n: number) => void }) => {
+      opts?.onHidden?.(hidden)
+      return refsOf(listed)
+    },
+    sleep: async () => {},
+  } as never)
+
+  it('count 补齐成功 → 不算不及预期(渲染层据此保持沉默)', async () => {
+    const s = await run({ count: 3 } as never, 3, 2)
+    expect(s.unavailable).toBe(2)        // 数据层仍带着,agent 可读
+    expect(s.shortfall).toBe(false)      // 但「无需解释」
+  })
+
+  it('count 补不齐 → 算不及预期(必须说明少在哪)', async () => {
+    const s = await run({ count: 5 } as never, 2, 3)
+    expect(s).toMatchObject({ unavailable: 3, shortfall: true })
+  })
+
+  it('日期范围模式:窗口内少了就算不及预期(没有补齐一说)', async () => {
+    const s = await run({ from: '2026-01-01', to: '2026-12-31' } as never, 4, 1)
+    expect(s).toMatchObject({ unavailable: 1, shortfall: true })
+  })
+
+  it('没有不可访问的文章 → 字段整个缺省,不给下游添噪', async () => {
+    const s = await run({ count: 2 } as never, 2, 0)
+    expect(s.unavailable).toBeUndefined()
+    expect(s.shortfall).toBeUndefined()
+  })
+})
+
+describe('两类失败在汇总里分开(M38)', () => {
+  it('下载阶段发现的不可见与列表阶段过滤的合并,failed 只留真故障', async () => {
+    const refs = [0, 1, 2].map((i) => ({ url: `u${i}`, title: `t${i}`, createTime: 100 - i }))
+    const s = await crawlAccount('FID', { count: 3 } as never, {
+      mpFetch: (async () => ({})) as never, token: 'T',
+      downloadOne: async (url: string) => {
+        if (url === 'u1') throw new ArticleUnavailableError('读者不可见')
+        if (url === 'u2') throw new Error('socket hang up')
+        return { url, ok: true }
+      },
+      listFn: async (_f: never, _t: never, _i: never, _r: never, opts?: { onHidden?: (n: number) => void }) => {
+        opts?.onHidden?.(1)      // 列表阶段还滤掉了 1 篇
+        return refs
+      },
+      sleep: async () => {},
+    } as never)
+    expect(s.unavailable).toBe(2)     // 列表 1 + 下载时发现 1
+    expect(s.realFailures).toBe(1)    // 只有 socket hang up 才是真故障
+    expect(s.shortfall).toBe(true)    // 要 3 篇只拿到 1 篇
   })
 })

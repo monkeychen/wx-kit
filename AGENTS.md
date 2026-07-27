@@ -90,6 +90,14 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（Electron 42 仍如此），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
 - **CLI 模式必须注册 no-op `window-all-closed`**（`electron/main.ts`）：否则 PDF 用的离屏 BrowserWindow 关闭会触发 Electron 默认自动退出，截断流程。
 - **文章列表只能用 `cgi-bin/appmsgpublish`,别换回 `cgi-bin/appmsg?type=9`**(v0.8.2 R4 实录)：后者拉的是「图文素材」,**只返回 `item_show_type=0`**——实测某号 appmsg 给 370 篇/最新卡在 2026-07-17,appmsgpublish 给 770 篇/最新 07-25,文字消息(10)与视频消息(5)全在里面。旧接口没有「取全部类型」的开关(`type` 换任何值都 `ret=200002`)。**后果不只是批量少几篇:订阅检查共用 `fetchPage`,曾长期静默漏检整类消息而检查记录显示「无新文章」**。新接口是三层嵌套(`publish_page` → `publish_list[].publish_info` → `appmsgex[]`,中间两层是 JSON 字符串),且 **`begin`/`count` 按「群发组」计不是文章数**,游标必须按组数推进。
+- **文章被拒之后,列表接口不再有任何标记**(v0.8.3 R1 实测,别再花时间找):`checking` 只在**审核期间**为 1,
+  审核结束后无论通过与否都归零——实测同两篇文章昨天 `checking:1`、今天 `checking:0`,而页面始终打不开
+  (「此内容发送失败无法查看…涉嫌违规」)。把 6 篇的每个字段(含嵌套)做过集合对比,
+  连最可能藏标记的 `sent_info` 都完全一致;**唯一相关的是 `line_info.line_count`**(打不开的为 0),
+  但它会误伤视频消息(天然没有正文行数却能下),**是启发式不是状态标记,已决定不用**——
+  误滤是静默的、代价远高于明确失败。所以:列表阶段过滤 `is_deleted`/`checking`/`ban_flag`(滤掉审核期间的),
+  **下载阶段靠错误页特征认出来**(`ArticleUnavailableError`),并把「读者本就打不开」与「下载故障」
+  在汇总里分成两类——混在一起会让用户以为工具坏了。
 - **文章 id 是 `mid_idx`(不含 `sn`),跨 URL 形态要靠 `canonicalId` 匹配**：同一篇文章后台列表给短链 `s/XXXX`、分享/旧接口给长链 `s?__biz=..&mid=..&idx=..&sn=..`,**光看 URL 认不出是同一篇**(换接口后重复下载的根因)。所以:① 判重用列表已给的 `appmsgid`/`itemidx`(= mid/idx),经 `DownloadQueue`(可接受 ref)透传到 `downloadArticle`;② `sn` 是防伪/追踪参数、同一篇在不同分享链接里会变,**含它会把一篇拆成两篇**;③ `Library.get/has` 按 `canonicalId` 比,让老库的 `mid_idx_sn` 与新的 `mid_idx` 认作同一篇(不必迁移 library.json);④ **`Library.remove` 保持字面匹配**——删除必须精确,canonical 会误删同篇的另一条。⑤ **不能按标题去重**:真实库里有周更同名但 mid 不同的不同文章。
 - **解析按 `item_show_type` 分发,不要用 `appmsg_type`**：两者**正交**——实测 `appmsg_type=10002` 出现在一篇**没有视频**的文字消息上,它不表示「有视频」。已知 `item_show_type`:`0` 图文 / `5` 视频消息 / `8` 图文消息(小绿书) / `10` 文字消息 / `11` 发布通告,**且是开放集合**。**未知类型必须走兜底 + 进 `warnings[]`**:旧的启发式链(`#js_content` 非空就当正文)对没见过的类型永远不报错,视频页的 `#js_content` 是分享提示壳,曾让 21.8 万字符内联 JS 当正文一路绿灯。告警条件要窄(读不到类型但正文正常时不报)——噪音多了告警会被无视。
 - **视频是内容不是格式**：`DownloadFormat` 里没有 video,有视频就下(和图片一样),由设置 `downloadVideos`(默认开)+ CLI `--no-video` 控制。直链带 `auth_key`/`dis_t` **有时效**,必须在解析同一次流程内下完、**URL 绝不入库**。择清晰度按 `width × height`,**`format_id` 数值与画质无关**(实测 `f10002`=1572×1080/133MB 最高清,`f10104`=480×328/12.9MB 最低)。`video_page_info: {}` / `mp_video_trans_info: []` 是**所有文章页都有的空壳**,判有无视频要看数组内容。

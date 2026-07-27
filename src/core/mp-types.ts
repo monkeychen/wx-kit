@@ -42,6 +42,20 @@ export interface CrawlSummary {
   failed: number
   skipped: number
   filteredOut?: number    // 被标题关键词过滤掉的篇数(M24;未过滤或全通过则缺省)
+  /**
+   * 读者不可访问(审核未通过/已删除/被封禁)的篇数(M38)。
+   * 两个来源合并:列表阶段就能标出来的,和下载时才发现的
+   * ——**列表接口在文章被拒后不再有标记**(`checking` 只在审核期间为 1),所以后者不可避免。
+   */
+  unavailable?: number
+  /** `failed` 里刨掉「读者不可见」后剩下的真故障数(网络/解析等,重试可能有用) */
+  realFailures?: number
+  /**
+   * 结果是否**不及用户预期**(M38)——决定要不要向用户解释那些被跳过的文章。
+   * 判断收在这里而不是各渲染层:count 模式补齐成功就没什么可解释的(要 3 篇给了 3 篇),
+   * 只有「翻到底仍不够」或「日期范围内确实少了」才需要说明。GUI 与 CLI 各判一次必然漂。
+   */
+  shortfall?: boolean
   items: import('./types').DownloadItemResult[]
 }
 

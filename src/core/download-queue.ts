@@ -1,6 +1,7 @@
 // src/core/download-queue.ts
 import type { DownloadItemResult, DownloadSummary, ProgressEvent } from './types'
 import type { ArticleIdHint } from './article-id'
+import { ArticleUnavailableError } from './download-article'
 
 /** 队列条目：光有 URL 时无法判重（短链认不出与长链是同一篇），故允许带上列表给的主键 */
 export type QueueItem = string | ({ url: string } & ArticleIdHint)
@@ -30,7 +31,12 @@ export class DownloadQueue {
         items.push(r)
         this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'save' })
       } catch (err) {
-        items.push({ url, ok: false, error: { code: 'DOWNLOAD_FAILED', message: (err as Error).message } })
+        // 「读者打不开」与「下载失败」对用户是两回事:前者重试也没用,不该让人以为工具坏了
+        const unavailable = err instanceof ArticleUnavailableError
+        items.push({
+          url, ok: false, ...(unavailable ? { unavailable: true } : {}),
+          error: { code: unavailable ? 'ARTICLE_UNAVAILABLE' : 'DOWNLOAD_FAILED', message: (err as Error).message },
+        })
         this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'failed' })
       }
     }
@@ -38,8 +44,9 @@ export class DownloadQueue {
     const succeeded = items.filter(i => i.ok && !i.skipped).length
     const skipped = items.filter(i => i.ok && i.skipped).length
     const failed = items.filter(i => !i.ok).length
+    const unavailable = items.filter(i => i.unavailable).length
     this.onProgress({ total, completed: items.length, currentUrl: '', phase: 'done' })
 
-    return { ok: failed === 0, total, succeeded, failed, skipped, items }
+    return { ok: failed === 0, total, succeeded, failed, skipped, ...(unavailable ? { unavailable } : {}), items }
   }
 }
