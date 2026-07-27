@@ -334,8 +334,12 @@ function kindLabel(t?: number): string {
    **改为「图片」**(与 `message-kind.ts` 的 `picture` 一致;「小绿书」是微信黑话,不进 UI 文案)。
 2. **未知类型(开放集合)不标,而它恰恰最该标**。`kindLabel` 对未知 `t` 返回 `''`,
    与「普通图文」在卡片上**完全无法区分**。但未知类型走的是兜底解析、`warnings` 里有话说
-   ——这是 M36 立下的规矩(「未知类型必须走兜底 + 进 warnings」),**结果 warnings 在 GUI 里一个字都没露出**,
-   只写在 `meta.json` 里给 agent 看。「下到了但可能不对」的信号,人看不见。
+   ——这是 M36 立下的规矩(「未知类型必须走兜底 + 进 warnings」),而告警根本没露出来。
+   **(实现前复核更正,2026-07-28)**:原写「只写在 meta.json 里给 agent 看」是错的——
+   `buildMeta` 不写 warnings,`ArticleMeta` 也没有该字段,它**只经 `onWarning` 汇进
+   `DownloadItemResult.warnings`,唯有 CLI 的 JSON 输出看得到**。
+   即 **GUI 模式下告警彻底消失**:下载完成、告警产生、没有任何人看得见。
+   所以修法要先**持久化**(meta 增 `warnings?`),否则事后根本没有可显示的数据。
    → 未知类型给一个**警示态**标识(如 `⚠ 未知类型`),并让 `warnings` 在卡片/阅读器可见(hover 或详情)。
 3. **`11 发布通告` 归入默认不标**:它在 `message-kind.ts` 里映射成 `article`,内容形态确实接近图文,
    现状可接受。**不改**,但记在这里免得下次又被当成遗漏重查一遍。
@@ -350,7 +354,8 @@ function kindLabel(t?: number): string {
 - [ ] 普通图文(0)与发布通告(11)**仍不显示类型标识**(现状,不得回归)。
 - [ ] `itemShowType === 8` 显示「图片」,不再显示与默认类型同名的「图文」。
 - [ ] 未识别的 `itemShowType` 显示可辨的警示态标识,与「无标识 = 普通图文」不再混淆。
-- [ ] 解析产生的 `warnings` 在 GUI 可见(不必显眼,但**必须能找到**),不再只存在于 meta.json。
+- [ ] 解析产生的 `warnings` **写进 meta.json** 并在 GUI 可见(不必显眼,但**必须能找到**)——
+      此前它只活在 CLI 的输出里,GUI 模式下产生即消失。
 - [ ] 类型 → 文案的映射**只有一份**(在 `core/message-kind.ts`),文库卡片与订阅列表(R4)共用。
 - [ ] 已下载的老文章不需要重新下载即可正确显示(标识只读 `meta.itemShowType`,无迁移)。
 
