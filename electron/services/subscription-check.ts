@@ -4,7 +4,7 @@ import { checkSubscriptions } from '../../src/core/check-subscriptions'
 import { MpAuthExpired } from '../../src/core/mp-errors'
 import type { Subscriptions, CheckLogEntry, CheckFailure } from '../../src/core/subscriptions'
 import type { ArticleRef, MpFetch } from '../../src/core/mp-types'
-import type { DownloadFormat, ProgressEvent } from '../../src/core/types'
+import type { DownloadFormat, DownloadSummary, ProgressEvent } from '../../src/core/types'
 import type { HistorySource } from '../../src/core/download-history'
 import type { AppSettings } from './settings'
 
@@ -14,7 +14,7 @@ export interface RunCheckDeps {
   session: { token: string } | null
   mpFetch: MpFetch | null
   downloadRefs: (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource,
-    onProgress?: (e: ProgressEvent) => void) => Promise<void>
+    onProgress?: (e: ProgressEvent) => void) => Promise<DownloadSummary>
   log: (entry: CheckLogEntry) => Promise<void>
   onEmit?: () => void
   check?: typeof checkSubscriptions
@@ -91,14 +91,20 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
     if (settings.subscriptionNewArticleAction === 'download') {
       // 自动下载的进度此前完全不可见(手动下载有进度条,自动下载连一条事件都不发)
       deps.onDownloadProgress?.({ fakeid: r.fakeid, total, done: 0, phase: 'start' })
-      await downloadRefs(r.newRefs, settings.defaultFormats,
+      const summary = await downloadRefs(r.newRefs, settings.defaultFormats,
         { kind: 'account', nickname, fakeid: r.fakeid, range: { count: total } },
         (e) => deps.onDownloadProgress?.({ fakeid: r.fakeid, total, done: e.completed, phase: e.phase }))
       deps.onDownloadProgress?.({ fakeid: r.fakeid, total, done: total, phase: 'done' })
-      await subs.clearNewRefs(r.fakeid)
-      downloaded = total
+      // 真故障(网络/频控)留在待处理里等重试:此前无脑 clear,自动下载失败的文章就此消失,
+      // 而自动模式下用户根本没看着屏幕,连「刚才失败了」都不知道。
+      // 读者本就打不开的(unavailable)不留 —— 重试无用,留着只会变成永远清不掉的红点。
+      const doneUrls = new Set(summary.items.filter((i) => i.ok || i.unavailable).map((i) => i.url))
+      const kept = r.newRefs.filter((x) => !doneUrls.has(x.url))
+      if (kept.length) await subs.setPendingRefs(r.fakeid, kept)
+      else await subs.clearNewRefs(r.fakeid)
+      downloaded = summary.succeeded
     } else {
-      await subs.setNewRefs(r.fakeid, r.newRefs)
+      await subs.addNewRefs(r.fakeid, r.newRefs)
     }
     perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: total, downloaded })
   }

@@ -38,6 +38,11 @@ export interface ArticleMeta {
   /** 消息类型（M36）：让「这篇是什么」可查、可筛，也便于日后适配新类型时定位存量 */
   itemShowType?: number
   /**
+   * 解析/下载期的非致命告警（M40，有才写）。此前只活在 DownloadItemResult 里，
+   * 下载一结束就没了——「下到了但可能不对」是事后最该查得到的信号，必须留痕。
+   */
+  warnings?: string[]
+  /**
    * 内嵌视频明细（有视频才写）。**不存 url**——直链带 auth_key/dis_t 签名有时效，
    * 存下来隔次就失效，只会误导。`path` 为库内相对路径，未下载（没选 video 格式）时缺省。
    */

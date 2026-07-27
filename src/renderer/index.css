@@ -367,6 +367,8 @@ body {
   border: 1px solid var(--line); border-radius: 3px;
   font-size: 11px; line-height: 16px; color: var(--ink-soft);
 }
+/* 警示态（M40）：未识别类型、解析告警——弱化但要能一眼分辨出「这篇不太对」 */
+.kind-tag.warn { border-color: var(--cinnabar); color: var(--cinnabar); }
 .card-actions {
   display: flex;
   gap: 4px;
@@ -765,3 +767,11 @@ body {
 .ant-message, .ant-popover, .ant-tooltip { font-family: var(--font-sans); }
 
 .nav-badge { display: inline-block; min-width: 16px; height: 16px; padding: 0 5px; margin-left: 6px; border-radius: 8px; background: var(--cinnabar); color: #fff; font-size: 11px; line-height: 16px; text-align: center; vertical-align: middle; }
+
+/* 订阅待处理明细（M40）：展开才出现，收起时版面与展开前完全一致 */
+.subs-pending { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.subs-pending-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.subs-pending-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.subs-pending-time { font-size: 12px; white-space: nowrap; }

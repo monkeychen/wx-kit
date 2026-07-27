@@ -18,25 +18,53 @@ describe('Subscriptions store', () => {
   it('addAccount adds, and re-add updates identity but keeps newRefs', async () => {
     const s = new Subscriptions(dir)
     await s.addAccount({ fakeid: 'f1', nickname: '甲', subscribed: true, watermark: 100 })
-    await s.setNewRefs('f1', [{ url: 'u', title: 't', createTime: 200 }])
+    await s.addNewRefs('f1', [{ url: 'u', title: 't', createTime: 200 }])
     await s.addAccount({ fakeid: 'f1', nickname: '甲改名', subscribed: true, watermark: 150 })
     const [a] = await s.list()
     expect(a).toMatchObject({ fakeid: 'f1', nickname: '甲改名', subscribed: true, watermark: 150 })
     expect(a.newRefs).toHaveLength(1)   // 重加不抹掉已发现的新文章
   })
 
-  it('setSubscribed / updateWatermark / setNewRefs / clearNewRefs', async () => {
+  it('setSubscribed / updateWatermark / addNewRefs / clearNewRefs', async () => {
     const s = new Subscriptions(dir)
     await s.addAccount({ fakeid: 'f1', nickname: '甲', subscribed: false, watermark: 0 })
     await s.setSubscribed('f1', true)
     await s.updateWatermark('f1', 300)
-    await s.setNewRefs('f1', [{ url: 'u', title: 't', createTime: 400 }])
+    await s.addNewRefs('f1', [{ url: 'u', title: 't', createTime: 400 }])
     let [a] = await s.list()
     expect(a).toMatchObject({ subscribed: true, watermark: 300 })
     expect(a.newRefs).toHaveLength(1)
     await s.clearNewRefs('f1')
     ;[a] = await s.list()
     expect(a.newRefs).toEqual([])
+  })
+
+  it('addNewRefs 合并而不是覆盖——留着没处理的不能被下一轮检查冲掉', async () => {
+    const s = new Subscriptions(dir)
+    await s.addAccount({ fakeid: 'f1', nickname: '甲', subscribed: true, watermark: 0 })
+    await s.addNewRefs('f1', [
+      { url: 'u1', title: '留着的一', createTime: 100, appmsgid: 1, itemidx: 1 },
+      { url: 'u2', title: '留着的二', createTime: 200, appmsgid: 2, itemidx: 1 },
+    ])
+    await s.addNewRefs('f1', [{ url: 'u3', title: '新发现的', createTime: 300, appmsgid: 3, itemidx: 1 }])
+    const [a] = await s.list()
+    expect(a.newRefs.map((r) => r.title)).toEqual(['新发现的', '留着的二', '留着的一'])
+  })
+
+  it('removeNewRefs 只删指定的几篇，其余仍在待处理里', async () => {
+    const s = new Subscriptions(dir)
+    await s.addAccount({ fakeid: 'f1', nickname: '甲', subscribed: true, watermark: 0 })
+    await s.addNewRefs('f1', [
+      { url: 'u1', title: 'A', createTime: 100, appmsgid: 1, itemidx: 1 },
+      { url: 'u2', title: 'B', createTime: 200, appmsgid: 2, itemidx: 1 },
+      { url: 'u3', title: 'C', createTime: 300, appmsgid: 3, itemidx: 1 },
+    ])
+    await s.removeNewRefs('f1', ['2_1'])
+    let [a] = await s.list()
+    expect(a.newRefs.map((r) => r.title)).toEqual(['C', 'A'])
+    await s.removeNewRefs('f1', ['1_1', '3_1'])
+    ;[a] = await s.list()
+    expect(a.newRefs).toEqual([])                      // 全删等价于清空
   })
 
   it('persists lastRunAt across instances', async () => {

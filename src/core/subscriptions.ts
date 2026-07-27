@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { atomicWriteFile } from './atomic-write'
 import { withPathLock } from './path-lock'
 import type { ArticleRef } from './mp-types'
+import { mergeNewRefs, removeRefs } from './subscription-refs'
 import type { HistoryEvent } from './download-history'
 
 export interface SubscribedAccount {
@@ -110,8 +111,23 @@ export class Subscriptions {
   async updateWatermark(fakeid: string, watermark: number): Promise<void> {
     await this.mutate((d) => { const a = this.find(d, fakeid); if (a) { a.watermark = watermark; a.lastCheckedAt = Date.now() } })
   }
-  async setNewRefs(fakeid: string, refs: ArticleRef[]): Promise<void> {
-    await this.mutate((d) => { const a = this.find(d, fakeid); if (a) { a.newRefs = refs; a.lastCheckedAt = Date.now() } })
+  /**
+   * 把本轮发现的新文章**并入**待处理列表(M40)。
+   * 曾是整体覆盖 —— 用户留着没处理的会被下一轮检查冲掉,那是静默丢数据。
+   */
+  async addNewRefs(fakeid: string, refs: ArticleRef[]): Promise<void> {
+    await this.mutate((d) => {
+      const a = this.find(d, fakeid)
+      if (a) { a.newRefs = mergeNewRefs(a.newRefs, refs); a.lastCheckedAt = Date.now() }
+    })
+  }
+  /** 直接把待处理列表设成给定的几篇(自动下载后只留下没下成的那些)。 */
+  async setPendingRefs(fakeid: string, refs: ArticleRef[]): Promise<void> {
+    await this.mutate((d) => { const a = this.find(d, fakeid); if (a) a.newRefs = refs })
+  }
+  /** 移除指定的几篇(下载完/忽略掉的);未列出的仍留在待处理里。 */
+  async removeNewRefs(fakeid: string, ids: string[]): Promise<void> {
+    await this.mutate((d) => { const a = this.find(d, fakeid); if (a) a.newRefs = removeRefs(a.newRefs, ids) })
   }
   async clearNewRefs(fakeid: string): Promise<void> {
     await this.mutate((d) => { const a = this.find(d, fakeid); if (a) a.newRefs = [] })

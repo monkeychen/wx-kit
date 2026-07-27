@@ -48,3 +48,21 @@ export function unknownKindWarning(itemShowType: number | null): string {
     ? '页面里没有读到消息类型,已按普通图文解析;若正文异常请反馈该链接。'
     : `未识别的消息类型 ${itemShowType},已按普通图文解析;若正文异常请反馈该链接。`
 }
+
+/**
+ * 卡片/列表上的类型标识。**普通图文(0/11)与「读不到类型」一律不标**——
+ * 文库里绝大多数是普通图文,全标一遍等于全不标;标识的价值在于**它出现时你就知道这篇不一样**。
+ *
+ * 两个容易踩的点:
+ * - `8` 是**图片消息(小绿书)**,曾被标成「图文」——那正是不标标签的默认类型的名字,
+ *   于是「标了图文的反而不是普通图文」,自相矛盾(M40 修)。
+ * - `itemShowType` 缺失(M36 之前下的老文章)必须与「未知类型」区分:前者不标,
+ *   后者标警示态。否则存量文库会一片 ⚠。
+ */
+export function kindTag(itemShowType?: number | null): { text: string; warn: boolean } | null {
+  if (itemShowType == null) return null
+  const kind = kindOf(itemShowType)
+  if (kind === 'article') return null
+  if (kind === 'unknown') return { text: '未知类型', warn: true }
+  return { text: { video: '视频', text: '文字', picture: '图片' }[kind], warn: false }
+}

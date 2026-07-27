@@ -77,6 +77,18 @@ async function main() {
     JSON.stringify({ libraryRoot, defaultFormats: ['cover', 'md', 'html', 'meta'], cliLinkPrompted: true }))
   log('libraryRoot', libraryRoot)
 
+  // M40:seed 一个带待处理新文章的订阅号,让「展开看标题 → 挑着处理」这条链路能真跑。
+  // 刻意 subscribed:false —— 这些数据全在本地,不需要网络,也不会让「检查」真去请求微信。
+  const M40_REFS = [
+    { url: 'https://mp.weixin.qq.com/s/e2e-a', title: 'M40 待处理一', createTime: 1753600000, appmsgid: 900001, itemidx: 1, itemShowType: 0 },
+    { url: 'https://mp.weixin.qq.com/s/e2e-b', title: 'M40 待处理二(视频消息)', createTime: 1753500000, appmsgid: 900002, itemidx: 1, itemShowType: 5 },
+    { url: 'https://mp.weixin.qq.com/s/e2e-c', title: 'M40 待处理三', createTime: 1753400000, appmsgid: 900003, itemidx: 1, itemShowType: 10 },
+  ]
+  writeFileSync(join(libraryRoot, 'subscriptions.json'), JSON.stringify({
+    version: 1, lastRunAt: null, checkLog: [],
+    accounts: [{ fakeid: 'e2e-m40', nickname: 'E2E 待处理号', subscribed: false, watermark: 1753600000, lastCheckedAt: Date.now(), newRefs: M40_REFS }],
+  }))
+
   const realSession = join(homedir(), 'Library', 'Application Support', 'wx-kit', 'mp-session.json')
   let hasSession = false
   if (existsSync(realSession)) {
@@ -304,6 +316,37 @@ async function main() {
       const rowRes = await win.locator('[data-testid="subs-row-result"]').first().innerText()
       assert(rowRes.trim().length > 1, `M34: inline check result is non-empty (got: ${rowRes})`)
     }
+    // ============ M40 · 待处理新文章:看得见、挑得动 ============
+    {
+      const row = win.locator('[data-testid="subs-row"]').filter({ hasText: 'E2E 待处理号' })
+      assert((await row.count()) === 1, 'M40: seeded pending account is listed')
+      assert((await row.locator('[data-testid="subs-pending"]').count()) === 0, 'M40: pending detail stays collapsed by default')
+      await row.locator('[data-testid="subs-expand"]').click()
+      await row.locator('[data-testid="subs-pending"]').waitFor({ timeout: 5000 })
+      const items = row.locator('[data-testid="subs-pending-item"]')
+      assert((await items.count()) === 3, `M40: expanding lists every pending article (got ${await items.count()})`)
+      const firstTitle = await row.locator('[data-testid="subs-pending-title"]').first().innerText()
+      assert(firstTitle.includes('M40 待处理一'), `M40: pending rows show the actual title (got: ${firstTitle})`)
+      // 类型标只给非普通图文:3 篇里 1 视频 + 1 文字 = 2 个标,普通图文那篇不标
+      const kinds = await row.locator('[data-testid="subs-pending-kind"]').allInnerTexts()
+      assert(kinds.length === 2 && kinds.includes('视频') && kinds.includes('文字'),
+        `M40: only non-ordinary kinds are tagged (got: ${JSON.stringify(kinds)})`)
+      // 默认全选 → 动作文案就是全部篇数
+      const dlAll = await row.locator('[data-testid="subs-download-new"]').innerText()
+      assert(dlAll.includes('3'), `M40: everything is selected by default (got: ${dlAll})`)
+      // 取消勾选一篇 → 动作只作用于剩下的两篇
+      await items.first().locator('input[type="checkbox"]').click()
+      const dlPicked = await row.locator('[data-testid="subs-download-new"]').innerText()
+      assert(dlPicked.includes('2'), `M40: action follows the selection (got: ${dlPicked})`)
+      // 忽略所选 → 只走掉勾上的两篇,没勾的那篇仍在待处理里
+      await row.locator('[data-testid="subs-dismiss-new"]').click()
+      await win.waitForTimeout(800)
+      const left = await row.locator('[data-testid="subs-pending-item"]').count()
+      assert(left === 1, `M40: unselected article survives a partial dismiss (left=${left})`)
+      const leftTitle = await row.locator('[data-testid="subs-pending-title"]').first().innerText()
+      assert(leftTitle.includes('M40 待处理一'), `M40: the survivor is the one left unchecked (got: ${leftTitle})`)
+    }
+
     // M12: 可观测性元素
     assert((await win.locator('[data-testid="subs-next-check"]').count()) === 1, 'subscriptions page shows next-check line')
     assert((await win.locator('[data-testid="subs-open-log"]').count()) === 1, 'subscriptions page offers open-log link')
