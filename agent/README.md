@@ -4,8 +4,11 @@
 
 ## 内含
 
-- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**（v0.6.0）：安装（brew/npm 自动检测）、登录态（含 headless 的 session 迁移）、全部 CLI 原子能力速查与组合范例。agent 从零上手 wx-kit 看这个。
-- `wx-kit-compose/` —— 文库素材创作编排 skill：用文库文章作素材，走「选料 → 选题 → 写作」（带人工检查点），写作委派给 `khazix-writer`。环境/安装前置问题参见 `wx-kit-skill`。详见其 `SKILL.md`。
+- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**：安装（brew/npm 自动检测）、登录态（含 headless 的 session 迁移）、全部 CLI 原子能力速查与组合范例。agent 从零上手 wx-kit 看这个。
+  **它是 CLI 契约的唯一真相**——参数、输出结构、错误码只在这里维护，随每次 CLI 变更同步。
+- `wx-kit-compose/` —— 素材创作编排 skill：走「取料 → 选题 → 写作」（带两个人工检查点），定稿后可选发到个人站点；写作委派给 `khazix-writer`。
+  取料的起点可以是**已下载的文库**，也可以是 `subscription digest`（「昨天/某天各订阅号发了什么」，还没下载时从这儿开始）。
+  **它刻意不复述 CLI 参数**，只说「哪一步用哪个能力」——抄来的命令细节不会跟着源头变，这正是它曾落后二十个里程碑的原因。
 
 ## 安装
 
@@ -17,7 +20,19 @@
 
 依赖的写作 skill `khazix-writer` 需已安装（它承载笔调）；研究 skill `hv-analysis` 可选（仅旁路深研用）。
 
-## 供料契约（wx-kit `library export`）
+## 供料契约
+
+素材有两个入口,对应「已经下过」与「还没下过」:
+
+| 入口 | 命令 | 什么时候用 |
+|---|---|---|
+| 已下载的文库 | `library export` / `library search` / `library list` | 素材已在本地 |
+| 还没下载 | `subscription digest --date <YYYY-MM-DD>` | 只知道「某天各订阅号发了什么」,先看清单再决定下哪几篇 |
+
+`digest` 只查询——不下载、不写库、不推订阅水位;每篇带 `downloaded` 标记,
+`true` 的直接读本地,`false` 的才 `download`。**日期由 agent 换算**,CLI 只认 `YYYY-MM-DD`/`today`/`yesterday`。
+
+### `library export` 的清单格式
 
 输出 stdout 纯 JSON 清单（**正文不内联**，给 `content.md` 绝对路径）：
 
@@ -30,6 +45,15 @@
 ```
 
 选料器（可组合，交集语义）：`--ids a,b,c` / `--since YYYY-MM-DD`（按 `downloadTime`）/ `--account <公众号名>`（昵称包含匹配，注：无 fakeid）/ `--all`（无选料器时必须显式给，否则报 `NO_SELECTOR` 退出 1）。`--out <库根>` 指定文库目录（默认 `~/Documents/wx-kit`）。
+
+### 两个影响「素材能不能用」的字段
+
+每篇的 `meta.json` 里（`library list` 的输出同源）：
+
+- **`itemShowType`** —— 消息类型：`0` 图文 / `5` 视频消息 / `8` 图片消息 / `10` 文字消息。
+  **视频与文字消息没有长正文**，正文往往只是一段几十字的描述；当写作素材时价值与图文完全不同。
+- **`warnings`** —— 解析告警（遇到没适配的新消息类型、正文疑似脚本等）。
+  「下到了但可能不对」的唯一信号，读正文前值得扫一眼。
 
 ### 怎么跑这条 CLI
 
@@ -52,6 +76,11 @@
 ## 不走 CLI 也行：GUI 导出
 
 文库页多选文章 →「导出为素材」→ 写出 `<库根>/exports/<时间戳>.json`（同上清单格式）。skill 读最新那个文件即可，无需跑 CLI。
+
+## 下游：发到个人站点（可选）
+
+`site sync --ids <id> --slug <slug>` 把文库文章按 Astro 站点规范生成到 `content/posts/<日期>-<slug>/`（纯本地，不联网；需先配 `siteSyncPostsDir`）。
+**compose 默认不做这一步**——发布是不可逆的对外动作，要用户明确要求。
 
 ## 设计边界（v0.4.0 既定）
 
