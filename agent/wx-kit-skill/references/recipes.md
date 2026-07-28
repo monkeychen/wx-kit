@@ -58,7 +58,7 @@ wx-kit subscription list | jq -r '.accounts[] | select(.subscribed) | "\(.nickna
 wx-kit subscription check-now --accounts <fakeid1>,<fakeid2>   # 只查指定号
 ```
 
-## 5. 「昨天各号发了什么?」→ 按需取内容(完整链路)
+## 5. 「昨天各号发了什么?」→ 直接拿到可读的素材(完整链路)
 
 用户问「昨天/前天/7月23日各订阅号发了什么」时走这条。**注意第一步是你自己算日期。**
 
@@ -67,26 +67,31 @@ wx-kit subscription check-now --accounts <fakeid1>,<fakeid2>   # 只查指定号
 #    传「昨天」「7月23日」会报 BAD_DATE —— 它刻意不猜,猜错是静默给错答案。
 DATE=$(date -v-1d +%F)        # macOS;Linux: date -d yesterday +%F。你也可以直接算好写死。
 
-# ② 查那天的发布清单(只查询,不下载、不写库、不推水位)
+# ② 只是想看清单(不取正文):纯查询,不下载不写库
 wx-kit subscription digest --date "$DATE" > digest.json
-
-# ③ 先给用户看清单(这一步往往就够了)
 jq -r '.articles[] | "\(.account)｜\(.title)｜\(if .downloaded then "已在库" else "未下载" end)"' digest.json
 
-# ④ 要内容时按 downloaded 分流 —— 已下的读本地,别重复下载
-jq -r '.articles[] | select(.downloaded) | .id' digest.json      # → library list 里按 id 找 dir,读 dir/content.md
-jq -r '.articles[] | select(.downloaded | not) | .url' digest.json | while read -r u; do
-  wx-kit download --url "$u" --formats md,meta
-done
+# ③ 要正文:同一条命令加 --download。缺的下、已有的跳过,**每篇直接带本地路径**
+wx-kit subscription digest --date "$DATE" --download --formats md,meta > material.json
+jq -r '.articles[] | select(.contentPath) | "\(.title)\t\(.contentPath)"' material.json
+# 然后按 contentPath 逐个读 content.md 即可 —— 不必再跑 library export,也不必自己拼路径
 ```
+
+**别用「先 digest 再逐个 download」那套**:那要你把「刚下的」和「本来就有的」两种结果合并,
+`--download` 已经把这件事做完了(两者形状完全一致)。
 
 要点:
 
 - **订阅号多时先缩范围**:`--accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取)。
-  全量 16 个号约 30–60 秒,stderr 有逐号进度。
+  全量 16 个号约 30–60 秒,stderr 有逐号进度;`--download` 阶段另有 `↓ [n/m] 标题`。
+- **`--formats` 缺省跟设置走**(不是固定的 `md,html,meta`,那是 `crawl` 的缺省)。
+  只当素材读的话 `md,meta` 就够;想省流量加 `--no-video`(单个视频可达上百 MB)。
+- **`contentPath` 只在正文文件真存在时才有**(选了 `md`)。没有它就只有 `dir`,别硬拼路径去读。
+- **拿不到的那几篇仍在清单里**:`unavailable: true` = 读者本就打不开(审核未通过/已删除),**重试无用**;
+  只有 `error` 的是真故障(网络/频控),可以再试。
 - **`itemShowType` 影响能拿到什么**:`5` 视频消息 / `10` 文字消息**没有长正文**,
   正文只是一段描述;当写作素材时价值与图文完全不同,挑素材前先看这个字段。
-- 某号失败进 `failures` 但**退出码仍是 0**(部分成功)——要判断是否完整,看 `failures` 而不是退出码。
+- 某号列表查失败进 `failures` 但**退出码仍是 0**(部分成功)——判断是否完整看 `failures`,不看退出码。
 
 ## 6. 每天拉所有公众号最近文章清单(默认排序即用)
 

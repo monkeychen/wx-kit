@@ -60,8 +60,10 @@ wx-kit library export --ids <id,id>            # {"ok":true,"count":N,"articles"
 ```
 
 ArticleMeta 字段:`id, title, author, account, publishTime, sourceUrl, digest, coverUrl, downloadTime, formats, dir`;
-另有 `itemShowType`(消息类型:`0` 普通图文 / `5` 视频消息 / `8` 图文消息(小绿书) / `10` 文字消息 / `11` 发布通告;
-**这是开放集合**,遇到没适配的类型会按图文兜底并在 `warnings[]` 里报出来)。
+另有 `itemShowType`(消息类型:`0` 普通图文 / `5` 视频消息 / `8` 图片消息(小绿书) / `10` 文字消息 / `11` 发布通告;
+**这是开放集合**,遇到没适配的类型会按图文兜底并在 `warnings` 里报出来)、
+`videos`(有内嵌视频才有,不含 url——直链带签名有时效)、
+`warnings`(解析/下载期的告警,有才写:「下到了但可能不对」的唯一信号)。
 含视频的文章另有 `videos: [{videoId, formatId, width, height, filesize, durationMs, path?}]`
 (**没有 url**——直链带时效签名,存下来隔次即失效;`path` 缺省表示没下到)。
 `library export` 直接在 stdout 输出素材清单,每篇含 `contentPath`(content.md 绝对路径),供下游创作/分析直接读文件(GUI 的「导出选中为素材」才是落盘成清单文件)。
@@ -99,6 +101,9 @@ wx-kit subscription check-now --accounts <fakeid,fakeid>  # 只检查指定号(�
 ```sh
 wx-kit subscription digest --date 2026-07-23
 wx-kit subscription digest --date yesterday --accounts <fakeid,fakeid>
+# 顺带把缺的取回来(已下载的自动跳过),输出带本地路径 —— 要正文时用这条,别自己逐个 download
+wx-kit subscription digest --date yesterday --download
+wx-kit subscription digest --date yesterday --download --formats md,meta --no-video
 ```
 
 **日期由你(agent)换算**:命令只认 `YYYY-MM-DD` / `today` / `yesterday`。
@@ -124,11 +129,19 @@ wx-kit subscription digest --date yesterday --accounts <fakeid,fakeid>
 | `downloaded` | **决定下一步**:`true` → 这篇已在库里,用 `library list`/`search` 拿 `dir` 直接读 `content.md`;`false` → 要内容就 `wx-kit download --url <url>` |
 | `id` | 与库内同源的文章主键(`mid_idx`),可直接与 `library list` 的 `id` 对账 |
 | `itemShowType` | `0` 图文 / `5` 视频消息 / `8` 图片消息 / `10` 文字消息。**视频与文字消息没有长正文**,当素材用途不同 |
+| `dir` / `contentPath` | 文章在本地的目录与正文文件。**刚下的与本来就有的形状完全一致**,不必合并两种结果。`contentPath` **只在正文文件真存在时才有**(下载时选了 `md`);没有它就只有 `dir` |
+| `warnings` | 解析告警(未识别类型、正文疑似脚本等):「下到了但可能不对」的唯一信号,读正文前扫一眼 |
+| `error` / `unavailable` | 只在 `--download` 且这篇没拿到时出现。`unavailable: true` = 读者本就打不开(审核未通过/已删除/违规下架),**重试无用别死磕**;只有 `error` 的是真故障(网络/频控),可以再试 |
 | `articles` | **跨号合并后按发布时间降序**,不按号分组 |
 | `failures` | 某号查失败(频控/登录态);**其余号照常返回,退出码仍 0**。一个号都没查成才是 `ok:false` + 退出码 1 |
 
-**只查询**:不下载、不写库、**不推进订阅水位**——可以反复查同一天,不会把「新文章」标记吃掉
+**默认只查询**:不下载、不写库、**不推进订阅水位**——可以反复查同一天,不会把「新文章」标记吃掉
 (这点与 `check-now` 不同,后者是按水位问「有没有新的」)。
+
+**`--download` 的行为**:只下 `downloaded:false` 的那几篇(串行),已在库的一次请求都不发;
+`--formats` **缺省取设置里的 `defaultFormats`**(注意与 `crawl` 不同,后者缺省是固定的 `md,html,meta`);
+失败的条目**留在清单里**并带 `error`,不会静默消失。**即使带 `--download` 也不推进订阅水位。**
+digest 不记状态,所以 `unavailable` 的文章下次仍会被再试一次——想省请求就自己按这个字段跳过。
 
 **耗时**:每个号一次请求 + 随机延迟,16 个号约 30–60 秒。**订阅号多时用 `--accounts` 缩小范围**;
 stderr 有逐号进度(`[3/16] 某号 … 2 篇`),别把它当成卡死。

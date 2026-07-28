@@ -39,12 +39,16 @@ description: |
 **A. 还没下载，只知道「昨天/某天各号发了什么」** —— 选题真正的起点
 
 ```sh
-wx-kit subscription digest --date 2026-07-27      # 日期你自己算：CLI 只认 YYYY-MM-DD / today / yesterday
+# 只看清单（不取正文）：日期你自己算，CLI 只认 YYYY-MM-DD / today / yesterday
+wx-kit subscription digest --date 2026-07-27
+# 要正文：同一条命令加 --download，缺的下、已有的跳过，每篇直接带 dir/contentPath
+wx-kit subscription digest --date 2026-07-27 --download --formats md,meta
 ```
 
-拿到那天各订阅号的发布清单（不下载、不写库）。**按 `downloaded` 分流**：
-`true` 的已在库里，直接读；`false` 的想要正文才 `wx-kit download --url <url>`。
-下完再走下面的选料。**别把整天的文章一股脑下下来**——先看标题决定要哪几篇。
+**先不带 `--download` 看一眼清单**，和用户确认要哪几篇再取——那天可能有十几篇，
+其中多数你只是扫个标题就过了，全下会把几十 MB 和几十次请求花在没人看的文章上。
+确认后加 `--download`：清单里每篇带 `contentPath`，直接读，**不必自己逐个 `download`、
+也不必把「刚下的」和「本来就有的」两种结果合并**（那道缝 CLI 已经缝好了）。
 
 **B. GUI 已导出**：用户在文库多选 →「导出为素材」写出 `<库根>/exports/<时间戳>.json`。读最新那个。
 
@@ -122,7 +126,8 @@ wx-kit site sync --ids <文章id> --slug <url-slug>     # 需先配好 siteSyncP
 - **跳过检查点直接出成品**：最常见的错。两个 🛑 必须停。
 - **未经要求就 `site sync`**：发布是对外且不可逆的，用户没说「发」就停在定稿。
 - **自作主张 `--all` 导全库**：用户没指定就先问，别一股脑全导。
-- **拿到 digest 清单就把整天的文章全下了**：先看标题挑几篇，`downloaded:true` 的更是根本不用下。
+- **拿到 digest 清单就把整天的文章全下了**：先看标题、和用户确认要哪几篇，再加 `--download`。
+- **自己逐个 `download` 再去查路径**：`digest --download` 已经把清单和本地路径给齐了。
 - **没看 `itemShowType` 就把视频/文字消息当长文用**：那类「正文」只有一段描述，据此写论据等于编造。
 - **把清单里的 `contentPath` 当正文**：那是路径，要去读文件。
 - **为选题去跑 hv-analysis**：错位且慢；选题轻量内联即可。

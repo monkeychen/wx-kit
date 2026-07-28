@@ -9,7 +9,7 @@ import { ALL_FORMATS } from '../core/types'
 import { fetchHtml, fetchBinary } from '../core/fetch-html'
 import { Library } from '../core/library'
 import { DownloadQueue } from '../core/download-queue'
-import { downloadArticle } from '../core/download-article'
+import { downloadArticle, ArticleUnavailableError } from '../core/download-article'
 import { getSession, login } from '../../electron/services/mp-auth'
 import { exportSession, importSession } from '../../electron/services/session-transfer'
 import { makeMpFetch } from '../../electron/services/mp-fetch'
@@ -29,7 +29,7 @@ import { History, eventFromSummary, type HistorySource } from '../core/download-
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine } from '../core/subscriptions'
 import { nextCheckAt } from '../core/subscription-schedule'
 import { resolveDigestDate } from '../core/digest-date'
-import { subscriptionDigest } from '../core/subscription-digest'
+import { subscriptionDigest, fetchMissing } from '../core/subscription-digest'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 
 function defaultLibraryRoot(): string {
@@ -376,9 +376,12 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   subscription
     .command('digest')
-    .description('查已订阅公众号「某一天」发布了什么(只查询,不下载、不写库、不推水位)')
+    .description('查已订阅公众号「某一天」发布了什么(默认只查询;加 --download 顺带把缺的下下来)')
     .requiredOption('--date <date>', 'YYYY-MM-DD / today / yesterday(「昨天」「7月23日」等表达请先自行换算)')
     .option('--accounts <csv>', '只查指定公众号(逗号分隔 fakeid,默认全部已订阅;号多时耗时明显)')
+    .option('--download', '把清单里还没下载的下下来(已下载的自动跳过),输出带本地路径')
+    .option('--formats <csv>', '仅配合 --download:cover,md,html,pdf,meta(默认取设置里的 defaultFormats)')
+    .option('--no-video', '仅配合 --download:不下载文中内嵌视频(默认按设置;单个视频可达上百 MB)')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (o) => {
       let when
@@ -404,16 +407,57 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       // 那批文章的 id 是路径哈希(真实库里 32/267 篇),光比 id 会把它们误报成「没下载」,
       // 于是 agent 照着 downloaded:false 又下一遍 —— 正是 digest 最该避免的事。
       const stored = await library.list()
-      const haveIds = new Set(stored.map((a) => canonicalId(a.id)))
-      const haveUrls = new Set(stored.map((a) => a.sourceUrl))
+      const byId = new Map(stored.map((a) => [canonicalId(a.id), a]))
+      const byUrl = new Map(stored.map((a) => [a.sourceUrl, a]))
+      const localOf = async (id: string, url: string) => {
+        const m = byId.get(canonicalId(id)) ?? byUrl.get(url)
+        if (!m) return null
+        return {
+          dir: m.dir,
+          // 只在正文文件真会存在时给路径 —— 给个指向不存在文件的路径比不给更糟
+          ...(m.formats.includes('md') ? { contentPath: join(m.dir, 'content.md') } : {}),
+          ...(m.warnings?.length ? { warnings: m.warnings } : {}),
+        }
+      }
 
       const result = await subscriptionDigest({
         accounts, date: when.date, fromTs: when.fromTs, toTs: when.toTs,
         listByDate: (fakeid) => listArticles(mpFetch, session.token, fakeid, { from: when.date, to: when.date }),
-        isDownloaded: async (id, url) => haveIds.has(canonicalId(id)) || haveUrls.has(url),
+        localOf,
         // 16 个号要跑半分钟,没有逐号输出会像卡死
         onProgress: (e) => process.stderr.write(`[${e.index}/${e.total}] ${e.nickname} … ${e.count} 篇\n`),
       })
+
+      // --download:把缺的取回来。**只在显式要求时才构造下载依赖**——
+      // 不带这个 flag 时这段整个不执行,「行为一字不变」由结构保证而不是靠 if 里的自觉。
+      if (o.download) {
+        const s = await settingsFor().get()
+        // 缺省跟设置里的 defaultFormats 走(与 crawl 的硬编码 'md,html,meta' **有意不同**:
+        // 「我平时下什么就下什么」比记住一串字面量更符合直觉。别顺手统一成硬编码)
+        const formats = o.formats ? parseFormats(String(o.formats)) : s.defaultFormats
+        const ddeps = {
+          fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
+          now: () => new Date().toISOString(), library, libraryRoot: root,
+          downloadVideos: o.video === false ? false : s.downloadVideos,
+        }
+        result.articles = await fetchMissing(result.articles, {
+          download: async (url, hint) => {
+            try {
+              const r = await downloadArticle(url, formats, ddeps, hint)
+              return { ok: true, ...(r.dir ? { dir: r.dir } : {}), ...(r.warnings ? { warnings: r.warnings } : {}) }
+            } catch (e) {
+              // 「读者本就打不开」与真故障分开:前者重试无用(v0.8.3 的结论)
+              return {
+                ok: false, error: (e as Error).message,
+                ...(e instanceof ArticleUnavailableError ? { unavailable: true } : {}),
+              }
+            }
+          },
+          ...(formats.includes('md') ? { contentPathOf: (dir: string) => join(dir, 'content.md') } : {}),
+          onProgress: (e) => process.stderr.write(`↓ [${e.index}/${e.total}] ${e.title}\n`),
+        })
+      }
+
       outJson(result)
       // 一个号都没查成不是「部分成功」,给非 0 退出码让 agent 能分辨
       exitCode = result.ok ? 0 : 1
