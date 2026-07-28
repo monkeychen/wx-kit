@@ -65,7 +65,8 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 | 导出素材清单 | `wx-kit library export --ids <id,id>` |
 | 订阅号列表/立即检查 | `wx-kit subscription list` / `wx-kit subscription check-now` |
 | 只检查某几个号 | `wx-kit subscription check-now --accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取) |
-| **某一天各订阅号发了什么** | `wx-kit subscription digest --date <YYYY-MM-DD\|today\|yesterday>`(只查询不下载;**「昨天」「7月23日」这类说法由你换算成 YYYY-MM-DD**,CLI 不解析自然语言) |
+| **某一天各订阅号发了什么** | `wx-kit subscription digest --date <YYYY-MM-DD\|today\|yesterday>`(只查询;**「昨天」「7月23日」这类说法由你换算成 YYYY-MM-DD**,CLI 不解析自然语言) |
+| **某一天的文章直接取成素材** | 上面那条加 `--download`:缺的下、已有的跳过,**每篇带 `dir`/`contentPath` 可直接读正文** |
 | 读/写设置 | `wx-kit settings get libraryRoot` / `wx-kit settings set libraryRoot <dir>` |
 | 同步到个人站点 | `wx-kit site sync --ids <id> --slug <slug>`(按 Astro 站点规范生成目录,纯本地) |
 | 检查有无新版本 | `wx-kit update --check`(只检查;`upgradeCommand` 按安装渠道给,`version` 命令不联网) |
@@ -79,6 +80,7 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
   遇到没适配的新类型会按图文兜底并在该篇 `warnings[]` 里说明——**批处理时值得 `jq` 扫一眼 `warnings`**,
   它是「下到了但可能不对」的唯一信号。
 - **`digest` 的 `downloaded` 字段直接决定下一步**:`true` 就读本地 `content.md`,别重复下载。
+  要正文时**别自己逐个 `download`**——直接加 `--download`,一条命令就把清单和本地路径都给齐了。
 
 ## 频控纪律(重要)
 

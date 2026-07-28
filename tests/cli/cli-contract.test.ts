@@ -207,6 +207,12 @@ describe('CLI subscription digest', () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
   })
 
+  it('--download 存在且不改变「日期先挡下」的顺序（错日期时一次请求都不该发）', async () => {
+    const code = await runCli(['subscription', 'digest', '--date', '2026-2-30', '--download'])
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'BAD_DATE' } })
+  })
+
   it('缺 --date → 用法错（退出码 2），不静默当成今天', async () => {
     expect(await runCli(['subscription', 'digest'])).toBe(2)
   })
