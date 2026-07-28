@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.8.4-released-success.svg)
+![Status](https://img.shields.io/badge/v0.8.5-released-success.svg)
 
 <!-- 截图：v0.2.0（真实数据态，后续版本 UI 一致） -->
 | 下载 · 按链接 | 下载 · 按公众号 | 文库 · 分组卡片 | 文库 · 列表 | 设置 |
@@ -23,14 +23,15 @@
 - **库内阅读**已下载文章;
 - **同二进制**带 CLI(`npx electron . download ...`),面向 AI agent 自动化调用。
 
-**最新版本 v0.8.4(看得见,还能挑)**:
+**最新版本 v0.8.5(一个问题,一份清单)**:
 
-- **订阅新文章能看见是哪几篇**:展开列出标题/时间/类型,点标题直接打开原文,**挑着下载或忽略**——不再只有一个数字、只能全下或全不要。
-- **有新版终于会提示**:此前「每天最多查一次」的限流把上次查到的结论一起吞了,且只在开窗后查一次(常年开着的应用可能几天不查)。现在缓存结论 + 常开也定期检查。
-- **CLI 查「某天各订阅号发了什么」**:`wx-kit subscription digest --date yesterday`,只查询不下载,每篇带 `downloaded` 标记,agent 据此分流。
-- **类型标识修正**:图片消息(小绿书)此前被标成「图文」——正是默认类型的名字;未知类型给警示态;解析告警从「图形界面里根本看不到」变成卡片上可查。
+- **`subscription digest --download`**:查某天各订阅号发了什么,**顺带把缺的下下来**(已有的跳过),
+  清单里每篇带 `dir`/`contentPath`——**拿到就能读正文**,不必自己逐个下载再合并两种结果。
+- `--formats` 缺省跟设置里的默认格式走;`contentPath` 只在正文文件真存在时才给(给个不存在的路径比不给更糟)。
+- 拿不到的仍留在清单里并区分原因:`unavailable` = 读者本就打不开(重试无用),`error` = 真故障(可重试)。
+- **不带 `--download` 时行为一字不变**:纯只读,不下载、不写库、不推进订阅水位。
 
-上一版 v0.8.3(打不开的文章不再算「下载失败」):作者发布失败/违规下架的文章报出具体原因,与真故障分开计数。
+上一版 v0.8.4(看得见,还能挑):订阅新文章展开可见、挑着下载或忽略;更新检查在常开的应用里也生效;类型标识修正。
 
 历史版本亮点见下方[「项目状态」](#项目状态)与 [`ROADMAP.md`](ROADMAP.md) 发布史,逐版发布说明在 `docs/releases/`。
 
@@ -78,8 +79,8 @@ wx-kit --version
 
 ## 30 秒上手(下载安装包)
 
-去 [Releases](../../releases) 选平台对应包(最新 v0.8.4:`wx-kit-0.8.4-arm64.dmg`(Apple Silicon) /
-`wx-kit-0.8.4.dmg`(Intel) / `wx-kit Setup 0.8.4.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
+去 [Releases](../../releases) 选平台对应包(最新 v0.8.5:`wx-kit-0.8.5-arm64.dmg`(Apple Silicon) /
+`wx-kit-0.8.5.dmg`(Intel) / `wx-kit Setup 0.8.5.exe`(Windows))。当前**未签名/未公证**,首次打开需手动放行:
 
 - **macOS** —— 拖入「应用程序」后,首次打开被拦时进「系统设置 → 隐私与安全性」点「仍要打开」(macOS 15 Sequoia 起已移除「右键→打开」快捷绕过);或命令行 `xattr -cr /Applications/wx-kit.app`。
 - **Windows** —— SmartScreen →「更多信息」→「仍要运行」。
@@ -183,7 +184,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 – v0.8.4 均已发布**(最新 **v0.8.4**:看得见,还能挑)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 – v0.8.5 均已发布**(最新 **v0.8.5**:一个问题,一份清单)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -247,6 +248,9 @@ wx-kit auth-status
 **v0.8.0 · 让内容流到该去的地方(2026-07-22)**
 - ✅ M31 — CLI/订阅增强与 bug 修复:订阅按号点检(行内「检查」+ CLI `--accounts`)、`library list`/`search` 默认按发布时间降序(`--sort`/`--order`,排序逻辑抽 core 与 GUI 共享)、`-h` 附仓库地址、修 mac CLI 堆程序坞图标
 - ✅ M32 — 站点同步:文库/CLI 按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平);设置开关默认关;产物过真实站点 `npm run check`
+
+**v0.8.5 · 一个问题,一份清单(2026-07-28)**
+- ✅ M43 — `subscription digest --download`:缺的下、已有的跳过,清单统一带 `dir`/`contentPath`;查询与取内容是两个独立步骤,「不带 flag 行为不变」由结构保证
 
 **v0.8.4 · 看得见,还能挑(2026-07-28)**
 - ✅ M39 — 更新检查在常开的应用里也生效:缓存上次结论(限流不再连结论一起吞)+ 主进程定期检查
