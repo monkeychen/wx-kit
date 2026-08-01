@@ -12,7 +12,7 @@ import { History, eventFromSummary, type HistorySource } from '../src/core/downl
 import { DownloadQueue } from '../src/core/download-queue'
 import { downloadArticle } from '../src/core/download-article'
 import { readArticleContent, type ReadableKind } from '../src/core/read-article'
-import { login, getSession, clearSession } from './services/mp-auth'
+import { login, getSession } from './services/mp-auth'
 import { makeMpFetch } from './services/mp-fetch'
 import { searchAccount, listArticles } from '../src/core/mp-client'
 import { crawlAccount } from '../src/core/mp-crawl'
@@ -181,15 +181,6 @@ export function registerIpc(settings: SettingsService): void {
     try { await searchAccount(makeMpFetch(session), session.token, '腾讯'); return { valid: true } }
     catch (e) { if (e instanceof MpAuthExpired) return { valid: false }; throw e }
   })
-
-  // 设置页「公众号账号」区:只读本地 session,不发请求(不触发探测、不在频控期加重)。
-  // 有效性探测归 mp:authStatus;这里只回答「有没有登录态 + 何时扫码」。
-  ipcMain.handle('mp:sessionInfo', () => {
-    const session = getSession()
-    return { loggedIn: !!session, loginAt: session?.timestamp ?? null }
-  })
-
-  ipcMain.handle('mp:logout', async () => { await clearSession() })
 
   ipcMain.handle('mp:search', async (_e, name: string) => {
     const session = getSession()

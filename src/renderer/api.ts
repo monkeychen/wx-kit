@@ -55,9 +55,6 @@ export interface WxApi {
   // —— M3.5 批量爬取 ——
   mpAuthStatus(): Promise<{ valid: boolean }>
   mpLogin(): Promise<{ ok: boolean; error?: string }>
-  /** 设置页账号区:只读本地 session(不探测、不加重频控) */
-  mpSessionInfo(): Promise<{ loggedIn: boolean; loginAt: number | null }>
-  mpLogout(): Promise<void>
   mpSearch(name: string): Promise<{ ok: boolean; list?: MpAccount[]; error?: { code: string; message: string } }>
   mpCrawl(fakeid: string, nickname: string, range: CrawlRangeInput, formats: DownloadFormat[], keywords?: { include?: string[]; exclude?: string[] }): Promise<CrawlSummary>
   onCrawlProgress(cb: (e: CrawlEvent) => void): () => void

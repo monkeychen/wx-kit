@@ -13,8 +13,6 @@ import type { DownloadFormat } from '../../core/types'
 export default function Settings() {
   const [s, setS] = useState<AppSettings | null>(null)
   const [cliLink, setCliLink] = useState<Awaited<ReturnType<typeof api.cliLinkStatus>> | null>(null)
-  const [mpSession, setMpSession] = useState<{ loggedIn: boolean; loginAt: number | null } | null>(null)
-  const [loginBusy, setLoginBusy] = useState(false)
 
   const [ver, setVer] = useState('')
   // M37 更新检查:三态(未查 / 查询中 / 有结果),查不到用 'failed' 与「已是最新」区分开
@@ -25,7 +23,6 @@ export default function Settings() {
 
   useEffect(() => { api.getSettings().then(setS) }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
-  useEffect(() => { api.mpSessionInfo().then(setMpSession) }, [])
   useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不阻塞设置页 */ }) }, [])
   useEffect(() => { api.updateChannel().then(setChan).catch(() => { /* 渠道识别失败就退回通用引导 */ }) }, [])
   useEffect(() => api.onUpdateProgress((p) => setDl({ done: p.done, total: p.total })), [])
@@ -76,18 +73,6 @@ export default function Settings() {
       setCliLink(await api.cliLinkStatus())
     } catch (e) { message.error('创建失败：' + (e as Error).message) }
   }
-  const doMpLogin = async () => {
-    setLoginBusy(true)
-    const r = await api.mpLogin()
-    setLoginBusy(false)
-    if (r.ok) { setMpSession(await api.mpSessionInfo()); message.success('已登录') }
-    else if (r.error !== 'CANCELLED') message.error('登录失败：' + (r.error ?? ''))
-  }
-  const doMpLogout = async () => {
-    await api.mpLogout()
-    setMpSession({ loggedIn: false, loginAt: null })
-    message.success('已退出登录')
-  }
 
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
@@ -100,32 +85,6 @@ export default function Settings() {
         </div>
 
         <div className="surface">
-          <div className="setting-block">
-            <div className="setting-label">公众号账号</div>
-            <div className="setting-hint">
-              扫码登录公众号后台后,可按公众号批量下载、检查订阅更新。登录态保存在本地;过期或被频控时可在此重新登录。
-            </div>
-            <Space align="center" style={{ marginTop: 8 }} wrap>
-              {mpSession?.loggedIn ? (
-                <>
-                  <span className="faint" data-testid="set-mp-status">
-                    已登录{mpSession.loginAt ? ` · 扫码于 ${new Date(mpSession.loginAt).toLocaleString()}` : ''}
-                  </span>
-                  <Button loading={loginBusy} onClick={doMpLogin} data-testid="set-mp-relogin">重新登录</Button>
-                  <Popconfirm title="退出登录？" description="清掉本地登录态;按公众号下载与订阅检查会暂停,需重新扫码。"
-                    okText="退出" cancelText="取消" onConfirm={doMpLogout}>
-                    <Button danger data-testid="set-mp-logout">退出登录</Button>
-                  </Popconfirm>
-                </>
-              ) : (
-                <>
-                  <span className="faint" data-testid="set-mp-status">未登录</span>
-                  <Button type="primary" loading={loginBusy} onClick={doMpLogin} data-testid="set-mp-login">扫码登录</Button>
-                </>
-              )}
-            </Space>
-          </div>
-
           <div className="setting-block">
             <div className="setting-label">文章库位置</div>
             <div className="setting-hint">下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。</div>

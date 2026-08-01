@@ -355,18 +355,6 @@ async function main() {
     // 设置页：订阅控件 + M12 调度模式切换
     await win.click('[data-testid="nav-设置"]')
     await win.waitForSelector('[data-testid="set-subs-auto"]', { timeout: 10000 })
-    // 公众号账号区:有 seed session → 已登录态(重登/退出按钮);无 session → 未登录态(扫码登录)
-    const mpStatus = await win.locator('[data-testid="set-mp-status"]').textContent()
-    if (hasSession) {
-      assert(mpStatus.includes('已登录'), 'mp account shows 已登录 with seeded session')
-      assert((await win.locator('[data-testid="set-mp-relogin"]').count()) === 1, 'logged-in: 重新登录 button present')
-      assert((await win.locator('[data-testid="set-mp-logout"]').count()) === 1, 'logged-in: 退出登录 button present')
-      assert((await win.locator('[data-testid="set-mp-login"]').count()) === 0, 'logged-in: no 扫码登录 button')
-    } else {
-      assert(mpStatus.includes('未登录'), 'mp account shows 未登录 when no session')
-      assert((await win.locator('[data-testid="set-mp-login"]').count()) === 1, 'logged-out: 扫码登录 button present')
-      assert((await win.locator('[data-testid="set-mp-relogin"]').count()) === 0, 'logged-out: no 重新登录 button')
-    }
     assert((await win.locator('[data-testid="set-subs-action"]').count()) === 1, 'settings has new-article-action control')
     assert((await win.locator('[data-testid="set-subs-mode"]').count()) === 1, 'settings has schedule-mode selector')
     // 默认 daily 显示时刻控件；切到 interval 显示小时控件
