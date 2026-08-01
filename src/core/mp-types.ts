@@ -20,12 +20,16 @@ export interface ArticleRef {
   url: string
   title: string
   createTime: number      // unix 秒
-  /** 消息类型(M36):0 图文 / 5 视频 / 8 图文消息 / 10 文字 / 11…;列表接口直接给,不必猜 */
+  /**
+   * 消息类型:0 图文 / 5 视频 / 8 图片 / 10 文字 / 11…;开放集合。
+   * 列表接口给(appmsg?type=9 只回 0);**下载阶段会从文章 HTML 重读真实类型**写进 meta,
+   * 故即使列表给 0,文库卡片的类型标识仍准确。
+   */
   itemShowType?: number
   /**
-   * 微信自己的文章主键(= 长链里的 mid / idx)。列表接口直接给,**是跨 URL 形态稳定的去重依据**:
-   * 同一篇文章,旧接口给长链 `s?__biz=..&mid=..&idx=..&sn=..`、新接口给短链 `s/XXXX`,
-   * 光看 URL 认不出是同一篇(M36 换接口后重复下载的根因)。
+   * 微信自己的文章主键(= 长链里的 mid / idx),**跨 URL 形态稳定的去重依据**。
+   * appmsg 接口给长链(本身含 mid/idx),列表项也常直接带 appmsgid/itemidx;
+   * 透传它比对 URL 更稳——同一篇在不同分享链里 `sn` 会变,光看 URL 会认成两篇。
    */
   appmsgid?: number
   itemidx?: number
@@ -44,8 +48,8 @@ export interface CrawlSummary {
   filteredOut?: number    // 被标题关键词过滤掉的篇数(M24;未过滤或全通过则缺省)
   /**
    * 读者不可访问(审核未通过/已删除/被封禁)的篇数(M38)。
-   * 两个来源合并:列表阶段就能标出来的,和下载时才发现的
-   * ——**列表接口在文章被拒后不再有标记**(`checking` 只在审核期间为 1),所以后者不可避免。
+   * 由下载阶段认出——**列表接口在文章被拒后不再有标记**(`checking` 只在审核期间为 1),
+   * 只能在下到错误页时由 `ArticleUnavailableError` 认出来。
    */
   unavailable?: number
   /** `failed` 里刨掉「读者不可见」后剩下的真故障数(网络/解析等,重试可能有用) */

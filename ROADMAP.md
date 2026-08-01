@@ -7,6 +7,7 @@
 
 - **最新发布:v0.8.5(2026-07-28,一个问题一份清单)** —— tag `v0.8.5` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M43 `subscription digest --download`(缺的下、已有的跳过,清单统一带 `dir`/`contentPath`),需求/验收 `docs/PRD-v0.8.5.md`。上一功能版 v0.8.4(2026-07-28,看得见还能挑):M39–M42,需求/验收 `docs/PRD-v0.8.4.md`。
 - **v0.8.6 需求收集中**(2026-07-28 起)——已收 R1(链接缺手型光标:根因是全库没有 `a { cursor: pointer }`,而 antd 按组件作用域注入,于是「有没有手型」取决于祖先恰好是不是 antd 组件),见 `docs/PRD-v0.8.6.md`。
+- **M44 进行中**(2026-08-02):列表接口回退至 `appmsg?type=9`(换 appmsgpublish 后撞账号级频控 `200013`,探针证两端口同 ret、与端点无关;权衡牺牲文字/视频消息列表覆盖换更轻频控压力),合 main **暂不发版**——等账号解封真机验证通过再发,见里程碑目录与 `plans/2026-08-02-m44.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
@@ -60,6 +61,7 @@
 | **M41** ✅ | v0.8.4 | CLI `subscription digest --date`:查已订阅号某一天发了什么(不下载、不写库、不推水位),输出带 `downloaded` 让 agent 分流;自然语言日期由 agent 换算,CLI 只认 `YYYY-MM-DD`/`today`/`yesterday`;**wx-kit-skill 三处同步是交付物不是附属**;`downloaded` 除比 id 还比 sourceUrl(存量 32 篇哈希 id 否则会被误报未下载)(2026-07-28 完成,真机验证纯查询不留痕) | `plans/2026-07-28-m41.md` |
 | **M42** ✅ | v0.8.4 | `agent/wx-kit-compose` 跟上 CLI(最后改动停在 2026-06-23/v0.4.0):补上游 `digest` 选题入口、下游可选 `site sync`、中间 `library search`/`--sort`、素材质量信号 `itemShowType`/`warnings`;`agent/README.md` 一并核对。**做法上的关键决定:不把 CLI 细节抄进 compose**(参数/契约一律指向 wx-kit-skill)——它落后二十个里程碑的根因就是抄了不会跟着变的东西,再抄一遍只是把 bug 推迟(2026-07-28 完成,命令与 flag 逐条对源码核实、真实走通取料链路) | `plans/2026-07-28-m42.md` |
 | **M43** ✅ | v0.8.5 | `subscription digest --download`:缺的下、已有的跳过,清单**统一带 `dir`/`contentPath`**(不区分刚下的与本来就有的)+ `--formats` 缺省跟设置走(与 crawl 的硬编码缺省有意不同);只读与下载切成两个 core 函数,「不带 flag 行为一字不变」由结构保证;`unavailable` 一路透传到清单(重试无用别死磕)(2026-07-28 完成,真机验证下 1 留 2/复跑零请求/水位不变) | `plans/2026-07-28-m43.md` |
+| **M44** 🚧 | 待发 | **列表接口回退 `appmsgpublish`→`appmsg?type=9`**:换 appmsgpublish 后约一天触发账号级频控(`200013`,探针证两端口同 ret、与端点无关);权衡牺牲文字/视频消息列表覆盖换更轻频控压力。只换端点+解析层,保住去重主键链/解析类型识别/不可见下载阶段兜底(皆与端点解耦);移除列表侧 `isReaderVisible`/`onHidden`,CLAUDE.md 陷阱条目同步重写。合 main **暂不发版**,等账号解封真机验证通过再发 | `plans/2026-08-02-m44.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`(收集中)(逐条验收看各 §4)。
 

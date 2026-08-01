@@ -4,13 +4,14 @@ import { MpRateLimited, MpAuthExpired, MpApiError } from './mp-errors'
 
 const SEARCHBIZ = 'https://mp.weixin.qq.com/cgi-bin/searchbiz'
 /**
- * 「已发表」列表。**不要换回 `cgi-bin/appmsg?type=9`** —— 那个拉的是「图文素材」,
- * 只返回 item_show_type=0 的图文:实测某号 appmsg 给 370 篇、最新卡在 2026-07-17,
- * 而本接口给 770 篇、最新 2026-07-25,文字消息(10)与视频消息(5)全在里面。
- * 旧接口没有「取全部类型」的开关(type 换任何值都 ret=200002),只能换接口。
- * 后果不只是批量抓取少几篇:订阅检查共用这条链路,曾长期静默漏检整类消息。
+ * 图文素材列表。**已知限制:只返回 `item_show_type=0` 的图文**——文字消息(10)与
+ * 视频消息(5)不进列表(它们在「已发表」`appmsgpublish` 接口里,但那个接口每页 20 组、
+ * 返回数据多,频控压力更大)。2026-08(M44):换用 appmsgpublish 后约一天即触发账号级
+ * 频控(200013),探针证实两端口同 ret、与端点无关——换回 appmsg 并不能解封,但 appmsg
+ * 每页实回 ~5 条、更轻,解封后更不易再触发。代价是文字/视频消息的列表覆盖丢失
+ * (单篇仍可经 URL 下载,只是不在批量列表里;消息类型在下载阶段从文章 HTML 重读,不丢)。
  */
-const APPMSG_PUBLISH = 'https://mp.weixin.qq.com/cgi-bin/appmsgpublish'
+const APPMSG = 'https://mp.weixin.qq.com/cgi-bin/appmsg'
 const PAGE = 20
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -42,82 +43,47 @@ export async function searchAccount(mpFetch: MpFetch, token: string, name: strin
 
 export interface ListOpts {
   sleep?: (ms: number) => Promise<void>
-  /**
-   * 上报被过滤掉的「读者不可访问」篇数。做成回调而不是改返回类型:
-   * `listArticles` 的返回值被 crawl/ipc/cli 多处消费,改签名波及面大。
-   */
-  onHidden?: (n: number) => void
 }
 
-/** 中间两层是 JSON 字符串;脏数据不该炸掉整次抓取,解析失败按空处理 */
-function parseJsonSafe<T>(raw: unknown): T | null {
-  if (typeof raw !== 'string') return null
-  try { return JSON.parse(raw) as T } catch { return null }
-}
-
-interface PublishGroup { publish_info?: string }
-interface PublishPage { total_count?: number; publish_list?: PublishGroup[] }
-interface AppMsgEx {
+/** app_msg_list 里一项(图文素材记录)。只取我们用得着的字段,其余忽略。 */
+interface AppMsgItem {
   link?: string; title?: string; create_time?: number
-  item_show_type?: number; itemidx?: number; is_deleted?: boolean
-  appmsgid?: number
-  checking?: number; ban_flag?: number
+  item_show_type?: number; appmsgid?: number; itemidx?: number
 }
 
 /**
- * 读者能否打开这篇文章。三个字段都来自后台列表,含义各不相同:
- *   `is_deleted` —— 作者自己删了
- *   `checking`   —— 审核不通过(**终态**,不是「审核中」;页面显示「此内容发送失败无法查看…涉嫌违规」)
- *   `ban_flag`   —— 封禁标记(未见真实样本,按字面处理:非 0 即不可见)
+ * 拉一页图文素材。返回扁平的 `app_msg_list[]`,每项是一篇文章。
+ * **pageLen = 原始返回条数**(含无链接项);begin 是原始列表偏移,必须按它推进。
+ * 微信实际每页常少于请求的 count(实测 ~5),按固定步长推进会跳内容(见 listArticles 注释)。
  *
- * 这三种文章的页面都打不开(返回微信的错误页),列进结果只会产生**必然失败**的下载,
- * 而且失败原因会退化成笼统的「no title parsed」——信号在列表里就有,不该拖到下载时才发现。
- */
-function isReaderVisible(a: AppMsgEx): boolean {
-  return !a.is_deleted && !a.checking && !a.ban_flag
-}
-
-/**
- * 拉一页「已发表」记录。
- * 结构:`publish_page`(JSON 串)→ `publish_list[]` → 每组的 `publish_info`(JSON 串)→ `appmsgex[]`。
- * **begin/count 按「群发组」计,不是文章数**——一次群发多篇时一组含多项,
- * 故 pageLen 返回组数;按文章数推进游标会整组跳过(旧接口踩过同类坑,见下方 listArticles 注释)。
+ * 「读者不可访问」(审核未通过/已删除/违规)的文章**不在这里预过滤**:appmsg 的字段语义
+ * 不保证与 appmsgpublish 一致,且 v0.8.3 的结论是「误滤代价高于明确失败」——交给下载阶段
+ * 的 `ArticleUnavailableError` 从错误页认出来,汇总里把「不可见」与「真故障」分开。
  */
 async function fetchPage(
   mpFetch: MpFetch, token: string, fakeid: string, begin: number,
-): Promise<{ items: ArticleRef[]; total: number; pageLen: number; hidden: number }> {
-  const json = await mpFetch(APPMSG_PUBLISH, {
-    sub: 'list', sub_action: 'list_ex', begin: String(begin), count: String(PAGE), fakeid,
-    type: '101_1', free_publish_type: '1', search_field: 'null', query: '',
-    token, lang: 'zh_CN', f: 'json', ajax: '1',
+): Promise<{ items: ArticleRef[]; total: number; pageLen: number }> {
+  const json = await mpFetch(APPMSG, {
+    action: 'list_ex', begin: String(begin), count: String(PAGE), fakeid,
+    token, lang: 'zh_CN', f: 'json', ajax: '1', type: '9', query: '',
   })
   checkRet(json)
-  const page = parseJsonSafe<PublishPage>((json as Record<string, unknown>).publish_page)
-  const groups = page?.publish_list ?? []
-  const items: ArticleRef[] = []
-  let hidden = 0
-  for (const g of groups) {
-    const info = parseJsonSafe<{ appmsgex?: AppMsgEx[] }>(g.publish_info)
-    for (const a of info?.appmsgex ?? []) {
-      if (!a.link) continue
-      if (!isReaderVisible(a)) { hidden++; continue }
-      items.push({
-        url: String(a.link), title: String(a.title ?? ''), createTime: Number(a.create_time ?? 0),
-        ...(a.item_show_type != null ? { itemShowType: Number(a.item_show_type) } : {}),
-        // 去重要用:本接口给短链,认不出与长链是同一篇,得靠 mid/idx
-        ...(a.appmsgid != null ? { appmsgid: Number(a.appmsgid) } : {}),
-        ...(a.itemidx != null ? { itemidx: Number(a.itemidx) } : {}),
-      })
-    }
-  }
-  return { items, total: Number(page?.total_count ?? 0), pageLen: groups.length, hidden }
+  const raw = (json.app_msg_list as AppMsgItem[]) ?? []
+  const items: ArticleRef[] = raw
+    .filter((i) => i.link)
+    .map((i) => ({
+      url: String(i.link), title: String(i.title ?? ''), createTime: Number(i.create_time ?? 0),
+      ...(i.item_show_type != null ? { itemShowType: Number(i.item_show_type) } : {}),
+      ...(i.appmsgid != null ? { appmsgid: Number(i.appmsgid) } : {}),
+      ...(i.itemidx != null ? { itemidx: Number(i.itemidx) } : {}),
+    }))
+  return { items, total: Number(json.app_msg_cnt ?? 0), pageLen: raw.length }
 }
 
 /**
  * 订阅检查专用:从最新往回翻,直到看见 ≤sinceTs 的已读文章为止,封顶 cap 篇。
  * 日常(水位就在第一页内)恒 1 次请求;空窗多日后整页全新才继续翻深,不漏文章。
- * (M36 前的旧接口每页实回 ~5 条,这条「翻到水位为止」的逻辑正是为它做的补偿;
- *  换 appmsgpublish 后每页 20 组,一次请求覆盖更深,逻辑不变但触发翻页的机会少多了。)
+ * 微信每页实回 ~5 条,故「翻到水位为止」要按实际返回篇数推进游标。
  * 返回值含扫到的旧文章,新旧判定留给调用方(checkSubscriptions 按水位过滤)。
  */
 export async function listArticlesSince(
@@ -128,8 +94,7 @@ export async function listArticlesSince(
   let begin = 0
   for (;;) {
     if (begin > 0) await sleepFn(randMs(1000, 3000))
-    const { items, total, pageLen, hidden } = await fetchPage(mpFetch, token, fakeid, begin)
-    if (hidden) opts.onHidden?.(hidden)
+    const { items, total, pageLen } = await fetchPage(mpFetch, token, fakeid, begin)
     if (!pageLen) break
     out.push(...items)
     if (items.some((i) => i.createTime <= sinceTs)) break   // 已翻到水位(本页含已读)
@@ -148,8 +113,7 @@ export async function listArticles(
   let begin = 0
   for (;;) {
     if (begin > 0) await sleepFn(randMs(1000, 3000))
-    const { items, total, pageLen, hidden } = await fetchPage(mpFetch, token, fakeid, begin)
-    if (hidden) opts.onHidden?.(hidden)
+    const { items, total, pageLen } = await fetchPage(mpFetch, token, fakeid, begin)
     if (!pageLen) break   // 这一页原始为空 = 没有更多文章
     if ('count' in range) {
       out.push(...items)
@@ -163,8 +127,8 @@ export async function listArticles(
         out.push(it)
       }
     }
-    // 游标必须按「本页实际返回的组数」推进：微信常少于请求的 count，
-    // 且一组可能含多篇；按固定步长或按文章数推进都会跳内容（见 mp-client.test）。
+    // 游标必须按「本页实际返回的篇数」推进:微信每页实回常少于请求的 count(~5),
+    // 按固定步长(如 count=20)推进会跳过中间文章(曾导致日期范围/最近 N 篇漏抓,见 mp-client.test)。
     begin += pageLen
     if (begin >= total) break
   }

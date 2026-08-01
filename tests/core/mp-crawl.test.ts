@@ -188,7 +188,7 @@ describe('crawlAccount with keywords', () => {
 })
 
 describe('文章主键透传给下载(M36)', () => {
-  it('downloadOne 收到列表给的 appmsgid/itemidx —— 否则短链判不了重', async () => {
+  it('downloadOne 收到列表给的 appmsgid/itemidx —— 跨 URL 形态判重靠它', async () => {
     const seen: Array<{ url: string; hint?: unknown }> = []
     const refs = [
       { url: 'https://mp.weixin.qq.com/s/AAA', title: 'a', createTime: 2, appmsgid: 100, itemidx: 1 },
@@ -208,29 +208,34 @@ describe('文章主键透传给下载(M36)', () => {
   })
 })
 
-describe('不可访问文章的上报(M38)', () => {
+describe('不可访问文章的上报(下载阶段, M38)', () => {
+  // appmsg 列表不预过滤「读者不可见」(字段语义不保证 + 误滤代价高),改由下载阶段认出。
   const refsOf = (n: number) => Array.from({ length: n }, (_, i) => ({
     url: `u${i}`, title: `t${i}`, createTime: 1000 - i, appmsgid: 100 + i, itemidx: 1,
   }))
-  const run = async (range: never, listed: number, hidden: number) => crawlAccount('FID', range, {
+  // 前 unavailableN 篇在下载时抛 ArticleUnavailableError(读者不可见)
+  const run = async (range: never, listed: number, unavailableN: number) => crawlAccount('FID', range, {
     mpFetch: (async () => ({})) as never, token: 'T',
-    downloadOne: async (url: string) => ({ url, ok: true }),
-    listFn: async (_f: never, _t: never, _id: never, _r: never, opts?: { onHidden?: (n: number) => void }) => {
-      opts?.onHidden?.(hidden)
-      return refsOf(listed)
+    downloadOne: async (url: string) => {
+      const i = Number(url.slice(1))
+      if (i < unavailableN) throw new ArticleUnavailableError('读者不可见')
+      return { url, ok: true }
     },
+    listFn: async () => refsOf(listed),
     sleep: async () => {},
   } as never)
 
-  it('count 补齐成功 → 不算不及预期(渲染层据此保持沉默)', async () => {
-    const s = await run({ count: 3 } as never, 3, 2)
+  it('count 模式:可下篇数补齐 → 不算不及预期(渲染层据此保持沉默)', async () => {
+    // 列出 5 篇、前 2 篇不可见,要 count=3 → 后 3 篇可下,succeeded 达标
+    const s = await run({ count: 3 } as never, 5, 2)
     expect(s.unavailable).toBe(2)        // 数据层仍带着,agent 可读
-    expect(s.shortfall).toBe(false)      // 但「无需解释」
+    expect(s.shortfall).toBe(false)      // succeeded(3) + skipped(0) >= count
   })
 
-  it('count 补不齐 → 算不及预期(必须说明少在哪)', async () => {
-    const s = await run({ count: 5 } as never, 2, 3)
-    expect(s).toMatchObject({ unavailable: 3, shortfall: true })
+  it('count 模式:补不齐 → 算不及预期(必须说明少在哪)', async () => {
+    // 列出 3 篇、前 2 篇不可见,要 count=3 → 只能下 1 篇
+    const s = await run({ count: 3 } as never, 3, 2)
+    expect(s).toMatchObject({ unavailable: 2, shortfall: true })
   })
 
   it('日期范围模式:窗口内少了就算不及预期(没有补齐一说)', async () => {
@@ -246,7 +251,7 @@ describe('不可访问文章的上报(M38)', () => {
 })
 
 describe('两类失败在汇总里分开(M38)', () => {
-  it('下载阶段发现的不可见与列表阶段过滤的合并,failed 只留真故障', async () => {
+  it('下载阶段的不可见算 unavailable、其余才算真故障,failed 不混为一谈', async () => {
     const refs = [0, 1, 2].map((i) => ({ url: `u${i}`, title: `t${i}`, createTime: 100 - i }))
     const s = await crawlAccount('FID', { count: 3 } as never, {
       mpFetch: (async () => ({})) as never, token: 'T',
@@ -255,14 +260,11 @@ describe('两类失败在汇总里分开(M38)', () => {
         if (url === 'u2') throw new Error('socket hang up')
         return { url, ok: true }
       },
-      listFn: async (_f: never, _t: never, _i: never, _r: never, opts?: { onHidden?: (n: number) => void }) => {
-        opts?.onHidden?.(1)      // 列表阶段还滤掉了 1 篇
-        return refs
-      },
+      listFn: async () => refs,
       sleep: async () => {},
     } as never)
-    expect(s.unavailable).toBe(2)     // 列表 1 + 下载时发现 1
-    expect(s.realFailures).toBe(1)    // 只有 socket hang up 才是真故障
+    expect(s.unavailable).toBe(1)     // 只有 u1 是读者不可见
+    expect(s.realFailures).toBe(1)    // u2 socket hang up 才是真故障
     expect(s.shortfall).toBe(true)    // 要 3 篇只拿到 1 篇
   })
 })

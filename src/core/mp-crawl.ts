@@ -53,11 +53,10 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
 
   // 列表阶段：命中频控则指数退避，最多 3 次。退避等待可被取消即时打断（见 abortableWait）。
   let refs: ArticleRef[] = []
-  let hidden = 0                 // 读者不可访问、未列入的篇数(M38)
   for (let attempt = 0; ; attempt++) {
     if (deps.signal?.aborted) break   // 已取消则停止重试，进下载阶段空跑收尾
     try {
-      refs = await listFn(deps.mpFetch, deps.token, fakeid, range, { sleep, onHidden: (n) => { hidden += n } })
+      refs = await listFn(deps.mpFetch, deps.token, fakeid, range, { sleep })
       break
     } catch (e) {
       if (e instanceof MpRateLimited && attempt < 3) {
@@ -103,10 +102,10 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
     .slice(s.items.length)
     .map((r) => ({ url: r.url, ok: false, title: r.title, cancelled: true }))
 
-  // 「读者打不开」有两个来源:列表阶段就标出来的(hidden),和下载时才发现的(s.unavailable)。
-  // 对用户是同一件事,合并成一个数;剩下的 failed 才是真正的下载故障。
-  const unavailable = hidden + (s.unavailable ?? 0)
-  const realFailures = s.failed - (s.unavailable ?? 0)
+  // 「读者打不开」由下载阶段认出(列表接口在文章被拒后不再有标记,见 v0.8.3 的结论);
+  // 剩下的 failed 才是真正的下载故障(网络/解析等,重试可能有用)。
+  const unavailable = s.unavailable ?? 0
+  const realFailures = s.failed - unavailable
   // 结果是否不及预期:count 模式看拿到几篇能读的,日期模式只要窗口内少了就算
   const shortfall = 'count' in range ? s.succeeded + s.skipped < range.count : unavailable > 0
   return {
