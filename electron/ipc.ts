@@ -189,7 +189,7 @@ export function registerIpc(settings: SettingsService): void {
     return { loggedIn: !!session, loginAt: session?.timestamp ?? null }
   })
 
-  ipcMain.handle('mp:logout', () => { clearSession() })
+  ipcMain.handle('mp:logout', async () => { await clearSession() })
 
   ipcMain.handle('mp:search', async (_e, name: string) => {
     const session = getSession()
