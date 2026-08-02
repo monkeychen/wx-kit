@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
 import type { UpdateInfo, UpdateChannelInfo } from '../api'
 import type { MpProtectionStatus } from '../api'
+import type { MpAuthActionResult, MpSessionInfo } from '../api'
 import { DMG_POST_INSTALL_HINT } from '../../core/install-channel'
 import type { DownloadFormat } from '../../core/types'
 
@@ -22,12 +23,16 @@ export default function Settings() {
   const [chan, setChan] = useState<UpdateChannelInfo | null>(null)
   const [dl, setDl] = useState<{ done: number; total: number } | null>(null)
   const [mpProtection, setMpProtection] = useState<MpProtectionStatus | null>(null)
+  const [mpSession, setMpSession] = useState<MpSessionInfo | null>(null)
+  const [mpAuthBusy, setMpAuthBusy] = useState<'login' | 'relogin' | 'logout' | null>(null)
+  const [mpCleanupError, setMpCleanupError] = useState('')
 
   useEffect(() => { api.getSettings().then(setS) }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
   useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不阻塞设置页 */ }) }, [])
   useEffect(() => { api.updateChannel().then(setChan).catch(() => { /* 渠道识别失败就退回通用引导 */ }) }, [])
   useEffect(() => api.onUpdateProgress((p) => setDl({ done: p.done, total: p.total })), [])
+  useEffect(() => { api.mpSessionInfo().then(setMpSession).catch(() => {}) }, [])
   useEffect(() => {
     let active = true
     const refresh = () => api.mpProtectionStatus().then((value) => { if (active) setMpProtection(value) }).catch(() => {})
@@ -93,6 +98,46 @@ export default function Settings() {
       message.success('已恢复请求许可；当前没有发起任何微信请求')
     } catch (e) { message.error('恢复失败：' + (e as Error).message) }
   }
+  const explainAuthFailure = (result: MpAuthActionResult) => {
+    if (result.code === 'MP_AUTH_CLEAR_FAILED') {
+      setMpCleanupError(result.error ?? '登录态没有清理完整，请重试')
+      message.error(result.error ?? '登录态没有清理完整，请重试')
+    } else if (result.code === 'MP_GOVERNOR_PAUSED' || result.code === 'MP_RATE_LIMITED') {
+      message.warning((result.error ?? '微信请求已暂停') + '；请先查看上方“微信请求保护”')
+    } else if (result.error !== 'CANCELLED') {
+      message.error('登录失败：' + (result.error ?? '未知错误'))
+    }
+  }
+  const refreshMpSession = async () => {
+    const value = await api.mpSessionInfo()
+    setMpSession(value)
+    return value
+  }
+  const doMpLogin = async (relogin: boolean) => {
+    setMpAuthBusy(relogin ? 'relogin' : 'login')
+    setMpCleanupError('')
+    try {
+      const result = relogin ? await api.mpRelogin() : await api.mpLogin()
+      await refreshMpSession()
+      if (result.ok) message.success(relogin ? '已重新登录' : '已登录')
+      else if (result.error === 'CANCELLED') {
+        message.info(relogin ? '已取消重新登录，旧登录态已经清除' : '已取消登录')
+      } else explainAuthFailure(result)
+    } catch (e) { message.error('登录失败：' + (e as Error).message) }
+    finally { setMpAuthBusy(null) }
+  }
+  const doMpLogout = async () => {
+    setMpAuthBusy('logout')
+    try {
+      const result = await api.mpLogout()
+      await refreshMpSession()
+      if (result.ok) { setMpCleanupError(''); message.success('已彻底退出登录，设置和文库均已保留') }
+      else explainAuthFailure(result)
+    } catch (e) {
+      const text = '退出失败：' + (e as Error).message
+      setMpCleanupError(text); message.error(text)
+    } finally { setMpAuthBusy(null) }
+  }
 
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
@@ -144,6 +189,46 @@ export default function Settings() {
                 )}
               </Space>
             ) : <div className="faint" style={{ marginTop: 8 }}>正在读取保护状态…</div>}
+          </div>
+
+          <div className="setting-block" data-testid="mp-account">
+            <div className="setting-label">公众号账号</div>
+            <div className="setting-hint">
+              重新登录会先清除旧账号的完整登录态再打开扫码窗口；退出登录只清公众号会话，
+              不会删除设置、订阅、文库、下载历史或频控保护状态。
+            </div>
+            <Space align="center" style={{ marginTop: 8 }} wrap>
+              {mpCleanupError ? (
+                <>
+                  <span data-testid="set-mp-status" style={{ color: 'var(--cinnabar)' }}>
+                    退出未完成，仍可能残留登录数据
+                  </span>
+                  <Button danger loading={mpAuthBusy === 'logout'} onClick={doMpLogout}
+                    data-testid="set-mp-logout-retry">重试清理</Button>
+                </>
+              ) : mpSession?.loggedIn ? (
+                <>
+                  <span className="faint" data-testid="set-mp-status">
+                    已登录{mpSession.loginAt ? ` · 扫码于 ${new Date(mpSession.loginAt).toLocaleString()}` : ''}
+                  </span>
+                  <Button loading={mpAuthBusy === 'relogin'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'relogin'}
+                    onClick={() => doMpLogin(true)} data-testid="set-mp-relogin">重新登录</Button>
+                  <Popconfirm title="彻底退出登录？"
+                    description="只清公众号会话和专用分区；设置、订阅、文库及频控状态都会保留。"
+                    okText="退出" cancelText="取消" onConfirm={doMpLogout}>
+                    <Button danger loading={mpAuthBusy === 'logout'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'logout'}
+                      data-testid="set-mp-logout">退出登录</Button>
+                  </Popconfirm>
+                </>
+              ) : mpSession ? (
+                <>
+                  <span className="faint" data-testid="set-mp-status">未登录</span>
+                  <Button type="primary" loading={mpAuthBusy === 'login'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'login'}
+                    onClick={() => doMpLogin(false)} data-testid="set-mp-login">扫码登录</Button>
+                </>
+              ) : <span className="faint" data-testid="set-mp-status">正在读取登录状态…</span>}
+            </Space>
+            {mpCleanupError && <div className="setting-hint" style={{ color: 'var(--cinnabar)', marginTop: 6 }}>{mpCleanupError}</div>}
           </div>
 
           <div className="setting-block">

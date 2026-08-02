@@ -17,7 +17,7 @@ vi.mock('electron', () => ({
   },
 }))
 vi.mock('../../electron/services/mp-auth', () => ({
-  getSession: vi.fn(() => null), clearSession: vi.fn(), login: vi.fn(),
+  getSession: vi.fn(() => null), startFreshLogin: vi.fn(),
 }))
 
 import { runCli } from '../../src/cli'

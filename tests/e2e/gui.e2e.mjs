@@ -4,12 +4,12 @@
 //   M6 下载闭环 + 历史 (就地阅读/文件夹 · 复制下载项 · 已存在跳过 · 失败重试)
 //   M7 反馈 (失败项话术/重试)
 //   M9 文库组织 (排序 · 筛选 · 分组 · 卡片⇄列表 · 单击选中/双击阅读 · 批量删除)
-//   + 阅读器 wxfile:// 图片/iframe · 设置库根 · 微信请求保护（全程网络封锁）
+//   + 阅读器 wxfile:// 图片/iframe · 设置库根 · 微信请求保护/彻底退出（全程网络封锁）
 //
 // Run: npx vite build && node tests/e2e/gui.e2e.mjs   (or: npm run test:e2e)
 import { _electron as electron } from 'playwright'
 import http from 'node:http'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -59,6 +59,8 @@ async function main() {
     if (u.pathname.startsWith('/article/')) {
       const art = ARTICLES[u.pathname.slice('/article/'.length)] ?? ARTICLES.a1
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(makeHtml(server.address().port, art))
+    } else if (u.pathname === '/partition-state') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<!doctype html><title>local partition probe</title>')
     } else if (u.pathname === '/pic.png' || u.pathname === '/cover.png') {
       res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG)
     } else { res.writeHead(404); res.end('no') }
@@ -77,6 +79,7 @@ async function main() {
     JSON.stringify({
       libraryRoot,
       defaultFormats: ['cover', 'md', 'html', 'meta'],
+      subscriptionCheckTime: '22:03',
       cliLinkPrompted: true,
       updateCheckEnabled: false,
     }))
@@ -346,7 +349,22 @@ async function main() {
     assert((await win.locator('[data-testid="subs-open-log"]').count()) === 1, 'subscriptions page offers open-log link')
     assert((await win.locator('[data-testid="subs-check-log"]').count()) === 1, 'subscriptions page has a check-log section')
 
-    // 设置页：订阅控件 + M12 调度模式切换
+    // M47:只在本地种一份 fake session，供设置页验“彻底退出”；不复制真实 session、不访问微信。
+    writeFileSync(join(userDataDir, 'mp-session.json'), JSON.stringify({
+      token: 'offline-e2e', cookies: [], timestamp: 1785600000000,
+    }), { mode: 0o600 })
+    await app.evaluate(async ({ BrowserWindow, session }, fixturePort) => {
+      const partition = session.fromPartition('persist:mpweixin')
+      await partition.cookies.set({
+        url: 'https://mp.weixin.qq.com/', name: 'wxk_offline_e2e', value: 'old', secure: true,
+      })
+      const probe = new BrowserWindow({ show: false, webPreferences: { partition: 'persist:mpweixin' } })
+      await probe.loadURL(`http://127.0.0.1:${fixturePort}/partition-state`)
+      await probe.webContents.executeJavaScript("localStorage.setItem('wxk_offline_e2e', 'old')")
+      probe.destroy()
+    }, port)
+
+    // 设置页：M47 账号退出 + 订阅控件 + M12 调度模式切换
     await win.click('[data-testid="nav-设置"]')
     await win.waitForSelector('[data-testid="set-subs-auto"]', { timeout: 10000 })
     assert((await win.locator('[data-testid="mp-protection"]').count()) === 1, 'M46: settings exposes global WeChat request protection')
@@ -360,6 +378,34 @@ async function main() {
     assert((await win.locator('[data-testid="mp-protection-mode"]').innerText()).includes('已启用保护'), 'M46: resume changes permission without probing WeChat')
     const nextRequestText = await win.locator('[data-testid="mp-protection-next"]').innerText()
     assert(nextRequestText.includes('最早可执行：') && !nextRequestText.includes('需先手动恢复'), 'M46: protection status explains when the next request can run')
+    await win.waitForSelector('[data-testid="set-mp-relogin"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="set-mp-logout"]').count()) === 1, 'M47: logged-in account exposes relogin and logout')
+    assert((await win.locator('[data-testid="set-mp-status"]').innerText()).includes('已登录'), 'M47: account status reads only the local session')
+    assert(await win.locator('[data-testid="set-subs-time"]').inputValue() === '22:03', 'M47: custom daily check time is loaded before logout')
+    assert(await win.locator('[data-testid="format-cover"]').getAttribute('aria-checked') === 'true', 'M47: custom default formats are loaded before logout')
+
+    await win.click('[data-testid="set-mp-logout"]')
+    await win.click('.ant-popover:visible .ant-btn-primary')
+    await win.waitForSelector('[data-testid="set-mp-login"]', { timeout: 10000 })
+    assert((await win.locator('[data-testid="set-mp-status"]').innerText()).includes('未登录'), 'M47: logout refreshes account status immediately')
+    assert(!existsSync(join(userDataDir, 'mp-session.json')), 'M47: logout deletes only the local session file')
+    const settingsAfterLogout = JSON.parse(readFileSync(join(userDataDir, 'settings.json'), 'utf-8'))
+    assert(settingsAfterLogout.subscriptionCheckTime === '22:03', 'M47: logout preserves custom daily check time')
+    assert(JSON.stringify(settingsAfterLogout.defaultFormats) === JSON.stringify(['cover', 'md', 'html', 'meta']), 'M47: logout preserves custom default formats')
+    const protectionAfterLogout = JSON.parse(readFileSync(join(userDataDir, 'mp-request-state.json'), 'utf-8'))
+    assert(protectionAfterLogout.mode === 'active', 'M47: logout does not reset request protection state')
+    const partitionAfterLogout = await app.evaluate(async ({ BrowserWindow, session }, fixturePort) => {
+      const partition = session.fromPartition('persist:mpweixin')
+      const cookies = await partition.cookies.get({ url: 'https://mp.weixin.qq.com/' })
+      const probe = new BrowserWindow({ show: false, webPreferences: { partition: 'persist:mpweixin' } })
+      await probe.loadURL(`http://127.0.0.1:${fixturePort}/partition-state`)
+      const localValue = await probe.webContents.executeJavaScript("localStorage.getItem('wxk_offline_e2e')")
+      probe.destroy()
+      return { cookies: cookies.map((cookie) => cookie.name), localValue }
+    }, port)
+    assert(!partitionAfterLogout.cookies.includes('wxk_offline_e2e'), 'M47: logout really clears the persistent partition cookie jar')
+    assert(partitionAfterLogout.localValue === null, 'M47: logout really clears persistent partition local storage')
+    assert(await win.locator('[data-testid="set-subs-time"]').inputValue() === '22:03', 'M47: settings UI keeps custom time after logout')
     assert((await win.locator('[data-testid="set-subs-action"]').count()) === 1, 'settings has new-article-action control')
     assert((await win.locator('[data-testid="set-subs-mode"]').count()) === 1, 'settings has schedule-mode selector')
     // 默认 daily 显示时刻控件；切到 interval 显示小时控件

@@ -149,7 +149,7 @@ export interface MpRequestState {
 **修改**:`electron/services/session-transfer.ts`
 
 - 唯一定义 `MP_PARTITION = 'persist:mpweixin'`;
-- 登录窗口、请求 transport、重新登录/退出登录(R5 已顺延到 v0.8.7,但底层常量可先复用)都引用它;
+- 登录窗口、请求 transport、重新登录/退出登录(后续已作为 R8/M47 迁入当前版本)都引用它;
 - 扫码完成后保留 token/时间等元数据,运行时 Cookie 从 Session Cookie Jar 读取;
 - 导入 session 时把 Cookie 明确恢复到该 Session,不再只写一份孤立 JSON;
 - 导出格式若需补 domain/path/secure/expires,提供向后兼容解析,旧 name/value 文件仍能导入;

@@ -12,7 +12,7 @@ import { History, eventFromSummary, type HistorySource } from '../src/core/downl
 import { DownloadQueue } from '../src/core/download-queue'
 import { downloadArticle } from '../src/core/download-article'
 import { readArticleContent, type ReadableKind } from '../src/core/read-article'
-import { login, getSession } from './services/mp-auth'
+import { clearMpAuthState, getSession, MpAuthClearError, startFreshLogin } from './services/mp-auth'
 import { makeMpFetch } from './services/mp-fetch'
 import { searchAccount, listArticles } from '../src/core/mp-client'
 import { crawlAccount } from '../src/core/mp-crawl'
@@ -173,11 +173,39 @@ export function registerIpc(settings: SettingsService): void {
     return summary
   })
 
-  // —— M3.5 批量爬取 ——
-  ipcMain.handle('mp:login', async () => {
-    try { await mpGateway.runAction('auth-verify', MP_ORIGIN, login); return { ok: true } }
+  // —— M3.5 批量爬取 / M47 会话重置 ——
+  let crawlAbort: AbortController | null = null
+  const runFreshLogin = async () => {
+    try { await mpGateway.runAction('auth-verify', MP_ORIGIN, startFreshLogin); return { ok: true } }
     catch (e) {
-      return { ok: false, error: (e as Error).message, code: (e as { code?: string }).code }
+      return {
+        ok: false,
+        error: (e as Error).message,
+        code: (e as { code?: string }).code,
+        failedSteps: e instanceof MpAuthClearError ? e.failedSteps : undefined,
+      }
+    }
+  }
+  ipcMain.handle('mp:login', runFreshLogin)
+  ipcMain.handle('mp:relogin', runFreshLogin)
+
+  // 设置页只读本地文件，不做微信探测；“登录是否仍有效”只有用户下一次明确操作才知道。
+  ipcMain.handle('mp:sessionInfo', () => {
+    const value = getSession()
+    return { loggedIn: !!value, loginAt: value?.timestamp ?? null }
+  })
+
+  // 退出是纯本地安全动作：频控熔断时照样能退出，也不会改写熔断/审计状态。
+  ipcMain.handle('mp:logout', async () => {
+    crawlAbort?.abort()
+    try { await clearMpAuthState(); return { ok: true } }
+    catch (e) {
+      return {
+        ok: false,
+        error: (e as Error).message,
+        code: (e as { code?: string }).code,
+        failedSteps: e instanceof MpAuthClearError ? e.failedSteps : undefined,
+      }
     }
   })
 
@@ -202,7 +230,6 @@ export function registerIpc(settings: SettingsService): void {
     }
   })
 
-  let crawlAbort: AbortController | null = null
   ipcMain.on('mp:crawl:cancel', () => { crawlAbort?.abort() })
   ipcMain.handle('mp:crawl', async (event, { fakeid, nickname, range, formats, keywords }: { fakeid: string; nickname: string; range: CrawlRange; formats: DownloadFormat[]; keywords?: import('../src/core/mp-crawl').KeywordFilter }) => {
     const abort = new AbortController()
