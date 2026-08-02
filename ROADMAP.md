@@ -6,7 +6,7 @@
 ## 当前状态
 
 - **最新发布:v0.8.5(2026-07-28,一个问题一份清单)** —— tag `v0.8.5` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M43 `subscription digest --download`(缺的下、已有的跳过,清单统一带 `dir`/`contentPath`),需求/验收 `docs/PRD-v0.8.5.md`。上一功能版 v0.8.4(2026-07-28,看得见还能挑):M39–M42,需求/验收 `docs/PRD-v0.8.4.md`。
-- **v0.8.6 需求收集中**(2026-07-28 起)——已收 R1(链接缺手型光标:根因是全库没有 `a { cursor: pointer }`,而 antd 按组件作用域注入,于是「有没有手型」取决于祖先恰好是不是 antd 组件),见 `docs/PRD-v0.8.6.md`。
+- **v0.8.6 需求收集中**(2026-07-28 起)——已收 R1–R5:链接交互、安全告警、README 重做、订阅 pending 失败可见、公众号重新登录与彻底退出登录;逐条核实与验收见 `docs/PRD-v0.8.6.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果。
 
 ## 里程碑目录
