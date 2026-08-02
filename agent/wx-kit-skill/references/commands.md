@@ -28,12 +28,27 @@ wx-kit search <名称>
 ## auth-status / login / session — 登录态
 
 ```sh
-wx-kit auth-status                    # {"ok":true,"valid":true|false}(做一次真探测)
+wx-kit auth-status                    # 只读本地:{"ok":true,"present":false,"valid":false}
+                                      # 有本地态:{"ok":true,"present":true,"valid":null,"checkedAt":...}
 wx-kit login                          # 弹扫码窗;成功 {"ok":true};用户关窗 {"ok":false,error.code:"CANCELLED"} 退出码 2
 wx-kit session export [-o <file>]     # 导出登录态(0600);无登录态 → error.code:"NO_SESSION" 退出码 1
-wx-kit session import <file>          # 导入并立即探测:{"ok":true,"valid":true|false|null,"note"?}
+wx-kit session import <file>          # 只导入、不探测:{"ok":true,"valid":null,"note":"…"}
                                       # 结构非法 → error.code:"CLI_ERROR" 退出码 2,不动既有 session
 ```
+
+`present:true`只表示本机保存了登录态,不等于微信已确认它有效;有效性在下一次用户明确发起的实际操作中确认。
+
+## protection — 全局微信请求保护(零微信请求)
+
+```sh
+wx-kit protection status              # {"ok":true,"protection":{"mode","lastRequestAt","nextAllowedAt","queued",...}}
+wx-kit protection pause               # 立即阻止后续微信请求
+wx-kit protection resume              # 只恢复请求许可,本动作本身不联网
+```
+
+- 首次升级到 v0.8.6 没有治理状态文件时会保护性进入 `user-paused`。
+- `mode:"rate-limited"`表示已检测到频控并全局熔断;不要自动 resume、重试或定时探测。
+- 只有用户明确授权继续访问微信后才可 resume。恢复后的实际请求仍服从全局队列与随机间隔。
 
 ## crawl — 批量爬取(需登录)
 
@@ -94,7 +109,8 @@ wx-kit subscription check-now   # {"ok":true,"accounts":N,"newFound":N,"failed":
 wx-kit subscription check-now --accounts <fakeid,fakeid>  # 只检查指定号(部分检查;fakeid 从 subscription list 取),不传=全部
 ```
 
-`failures` 逐号给失败原因(如「微信频率限制(200013)」)。检查同时落盘日志与历史,与 GUI 同源。
+`failures` 逐号给失败原因。若出现频控,本轮立即停止且全局熔断,不会继续查其它号或自动重试。
+检查同时落盘日志与历史,与 GUI 同源。
 
 ### subscription digest — 某一天各订阅号发了什么(需登录)
 
@@ -143,7 +159,7 @@ wx-kit subscription digest --date yesterday --download --formats md,meta --no-vi
 失败的条目**留在清单里**并带 `error`,不会静默消失。**即使带 `--download` 也不推进订阅水位。**
 digest 不记状态,所以 `unavailable` 的文章下次仍会被再试一次——想省请求就自己按这个字段跳过。
 
-**耗时**:每个号一次请求 + 随机延迟,16 个号约 30–60 秒。**订阅号多时用 `--accounts` 缩小范围**;
+**耗时**:每个号至少一次请求,且每次都服从全局随机间隔;16 个号通常需要数分钟。**订阅号多时用 `--accounts` 缩小范围**;
 stderr 有逐号进度(`[3/16] 某号 … 2 篇`),别把它当成卡死。
 
 ## settings — 设置(免登录)
@@ -155,7 +171,7 @@ wx-kit settings set <键> <值>   # 常用键:libraryRoot、defaultFormats(逗�
 
 ## 退出码
 
-`0` 成功(含 valid:false 这类「如实回答」);`1` 业务失败(下载失败/无 session 可导出);`2` 用法错误或需要登录(`AUTH_REQUIRED`/`CANCELLED`/`CLI_ERROR`)。
+`0` 成功(含 `valid:null` 这类「如实回答」);`1` 业务失败(下载失败/保护性拒绝/无 session 可导出);`2` 用法错误或需要登录(`AUTH_REQUIRED`/`CANCELLED`/`CLI_ERROR`)。
 
 ## update — 检查新版本
 

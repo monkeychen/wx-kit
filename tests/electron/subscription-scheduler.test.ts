@@ -51,4 +51,15 @@ describe('SubscriptionScheduler 防重入', () => {
     expect(runCheck).not.toHaveBeenCalled()
     sch.stop()
   })
+
+  it('does not start a check while global request protection is paused', async () => {
+    const runCheck = vi.fn(async () => {})
+    const deps = makeDeps(runCheck)
+    deps.canRun = async () => false
+    const sch = new SubscriptionScheduler(deps)
+    sch.start()
+    await vi.advanceTimersByTimeAsync(2 * 60_000)
+    expect(runCheck).not.toHaveBeenCalled()
+    sch.stop()
+  })
 })

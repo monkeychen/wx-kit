@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { linkStatus, createLink, pathContains, ensureInProfile, profilePathFor } from './services/cli-link'
 import type { DownloadFormat } from '../src/core/types'
-import { fetchHtml, fetchBinary } from '../src/core/fetch-html'
+import { fetchBinary as fetchGenericBinary } from '../src/core/fetch-html'
 import { Library } from '../src/core/library'
 import { History, eventFromSummary, type HistorySource } from '../src/core/download-history'
 import { DownloadQueue } from '../src/core/download-queue'
@@ -32,10 +32,14 @@ import { UpdateScheduler } from './services/update-scheduler'
 import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 import type { RunCheckResult } from './services/subscription-check'
+import { articleFetchers, createMpRuntime } from './services/mp-runtime'
+import { MP_ORIGIN } from './services/mp-session'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
 export function registerIpc(settings: SettingsService): void {
+  const mpGateway = createMpRuntime(app.getPath('userData'))
+  const { fetchHtml, fetchBinary } = articleFetchers(mpGateway)
   const libraryFor = async () => new Library((await settings.get()).libraryRoot)
   const historyFor = async () => {
     const s = await settings.get()
@@ -171,23 +175,29 @@ export function registerIpc(settings: SettingsService): void {
 
   // —— M3.5 批量爬取 ——
   ipcMain.handle('mp:login', async () => {
-    try { await login(); return { ok: true } }
-    catch (e) { return { ok: false, error: (e as Error).message } }
+    try { await mpGateway.runAction('auth-verify', MP_ORIGIN, login); return { ok: true } }
+    catch (e) {
+      return { ok: false, error: (e as Error).message, code: (e as { code?: string }).code }
+    }
   })
 
   ipcMain.handle('mp:authStatus', async () => {
-    const session = getSession()
-    if (!session) return { valid: false }
-    try { await searchAccount(makeMpFetch(session), session.token, '腾讯'); return { valid: true } }
-    catch (e) { if (e instanceof MpAuthExpired) return { valid: false }; throw e }
+    const value = getSession()
+    return value
+      ? { status: 'present' as const, checkedAt: value.timestamp, valid: null }
+      : { status: 'missing' as const, valid: false }
   })
+
+  ipcMain.handle('mp:protectionStatus', () => mpGateway.status())
+  ipcMain.handle('mp:protectionPause', () => mpGateway.pause())
+  ipcMain.handle('mp:protectionResume', () => mpGateway.resume())
 
   ipcMain.handle('mp:search', async (_e, name: string) => {
     const session = getSession()
     if (!session) return { ok: false, error: { code: 'AUTH_REQUIRED', message: '请先登录公众号后台' } }
-    try { return { ok: true, list: await searchAccount(makeMpFetch(session), session.token, name) } }
+    try { return { ok: true, list: await searchAccount(makeMpFetch(mpGateway), session.token, name) } }
     catch (e) {
-      const code = e instanceof MpAuthExpired ? 'AUTH_REQUIRED' : 'MP_API_ERROR'
+      const code = e instanceof MpAuthExpired ? 'AUTH_REQUIRED' : ((e as { code?: string }).code ?? 'MP_API_ERROR')
       return { ok: false, error: { code, message: (e as Error).message } }
     }
   })
@@ -211,11 +221,10 @@ export function registerIpc(settings: SettingsService): void {
     }
     try {
       const summary = await crawlAccount(fakeid, range, {
-        mpFetch: makeMpFetch(session), token: session.token, keywords,
+        mpFetch: makeMpFetch(mpGateway), token: session.token, keywords,
         downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
         onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
         onItem: (ev) => send({ kind: 'item', ...ev }),
-        onBackoff: (ev) => send({ kind: 'backoff', ...ev }),
         shouldContinue: () => !abort.signal.aborted,
         signal: abort.signal,
       })
@@ -244,7 +253,7 @@ export function registerIpc(settings: SettingsService): void {
     const session = getSession()
     if (!session) return Math.floor(Date.now() / 1000)
     try {
-      const refs = await listArticles(makeMpFetch(session), session.token, fakeid, { count: 1 })
+      const refs = await listArticles(makeMpFetch(mpGateway), session.token, fakeid, { count: 1 })
       return refs[0]?.createTime ?? Math.floor(Date.now() / 1000)
     } catch { return Math.floor(Date.now() / 1000) }
   }
@@ -278,7 +287,7 @@ export function registerIpc(settings: SettingsService): void {
       const session = getSession()
       const result = await svcRunSubscriptionCheck(trigger, {
         subs, settings: s, session: session ? { token: session.token } : null,
-        mpFetch: session ? makeMpFetch(session) : null,
+        mpFetch: session ? makeMpFetch(mpGateway) : null,
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
         onDownloadProgress: broadcastDlProgress,
         ...(fakeids ? { fakeids } : {}),
@@ -388,7 +397,7 @@ export function registerIpc(settings: SettingsService): void {
     try {
       send(0)
       // 安装包与视频同量级(140MB),沿用按体积算的超时,别用图片档
-      const { data } = await fetchBinary(asset.url, Math.max(60_000, Math.ceil(asset.size / 200_000) * 1000))
+      const { data } = await fetchGenericBinary(asset.url, Math.max(60_000, Math.ceil(asset.size / 200_000) * 1000))
       writeFileSync(dest, data)
       send(asset.size)
       void shell.openPath(dest)      // dmg 自动挂载 / exe 直接起安装程序
@@ -398,6 +407,11 @@ export function registerIpc(settings: SettingsService): void {
     }
   })
 
-  new SubscriptionScheduler({ settings, subsFor, runCheck: () => runSubscriptionCheck('auto') }).start()
+  new SubscriptionScheduler({
+    settings,
+    subsFor,
+    runCheck: () => runSubscriptionCheck('auto'),
+    canRun: async () => (await mpGateway.status()).mode === 'active',
+  }).start()
   new UpdateScheduler({ check: runUpdateCheck, windows: () => BrowserWindow.getAllWindows() }).start()
 }

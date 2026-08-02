@@ -1,6 +1,6 @@
 # wx-kit v0.8.6 产品需求文档(紧急频控修复)
 
-> **状态:范围已确认,待实现**(2026-08-02)。
+> **状态:实现与离线验收完成,待发布**(2026-08-02)。
 > 本版本插队到原 v0.8.6 之前;原 v0.8.6 的 R1–R5 顺延为 v0.8.7。
 > **真实微信访问冻结**:安哥解除冻结前,开发、测试、打包验证均不得向微信域名发起请求。
 
@@ -160,18 +160,22 @@
 
 ## 6. 验收契约
 
-- [ ] 代码静态扫描确认:所有微信请求只能通过统一网关;生产路径无微信域名旁路 axios/Node fetch。
-- [ ] Windows/macOS 不再统一声称自己是 macOS Chrome 124;请求身份与所用 Chromium Session 一致。
-- [ ] GUI/CLI/订阅/digest/crawl 同时请求时,全局只按一个队列和一个持久状态决策。
-- [ ] 进入按公众号下载页、执行默认 `auth-status`、导入 session 均为零微信请求。
-- [ ] digest 连续多个账号的首屏请求也经过全局随机间隔。
-- [ ] 模拟 200013 后没有第二次请求;所有入口立即被熔断,重启后仍保持暂停。
-- [ ] 模拟取消排队任务后,transport 调用次数不增加。
-- [ ] UI/CLI 能解释“为什么没发请求、何时可继续、是否已经全局暂停”。
-- [ ] 日志不含 token、Cookie、完整敏感 URL。
-- [ ] `npm test`、`npm run lint`、`npm run typecheck`、离线 e2e、build 通过;
+- [x] 代码静态扫描确认:所有微信请求只能通过统一网关;生产路径无微信域名旁路 axios/Node fetch。
+- [x] Windows/macOS 不再统一声称自己是 macOS Chrome 124;请求身份与所用 Chromium Session 一致。
+- [x] GUI/CLI/订阅/digest/crawl 同时请求时,全局只按一个队列和一个持久状态决策。
+- [x] 进入按公众号下载页、执行默认 `auth-status`、导入 session 均为零微信请求。
+- [x] digest 连续多个账号的首屏请求也经过全局随机间隔。
+- [x] 模拟 200013 后没有第二次请求;所有入口立即被熔断,重启后仍保持暂停。
+- [x] 模拟取消排队任务后,transport 调用次数不增加。
+- [x] UI/CLI 能解释“为什么没发请求、何时可继续、是否已经全局暂停”。
+- [x] 日志不含 token、Cookie、完整敏感 URL。
+- [x] `npm test`、`npm run lint`、`npm run typecheck`、离线 e2e、build 通过;
       全流程由网络封锁证明没有访问微信。
-- [ ] 发布说明明确标注:冻结期未做真实微信联调;不声称能够绕过或保证不触发微信风控。
+- [x] 发布说明明确标注:冻结期未做真实微信联调;不声称能够绕过或保证不触发微信风控。
+
+离线验收证据:567 项单测通过;lint/typecheck 通过;GUI e2e 输出
+`offline e2e attempted zero WeChat requests (blocked=0)`与`ALL PASSED`;`npm run build`
+完成 macOS arm64/x64 未签名安装包。**未执行任何真实微信请求,真实兼容性仍待安哥解冻后单独授权验证。**
 
 ## 7. 非目标
 

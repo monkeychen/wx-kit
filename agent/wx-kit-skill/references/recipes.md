@@ -10,6 +10,7 @@ command -v wx-kit >/dev/null || brew install --cask monkeychen/wx-kit/wx-kit
 WX=${WX:-$(command -v wx-kit || echo /Applications/wx-kit.app/Contents/MacOS/wx-kit)}
 
 "$WX" --version
+"$WX" protection status   # 非 active 时先报告用户;不要自动 resume
 "$WX" download --url "https://mp.weixin.qq.com/s/XXXX" --formats md,meta
 "$WX" library list > /tmp/lib.json && jq '.items | length' /tmp/lib.json   # 确认入库
 ```
@@ -21,7 +22,9 @@ WX=${WX:-$(command -v wx-kit || echo /Applications/wx-kit.app/Contents/MacOS/wx-
 wx-kit login && wx-kit session export -o s.json && scp s.json server:~/
 
 # 服务器上:
-wx-kit session import ~/s.json && rm ~/s.json      # {"ok":true,"valid":true} 才继续
+wx-kit session import ~/s.json && rm ~/s.json      # {"ok":true,"valid":null}:已导入,没有隐藏探测
+wx-kit protection status                           # 先把当前暂停/熔断原因报告给用户
+# 仅在用户明确授权继续访问微信后:wx-kit protection resume
 wx-kit crawl --fakeid "MzIyMzA5NjEyMA==" --count 10 --formats md,meta > crawl.json
 jq '{listed, succeeded, failed}' crawl.json
 ```
@@ -143,4 +146,3 @@ wx-kit crawl "某公众号" --count 200 --no-video --out ./out
 
 **注意**:单个视频可达上百 MB(实测 1572×1080 一档 133MB,约 1 分钟下完)。
 `--no-video` 时正文仍会注明「本文含 N 个视频(未下载)」,信息不丢。
-

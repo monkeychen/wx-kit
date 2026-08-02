@@ -5,8 +5,15 @@ import { MpRateLimited, MpAuthExpired, MpApiError } from '../../src/core/mp-erro
 
 describe('explainError', () => {
   it('maps rate-limit (by code and by message)', () => {
-    expect(explainError(new MpRateLimited('微信频率限制（200013）')).title).toBe('微信访问太频繁')
-    expect(explainError(new Error('mp ret 200013')).title).toBe('微信访问太频繁')
+    expect(explainError(new MpRateLimited('微信频率限制（200013）')).title).toBe('微信请求已全局停止')
+    expect(explainError(new Error('mp ret 200013')).title).toBe('微信请求已全局停止')
+    expect(explainError({ code: 'MP_RATE_LIMITED', message: 'blocked' }).hint).toContain('不会自动重试')
+  })
+
+  it('maps paused, cancelled and offline-blocked protection errors', () => {
+    expect(explainError({ code: 'MP_GOVERNOR_PAUSED', message: 'paused' }).title).toContain('暂停')
+    expect(explainError({ code: 'MP_REQUEST_CANCELLED', message: 'cancelled' }).title).toContain('取消')
+    expect(explainError({ code: 'MP_NETWORK_BLOCKED', message: 'blocked' }).title).toContain('测试模式')
   })
 
   it('maps auth-expired (class, AUTH_REQUIRED string, 200040)', () => {

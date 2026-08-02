@@ -13,9 +13,6 @@ const SEARCHBIZ = 'https://mp.weixin.qq.com/cgi-bin/searchbiz'
 const APPMSG_PUBLISH = 'https://mp.weixin.qq.com/cgi-bin/appmsgpublish'
 const PAGE = 20
 
-export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
-export const randMs = (min: number, max: number): number => Math.floor(min + Math.random() * (max - min))
-
 /** 检查 base_resp.ret，把已知风控/失效码翻译成具体异常。 */
 export function checkRet(json: MpJson): void {
   const ret = json.base_resp?.ret ?? 0
@@ -123,11 +120,9 @@ async function fetchPage(
 export async function listArticlesSince(
   mpFetch: MpFetch, token: string, fakeid: string, sinceTs: number, opts: ListOpts = {}, cap = 20,
 ): Promise<ArticleRef[]> {
-  const sleepFn = opts.sleep ?? sleep
   const out: ArticleRef[] = []
   let begin = 0
   for (;;) {
-    if (begin > 0) await sleepFn(randMs(1000, 3000))
     const { items, total, pageLen, hidden } = await fetchPage(mpFetch, token, fakeid, begin)
     if (hidden) opts.onHidden?.(hidden)
     if (!pageLen) break
@@ -143,11 +138,9 @@ export async function listArticlesSince(
 export async function listArticles(
   mpFetch: MpFetch, token: string, fakeid: string, range: CrawlRange, opts: ListOpts = {},
 ): Promise<ArticleRef[]> {
-  const sleepFn = opts.sleep ?? sleep
   const out: ArticleRef[] = []
   let begin = 0
   for (;;) {
-    if (begin > 0) await sleepFn(randMs(1000, 3000))
     const { items, total, pageLen, hidden } = await fetchPage(mpFetch, token, fakeid, begin)
     if (hidden) opts.onHidden?.(hidden)
     if (!pageLen) break   // 这一页原始为空 = 没有更多文章

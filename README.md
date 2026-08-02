@@ -33,6 +33,9 @@
 
 上一版 v0.8.4(看得见,还能挑):订阅新文章展开可见、挑着下载或忽略;更新检查在常开的应用里也生效;类型标识修正。
 
+**v0.8.6 紧急保护版已完成实现、尚未发布**:微信请求已统一收口到 Chromium Session 与全局队列,
+命中频控立即持久熔断且不自动重试;当前只完成网络封锁下的离线验收,尚未做真实微信联调。
+
 历史版本亮点见下方[「项目状态」](#项目状态)与 [`ROADMAP.md`](ROADMAP.md) 发布史,逐版发布说明在 `docs/releases/`。
 
 ## 特性
@@ -40,7 +43,7 @@
 - 🖥 **GUI + CLI 双启动** —— 同一份 Electron 二进制,带子命令即进 CLI,否则开窗口。
 - 📦 **多格式导出** —— 封面、Markdown、HTML、PDF、元信息,可任意组合;文中图片与视频自动本地化。
 - 🔁 **断点续传 + 去重** —— 每篇落盘即写索引,中断/重跑自动跳过。
-- 🛡 **节流 + 退避** —— 批量爬取默认串行 + 随机延迟,命中频控自动退避,不裸报错。
+- 🛡 **全局请求保护** —— GUI/CLI/订阅/下载共用持久队列与随机间隔,命中频控立即停手,不自动重试或探测恢复。
 - 💻 **单进程单语言** —— 纯 Node + Electron 42,无 Python 边车、无独立 chromium、无数据库(文件系统 + JSON 索引)。
 - 🤖 **Agent 友好** —— 同一 CLI 输出纯 JSON,`stdout` 走数据、`stderr` 走进度、退出码 `0/1/2`。
 
@@ -135,7 +138,10 @@ wx-kit --version
 ```bash
 npx electron . download --url <u> [--formats md,html,pdf,meta] [--out <dir>]
 npx electron . login                                   # 扫码登录公众号后台
-npx electron . auth-status                             # 查登录态(真探测)
+npx electron . auth-status                             # 只查本地登录态(零微信请求;有效性可能未知)
+npx electron . protection status                       # 查全局请求保护状态(零微信请求)
+npx electron . protection pause                        # 立即暂停所有微信请求
+npx electron . protection resume                       # 明确恢复请求许可(本动作不联网)
 npx electron . search <公众号名>                        # 搜号,返候选
 npx electron . crawl <公众号名> --count 2              # 批量爬取
 npx electron . library list                            # 列已下文章
@@ -146,7 +152,7 @@ npx electron . subscription check-now                  # 立即检查订阅更�
 npx electron . settings get [键]                        # 读设置(全量或单键)(v0.5.0)
 npx electron . settings set <键> <值>                   # 写设置(v0.5.0)
 npx electron . session export [-o <file>]              # 导出登录态(供 headless 机器用,v0.6.0)
-npx electron . session import <file>                   # 导入登录态并探测有效性(v0.6.0)
+npx electron . session import <file>                   # 只导入登录态,不做隐藏探测(v0.8.6)
 npx electron . --version            # 版本号(裸 semver);--help / help <子命令> 看帮助(v0.5.0)
 ```
 
@@ -156,7 +162,7 @@ npx electron . --version            # 版本号(裸 semver);--help / help <子�
 
 ### 安装包后的 CLI 用法
 
-GUI 与 CLI 是**同一个二进制**:不带子命令开窗口,带子命令(`download`/`login`/`auth-status`/`search`/`crawl`/`library`/`subscription`/`settings`/`session`/`version`/`help`)或 `-h`/`--help`/`-v`/`--version` 即进 CLI。装完后直接调安装目录里的可执行文件(**不是** `npx electron .`):
+GUI 与 CLI 是**同一个二进制**:不带子命令开窗口,带子命令(`download`/`login`/`auth-status`/`protection`/`search`/`crawl`/`library`/`subscription`/`settings`/`session`/`version`/`help`)或 `-h`/`--help`/`-v`/`--version` 即进 CLI。装完后直接调安装目录里的可执行文件(**不是** `npx electron .`):
 
 **macOS** —— 可执行文件在 .app 包内层:
 
@@ -184,7 +190,7 @@ wx-kit auth-status
 
 ## 项目状态
 
-**v0.1.0 – v0.8.5 均已发布**(最新 **v0.8.5**:一个问题,一份清单)。各里程碑均合入 main,端到端在真实微信公众号后台验证通过:
+**v0.1.0 – v0.8.5 均已发布**(最新 **v0.8.5**:一个问题,一份清单)。v0.8.6 已完成实现与离线验收、尚未发布;由于当前账号/IP处于频控期,本版没有做真实微信联调:
 
 **v0.1.0 · 第一阶段主线**
 - ✅ M1 — 核心层 + CLI `download` 五格式
@@ -238,7 +244,7 @@ wx-kit auth-status
 **v0.6.0 · Agent 自动化闭环(2026-07-19)**
 - ✅ M25 — 体验杂项:文库默认发布时间降序+排序跨会话记忆、检查日志入口(设置页/订阅页)、CLI 帮助大改(双模式/输出契约/子命令清单/示例)
 - ✅ M26 — 安装通道:brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包(`wx-kit`),发版规约同步扩展
-- ✅ M27 — 登录态跨机迁移:`session export`/`import`(0600 + 结构校验 + 导入即真探测),headless 环境闭环
+- ✅ M27 — 登录态跨机迁移:`session export`/`import`(0600 + 结构校验),headless 环境闭环;v0.8.6 起导入不再隐藏探测
 - ✅ M28 — agent skill:`agent/wx-kit-skill/`(安装/登录态/能力速查/组合范例,样例逐条实测)
 
 **v0.7.0 · 磨平「下载 → 创作」链路(2026-07-20)**
@@ -248,6 +254,12 @@ wx-kit auth-status
 **v0.8.0 · 让内容流到该去的地方(2026-07-22)**
 - ✅ M31 — CLI/订阅增强与 bug 修复:订阅按号点检(行内「检查」+ CLI `--accounts`)、`library list`/`search` 默认按发布时间降序(`--sort`/`--order`,排序逻辑抽 core 与 GUI 共享)、`-h` 附仓库地址、修 mac CLI 堆程序坞图标
 - ✅ M32 — 站点同步:文库/CLI 按 Astro 站点规范生成 `content/posts/<日期>-<slug>/`(目录级原子写入、slug 冲突不覆盖、图片摊平);设置开关默认关;产物过真实站点 `npm run check`
+
+**v0.8.6 · 请求保护与全局频控治理(实现完成,待发布)**
+- ✅ M44 — 所有微信流量共用持久全局网关,跨 GUI/CLI 串行;200013/429/验证页立即熔断,零自动重试
+- ✅ M45 — 后台 API、文章和媒体统一使用登录分区的 Chromium Session/Cookie Jar,删除固定 macOS Chrome 124 身份
+- ✅ M46 — `auth-status`/session import 零隐藏请求;设置页与 CLI 可查看/暂停/恢复保护;离线 e2e 微信请求尝试数为 0
+- ⚠️ 尚未做真实微信联调,不代表当前频控已解除,也不承诺以后不会触发平台风控
 
 **v0.8.5 · 一个问题,一份清单(2026-07-28)**
 - ✅ M43 — `subscription digest --download`:缺的下、已有的跳过,清单统一带 `dir`/`contentPath`;查询与取内容是两个独立步骤,「不带 flag 行为不变」由结构保证

@@ -34,6 +34,19 @@ describe('DownloadQueue', () => {
     expect(bad.error?.message).toContain('boom')
   })
 
+  it('stops before unsent items after a global protection signal and preserves its code', async () => {
+    const seen: string[] = []
+    const q = new DownloadQueue(async (url) => {
+      seen.push(url)
+      if (url === 'limited') throw Object.assign(new Error('微信频控'), { code: 'RATE_LIMITED' })
+      return { url, ok: true }
+    })
+    const summary = await q.run(['ok', 'limited', 'never-send'])
+    expect(seen).toEqual(['ok', 'limited'])
+    expect(summary.items[1]).toMatchObject({ error: { code: 'RATE_LIMITED' } })
+    expect(summary.items).toHaveLength(2)
+  })
+
   it('counts skipped (dedup) items as ok', async () => {
     const downloadOne: DownloadOne = async (url) => ({ url, ok: true, skipped: url === 'dup', id: url })
     const q = new DownloadQueue(downloadOne, () => {})

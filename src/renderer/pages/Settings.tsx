@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
 import type { UpdateInfo, UpdateChannelInfo } from '../api'
+import type { MpProtectionStatus } from '../api'
 import { DMG_POST_INSTALL_HINT } from '../../core/install-channel'
 import type { DownloadFormat } from '../../core/types'
 
@@ -20,12 +21,21 @@ export default function Settings() {
   const [updState, setUpdState] = useState<'idle' | 'checking' | 'done' | 'failed'>('idle')
   const [chan, setChan] = useState<UpdateChannelInfo | null>(null)
   const [dl, setDl] = useState<{ done: number; total: number } | null>(null)
+  const [mpProtection, setMpProtection] = useState<MpProtectionStatus | null>(null)
 
   useEffect(() => { api.getSettings().then(setS) }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
   useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不阻塞设置页 */ }) }, [])
   useEffect(() => { api.updateChannel().then(setChan).catch(() => { /* 渠道识别失败就退回通用引导 */ }) }, [])
   useEffect(() => api.onUpdateProgress((p) => setDl({ done: p.done, total: p.total })), [])
+  useEffect(() => {
+    let active = true
+    const refresh = () => api.mpProtectionStatus().then((value) => { if (active) setMpProtection(value) }).catch(() => {})
+    void refresh()
+    // 状态查询只读本地文件；短轮询让排队数和等待窗口可见，不会产生微信请求。
+    const timer = setInterval(refresh, 1_000)
+    return () => { active = false; clearInterval(timer) }
+  }, [])
 
   const checkUpdateNow = async () => {
     setUpdState('checking')
@@ -73,6 +83,16 @@ export default function Settings() {
       setCliLink(await api.cliLinkStatus())
     } catch (e) { message.error('创建失败：' + (e as Error).message) }
   }
+  const pauseMpRequests = async () => {
+    try { setMpProtection(await api.mpProtectionPause()); message.success('已暂停所有微信请求') }
+    catch (e) { message.error('暂停失败：' + (e as Error).message) }
+  }
+  const resumeMpRequests = async () => {
+    try {
+      setMpProtection(await api.mpProtectionResume())
+      message.success('已恢复请求许可；当前没有发起任何微信请求')
+    } catch (e) { message.error('恢复失败：' + (e as Error).message) }
+  }
 
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
@@ -85,6 +105,47 @@ export default function Settings() {
         </div>
 
         <div className="surface">
+          <div className="setting-block" data-testid="mp-protection">
+            <div className="setting-label">微信请求保护</div>
+            <div className="setting-hint">
+              所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，
+              不会自动重试或探测恢复。
+            </div>
+            {mpProtection ? (
+              <Space direction="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
+                <div data-testid="mp-protection-mode">
+                  当前状态：<strong>{mpProtection.mode === 'active' ? '已启用保护，可按需请求'
+                    : mpProtection.mode === 'rate-limited' ? '频控熔断，所有微信请求已停止'
+                      : '用户暂停，所有微信请求已停止'}</strong>
+                </div>
+                {(mpProtection.pausedReason || mpProtection.rateLimitSignal) && (
+                  <div className="setting-hint" data-testid="mp-protection-reason">
+                    {mpProtection.pausedReason ?? mpProtection.rateLimitSignal}
+                  </div>
+                )}
+                <div className="setting-hint">
+                  上次请求：{mpProtection.lastRequestAt ? new Date(mpProtection.lastRequestAt).toLocaleString() : '暂无'}；
+                  本进程排队：{mpProtection.queued} 项
+                </div>
+                <div className="setting-hint" data-testid="mp-protection-next">
+                  最早可执行：{mpProtection.mode === 'active' && mpProtection.nextAllowedAt > Date.now()
+                    ? new Date(mpProtection.nextAllowedAt).toLocaleString()
+                    : mpProtection.mode === 'active' ? '现在' : '需先手动恢复请求许可'}
+                </div>
+                {mpProtection.mode === 'active' ? (
+                  <Button danger onClick={pauseMpRequests} data-testid="mp-protection-pause">暂停所有微信请求</Button>
+                ) : (
+                  <Popconfirm
+                    title="恢复微信请求许可？"
+                    description="恢复动作本身不会联网；之后只有你的明确操作或已开启的订阅计划才会申请请求。"
+                    okText="恢复" cancelText="继续暂停" onConfirm={resumeMpRequests}>
+                    <Button type="primary" data-testid="mp-protection-resume">恢复请求许可</Button>
+                  </Popconfirm>
+                )}
+              </Space>
+            ) : <div className="faint" style={{ marginTop: 8 }}>正在读取保护状态…</div>}
+          </div>
+
           <div className="setting-block">
             <div className="setting-label">文章库位置</div>
             <div className="setting-hint">下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。</div>

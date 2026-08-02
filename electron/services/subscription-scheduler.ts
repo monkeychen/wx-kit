@@ -9,6 +9,8 @@ export interface SchedulerDeps {
   subsFor: () => Promise<Subscriptions>
   /** 返回值 scheduler 不关心(M34 起检查会回传逐号明细,给手动检查的行内反馈用) */
   runCheck: () => Promise<unknown>
+  /** 全局请求保护已暂停/熔断时，不启动业务检查，也不制造重复失败日志。 */
+  canRun?: () => Promise<boolean>
   now?: () => number
 }
 
@@ -30,6 +32,7 @@ export class SubscriptionScheduler {
     try {
       const s = await this.deps.settings.get()
       if (!s.subscriptionAutoCheck) return
+      if (this.deps.canRun && !await this.deps.canRun()) return
       const now = (this.deps.now ?? Date.now)()
       const lastRunAt = await (await this.deps.subsFor()).getLastRunAt()
       if (shouldRunCheck({

@@ -32,14 +32,13 @@ describe('checkSubscriptions', () => {
     expect(r.latest).toBe(100)
   })
 
-  it('does NOT retry/backoff on rate-limit — records the account as failed and moves on', async () => {
+  it('does NOT retry/backoff on rate-limit — aborts the whole run', async () => {
     const listFn = vi.fn(async () => { throw new MpRateLimited('rl') })
     const sleep = vi.fn(async () => {})
-    const [r] = await checkSubscriptions([acc('f1', 100)], { mpFetch: fetchStub, token: 't', listFn, sleep })
+    await expect(checkSubscriptions([acc('f1', 100)], { mpFetch: fetchStub, token: 't', listFn, sleep }))
+      .rejects.toBeInstanceOf(MpRateLimited)
     expect(listFn).toHaveBeenCalledTimes(1)   // 不退避重试,只试一次
     expect(sleep).not.toHaveBeenCalled()      // 没有 30/60/90s 退避等待
-    expect(r).toMatchObject({ fakeid: 'f1', ok: false, latest: 100 })
-    expect(r.error).toBeTruthy()
   })
 
   it('per-account isolation: one generic failure does not stop the rest', async () => {
@@ -63,17 +62,13 @@ describe('checkSubscriptions', () => {
     expect(res.map((r) => r.fakeid)).toEqual(['f3', 'f2', 'f1'])
   })
 
-  // —— 去规律化（A：账号间隔随机化，破坏恒定 2.0s 间隔指纹）——
-  it('uses a randomized inter-account delay (not a constant 2s)', async () => {
+  it('does not own an inter-account sleep; the global gateway owns all timing', async () => {
     const delays: number[] = []
     const sleep = vi.fn(async (ms: number) => { delays.push(ms) })
     const listFn = vi.fn(async () => [])
     await checkSubscriptions([acc('f1', 0), acc('f2', 0)],
       { mpFetch: fetchStub, token: 't', listFn, sleep, shuffle: (a) => a })
-    expect(delays).toHaveLength(1)              // 两账号之间一次间隔
-    expect(delays[0]).toBeGreaterThanOrEqual(3000)
-    expect(delays[0]).toBeLessThan(8000)
-    expect(delays[0]).not.toBe(2000)            // 不再是写死的 2s
+    expect(delays).toEqual([])
   })
 
   it('auth-expired aborts the whole check', async () => {

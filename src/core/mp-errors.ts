@@ -1,5 +1,5 @@
 // src/core/mp-errors.ts
-/** ret=200013：频控。调用方应退避降速。 */
+/** ret=200013：频控。v0.8.6 起由全局网关熔断，调用方不得自动重试。 */
 export class MpRateLimited extends Error { readonly code = 'RATE_LIMITED' }
 /** ret=200040：登录态失效。调用方应引导重新登录（AUTH_REQUIRED）。 */
 export class MpAuthExpired extends Error { readonly code = 'AUTH_REQUIRED' }
@@ -7,4 +7,17 @@ export class MpAuthExpired extends Error { readonly code = 'AUTH_REQUIRED' }
 export class MpApiError extends Error {
   readonly code = 'MP_API_ERROR'
   constructor(public ret: number, message: string) { super(message) }
+}
+
+export type MpProtectionErrorCode =
+  | 'MP_GOVERNOR_PAUSED'
+  | 'MP_RATE_LIMITED'
+  | 'MP_COOLDOWN'
+  | 'MP_REQUEST_CANCELLED'
+
+export class MpRequestProtectionError extends Error {
+  constructor(public readonly code: MpProtectionErrorCode, message: string) {
+    super(message)
+    this.name = 'MpRequestProtectionError'
+  }
 }

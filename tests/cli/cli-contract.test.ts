@@ -7,7 +7,15 @@ import { join } from 'node:path'
 import { SettingsService } from '../../electron/services/settings'
 
 // mock 掉 electron 绑定的服务，让 runCli 在纯 node 下可测
-vi.mock('electron', () => ({ BrowserWindow: class {} }))
+vi.mock('electron', () => ({
+  BrowserWindow: class {},
+  session: {
+    fromPartition: vi.fn(() => ({
+      fetch: vi.fn(),
+      cookies: { set: vi.fn(), get: vi.fn(async () => []) },
+    })),
+  },
+}))
 vi.mock('../../electron/services/mp-auth', () => ({
   getSession: vi.fn(() => null), clearSession: vi.fn(), login: vi.fn(),
 }))
@@ -36,10 +44,33 @@ describe('CLI auth gating', () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
   })
 
-  it('auth-status without session → valid:false', async () => {
+  it('auth-status without session → present:false / valid:false', async () => {
     const code = await runCli(['auth-status'])
     expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, valid: false })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, present: false, valid: false })
+  })
+
+  it('auth-status with local session is honest about unknown validity and does not probe', async () => {
+    ;(auth.getSession as ReturnType<typeof vi.fn>).mockReturnValue({ token: 't', cookies: [], timestamp: 123 })
+    const code = await runCli(['auth-status'])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, present: true, valid: null, checkedAt: 123 })
+  })
+})
+
+describe('CLI request protection', () => {
+  it('starts fail-closed and resumes only after an explicit local command', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-protection-cli-'))
+    expect(await runCli(['protection', 'status'], { userDataDir })).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, protection: { mode: 'user-paused' } })
+
+    stdout = ''
+    expect(await runCli(['protection', 'resume'], { userDataDir })).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, protection: { mode: 'active' } })
+
+    stdout = ''
+    expect(await runCli(['protection', 'pause'], { userDataDir })).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, protection: { mode: 'user-paused' } })
   })
 })
 
@@ -510,6 +541,7 @@ describe('CLI top-level help (M25 R3)', () => {
     expect(stdout).toContain('子命令:list / check-now')
     expect(stdout).toContain('子命令:get / set')
     expect(stdout).toContain('常用示例')
+    expect(stdout).toContain('protection status')
     expect(stdout).toContain('~/Documents/wx-kit')
   })
 
@@ -543,17 +575,17 @@ describe('CLI session export/import (M27)', () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
   })
 
-  it('import a valid file writes it and probes validity (expired here → valid:false)', async () => {
+  it('import a valid file writes it without probing WeChat and reports unknown validity', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'wxk-sess-cli2-'))
     const f = join(dir, 'in.json')
     writeFileSync(f, JSON.stringify({ token: '42', cookies: [{ name: 'a', value: 'b' }], timestamp: 1 }))
-    const { MpAuthExpired } = await import('../../src/core/mp-errors')
     const mpc = await import('../../src/core/mp-client')
-    const spy = vi.spyOn(mpc, 'searchAccount').mockRejectedValue(new MpAuthExpired('expired'))
+    const spy = vi.spyOn(mpc, 'searchAccount')
     const code = await runCli(['session', 'import', f], { userDataDir: dir })
-    spy.mockRestore()
     expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, valid: false })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, valid: null })
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
     expect(JSON.parse(readFileSync(join(dir, 'mp-session.json'), 'utf-8'))).toMatchObject({ token: '42' })
   })
 })
