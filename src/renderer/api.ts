@@ -9,12 +9,14 @@ import type { SyncSummary } from '../core/site-sync'
 import type { RunCheckResult } from '../../electron/services/subscription-check'
 import type { UpdateInfo, UpdateAsset } from '../core/check-update'
 import type { InstallChannel } from '../core/install-channel'
+import type { MpProtectionStatus } from '../../electron/services/mp-request-gateway'
 
 export type { HistoryEvent } from '../core/download-history'
 export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 export type { RunCheckResult, PerAccountResult } from '../../electron/services/subscription-check'
 export type { UpdateInfo, UpdateAsset } from '../core/check-update'
 export type { InstallChannel } from '../core/install-channel'
+export type { MpProtectionStatus } from '../../electron/services/mp-request-gateway'
 
 export interface UpdateChannelInfo { channel: InstallChannel; command: string | null; platform: string; arch: string }
 export interface UpdateProgress { name: string; done: number; total: number }
@@ -26,7 +28,6 @@ export interface CrawlRangeInput { count?: number; from?: string; to?: string }
 export type CrawlEvent =
   | { kind: 'listed'; items: { title: string; url: string }[] }
   | { kind: 'item'; index: number; status: CrawlItemStatus; error?: string }
-  | { kind: 'backoff'; attempt: number; waitMs: number; reason: 'rate-limit' }
   | { kind: 'done'; summary: CrawlSummary }
 
 export type CliLinkStatus = 'linked' | 'unlinked' | 'conflict'
@@ -53,8 +54,11 @@ export interface WxApi {
   appVersion(): Promise<string>
   copyText(text: string): Promise<void>
   // —— M3.5 批量爬取 ——
-  mpAuthStatus(): Promise<{ valid: boolean }>
-  mpLogin(): Promise<{ ok: boolean; error?: string }>
+  mpAuthStatus(): Promise<{ status: 'missing' | 'present'; valid: false | null; checkedAt?: number }>
+  mpLogin(): Promise<{ ok: boolean; error?: string; code?: string }>
+  mpProtectionStatus(): Promise<MpProtectionStatus>
+  mpProtectionPause(): Promise<MpProtectionStatus>
+  mpProtectionResume(): Promise<MpProtectionStatus>
   mpSearch(name: string): Promise<{ ok: boolean; list?: MpAccount[]; error?: { code: string; message: string } }>
   mpCrawl(fakeid: string, nickname: string, range: CrawlRangeInput, formats: DownloadFormat[], keywords?: { include?: string[]; exclude?: string[] }): Promise<CrawlSummary>
   onCrawlProgress(cb: (e: CrawlEvent) => void): () => void

@@ -10,7 +10,9 @@ export default function LoginGate({ onLoggedIn }: { onLoggedIn: () => void }) {
     const r = await api.mpLogin()
     setBusy(false)
     if (r.ok) onLoggedIn()
-    else setErr(r.error === 'CANCELLED' ? '已取消登录' : '登录失败：' + (r.error ?? ''))
+    else if (r.code === 'MP_GOVERNOR_PAUSED' || r.code === 'MP_RATE_LIMITED') {
+      setErr((r.error ?? '微信请求已暂停') + '。请先到“设置 → 微信请求保护”查看。')
+    } else setErr(r.error === 'CANCELLED' ? '已取消登录' : '登录失败：' + (r.error ?? ''))
   }
   return (
     <div className="empty-state" data-testid="login-gate">

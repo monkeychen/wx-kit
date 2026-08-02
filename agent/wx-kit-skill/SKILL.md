@@ -38,17 +38,27 @@ npm install -g @simiam/wx-kit
 > `~/bin/wx-kit` 快捷命令。npm 装完 `wx-kit` 直接在 PATH。
 > ⚠️ 别自己 `ln -s` 建软链——macOS 上 Electron 经软链找不到 Helper 子进程,download 会崩;要建就用 wrapper 脚本(GUI 引导创建的就是)。
 
-## 第二步:登录态(仅 search/crawl/subscription 需要;download 单篇不需要)
+## 第二步:请求保护(所有微信访问都适用)
 
 ```sh
-wx-kit auth-status        # → {"ok":true,"valid":true|false}
+wx-kit protection status  # 零微信请求;先看全局保护是否允许出网
 ```
 
-`valid:false` 时分场景:
+v0.8.6 首次启用请求保护时会处于 `user-paused`;**不要替用户自动解除暂停**。
+只有用户明确同意继续访问微信后才执行 `wx-kit protection resume`。若状态是 `rate-limited`,
+报告当前已全局停手,不要自行恢复、重试或定时探测。
+
+## 第三步:登录态(仅 search/crawl/subscription 需要;download 单篇不需要)
+
+```sh
+wx-kit auth-status        # 只查本地,零微信请求 → {"ok":true,"present":bool,"valid":false|null}
+```
+
+`present:false` 时分场景:
 
 - **有图形界面的机器**:`wx-kit login` 弹扫码窗,扫码后自动持久化,输出 `{"ok":true}`。
 - **headless/服务器**:在能扫码的机器上 `wx-kit login && wx-kit session export -o s.json`,
-  把文件传过来后 `wx-kit session import s.json`(自动探测有效性),用后删除文件。
+  把文件传过来后 `wx-kit session import s.json`(只导入,返回 `valid:null`,不隐藏探测),用后删除文件。
   ⚠️ session 文件等同登录凭证,勿入仓库、勿留存。
 
 ## 原子能力速查
@@ -68,6 +78,7 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 | **某一天各订阅号发了什么** | `wx-kit subscription digest --date <YYYY-MM-DD\|today\|yesterday>`(只查询;**「昨天」「7月23日」这类说法由你换算成 YYYY-MM-DD**,CLI 不解析自然语言) |
 | **某一天的文章直接取成素材** | 上面那条加 `--download`:缺的下、已有的跳过,**每篇带 `dir`/`contentPath` 可直接读正文** |
 | 读/写设置 | `wx-kit settings get libraryRoot` / `wx-kit settings set libraryRoot <dir>` |
+| 查看/暂停/恢复微信请求 | `wx-kit protection status` / `pause` / `resume`(三者本身均不访问微信) |
 | 同步到个人站点 | `wx-kit site sync --ids <id> --slug <slug>`(按 Astro 站点规范生成目录,纯本地) |
 | 检查有无新版本 | `wx-kit update --check`(只检查;`upgradeCommand` 按安装渠道给,`version` 命令不联网) |
 
@@ -84,7 +95,10 @@ wx-kit auth-status        # → {"ok":true,"valid":true|false}
 
 ## 频控纪律(重要)
 
-微信有频率限制。wx-kit 内置串行下载 + 随机延迟 + 命中频控退避,**agent 不要自行并发多个 crawl、不要对失败立即重试**——频控失败(`RATE_LIMITED`)等几分钟再来。crawl 一次 ≤ 30 篇为宜。
+微信有频率限制。wx-kit 把 GUI、CLI、订阅、文章与媒体请求收口到一个持久全局队列,
+并使用随机间隔。命中 `RATE_LIMITED`/`MP_RATE_LIMITED` 后会立即全局熔断、**不会自动重试**。
+agent 不要并发多个 crawl,不要自行 `protection resume`,也不要按“等几分钟再试”做自动探测;
+先向用户报告保护状态。即使已获准恢复,crawl 一次仍以 ≤ 30 篇为宜。
 
 ## 细节按需查
 

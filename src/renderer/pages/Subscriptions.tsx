@@ -93,6 +93,8 @@ export default function Subscriptions() {
       const summary = `查 ${r.accounts} 号 · 新 ${r.newFound} 篇 · ${tail}`
       if (r.failed > 0) message.warning(`${summary} · 失败 ${r.failed}，详见下方检查记录`)
       else message.success(summary)
+    } catch (e) {
+      message.warning((e as Error).message + '。可到“设置 → 微信请求保护”查看。')
     } finally { setChecking(false) }
   }
   // R1 部分检查:只查这一个号(in-flight 共享:正在跑时全入口置灰并入同一次运行)
@@ -104,6 +106,11 @@ export default function Subscriptions() {
       // 单号检查不弹全局提示；只有「一个号都没查成」这种说不清的情况才出声
       const note = noteText(r, true)
       if (note) setRowRes((prev) => ({ ...prev, [a.fakeid]: { fakeid: a.fakeid, nickname: a.nickname, ok: false, newFound: 0, downloaded: 0, error: note } }))
+    } catch (e) {
+      setRowRes((prev) => ({ ...prev, [a.fakeid]: {
+        fakeid: a.fakeid, nickname: a.nickname, ok: false, newFound: 0, downloaded: 0,
+        error: (e as Error).message,
+      } }))
     } finally { setChecking(false) }
   }
   /**

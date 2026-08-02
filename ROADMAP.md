@@ -6,13 +6,13 @@
 ## 当前状态
 
 - **最新发布:v0.8.5(2026-07-28,一个问题一份清单)** —— tag `v0.8.5` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M43 `subscription digest --download`(缺的下、已有的跳过,清单统一带 `dir`/`contentPath`),需求/验收 `docs/PRD-v0.8.5.md`。上一功能版 v0.8.4(2026-07-28,看得见还能挑):M39–M42,需求/验收 `docs/PRD-v0.8.4.md`。
-- **v0.8.6 紧急频控修复已立项**(2026-08-02)——M44–M46:请求指纹一致性、全局请求网关、持久熔断、隐藏请求清理与离线验收。**当前真实微信访问冻结**:安哥明确解除前不得运行登录探测、搜索、抓取、订阅检查、digest、文章/媒体下载或 live e2e;见 `docs/PRD-v0.8.6.md` 与 `docs/plans/2026-08-02-m44-m46-request-governance.md`。
+- **v0.8.6 紧急频控修复已完成实现与离线验收,待发布**(2026-08-02)——M44–M46:请求指纹一致性、全局请求网关、持久熔断、隐藏请求清理与网络封锁验收。567 项单测、lint、typecheck、离线 GUI e2e(`blocked=0`)及 macOS 双架构构建通过。**当前真实微信访问仍冻结**:这些结果不代表账号/IP 已解除频控,也不代表新请求栈已做真实兼容性验证;安哥明确解除前不得运行登录探测、搜索、抓取、订阅检查、digest、文章/媒体下载或 live e2e。见 `docs/PRD-v0.8.6.md` 与 `docs/plans/2026-08-02-m44-m46-request-governance.md`。
 - **v0.8.7 需求收集中**——原 v0.8.6 顺延;已收 R1–R5:链接交互、安全告警、README 重做、订阅 pending 失败可见、公众号重新登录与彻底退出登录;见 `docs/PRD-v0.8.7.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果;微信访问冻结期间只能跑网络封锁下的离线测试。
 
 ## 里程碑目录
 
-**M1–M43 已随 v0.1.0–v0.8.5 发布**(新里程碑启动时在此加行、标 🚧)。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M43 已随 v0.1.0–v0.8.5 发布;M44–M46 已实现、尚未随 v0.8.6 发布**。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -43,7 +43,7 @@
 | **M24** | v0.5.5 | 按公众号下载关键词筛选(issue #1):标题匹配,GUI 互斥下拉(仅下载含/排除含),CLI `--include`/`--exclude`,零额外请求 | 同上 |
 | **M25** ✅ | v0.6.0 | 体验杂项:文库默认发布时间降序+排序跨会话记忆、检查日志入口(设置页+订阅页可发现性)、CLI 帮助完善(2026-07-19 完成) | `plans/2026-07-19-m25-ux-misc.md` |
 | **M26** ✅ | v0.6.0 | 安装通道:brew tap(monkeychen/homebrew-wx-kit)+ npm 包(dist-npm staging)+ 发版规约⑦⑧(2026-07-19 完成,双通道隔离安装真机验证) | `plans/2026-07-19-m26-install-channels.md` |
-| **M27** ✅ | v0.6.0 | headless 登录态:`session export`/`import`(0600 + 结构校验 + 导入即真探测;2026-07-19 完成,真机 export→import→valid:true) | `plans/2026-07-19-m27-session-transfer.md` |
+| **M27** ✅ | v0.6.0 | headless 登录态:`session export`/`import`(0600 + 结构校验;当版导入即真探测,v0.8.6 起改为零请求导入;2026-07-19 完成) | `plans/2026-07-19-m27-session-transfer.md` |
 | **M28** ✅ | v0.6.0 | agent skill:`agent/wx-kit-skill/`(检测→安装→登录态→能力速查→范例;全新 agent 四步端到端验证;2026-07-19 完成) | `plans/2026-07-19-m28-agent-skill.md` |
 
 | **M29** ✅ | v0.7.0 | 保真与外观:markdown GFM 表格(自写规则+微信单元格压平)、应用内版本号(刊头+设置页关于)、原生标题栏文案去重(2026-07-20 完成,真实文章 3 张表端到端验证) | `plans/2026-07-20-m29.md` |
@@ -61,11 +61,11 @@
 | **M41** ✅ | v0.8.4 | CLI `subscription digest --date`:查已订阅号某一天发了什么(不下载、不写库、不推水位),输出带 `downloaded` 让 agent 分流;自然语言日期由 agent 换算,CLI 只认 `YYYY-MM-DD`/`today`/`yesterday`;**wx-kit-skill 三处同步是交付物不是附属**;`downloaded` 除比 id 还比 sourceUrl(存量 32 篇哈希 id 否则会被误报未下载)(2026-07-28 完成,真机验证纯查询不留痕) | `plans/2026-07-28-m41.md` |
 | **M42** ✅ | v0.8.4 | `agent/wx-kit-compose` 跟上 CLI(最后改动停在 2026-06-23/v0.4.0):补上游 `digest` 选题入口、下游可选 `site sync`、中间 `library search`/`--sort`、素材质量信号 `itemShowType`/`warnings`;`agent/README.md` 一并核对。**做法上的关键决定:不把 CLI 细节抄进 compose**(参数/契约一律指向 wx-kit-skill)——它落后二十个里程碑的根因就是抄了不会跟着变的东西,再抄一遍只是把 bug 推迟(2026-07-28 完成,命令与 flag 逐条对源码核实、真实走通取料链路) | `plans/2026-07-28-m42.md` |
 | **M43** ✅ | v0.8.5 | `subscription digest --download`:缺的下、已有的跳过,清单**统一带 `dir`/`contentPath`**(不区分刚下的与本来就有的)+ `--formats` 缺省跟设置走(与 crawl 的硬编码缺省有意不同);只读与下载切成两个 core 函数,「不带 flag 行为一字不变」由结构保证;`unavailable` 一路透传到清单(重试无用别死磕)(2026-07-28 完成,真机验证下 1 留 2/复跑零请求/水位不变) | `plans/2026-07-28-m43.md` |
-| **M44** | v0.8.6 | 全局请求治理与熔断:唯一网关、持久状态、跨 GUI/CLI 互斥、200013 零重试、排队/取消一致语义 | `plans/2026-08-02-m44-m46-request-governance.md` |
-| **M45** | v0.8.6 | Chromium 会话请求栈:后台 API/文章/媒体共用专用 Session 与 Cookie Jar,移除固定 macOS Chrome 124 和生产旁路 axios | 同上 |
-| **M46** | v0.8.6 | 隐藏请求清理 + 保护状态 UI/CLI + 网络封锁测试模式;冻结期只做 fixture/假 transport/隔离 userData 验证 | 同上 |
+| **M44** ✅ | v0.8.6 | 全局请求治理与熔断:唯一网关、持久状态、跨 GUI/CLI 互斥、200013 零重试、排队取消与批量停手(2026-08-02 离线完成) | `plans/2026-08-02-m44-m46-request-governance.md` |
+| **M45** ✅ | v0.8.6 | Chromium 会话请求栈:后台 API/文章/媒体共用专用 Session 与 Cookie Jar,移除固定 macOS Chrome 124 和生产旁路 axios(2026-08-02 离线完成) | 同上 |
+| **M46** ✅ | v0.8.6 | 隐藏请求清理 + 保护状态 UI/CLI + 网络封锁测试模式;fixture e2e 明确验证微信请求尝试数为 0(2026-08-02 离线完成) | 同上 |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`(紧急修复,待实现)、v0.8.7 `docs/PRD-v0.8.7.md`(收集中)(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`(紧急修复,实现完成待发布)、v0.8.7 `docs/PRD-v0.8.7.md`(收集中)(逐条验收看各 §4)。
 
 ## 版本发布史(最新在前)
 
@@ -76,7 +76,7 @@
 - **v0.8.1 · 2026-07-22 · 补丁:dock 图标真修复** —— v0.8.0 宣称修好的 R5 实为误判,安哥用正式版跑 `wx-kit -h` 当场复现。根因:`app.dock.hide()` 在 `whenReady()` 前调用**不生效**,AppKit 在 ready 前已把进程注册成 `Foreground` 并画了图标(实测 `-h` 期间状态序列 `NULL→Foreground→UIElement`);当时的验证用跑 2–3 秒的 `download` 且延迟 2 秒才采样,**跳过启动瞬间**,是假阴性。改由 `LSUIElement`(mac Info.plist)在进程启动时定为 accessory,GUI 分支 ready 后 `dock.show()` + `focus` 要回图标与焦点。另加设置页「站点同步」的 `?` hover 指引(指向 dreamble 站点源码)。发布说明 `docs/releases/v0.8.1.md`。
 - **v0.8.0 · 2026-07-22 · 让内容流到该去的地方** —— 两条主线:让 agent 用 CLI 用得更顺 + 让文章流进个人站点。M31 订阅按号点检(核心 `checkSubscriptions` 本就按 accounts 数组查,只需在编排层开子集口子;与全量共享 in-flight 守卫)+ `library list`/`search` 默认 publishTime 降序(`sortArticles` 从 renderer 抽到 core 共享,默认序变更属轻度 breaking 已显式标注)+ `-h` 附仓库地址(agent 自助读 README)+ 修 mac CLI 堆程序坞图标(Electron 是 GUI 子系统进程,CLI 分支须主动 `app.dock.hide()`);M32 站点同步(目录级原子写入不复用只能单文件的 `atomic-write`;slug 冲突不覆盖;产物落进真实站点跑 `npm run check` 作为跨项目验收,验完清理不留痕;`site` 漏登 `CLI_COMMANDS` 白名单曾导致命令静默启 GUI 挂起)。发布说明 `docs/releases/v0.8.0.md`,复盘 devlog §36。
 - **v0.7.0 · 2026-07-20 · 磨平「下载 → 创作」链路** —— 不铺新平台、不改架构,只磨四处毛刺:M29 markdown 导出保留 GFM 表格(自写规则 + 微信 `<section>` 单元格压平,不引 turndown-plugin-gfm——插件产出非法 GFM 要修等于重写)+ 应用内版本号(设置页「关于」,刊头版本号上线即按反馈撤回)+ 原生标题栏文案去重(title + index.html 同改空);M30 导出素材 Modal 就地显示路径 + 一键复制「给 agent 的指令」(调研后否决「直接唤起 Claude Code」:CLI 虽能带 prompt 起会话,但唤起的是新终端陌生 cwd 的新会话,不如粘进用户已开着的会话)。发布说明 `docs/releases/v0.7.0.md`。
-- **v0.6.0 · 2026-07-19 · Agent 自动化闭环** —— 四个里程碑一版打通「agent 不碰鼠标用起 wx-kit」:M25 文库默认发布时间降序+排序跨会话记忆、检查日志入口、CLI 帮助大改;M26 brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包双安装通道(发版规约⑦⑧);M27 `session export/import` 打通 headless 登录态(0600+结构校验+导入即真探测);M28 `agent/wx-kit-skill/` 能力说明书(样例逐条实测,全新 agent 四步端到端零人工)。发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
+- **v0.6.0 · 2026-07-19 · Agent 自动化闭环** —— 四个里程碑一版打通「agent 不碰鼠标用起 wx-kit」:M25 文库默认发布时间降序+排序跨会话记忆、检查日志入口、CLI 帮助大改;M26 brew tap(`monkeychen/homebrew-wx-kit`)+ npm 包双安装通道(发版规约⑦⑧);M27 `session export/import` 打通 headless 登录态(0600+结构校验;当版导入即真探测,v0.8.6 起已改为零请求导入);M28 `agent/wx-kit-skill/` 能力说明书(样例逐条实测,全新 agent 四步端到端零人工)。发布说明 `docs/releases/v0.6.0.md`,复盘 devlog §34。
 - **v0.5.5 · 2026-07-18 · 文库目录化导航 + 关键词筛选下载** —— M23 治「滚动好久」:分组默认收起为公众号目录(一屏尽览、展开记忆、粘性组头、回顶),实测千篇量级 `content-visibility` 后滚动 23→52fps,虚拟滚动推迟万篇级;M24 落地 issue #1:标题关键词筛选(GUI 互斥下拉,初版双输入框被安哥纠正——互斥要靠结构;CLI 双 flag 可组合),列出→下载之间过滤零额外请求。发布说明 `docs/releases/v0.5.5.md`,复盘 devlog §33。
 - **v0.5.4 · 2026-07-16 · 订阅检查:不重跑、看得清失败、请求更省** —— M22 三合一:调度防重入(检查耗时跨 tick 曾并发重复跑,真机同时段两条相同记录);失败明细可观测(检查记录/落盘日志/CLI JSON 逐号原因,GUI 弹窗);「翻到水位为止」取代固定取 20 篇(微信每页实回 ~5,日常 4 次请求 → 1 次,空窗多日自动翻深不漏)。发布说明 `docs/releases/v0.5.4.md`,复盘 devlog §32。
 - **v0.5.3 · 2026-07-13 · 修复 macOS 关窗后程序坞无法重开窗口** —— M21 补注册 `app.on('activate')`:主进程此前只做了 mac 惯例的一半(关窗驻留程序坞)而缺重建窗口的代码路径,点程序坞图标无响应、应用假死只能强退。缺陷自 v0.1.0 即存在,整进程启停的开发/测试路径一直未暴露。发布说明 `docs/releases/v0.5.3.md`,复盘 devlog §31。

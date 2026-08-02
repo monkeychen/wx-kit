@@ -1,10 +1,6 @@
 // src/core/fetch-html.ts
 import axios from 'axios'
 
-const UA =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-
 /**
  * 单个请求的硬上限（毫秒）。用 AbortSignal 兜底，覆盖连接/代理握手阶段。
  *
@@ -33,22 +29,9 @@ export function wrapFetchError(e: unknown, url: string, timeoutMs = FETCH_TIMEOU
   return e instanceof Error ? e : new Error(String(e))
 }
 
-export async function fetchHtml(url: string): Promise<string> {
-  try {
-    const res = await axios.get<string>(url, {
-      timeout: HTML_TIMEOUT_MS,
-      signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-      responseType: 'text',
-      headers: { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' },
-    })
-    return res.data
-  } catch (e) {
-    throw wrapFetchError(e, url, HTML_TIMEOUT_MS)
-  }
-}
-
 /**
- * 下载二进制资源（图片/封面/视频），返回 buffer 与内容类型。
+ * 通用二进制下载（当前仅用于 GitHub 安装包），返回 buffer 与内容类型。
+ * 微信文章/图片/视频不得调用这里，统一走 Chromium MpRequestGateway。
  * `timeoutMs` 可覆盖默认值：默认档对图片够用，但**视频完全不够**——
  * 实测 133MB 的视频在 2.66MB/s 下要 50 秒，用默认超时必然 abort（M35 踩过：
  * CLI 报 ok 但 videos 目录空的，21 秒结束正是 20 秒超时）。视频的超时按体积算，
@@ -62,7 +45,6 @@ export async function fetchBinary(url: string, timeoutMs = FETCH_TIMEOUT_MS): Pr
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
       responseType: 'arraybuffer',
-      headers: { 'User-Agent': UA, Referer: 'https://mp.weixin.qq.com/' },
     })
     return { data: Buffer.from(res.data), contentType: String(res.headers['content-type'] ?? '') }
   } catch (e) {

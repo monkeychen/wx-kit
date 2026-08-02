@@ -1,7 +1,7 @@
 // src/core/check-subscriptions.ts
-// 订阅检查编排：逐号「只列表不下载」，串行 + 账号间随机延迟 + 每轮打乱账号顺序（去规律化，破坏频控指纹）；
-// 频控不重试（命中即跳过，下一轮再来）；单号失败隔离，登录失效整体中止。
-import { listArticlesSince as listSinceImpl, sleep as sleepImpl, randMs } from './mp-client'
+// 订阅检查编排：逐号「只列表不下载」+ 每轮打乱账号顺序；
+// 请求间隔与频控熔断统一由全局 gateway 决定，本层不再维护第二套 sleep。
+import { listArticlesSince as listSinceImpl } from './mp-client'
 import { MpAuthExpired } from './mp-errors'
 import type { ArticleRef, MpFetch } from './mp-types'
 import type { SubscribedAccount } from './subscriptions'
@@ -27,20 +27,19 @@ export interface CheckDeps {
 export interface AccountCheckResult { fakeid: string; ok: boolean; newRefs: ArticleRef[]; latest: number; error?: string }
 
 export async function checkSubscriptions(accounts: SubscribedAccount[], deps: CheckDeps): Promise<AccountCheckResult[]> {
-  const sleep = deps.sleep ?? sleepImpl
   const listFn = deps.listFn ?? listSinceImpl
   const shuffle = deps.shuffle ?? shuffleImpl
   const results: AccountCheckResult[] = []
-  let first = true
   for (const acc of shuffle(accounts)) {   // 每轮打乱顺序：破坏「固定 fakeid 序列」指纹
-    if (!first) await sleep(randMs(3000, 8000))   // 账号间随机间隔（非恒定 2s），缓解频控 + 去机器节奏
-    first = false
-    // 频控不重试：命中即把该号记为本轮失败、跳过，等下一轮检查再来。
-    // （退避重试只会在已被限的状态下追加请求，反而加重/延长频控——见 devlog 频控原则。）
+    // gateway 会给每个账号首屏分配全局窗口；串行本身不再被误认为频控治理。
     let refs: ArticleRef[]
-    try { refs = await listFn(deps.mpFetch, deps.token, acc.fakeid, acc.watermark, { sleep }) }
+    try { refs = await listFn(deps.mpFetch, deps.token, acc.fakeid, acc.watermark, {}) }
     catch (e) {
       if (e instanceof MpAuthExpired) throw e   // 登录态失效：整体中止，交上层引导重新登录
+      const code = (e as { code?: string })?.code
+      if (code === 'RATE_LIMITED' || code === 'MP_GOVERNOR_PAUSED' || code === 'MP_RATE_LIMITED' || code === 'MP_NETWORK_BLOCKED') {
+        throw e // 全局保护状态不是「这个号失败」；继续循环只会制造重复拒绝与误导日志
+      }
       results.push({ fakeid: acc.fakeid, ok: false, newRefs: [], latest: acc.watermark, error: (e as Error).message })
       continue
     }

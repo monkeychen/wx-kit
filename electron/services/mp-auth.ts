@@ -3,6 +3,7 @@ import { BrowserWindow, app } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, writeFileSync, rmSync } from 'node:fs'
 import type { MpSession } from '../../src/core/mp-types'
+import { MP_ORIGIN, MP_PARTITION } from './mp-session'
 
 function sessionPath(): string { return join(app.getPath('userData'), 'mp-session.json') }
 
@@ -15,7 +16,7 @@ export function clearSession(): void { try { rmSync(sessionPath()) } catch { /* 
 export async function login(): Promise<MpSession> {
   const win = new BrowserWindow({
     width: 480, height: 640, title: '扫码登录公众号后台',
-    webPreferences: { partition: 'persist:mpweixin' },
+    webPreferences: { partition: MP_PARTITION },
   })
   return new Promise<MpSession>((resolve, reject) => {
     let done = false
@@ -24,10 +25,10 @@ export async function login(): Promise<MpSession> {
       const m = /[?&]token=(\d+)/.exec(url)
       if (url.includes('/cgi-bin/home') && m) {
         done = true
-        const cookies = (await win.webContents.session.cookies.get({ url: 'https://mp.weixin.qq.com' }))
+        const cookies = (await win.webContents.session.cookies.get({ url: MP_ORIGIN }))
           .map((c) => ({ name: c.name, value: c.value }))
         const session: MpSession = { token: m[1], cookies, timestamp: Date.now() }
-        writeFileSync(sessionPath(), JSON.stringify(session))
+        writeFileSync(sessionPath(), JSON.stringify(session), { mode: 0o600 })
         win.removeListener('closed', onClosed)
         win.destroy()
         resolve(session)
@@ -37,6 +38,6 @@ export async function login(): Promise<MpSession> {
     win.webContents.on('did-navigate', onNav)
     win.webContents.on('did-navigate-in-page', onNav)
     win.on('closed', onClosed)
-    win.loadURL('https://mp.weixin.qq.com/')
+    win.loadURL(MP_ORIGIN)
   })
 }

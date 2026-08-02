@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
 import { Popconfirm } from 'antd'
 import { explainError } from '../error-explain'
 
 export interface CrawlRow { title: string; url: string; status: 'waiting' | 'downloading' | 'ok' | 'skipped' | 'failed'; error?: string }
-export interface BackoffState { attempt: number; until: number }
 
 const ICON: Record<CrawlRow['status'], string> = { waiting: '·', downloading: '⟳', ok: '✓', skipped: '⊘', failed: '✗' }
 const BADGE: Record<string, [string, string]> = { ok: ['badge-ok', '成功'], skipped: ['badge-skip', '已存在'], failed: ['badge-fail', '失败'] }
@@ -13,29 +11,12 @@ interface Props {
   rows: CrawlRow[]
   eta: string
   running: boolean
-  backoff?: BackoffState | null
   onCancel: () => void
   onRetry: (index: number) => void
 }
 
-/** 退避横幅：列表阶段命中频控时显示，客户端每秒倒数，让用户知道是在等而非死机。 */
-function BackoffBanner({ attempt, until }: BackoffState) {
-  const [, tick] = useState(0)
-  useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const secs = Math.max(0, Math.ceil((until - Date.now()) / 1000))
-  return (
-    <div className="backoff-banner" data-testid="backoff-banner">
-      <span className="bk-dot" />
-      微信访问太频繁，已自动退避 · 约 <b>{secs}</b> 秒后重试（第 {attempt} 次）
-    </div>
-  )
-}
-
 /** 实时逐篇列表：整体进度 + 预计剩余 + 取消，逐篇行带状态徽章（失败可重试）。 */
-export default function CrawlProgress({ account, rows, eta, running, backoff, onCancel, onRetry }: Props) {
+export default function CrawlProgress({ account, rows, eta, running, onCancel, onRetry }: Props) {
   const done = rows.filter((r) => r.status === 'ok' || r.status === 'skipped' || r.status === 'failed').length
   const pct = rows.length ? Math.round((done / rows.length) * 100) : 0
   return (
@@ -51,7 +32,6 @@ export default function CrawlProgress({ account, rows, eta, running, backoff, on
           )
           : <span className="progress-count">{done}/{rows.length}</span>}
       </div>
-      {backoff && <BackoffBanner attempt={backoff.attempt} until={backoff.until} />}
       <div className="progress-track"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
       <div className="progress-current">{done}/{rows.length}{eta ? ' · ' + eta : ''}</div>
       <div className="result-list" style={{ marginTop: 10 }}>

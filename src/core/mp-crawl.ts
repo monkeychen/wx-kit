@@ -1,7 +1,6 @@
 // src/core/mp-crawl.ts
 import { DownloadQueue, type OnProgress } from './download-queue'
-import { listArticles as listArticlesImpl, sleep as sleepImpl, randMs } from './mp-client'
-import { MpRateLimited } from './mp-errors'
+import { listArticles as listArticlesImpl } from './mp-client'
 import type { MpFetch, ArticleRef, CrawlRange, CrawlSummary, CrawlItemEvent } from './mp-types'
 import type { DownloadItemResult } from './types'
 
@@ -37,10 +36,8 @@ export interface CrawlDeps {
   onItem?: (ev: CrawlItemEvent) => void
   /** 返回 false 则停止后续（取消）；已下载的保留。 */
   shouldContinue?: () => boolean
-  /** 取消信号：用于即时打断列表阶段的频控退避等待（否则要干等满 30~90s）。 */
+  /** 取消信号：列表开始前或下载队列阶段停止后续工作。频控不再自动退避重试。 */
   signal?: AbortSignal
-  /** 列表阶段命中频控、进入退避等待前上报，供 UI 显示「退避中 · N 秒后重试」。 */
-  onBackoff?: (ev: { attempt: number; waitMs: number; reason: 'rate-limit' }) => void
   /** 测试可注入假 listArticles。 */
   listFn?: (
     mpFetch: MpFetch, token: string, fakeid: string, range: CrawlRange, opts?: { sleep?: (ms: number) => Promise<void> },
@@ -48,27 +45,13 @@ export interface CrawlDeps {
 }
 
 export async function crawlAccount(fakeid: string, range: CrawlRange, deps: CrawlDeps): Promise<CrawlSummary> {
-  const sleep = deps.sleep ?? sleepImpl
   const listFn = deps.listFn ?? listArticlesImpl
 
-  // 列表阶段：命中频控则指数退避，最多 3 次。退避等待可被取消即时打断（见 abortableWait）。
   let refs: ArticleRef[] = []
   let hidden = 0                 // 读者不可访问、未列入的篇数(M38)
-  for (let attempt = 0; ; attempt++) {
-    if (deps.signal?.aborted) break   // 已取消则停止重试，进下载阶段空跑收尾
-    try {
-      refs = await listFn(deps.mpFetch, deps.token, fakeid, range, { sleep, onHidden: (n) => { hidden += n } })
-      break
-    } catch (e) {
-      if (e instanceof MpRateLimited && attempt < 3) {
-        const waitMs = 30000 * (attempt + 1)
-        deps.onBackoff?.({ attempt: attempt + 1, waitMs, reason: 'rate-limit' })
-        await abortableWait(sleep(waitMs), deps.signal)
-        if (deps.signal?.aborted) break
-        continue
-      }
-      throw e
-    }
+  if (!deps.signal?.aborted) {
+    // 频控由全局 gateway 熔断并直接抛出；这里绝不在已被限制的会话上追加请求。
+    refs = await listFn(deps.mpFetch, deps.token, fakeid, range, { onHidden: (n) => { hidden += n } })
   }
 
   const beforeFilter = refs.length
@@ -78,12 +61,11 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
   deps.onListed?.(refs)
 
   // 下载阶段：复用 DownloadQueue（串行 + 单篇失败不中断 + 汇总）。
-  // 逐篇上报「下载中→结果」，延迟在每篇前；index 经闭包计数（串行，顺序稳定）。
+  // 逐篇上报「下载中→结果」；真正的请求间隔由全局 gateway 统一决定。
   let index = -1
   const wrapped = async (url: string, hint?: { appmsgid?: number; itemidx?: number }) => {
     const i = ++index
     deps.onItem?.({ index: i, status: 'downloading' })
-    await sleep(randMs(2000, 5000))
     try {
       const r = await deps.downloadOne(url, hint)
       deps.onItem?.({ index: i, status: r.skipped ? 'skipped' : 'ok' })
@@ -116,18 +98,4 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
     ...(unavailable > 0 ? { unavailable, shortfall, realFailures } : {}),
     items: [...s.items, ...cancelled],
   }
-}
-
-/**
- * 等 wait 结束，但 signal 一旦 abort 就立即返回（不等满）。
- * 用于让频控退避的长 sleep 能被「取消」即时打断；底层 timer 即使空转也无副作用（调用方随后 break）。
- */
-function abortableWait(wait: Promise<void>, signal?: AbortSignal): Promise<void> {
-  if (!signal) return wait
-  if (signal.aborted) return Promise.resolve()
-  return new Promise<void>((resolve) => {
-    const done = () => { signal.removeEventListener('abort', done); resolve() }
-    signal.addEventListener('abort', done, { once: true })
-    wait.then(done, done)
-  })
 }

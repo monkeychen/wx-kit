@@ -6,7 +6,6 @@ import { homedir } from 'node:os'
 import { readFileSync, appendFileSync, existsSync } from 'node:fs'
 import type { DownloadFormat, DownloadSummary } from '../core/types'
 import { ALL_FORMATS } from '../core/types'
-import { fetchHtml, fetchBinary } from '../core/fetch-html'
 import { Library } from '../core/library'
 import { DownloadQueue } from '../core/download-queue'
 import { downloadArticle, ArticleUnavailableError } from '../core/download-article'
@@ -31,6 +30,9 @@ import { nextCheckAt } from '../core/subscription-schedule'
 import { resolveDigestDate } from '../core/digest-date'
 import { subscriptionDigest, fetchMissing } from '../core/subscription-digest'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
+import { articleFetchers, createMpRuntime } from '../../electron/services/mp-runtime'
+import type { MpRequestGateway } from '../../electron/services/mp-request-gateway'
+import { MP_ORIGIN } from '../../electron/services/mp-session'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -68,6 +70,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   wx-kit library list
   wx-kit library export --ids <id,id>
   wx-kit settings get libraryRoot
+  wx-kit protection status                         # 查看微信请求保护(零微信请求)
   wx-kit site sync --ids <id> --slug my-post        # 同步到个人站点(需先配 siteSyncPostsDir)
 
 文章库默认在 ~/Documents/wx-kit(可用 settings set libraryRoot <dir> 修改)。
@@ -82,6 +85,9 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     new SettingsService(userDataDir, defaultLibraryRoot())
   const resolveRoot = async (optOut?: string): Promise<string> =>
     optOut ?? (await settingsFor().get()).libraryRoot
+  let gateway: MpRequestGateway | null = null
+  const mpGateway = () => (gateway ??= createMpRuntime(userDataDir))
+  const mpArticleFetchers = () => articleFetchers(mpGateway())
 
   const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
@@ -105,7 +111,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const root = await resolveRoot(opts.out)
       const library = new Library(root)
       // commander 的 --no-video 把 opts.video 置 false；缺省为 true
-      const deps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
+      const deps = { ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
 
       const queue = new DownloadQueue(
         (url) => downloadArticle(url, formats, {
@@ -129,23 +135,36 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const session = getSession()
       if (!session) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login' } }); exitCode = 2; return }
       try {
-        const list = await searchAccount(makeMpFetch(session), session.token, name)
+        const list = await searchAccount(makeMpFetch(mpGateway()), session.token, name)
         outJson({ ok: true, list })
       } catch (e) {
         if (e instanceof MpAuthExpired) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '登录态失效，请重新 login' } }); exitCode = 2 }
-        else { outJson({ ok: false, error: { code: 'MP_API_ERROR', message: (e as Error).message } }); exitCode = 1 }
+        else { outJson({ ok: false, error: { code: (e as { code?: string }).code ?? 'MP_API_ERROR', message: (e as Error).message } }); exitCode = 1 }
       }
     })
 
   program
     .command('auth-status')
-    .description('查询登录态是否有效（会做一次廉价真探测）')
+    .description('查询本地是否保存登录态（零微信请求；有效性需在实际操作时确认）')
     .action(async () => {
       const session = getSession()
-      if (!session) { outJson({ ok: true, valid: false }); return }
-      try { await searchAccount(makeMpFetch(session), session.token, '腾讯'); outJson({ ok: true, valid: true }) }
-      catch (e) { if (e instanceof MpAuthExpired) outJson({ ok: true, valid: false }); else { outJson({ ok: false, error: { code: 'MP_API_ERROR', message: (e as Error).message } }); exitCode = 1 } }
+      if (!session) { outJson({ ok: true, present: false, valid: false }); return }
+      outJson({
+        ok: true, present: true, valid: null, checkedAt: session.timestamp,
+        note: '仅确认本地保存了登录态，未访问微信验证有效性',
+      })
     })
+
+  const protection = program.command('protection').description('微信请求保护（子命令:status / pause / resume）')
+  protection.command('status').description('查看保护状态（零微信请求）').action(async () => {
+    outJson({ ok: true, protection: await mpGateway().status() })
+  })
+  protection.command('pause').description('立即暂停所有微信请求（零微信请求）').action(async () => {
+    outJson({ ok: true, protection: await mpGateway().pause() })
+  })
+  protection.command('resume').description('恢复请求许可；本动作不会立即访问微信').action(async () => {
+    outJson({ ok: true, protection: await mpGateway().resume() })
+  })
 
   program
     .command('crawl')
@@ -167,7 +186,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         : (opts.from && opts.to) ? { from: String(opts.from), to: String(opts.to) }
         : null
       if (!range) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要 --count 或 --from/--to' } }); exitCode = 2; return }
-      const mpFetch = makeMpFetch(session)
+      const mpFetch = makeMpFetch(mpGateway())
       try {
         let fakeid = opts.fakeid as string | undefined
         if (!fakeid) {
@@ -180,7 +199,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         const formats = parseFormats(opts.formats)
         const root = await resolveRoot(opts.out)
         const library = new Library(root)
-        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
+        const ddeps = { ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
         const parseKws = (csv?: string) => csv ? String(csv).split(',').map((s) => s.trim()).filter(Boolean) : undefined
         const include = parseKws(opts.include), exclude = parseKws(opts.exclude)
         const summary = await crawlAccount(fakeid, range, {
@@ -202,10 +221,10 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .command('login')
     .description('打开扫码登录窗口，持久化 session')
     .action(async () => {
-      try { await login(); outJson({ ok: true }) }
+      try { await mpGateway().runAction('auth-verify', MP_ORIGIN, login); outJson({ ok: true }) }
       catch (e) {
         const cancelled = (e as Error).message === 'CANCELLED'
-        outJson({ ok: false, error: { code: cancelled ? 'CANCELLED' : 'LOGIN_FAILED', message: (e as Error).message } })
+        outJson({ ok: false, error: { code: cancelled ? 'CANCELLED' : ((e as { code?: string }).code ?? 'LOGIN_FAILED'), message: (e as Error).message } })
         exitCode = cancelled ? 2 : 1
       }
     })
@@ -225,18 +244,12 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     })
   sessionCmd
     .command('import')
-    .description('从文件导入登录态,并立即探测其有效性')
+    .description('从文件导入登录态（零微信请求；有效性在后续实际操作时确认）')
     .argument('<file>', '来自 session export 的文件')
     .action(async (file: string) => {
-      let session
-      try { session = await importSession(file, cliSessionPath()) }
+      try { await importSession(file, cliSessionPath()) }
       catch (e) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: (e as Error).message } }); exitCode = 2; return }
-      // 导入即真探测:失效也保留文件(如实告知),网络失败不误判为失效
-      try { await searchAccount(makeMpFetch(session), session.token, '腾讯'); outJson({ ok: true, valid: true }) }
-      catch (e) {
-        if (e instanceof MpAuthExpired) outJson({ ok: true, valid: false, note: '已导入,但该登录态已失效,需在有图形界面的机器重新 login 后再导出' })
-        else outJson({ ok: true, valid: null, note: `已导入;有效性探测失败(${(e as Error).message}),稍后可用 auth-status 复查` })
-      }
+      outJson({ ok: true, valid: null, note: '已导入；未访问微信探测有效性，后续实际操作将通过请求保护网关' })
     })
 
   const library = program.command('library').description('文章库(子命令:list / search / remove / rebuild / export)')
@@ -353,7 +366,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
         const library = new Library(root)
         // 订阅检查没有 --no-video 开关，按设置走（与 GUI 的定时检查一致）
-        const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: s.downloadVideos }
+        const ddeps = { ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: s.downloadVideos }
         const queue = new DownloadQueue((url, hint) => downloadArticle(url, formats, ddeps, hint))
         // 透传列表给的文章主键:订阅拿到的是短链,没 hint 会退化成哈希 id → 与「按公众号」抓的同一篇算两篇
         const summary = await queue.run(refs.map((r) => ({ url: r.url, appmsgid: r.appmsgid, itemidx: r.itemidx })))
@@ -363,7 +376,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),
         subs, settings: s, session: session ? { token: session.token } : null,
-        mpFetch: session ? makeMpFetch(session) : null, downloadRefs,
+        mpFetch: session ? makeMpFetch(mpGateway()) : null, downloadRefs,
         log: async (e) => {
           try { await subs.appendCheckLog(e); appendFileSync(logFilePath, formatCheckLogLine(e) + '\n') } catch { /* 留痕失败不阻断 */ }
           process.stderr.write(formatCheckLogLine(e) + '\n')
@@ -396,7 +409,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const root = await resolveRoot(o.out)
       const subs = new Subscriptions(root)
       const library = new Library(root)
-      const mpFetch = makeMpFetch(session)
+      const mpFetch = makeMpFetch(mpGateway())
       const only = o.accounts ? String(o.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : null
       const accounts = (await subs.list())
         .filter((a) => a.subscribed && (!only || only.includes(a.fakeid)))
@@ -436,7 +449,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         // 「我平时下什么就下什么」比记住一串字面量更符合直觉。别顺手统一成硬编码)
         const formats = o.formats ? parseFormats(String(o.formats)) : s.defaultFormats
         const ddeps = {
-          fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
+          ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow,
           now: () => new Date().toISOString(), library, libraryRoot: root,
           downloadVideos: o.video === false ? false : s.downloadVideos,
         }

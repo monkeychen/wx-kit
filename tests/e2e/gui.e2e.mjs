@@ -4,13 +4,13 @@
 //   M6 下载闭环 + 历史 (就地阅读/文件夹 · 复制下载项 · 已存在跳过 · 失败重试)
 //   M7 反馈 (失败项话术/重试)
 //   M9 文库组织 (排序 · 筛选 · 分组 · 卡片⇄列表 · 单击选中/双击阅读 · 批量删除)
-//   + 阅读器 wxfile:// 图片/iframe · 设置库根 · 公众号真实抓取(软跳过)
+//   + 阅读器 wxfile:// 图片/iframe · 设置库根 · 微信请求保护（全程网络封锁）
 //
 // Run: npx vite build && node tests/e2e/gui.e2e.mjs   (or: npm run test:e2e)
 import { _electron as electron } from 'playwright'
 import http from 'node:http'
-import { mkdtempSync, writeFileSync, rmSync, existsSync, copyFileSync } from 'node:fs'
-import { tmpdir, homedir } from 'node:os'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
@@ -74,7 +74,17 @@ async function main() {
   // cliLinkPrompted:true 防 M18 首启软链 Modal 在 e2e 里弹出——它跑在真实 HOME 上，
   // 若触发会污染开发机的 ~/bin / shell profile，且 Modal 遮罩会干扰后续断言。
   writeFileSync(join(userDataDir, 'settings.json'),
-    JSON.stringify({ libraryRoot, defaultFormats: ['cover', 'md', 'html', 'meta'], cliLinkPrompted: true }))
+    JSON.stringify({
+      libraryRoot,
+      defaultFormats: ['cover', 'md', 'html', 'meta'],
+      cliLinkPrompted: true,
+      updateCheckEnabled: false,
+    }))
+  // v0.8.6 首次运行默认保护性暂停；fixture e2e 明确激活本地请求，
+  // 同时由 WX_KIT_BLOCK_WECHAT_NETWORK=1 保证任何微信域名都出不去。
+  writeFileSync(join(userDataDir, 'mp-request-state.json'), JSON.stringify({
+    version: 1, mode: 'active', lastRequestAt: null, nextAllowedAt: 0, updatedAt: Date.now(),
+  }))
   log('libraryRoot', libraryRoot)
 
   // M40:seed 一个带待处理新文章的订阅号,让「展开看标题 → 挑着处理」这条链路能真跑。
@@ -89,27 +99,28 @@ async function main() {
     accounts: [{ fakeid: 'e2e-m40', nickname: 'E2E 待处理号', subscribed: false, watermark: 1753600000, lastCheckedAt: Date.now(), newRefs: M40_REFS }],
   }))
 
-  const realSession = join(homedir(), 'Library', 'Application Support', 'wx-kit', 'mp-session.json')
-  let hasSession = false
-  if (existsSync(realSession)) {
-    try { copyFileSync(realSession, join(userDataDir, 'mp-session.json')); hasSession = true; log('seeded real mp-session') }
-    catch (e) { log('mp-session copy failed:', e.message) }
-  } else {
-    log('no cached mp-session — account-mode step falls back to login-gate assertion')
-  }
-
   const app = await electron.launch({
     executablePath: electronPath,
     args: [projectRoot, `--user-data-dir=${userDataDir}`],
     cwd: projectRoot,
+    env: {
+      ...process.env,
+      WX_KIT_BLOCK_WECHAT_NETWORK: '1',
+      WX_KIT_TEST_FAST_REQUESTS: '1',
+    },
   })
   const win = await app.firstWindow()
   const errors = []
+  let blockedWechatRequests = 0
   win.on('pageerror', (e) => errors.push('pageerror: ' + String(e)))
   win.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()) })
   win.on('crash', () => errors.push('PAGE CRASHED'))
   const proc = app.process()
-  proc.stderr?.on('data', (d) => { const s = String(d); if (!s.includes('IMKCFRunLoop')) process.stderr.write('[main] ' + s) })
+  proc.stderr?.on('data', (d) => {
+    const s = String(d)
+    blockedWechatRequests += (s.match(/BLOCKED_WECHAT_NETWORK/g) ?? []).length
+    if (!s.includes('IMKCFRunLoop')) process.stderr.write('[main] ' + s)
+  })
 
   // 改 antd Select（v6：可点根为 .ant-select，选项为 .ant-select-item）：开下拉 → 点选项文本
   const pickSelect = async (testid, text) => {
@@ -268,28 +279,11 @@ async function main() {
     await win.waitForSelector('[data-testid="article-card"]', { state: 'detached', timeout: 10000 })
     assert(true, 'single delete removed the last card (library empty)')
 
-    // ============ M3.5/M6 · 公众号模式（有缓存 session 真跑，否则登录门）============
+    // ============ M3.5/M6 · 公众号模式（冻结期只验本地登录门，绝不复制真实 session）============
     await win.click('[data-testid="nav-下载"]')
     await win.click('[data-testid="mode-account"]')
-    if (hasSession) {
-      try {
-        await win.waitForSelector('[data-testid="account-search"]', { timeout: 15000 })
-        await win.fill('[data-testid="account-search"] input', '刘备教授')
-        await win.click('[data-testid="account-search"] button')
-        await win.waitForSelector('[data-testid="candidate"]', { timeout: 20000 })
-        await win.click('[data-testid="candidate"]')
-        await win.waitForSelector('[data-testid="start-crawl"]', { timeout: 8000 })
-        await win.fill('.range-row .ant-input-number-input', '1')
-        await win.click('[data-testid="start-crawl"]')
-        await win.waitForSelector('.event .ev-icon.acc', { timeout: 90000 })
-        assert(true, 'account-mode real crawl with cached session lands in download history')
-      } catch (e) {
-        log('account-mode real flow soft-skipped (mp/network/rate-limit):', e.message)
-      }
-    } else {
-      await win.waitForSelector('[data-testid="login-gate"]', { timeout: 10000 })
-      assert(true, 'account mode shows login gate without a session')
-    }
+    await win.waitForSelector('[data-testid="login-gate"]', { timeout: 10000 })
+    assert(true, 'account mode checks local state only and shows login gate without a session')
 
     // ============ M11/M12 · 订阅 ============
     await win.click('[data-testid="nav-订阅"]')
@@ -355,6 +349,17 @@ async function main() {
     // 设置页：订阅控件 + M12 调度模式切换
     await win.click('[data-testid="nav-设置"]')
     await win.waitForSelector('[data-testid="set-subs-auto"]', { timeout: 10000 })
+    assert((await win.locator('[data-testid="mp-protection"]').count()) === 1, 'M46: settings exposes global WeChat request protection')
+    assert((await win.locator('[data-testid="mp-protection-mode"]').innerText()).includes('已启用保护'), 'M46: seeded active protection state is visible')
+    await win.click('[data-testid="mp-protection-pause"]')
+    await win.waitForSelector('[data-testid="mp-protection-resume"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="mp-protection-mode"]').innerText()).includes('用户暂停'), 'M46: pause is immediate and local')
+    await win.click('[data-testid="mp-protection-resume"]')
+    await win.click('.ant-popover:visible .ant-btn-primary')
+    await win.waitForSelector('[data-testid="mp-protection-pause"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="mp-protection-mode"]').innerText()).includes('已启用保护'), 'M46: resume changes permission without probing WeChat')
+    const nextRequestText = await win.locator('[data-testid="mp-protection-next"]').innerText()
+    assert(nextRequestText.includes('最早可执行：') && !nextRequestText.includes('需先手动恢复'), 'M46: protection status explains when the next request can run')
     assert((await win.locator('[data-testid="set-subs-action"]').count()) === 1, 'settings has new-article-action control')
     assert((await win.locator('[data-testid="set-subs-mode"]').count()) === 1, 'settings has schedule-mode selector')
     // 默认 daily 显示时刻控件；切到 interval 显示小时控件
@@ -376,6 +381,7 @@ async function main() {
 
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
+    assert(blockedWechatRequests === 0, `offline e2e attempted zero WeChat requests (blocked=${blockedWechatRequests})`)
 
     // --- M21: 关窗后 activate(等价点程序坞图标)重建窗口 ---
     await win.close()

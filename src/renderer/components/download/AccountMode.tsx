@@ -4,7 +4,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { api } from '../../api'
 import type { CrawlEvent, CrawlRangeInput } from '../../api'
 import LoginGate from '../LoginGate'
-import CrawlProgress, { type CrawlRow, type BackoffState } from '../CrawlProgress'
+import CrawlProgress, { type CrawlRow } from '../CrawlProgress'
 import FormatPicker from '../FormatPicker'
 import { estimateRemaining } from '../../eta'
 import { explainError } from '../../error-explain'
@@ -33,12 +33,12 @@ export default function AccountMode({ onDone, prefill }: Props) {
   const [running, setRunning] = useState(false)
   const [rows, setRows] = useState<CrawlRow[]>([])
   const [eta, setEta] = useState('')
-  const [backoff, setBackoff] = useState<BackoffState | null>(null)
   const startRef = useRef(0)
 
   useEffect(() => {
     api.getSettings().then((s) => setFormats(s.defaultFormats)).catch(() => {})
-    api.mpAuthStatus().then((r) => setAuthValid(r.valid)).catch(() => setAuthValid(false))
+    // 只读本地登录态，不能为了渲染页面偷偷搜索一次固定关键词。
+    api.mpAuthStatus().then((r) => setAuthValid(r.status === 'present')).catch(() => setAuthValid(false))
   }, [])
 
   // 「照此再下」回填：直接进入「已选号 + 配置」态
@@ -56,11 +56,8 @@ export default function AccountMode({ onDone, prefill }: Props) {
   useEffect(() => {
     const off = api.onCrawlProgress((ev: CrawlEvent) => {
       if (ev.kind === 'listed') {
-        setBackoff(null)
         startRef.current = Date.now()
         setRows(ev.items.map((it) => ({ title: it.title, url: it.url, status: 'waiting' })))
-      } else if (ev.kind === 'backoff') {
-        setBackoff({ attempt: ev.attempt, until: Date.now() + ev.waitMs })
       } else if (ev.kind === 'item') {
         setRows((prev) => {
           const next = prev.slice()
@@ -70,7 +67,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
           return next
         })
       } else if (ev.kind === 'done') {
-        setRunning(false); setEta(''); setBackoff(null)
+        setRunning(false); setEta('')
       }
     })
     return off
@@ -99,7 +96,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
     // 关键词过滤:逗号/中文逗号分隔,留空不过滤;按操作类型只传 include 或 exclude 之一
     const kws = kwText.split(/[,，]/).map((k) => k.trim()).filter(Boolean)
     const keywords = kws.length ? (kwMode === 'include' ? { include: kws } : { exclude: kws }) : undefined
-    setRunning(true); setRows([]); setEta(''); setBackoff(null)
+    setRunning(true); setRows([]); setEta('')
     try {
       const summary = await api.mpCrawl(selected.fakeid, selected.nickname, range, formats, keywords)
       const cancelled = summary.total - summary.succeeded - summary.skipped - summary.failed
@@ -119,7 +116,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
       onDone()
     } catch (e) {
       const ex = explainError(e)
-      setRunning(false); setBackoff(null)
+      setRunning(false)
       if (ex.title === '登录已过期') setAuthValid(false)
       else message.error(`${ex.title}：${ex.hint}`)
     }
@@ -206,7 +203,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
 
         {(running || rows.length > 0) && (
           <CrawlProgress account={selected?.nickname ?? ''} rows={rows} eta={eta} running={running}
-            backoff={backoff} onCancel={() => api.mpCancelCrawl()} onRetry={retry} />
+            onCancel={() => api.mpCancelCrawl()} onRetry={retry} />
         )}
     </>
   )

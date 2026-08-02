@@ -1,11 +1,13 @@
 // electron/main.ts
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, session } from 'electron'
 import path, { join } from 'node:path'
 import { runCli } from '../src/cli'
 import { isCliInvocation } from './cli-dispatch'
 import { registerWxfileScheme, handleWxfileProtocol } from './protocol'
 import { registerIpc } from './ipc'
 import { SettingsService } from './services/settings'
+import { getMpElectronSession } from './services/mp-session'
+import { installWechatNetworkFreeze } from './services/wechat-network-freeze'
 
 // Must be called before app 'ready'. Safe in CLI mode — the registered
 // scheme is never exercised without a BrowserWindow.
@@ -32,6 +34,7 @@ async function main() {
     // before the summary/library write finish. We exit explicitly below.
     app.on('window-all-closed', () => {})
     await app.whenReady()
+    installWechatNetworkFreeze([session.defaultSession, getMpElectronSession()])
     const code = await runCli(args, { version: app.getVersion(), userDataDir: app.getPath('userData') })
     app.exit(code)
     return
@@ -39,6 +42,7 @@ async function main() {
 
   // GUI 模式
   await app.whenReady()
+  installWechatNetworkFreeze([session.defaultSession, getMpElectronSession()])
 
   // LSUIElement=true 让进程启动即无程序坞图标(为了 CLI,见上方 CLI 分支注释),
   // GUI 模式要把图标要回来;accessory 应用的窗口不会自动抢焦点,故一并 focus。
