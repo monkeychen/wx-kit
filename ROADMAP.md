@@ -6,13 +6,13 @@
 ## 当前状态
 
 - **最新发布:v0.8.5(2026-07-28,一个问题一份清单)** —— tag `v0.8.5` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M43 `subscription digest --download`(缺的下、已有的跳过,清单统一带 `dir`/`contentPath`),需求/验收 `docs/PRD-v0.8.5.md`。上一功能版 v0.8.4(2026-07-28,看得见还能挑):M39–M42,需求/验收 `docs/PRD-v0.8.4.md`。
-- **v0.8.6 紧急频控修复已完成实现与离线验收,待发布**(2026-08-02)——M44–M46:请求指纹一致性、全局请求网关、持久熔断、隐藏请求清理与网络封锁验收。567 项单测、lint、typecheck、离线 GUI e2e(`blocked=0`)及 macOS 双架构构建通过。**当前真实微信访问仍冻结**:这些结果不代表账号/IP 已解除频控,也不代表新请求栈已做真实兼容性验证;安哥明确解除前不得运行登录探测、搜索、抓取、订阅检查、digest、文章/媒体下载或 live e2e。见 `docs/PRD-v0.8.6.md` 与 `docs/plans/2026-08-02-m44-m46-request-governance.md`。
-- **v0.8.7 需求收集中**——原 v0.8.6 顺延;已收 R1–R5:链接交互、安全告警、README 重做、订阅 pending 失败可见、公众号重新登录与彻底退出登录;见 `docs/PRD-v0.8.7.md`。
+- **v0.8.6 紧急频控修复已完成实现与离线验收,待发布**(2026-08-02)——M44–M47:请求指纹一致性、全局请求网关、持久熔断、隐藏请求清理、网络封锁验收及公众号重新登录/彻底退出。573 项单测、lint、typecheck、离线 GUI e2e(`blocked=0`)及 macOS 双架构构建通过。**当前真实微信访问仍冻结**:这些结果不代表账号/IP 已解除频控,也不代表新请求栈或账号切换已做真实兼容性验证;安哥明确解除前不得运行登录探测、搜索、抓取、订阅检查、digest、文章/媒体下载或 live e2e。见 `docs/PRD-v0.8.6.md`、`docs/plans/2026-08-02-m44-m46-request-governance.md` 与 `docs/plans/2026-08-02-m47-auth-session-reset.md`。
+- **v0.8.7 需求收集中**——原 v0.8.6 顺延;现收 R1–R4:链接交互、安全告警、README 重做、订阅 pending 失败可见;原 R5 公众号会话重置已迁入 v0.8.6;见 `docs/PRD-v0.8.7.md`。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(GUI 端到端)看当前真实结果;微信访问冻结期间只能跑网络封锁下的离线测试。
 
 ## 里程碑目录
 
-**M1–M43 已随 v0.1.0–v0.8.5 发布;M44–M46 已实现、尚未随 v0.8.6 发布**。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M43 已随 v0.1.0–v0.8.5 发布;M44–M47 已实现、尚未随 v0.8.6 发布**。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -64,6 +64,7 @@
 | **M44** ✅ | v0.8.6 | 全局请求治理与熔断:唯一网关、持久状态、跨 GUI/CLI 互斥、200013 零重试、排队取消与批量停手(2026-08-02 离线完成) | `plans/2026-08-02-m44-m46-request-governance.md` |
 | **M45** ✅ | v0.8.6 | Chromium 会话请求栈:后台 API/文章/媒体共用专用 Session 与 Cookie Jar,移除固定 macOS Chrome 124 和生产旁路 axios(2026-08-02 离线完成) | 同上 |
 | **M46** ✅ | v0.8.6 | 隐藏请求清理 + 保护状态 UI/CLI + 网络封锁测试模式;fixture e2e 明确验证微信请求尝试数为 0(2026-08-02 离线完成) | 同上 |
+| **M47** ✅ | v0.8.6 | 公众号重新登录/彻底退出:统一清本地 session、整个专用分区、连接、HTTP/认证缓存;保留设置、订阅、文库、审计与频控状态(2026-08-02 离线完成;真实 A→B 切换待解冻) | `plans/2026-08-02-m47-auth-session-reset.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`(紧急修复,实现完成待发布)、v0.8.7 `docs/PRD-v0.8.7.md`(收集中)(逐条验收看各 §4)。
 

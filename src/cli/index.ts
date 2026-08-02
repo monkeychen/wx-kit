@@ -9,7 +9,7 @@ import { ALL_FORMATS } from '../core/types'
 import { Library } from '../core/library'
 import { DownloadQueue } from '../core/download-queue'
 import { downloadArticle, ArticleUnavailableError } from '../core/download-article'
-import { getSession, login } from '../../electron/services/mp-auth'
+import { getSession, startFreshLogin } from '../../electron/services/mp-auth'
 import { exportSession, importSession } from '../../electron/services/session-transfer'
 import { makeMpFetch } from '../../electron/services/mp-fetch'
 import { searchAccount, listArticles } from '../core/mp-client'
@@ -221,7 +221,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .command('login')
     .description('打开扫码登录窗口，持久化 session')
     .action(async () => {
-      try { await mpGateway().runAction('auth-verify', MP_ORIGIN, login); outJson({ ok: true }) }
+      try { await mpGateway().runAction('auth-verify', MP_ORIGIN, startFreshLogin); outJson({ ok: true }) }
       catch (e) {
         const cancelled = (e as Error).message === 'CANCELLED'
         outJson({ ok: false, error: { code: cancelled ? 'CANCELLED' : ((e as { code?: string }).code ?? 'LOGIN_FAILED'), message: (e as Error).message } })

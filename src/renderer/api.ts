@@ -20,6 +20,8 @@ export type { MpProtectionStatus } from '../../electron/services/mp-request-gate
 
 export interface UpdateChannelInfo { channel: InstallChannel; command: string | null; platform: string; arch: string }
 export interface UpdateProgress { name: string; done: number; total: number }
+export interface MpSessionInfo { loggedIn: boolean; loginAt: number | null }
+export interface MpAuthActionResult { ok: boolean; error?: string; code?: string; failedSteps?: string[] }
 
 export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null; checkLog: CheckLogEntry[]; nextCheckAt: number | null }
 export interface SubscriptionDownloadProgress { fakeid: string; total: number; done: number; phase: string }
@@ -55,7 +57,12 @@ export interface WxApi {
   copyText(text: string): Promise<void>
   // —— M3.5 批量爬取 ——
   mpAuthStatus(): Promise<{ status: 'missing' | 'present'; valid: false | null; checkedAt?: number }>
-  mpLogin(): Promise<{ ok: boolean; error?: string; code?: string }>
+  mpLogin(): Promise<MpAuthActionResult>
+  mpRelogin(): Promise<MpAuthActionResult>
+  /** 只读本地会话文件，不发登录探测。 */
+  mpSessionInfo(): Promise<MpSessionInfo>
+  /** 纯本地彻底退出，不受请求频控状态影响。 */
+  mpLogout(): Promise<MpAuthActionResult>
   mpProtectionStatus(): Promise<MpProtectionStatus>
   mpProtectionPause(): Promise<MpProtectionStatus>
   mpProtectionResume(): Promise<MpProtectionStatus>
