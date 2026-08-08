@@ -4,10 +4,10 @@
 
 ## 内含
 
-- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**：安装（brew/npm 自动检测）、登录态（含 headless 的 session 迁移）、全部 CLI 原子能力速查与组合范例。agent 从零上手 wx-kit 看这个。
+- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**：安装（brew/npm 自动检测）、按 URL 下载、本地文库、素材导出、站点同步，以及已停用命令的兼容边界。agent 从零上手 wx-kit 看这个。
   **它是 CLI 契约的唯一真相**——参数、输出结构、错误码只在这里维护，随每次 CLI 变更同步。
 - `wx-kit-compose/` —— 素材创作编排 skill：走「取料 → 选题 → 写作」（带两个人工检查点），定稿后可选发到个人站点；写作委派给 `khazix-writer`。
-  取料的起点可以是**已下载的文库**，也可以是 `subscription digest`（「昨天/某天各订阅号发了什么」，还没下载时从这儿开始）。
+  取料的起点可以是**已下载的文库**、GUI 导出的素材清单，也可以是用户给出 URL 后新下载的文章。
   **它刻意不复述 CLI 参数**，只说「哪一步用哪个能力」——抄来的命令细节不会跟着源头变，这正是它曾落后二十个里程碑的原因。
 
 ## 安装
@@ -22,15 +22,15 @@
 
 ## 供料契约
 
-素材有两个入口,对应「已经下过」与「还没下过」:
+素材有两个入口，对应“已经下过”与“用户已经给出 URL”：
 
 | 入口 | 命令 | 什么时候用 |
 |---|---|---|
 | 已下载的文库 | `library export` / `library search` / `library list` | 素材已在本地 |
-| 还没下载 | `subscription digest --date <YYYY-MM-DD>` | 只知道「某天各订阅号发了什么」,先看清单再决定下哪几篇 |
+| 用户给出 URL | `download --url <URL>` → `library export --ids <id>` | 先下载，再取得稳定的正文路径 |
 
-`digest` 只查询——不下载、不写库、不推订阅水位;每篇带 `downloaded` 标记,
-`true` 的直接读本地,`false` 的才 `download`。**日期由 agent 换算**,CLI 只认 `YYYY-MM-DD`/`today`/`yesterday`。
+按公众号搜索、历史抓取和订阅依赖微信私有后台，已经停用。用户没有提供文章 URL 时，应说明边界并请求链接，
+不要尝试 `search`、`crawl`、`subscription`、`login` 或 `session`。
 
 ### `library export` 的清单格式
 

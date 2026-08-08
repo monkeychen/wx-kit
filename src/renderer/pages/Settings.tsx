@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmented, Tooltip, message } from 'antd'
+import { Input, Button, Space, InputNumber, Popconfirm, Switch, Tooltip, message } from 'antd'
 import { FolderOpenOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
@@ -7,8 +7,6 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
 import type { UpdateInfo, UpdateChannelInfo } from '../api'
-import type { MpProtectionStatus } from '../api'
-import type { MpAuthActionResult, MpSessionInfo } from '../api'
 import { DMG_POST_INSTALL_HINT } from '../../core/install-channel'
 import type { DownloadFormat } from '../../core/types'
 
@@ -22,25 +20,12 @@ export default function Settings() {
   const [updState, setUpdState] = useState<'idle' | 'checking' | 'done' | 'failed'>('idle')
   const [chan, setChan] = useState<UpdateChannelInfo | null>(null)
   const [dl, setDl] = useState<{ done: number; total: number } | null>(null)
-  const [mpProtection, setMpProtection] = useState<MpProtectionStatus | null>(null)
-  const [mpSession, setMpSession] = useState<MpSessionInfo | null>(null)
-  const [mpAuthBusy, setMpAuthBusy] = useState<'login' | 'relogin' | 'logout' | null>(null)
-  const [mpCleanupError, setMpCleanupError] = useState('')
 
   useEffect(() => { api.getSettings().then(setS) }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
   useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不阻塞设置页 */ }) }, [])
   useEffect(() => { api.updateChannel().then(setChan).catch(() => { /* 渠道识别失败就退回通用引导 */ }) }, [])
   useEffect(() => api.onUpdateProgress((p) => setDl({ done: p.done, total: p.total })), [])
-  useEffect(() => { api.mpSessionInfo().then(setMpSession).catch(() => {}) }, [])
-  useEffect(() => {
-    let active = true
-    const refresh = () => api.mpProtectionStatus().then((value) => { if (active) setMpProtection(value) }).catch(() => {})
-    void refresh()
-    // 状态查询只读本地文件；短轮询让排队数和等待窗口可见，不会产生微信请求。
-    const timer = setInterval(refresh, 1_000)
-    return () => { active = false; clearInterval(timer) }
-  }, [])
 
   const checkUpdateNow = async () => {
     setUpdState('checking')
@@ -88,57 +73,6 @@ export default function Settings() {
       setCliLink(await api.cliLinkStatus())
     } catch (e) { message.error('创建失败：' + (e as Error).message) }
   }
-  const pauseMpRequests = async () => {
-    try { setMpProtection(await api.mpProtectionPause()); message.success('已暂停所有微信请求') }
-    catch (e) { message.error('暂停失败：' + (e as Error).message) }
-  }
-  const resumeMpRequests = async () => {
-    try {
-      setMpProtection(await api.mpProtectionResume())
-      message.success('已恢复请求许可；当前没有发起任何微信请求')
-    } catch (e) { message.error('恢复失败：' + (e as Error).message) }
-  }
-  const explainAuthFailure = (result: MpAuthActionResult) => {
-    if (result.code === 'MP_AUTH_CLEAR_FAILED') {
-      setMpCleanupError(result.error ?? '登录态没有清理完整，请重试')
-      message.error(result.error ?? '登录态没有清理完整，请重试')
-    } else if (result.code === 'MP_GOVERNOR_PAUSED' || result.code === 'MP_RATE_LIMITED') {
-      message.warning((result.error ?? '微信请求已暂停') + '；请先查看上方“微信请求保护”')
-    } else if (result.error !== 'CANCELLED') {
-      message.error('登录失败：' + (result.error ?? '未知错误'))
-    }
-  }
-  const refreshMpSession = async () => {
-    const value = await api.mpSessionInfo()
-    setMpSession(value)
-    return value
-  }
-  const doMpLogin = async (relogin: boolean) => {
-    setMpAuthBusy(relogin ? 'relogin' : 'login')
-    setMpCleanupError('')
-    try {
-      const result = relogin ? await api.mpRelogin() : await api.mpLogin()
-      await refreshMpSession()
-      if (result.ok) message.success(relogin ? '已重新登录' : '已登录')
-      else if (result.error === 'CANCELLED') {
-        message.info(relogin ? '已取消重新登录，旧登录态已经清除' : '已取消登录')
-      } else explainAuthFailure(result)
-    } catch (e) { message.error('登录失败：' + (e as Error).message) }
-    finally { setMpAuthBusy(null) }
-  }
-  const doMpLogout = async () => {
-    setMpAuthBusy('logout')
-    try {
-      const result = await api.mpLogout()
-      await refreshMpSession()
-      if (result.ok) { setMpCleanupError(''); message.success('已彻底退出登录，设置和文库均已保留') }
-      else explainAuthFailure(result)
-    } catch (e) {
-      const text = '退出失败：' + (e as Error).message
-      setMpCleanupError(text); message.error(text)
-    } finally { setMpAuthBusy(null) }
-  }
-
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
   return (
@@ -150,87 +84,6 @@ export default function Settings() {
         </div>
 
         <div className="surface">
-          <div className="setting-block" data-testid="mp-protection">
-            <div className="setting-label">微信请求保护</div>
-            <div className="setting-hint">
-              所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，
-              不会自动重试或探测恢复。
-            </div>
-            {mpProtection ? (
-              <Space direction="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
-                <div data-testid="mp-protection-mode">
-                  当前状态：<strong>{mpProtection.mode === 'active' ? '已启用保护，可按需请求'
-                    : mpProtection.mode === 'rate-limited' ? '频控熔断，所有微信请求已停止'
-                      : '用户暂停，所有微信请求已停止'}</strong>
-                </div>
-                {(mpProtection.pausedReason || mpProtection.rateLimitSignal) && (
-                  <div className="setting-hint" data-testid="mp-protection-reason">
-                    {mpProtection.pausedReason ?? mpProtection.rateLimitSignal}
-                  </div>
-                )}
-                <div className="setting-hint">
-                  上次请求：{mpProtection.lastRequestAt ? new Date(mpProtection.lastRequestAt).toLocaleString() : '暂无'}；
-                  本进程排队：{mpProtection.queued} 项
-                </div>
-                <div className="setting-hint" data-testid="mp-protection-next">
-                  最早可执行：{mpProtection.mode === 'active' && mpProtection.nextAllowedAt > Date.now()
-                    ? new Date(mpProtection.nextAllowedAt).toLocaleString()
-                    : mpProtection.mode === 'active' ? '现在' : '需先手动恢复请求许可'}
-                </div>
-                {mpProtection.mode === 'active' ? (
-                  <Button danger onClick={pauseMpRequests} data-testid="mp-protection-pause">暂停所有微信请求</Button>
-                ) : (
-                  <Popconfirm
-                    title="恢复微信请求许可？"
-                    description="恢复动作本身不会联网；之后只有你的明确操作或已开启的订阅计划才会申请请求。"
-                    okText="恢复" cancelText="继续暂停" onConfirm={resumeMpRequests}>
-                    <Button type="primary" data-testid="mp-protection-resume">恢复请求许可</Button>
-                  </Popconfirm>
-                )}
-              </Space>
-            ) : <div className="faint" style={{ marginTop: 8 }}>正在读取保护状态…</div>}
-          </div>
-
-          <div className="setting-block" data-testid="mp-account">
-            <div className="setting-label">公众号账号</div>
-            <div className="setting-hint">
-              重新登录会先清除旧账号的完整登录态再打开扫码窗口；退出登录只清公众号会话，
-              不会删除设置、订阅、文库、下载历史或频控保护状态。
-            </div>
-            <Space align="center" style={{ marginTop: 8 }} wrap>
-              {mpCleanupError ? (
-                <>
-                  <span data-testid="set-mp-status" style={{ color: 'var(--cinnabar)' }}>
-                    退出未完成，仍可能残留登录数据
-                  </span>
-                  <Button danger loading={mpAuthBusy === 'logout'} onClick={doMpLogout}
-                    data-testid="set-mp-logout-retry">重试清理</Button>
-                </>
-              ) : mpSession?.loggedIn ? (
-                <>
-                  <span className="faint" data-testid="set-mp-status">
-                    已登录{mpSession.loginAt ? ` · 扫码于 ${new Date(mpSession.loginAt).toLocaleString()}` : ''}
-                  </span>
-                  <Button loading={mpAuthBusy === 'relogin'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'relogin'}
-                    onClick={() => doMpLogin(true)} data-testid="set-mp-relogin">重新登录</Button>
-                  <Popconfirm title="彻底退出登录？"
-                    description="只清公众号会话和专用分区；设置、订阅、文库及频控状态都会保留。"
-                    okText="退出" cancelText="取消" onConfirm={doMpLogout}>
-                    <Button danger loading={mpAuthBusy === 'logout'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'logout'}
-                      data-testid="set-mp-logout">退出登录</Button>
-                  </Popconfirm>
-                </>
-              ) : mpSession ? (
-                <>
-                  <span className="faint" data-testid="set-mp-status">未登录</span>
-                  <Button type="primary" loading={mpAuthBusy === 'login'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'login'}
-                    onClick={() => doMpLogin(false)} data-testid="set-mp-login">扫码登录</Button>
-                </>
-              ) : <span className="faint" data-testid="set-mp-status">正在读取登录状态…</span>}
-            </Space>
-            {mpCleanupError && <div className="setting-hint" style={{ color: 'var(--cinnabar)', marginTop: 6 }}>{mpCleanupError}</div>}
-          </div>
-
           <div className="setting-block">
             <div className="setting-label">文章库位置</div>
             <div className="setting-hint">下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。</div>
@@ -258,7 +111,7 @@ export default function Settings() {
             <div className="setting-label">文中视频</div>
             <div className="setting-hint">
               文章里带视频时一并下载（和图片一样，属于文章内容，无需在格式里勾选）。
-              单个视频可达上百 MB——按公众号批量抓取前想省流量可以关掉。
+              单个视频可达上百 MB，需要节省空间或流量时可以关掉。
             </div>
             <Space align="center">
               <Switch checked={s.downloadVideos} data-testid="set-download-videos"
@@ -278,49 +131,6 @@ export default function Settings() {
                 okText="清空" cancelText="取消" onConfirm={clearHistory}>
                 <Button danger>清空下载历史</Button>
               </Popconfirm>
-            </Space>
-          </div>
-
-          <div className="setting-block">
-            <div className="setting-label">订阅</div>
-            <div className="setting-hint">检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。</div>
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>自动检查更新</span>
-                <Switch checked={s.subscriptionAutoCheck} data-testid="set-subs-auto"
-                  onChange={(v) => setS({ ...s, subscriptionAutoCheck: v })} />
-              </Space>
-              <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>检查频率</span>
-                <Segmented value={s.subscriptionScheduleMode} data-testid="set-subs-mode"
-                  onChange={(v) => setS({ ...s, subscriptionScheduleMode: v as 'daily' | 'interval' })}
-                  options={[{ label: '每天某时刻', value: 'daily' }, { label: '每隔N小时', value: 'interval' }]} />
-              </Space>
-              {s.subscriptionScheduleMode === 'daily' ? (
-                <Space align="center">
-                  <span style={{ minWidth: 96, display: 'inline-block' }}>每日检查时刻</span>
-                  <input type="time" value={s.subscriptionCheckTime} data-testid="set-subs-time"
-                    onChange={(e) => setS({ ...s, subscriptionCheckTime: e.target.value })}
-                    style={{ height: 32, padding: '0 8px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--paper)', color: 'var(--ink)' }} />
-                </Space>
-              ) : (
-                <Space align="center">
-                  <span style={{ minWidth: 96, display: 'inline-block' }}>每隔</span>
-                  <InputNumber min={1} max={24} value={s.subscriptionIntervalHours} data-testid="set-subs-interval"
-                    onChange={(v) => setS({ ...s, subscriptionIntervalHours: v ?? 6 })} addonAfter="小时" />
-                </Space>
-              )}
-              <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>发现新文章时</span>
-                <Select value={s.subscriptionNewArticleAction} style={{ width: 160 }} data-testid="set-subs-action"
-                  onChange={(v) => setS({ ...s, subscriptionNewArticleAction: v })}
-                  options={[{ value: 'notify', label: '仅提示' }, { value: 'download', label: '自动下载' }]} />
-              </Space>
-              <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>检查日志</span>
-                <Button size="small" onClick={() => api.subscriptionsOpenLog()} data-testid="set-open-checklog">📄 打开检查日志</Button>
-                <span className="faint" style={{ fontSize: 12.5 }}>完整检查历史,含每次失败原因</span>
-              </Space>
             </Space>
           </div>
 

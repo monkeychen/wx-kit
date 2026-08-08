@@ -10,10 +10,9 @@ describe('FileMpRequestStateStore', () => {
   let dir: string
   beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'wxk-mp-state-')) })
 
-  it('fails closed on first run instead of silently allowing network', async () => {
+  it('starts active so an explicit URL download is not locked behind a retired UI', async () => {
     const state = await new FileMpRequestStateStore(dir).read()
-    expect(state.mode).toBe('user-paused')
-    expect(state.pausedReason).toContain('首次启用')
+    expect(state.mode).toBe('active')
   })
 
   it('persists an explicit resume', async () => {
@@ -24,10 +23,10 @@ describe('FileMpRequestStateStore', () => {
     expect(loaded.updatedAt).toBe(123)
   })
 
-  it('treats corrupt state as protection pause', async () => {
+  it('recovers a corrupt state to active and leaves a diagnostic reason', async () => {
     writeFileSync(join(dir, 'mp-request-state.json'), '{broken')
     const state = await new FileMpRequestStateStore(dir).read()
-    expect(state.mode).toBe('user-paused')
+    expect(state.mode).toBe('active')
     expect(state.pausedReason).toContain('损坏')
   })
 

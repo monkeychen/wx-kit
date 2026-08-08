@@ -46,7 +46,7 @@ export function activeRequestState(now = Date.now()): MpRequestState {
   return { version: 1, mode: 'active', lastRequestAt: null, nextAllowedAt: 0, updatedAt: now }
 }
 
-/** v0.8.6 首次启动 fail closed：用户明确恢复前不产生微信请求。 */
+/** M44–M47 的历史 fail-closed 初始态；M49 起不再作为生产默认，但保留实现。 */
 export function protectiveRequestState(now = Date.now()): MpRequestState {
   return {
     version: 1,

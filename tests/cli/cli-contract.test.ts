@@ -21,56 +21,31 @@ vi.mock('../../electron/services/mp-auth', () => ({
 }))
 
 import { runCli } from '../../src/cli'
-import * as auth from '../../electron/services/mp-auth'
 
 let stdout = ''
 beforeEach(() => {
   stdout = ''
   vi.spyOn(process.stdout, 'write').mockImplementation((s) => { stdout += s; return true })
   vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-  ;(auth.getSession as ReturnType<typeof vi.fn>).mockReturnValue(null)
 })
 
-describe('CLI auth gating', () => {
-  it('search without session → AUTH_REQUIRED, exit 2', async () => {
-    const code = await runCli(['search', '猫笔刀'])
-    expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
-  })
+describe('CLI retired private API commands', () => {
+  it.each(['search', 'crawl', 'login', 'auth-status', 'session', 'subscription', 'protection'])(
+    '%s keeps CLI compatibility but exits with a stable disabled result', async (command) => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-retired-cli-'))
+    const code = await runCli([command], { userDataDir })
+    expect(code).toBe(1)
+    expect(JSON.parse(stdout)).toMatchObject({
+      ok: false,
+      error: { code: 'MP_BACKEND_UNAVAILABLE', alternative: expect.stringContaining('download --url') },
+    })
+    },
+  )
 
-  it('crawl without session → AUTH_REQUIRED, exit 2', async () => {
-    const code = await runCli(['crawl', '猫笔刀', '--count', '5'])
-    expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
-  })
-
-  it('auth-status without session → present:false / valid:false', async () => {
-    const code = await runCli(['auth-status'])
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, present: false, valid: false })
-  })
-
-  it('auth-status with local session is honest about unknown validity and does not probe', async () => {
-    ;(auth.getSession as ReturnType<typeof vi.fn>).mockReturnValue({ token: 't', cookies: [], timestamp: 123 })
-    const code = await runCli(['auth-status'])
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, present: true, valid: null, checkedAt: 123 })
-  })
-})
-
-describe('CLI request protection', () => {
-  it('starts fail-closed and resumes only after an explicit local command', async () => {
-    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-protection-cli-'))
-    expect(await runCli(['protection', 'status'], { userDataDir })).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, protection: { mode: 'user-paused' } })
-
-    stdout = ''
-    expect(await runCli(['protection', 'resume'], { userDataDir })).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, protection: { mode: 'active' } })
-
-    stdout = ''
-    expect(await runCli(['protection', 'pause'], { userDataDir })).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, protection: { mode: 'user-paused' } })
+  it('does not expose stale help for a retired command', async () => {
+    const code = await runCli(['help', 'subscription'])
+    expect(code).toBe(1)
+    expect(JSON.parse(stdout).error.code).toBe('MP_BACKEND_UNAVAILABLE')
   })
 })
 
@@ -150,25 +125,31 @@ describe('CLI library root falls back to settings.libraryRoot', () => {
 })
 
 describe('CLI settings get/set', () => {
-  it('get returns full settings; get <key> returns one', async () => {
+  it('get returns only active settings; get <key> returns one', async () => {
     const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli-'))
     await runCli(['settings', 'get'], { userDataDir: ud })
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, settings: { subscriptionScheduleMode: 'daily' } })
+    const result = JSON.parse(stdout)
+    expect(result).toMatchObject({ ok: true, settings: { libraryRoot: expect.any(String) } })
+    expect(result.settings).not.toHaveProperty('subscriptionScheduleMode')
     stdout = ''
-    await runCli(['settings', 'get', 'subscriptionScheduleMode'], { userDataDir: ud })
-    expect(JSON.parse(stdout)).toEqual({ ok: true, key: 'subscriptionScheduleMode', value: 'daily' })
+    await runCli(['settings', 'get', 'libraryRoot'], { userDataDir: ud })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, key: 'libraryRoot' })
   })
   it('set writes a valid key and echoes full settings', async () => {
     const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli2-'))
-    const code = await runCli(['settings', 'set', 'subscriptionIntervalHours', '4'], { userDataDir: ud })
+    const code = await runCli(['settings', 'set', 'historyRetentionDays', '30'], { userDataDir: ud })
     expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, settings: { subscriptionIntervalHours: 4 } })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, settings: { historyRetentionDays: 30 } })
   })
-  it('set rejects invalid key/value with exit 2', async () => {
+  it('retired subscription settings return the same unavailable boundary and stay stored', async () => {
     const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli3-'))
-    const code = await runCli(['settings', 'set', 'subscriptionScheduleMode', 'weekly'], { userDataDir: ud })
-    expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+    const service = new SettingsService(ud, '/unused')
+    await service.save({ subscriptionIntervalHours: 4 })
+    expect(await runCli(['settings', 'get', 'subscriptionIntervalHours'], { userDataDir: ud })).toBe(1)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'MP_BACKEND_UNAVAILABLE' } })
+    stdout = ''
+    expect(await runCli(['settings', 'set', 'subscriptionIntervalHours', '8'], { userDataDir: ud })).toBe(1)
+    expect((await service.get()).subscriptionIntervalHours).toBe(4)
   })
 })
 
@@ -220,108 +201,6 @@ describe('CLI library remove', () => {
     const code = await runCli(['library', 'remove', '--out', root])
     expect(code).toBe(2)
     expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SELECTOR' } })
-  })
-})
-
-describe('CLI subscription digest', () => {
-  it('非法日期 → BAD_DATE，退出码 2（在鉴权之前就挡下，不猜也不空跑）', async () => {
-    const code = await runCli(['subscription', 'digest', '--date', '7月23日'])
-    expect(code).toBe(2)
-    const out = JSON.parse(stdout)
-    expect(out).toMatchObject({ ok: false, error: { code: 'BAD_DATE' } })
-    expect(out.error.message).toMatch(/YYYY-MM-DD/)      // 报错要给出正确写法
-  })
-
-  it('日期合法但没登录 → AUTH_REQUIRED，退出码 2', async () => {
-    const code = await runCli(['subscription', 'digest', '--date', 'yesterday'])
-    expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
-  })
-
-  it('--download 存在且不改变「日期先挡下」的顺序（错日期时一次请求都不该发）', async () => {
-    const code = await runCli(['subscription', 'digest', '--date', '2026-2-30', '--download'])
-    expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'BAD_DATE' } })
-  })
-
-  it('缺 --date → 用法错（退出码 2），不静默当成今天', async () => {
-    expect(await runCli(['subscription', 'digest'])).toBe(2)
-  })
-})
-
-describe('CLI subscription list', () => {
-  it('lists accounts merged from subscriptions + history', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-subs-'))
-    writeFileSync(join(root, 'subscriptions.json'), JSON.stringify({
-      version: 1, lastRunAt: null, checkLog: [],
-      accounts: [{ fakeid: 'f1', nickname: 'A', subscribed: true, watermark: 10, lastCheckedAt: null, newRefs: [] }],
-    }))
-    const code = await runCli(['subscription', 'list', '--out', root])
-    expect(code).toBe(0)
-    const out = JSON.parse(stdout)
-    expect(out.ok).toBe(true)
-    expect(out.accounts).toEqual(expect.arrayContaining([expect.objectContaining({ fakeid: 'f1', subscribed: true })]))
-  })
-})
-
-describe('CLI subscription check-now', () => {
-  it('without session returns ok with note no-session', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-chk-'))
-    const code = await runCli(['subscription', 'check-now', '--out', root])
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session', newFound: 0 })
-  })
-  it('输出含 results 逐号明细字段(M34;无 session 时为空数组,agent 可无脑遍历)', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-chkres-'))
-    const code = await runCli(['subscription', 'check-now', '--out', root])
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, results: [] })
-  })
-  it('check-now persists no-session entry to subscriptions-check.log under userDataDir', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-chk2-'))
-    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-cli-ud-'))
-    const code = await runCli(['subscription', 'check-now', '--out', root], { userDataDir })
-    expect(code).toBe(0)
-    const logContent = readFileSync(join(userDataDir, 'subscriptions-check.log'), 'utf-8')
-    expect(logContent).toContain('no-session')
-  })
-})
-
-describe('CLI subscription check-now --accounts (v0.8.0 R1)', () => {
-  // 有 session 时全量检查会真发网络请求，故用「指定一个不存在的 fakeid」来验证透传：
-  // fakeids 若没接上，f1/f2 会被选中并走到真实 check；返回 no-accounts 即证明过滤生效。
-  const seedSubs = () => {
-    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-acc-'))
-    writeFileSync(join(root, 'subscriptions.json'), JSON.stringify({
-      version: 1, lastRunAt: null, checkLog: [],
-      accounts: [
-        { fakeid: 'f1', nickname: 'A', subscribed: true, watermark: 10, lastCheckedAt: null, newRefs: [] },
-        { fakeid: 'f2', nickname: 'B', subscribed: true, watermark: 10, lastCheckedAt: null, newRefs: [] },
-      ],
-    }))
-    ;(auth.getSession as ReturnType<typeof vi.fn>).mockReturnValue({ token: 't', cookies: [], timestamp: Date.now() })
-    return root
-  }
-
-  it('--accounts 过滤掉未指定的号：指定不存在的 fakeid → no-accounts，不触碰 f1/f2', async () => {
-    const root = seedSubs()
-    const code = await runCli(['subscription', 'check-now', '--accounts', 'nope', '--out', root])
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, accounts: 0, note: 'no-accounts' })
-  })
-
-  it('--accounts 的 csv 去空格后解析(" nope , nope2 " 同样只匹配这两个)', async () => {
-    const root = seedSubs()
-    const code = await runCli(['subscription', 'check-now', '--accounts', ' nope , nope2 ', '--out', root])
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, accounts: 0, note: 'no-accounts' })
-  })
-
-  it('无 session 时带 --accounts 仍走 no-session 分支，不崩', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-acc0-'))
-    const code = await runCli(['subscription', 'check-now', '--accounts', 'f1', '--out', root])
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session' })
   })
 })
 
@@ -536,12 +415,11 @@ describe('CLI top-level help (M25 R3)', () => {
     const code = await runCli(['-h'])
     expect(code).toBe(0)
     expect(stdout).toContain('无参启动图形界面')
-    expect(stdout).toContain('退出码 0=成功 1=业务失败 2=用法或鉴权错误')
+    expect(stdout).toContain('退出码 0=成功 1=业务失败 2=用法错误')
     expect(stdout).toContain('子命令:list / search / remove / rebuild / export')
-    expect(stdout).toContain('子命令:list / check-now')
     expect(stdout).toContain('子命令:get / set')
     expect(stdout).toContain('常用示例')
-    expect(stdout).toContain('protection status')
+    expect(stdout).toContain('search/crawl/login/auth-status/session/subscription/protection 已停用')
     expect(stdout).toContain('~/Documents/wx-kit')
   })
 
@@ -557,36 +435,6 @@ describe('CLI top-level help (M25 R3)', () => {
     const code = await runCli(['help', 'library'])
     expect(code).toBe(0)
     expect(stdout).not.toContain('https://github.com/monkeychen/wx-kit')
-  })
-})
-
-describe('CLI session export/import (M27)', () => {
-  it('export without session → NO_SESSION, exit 1', async () => {
-    const code = await runCli(['session', 'export'])
-    expect(code).toBe(1)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SESSION' } })
-  })
-
-  it('import an invalid file → CLI_ERROR, exit 2', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'wxk-sess-cli-'))
-    const bad = join(dir, 'bad.json'); writeFileSync(bad, JSON.stringify({ nope: 1 }))
-    const code = await runCli(['session', 'import', bad], { userDataDir: dir })
-    expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
-  })
-
-  it('import a valid file writes it without probing WeChat and reports unknown validity', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'wxk-sess-cli2-'))
-    const f = join(dir, 'in.json')
-    writeFileSync(f, JSON.stringify({ token: '42', cookies: [{ name: 'a', value: 'b' }], timestamp: 1 }))
-    const mpc = await import('../../src/core/mp-client')
-    const spy = vi.spyOn(mpc, 'searchAccount')
-    const code = await runCli(['session', 'import', f], { userDataDir: dir })
-    expect(code).toBe(0)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, valid: null })
-    expect(spy).not.toHaveBeenCalled()
-    spy.mockRestore()
-    expect(JSON.parse(readFileSync(join(dir, 'mp-session.json'), 'utf-8'))).toMatchObject({ token: '42' })
   })
 })
 

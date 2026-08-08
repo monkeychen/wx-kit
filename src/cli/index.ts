@@ -33,6 +33,11 @@ import { runSubscriptionCheck } from '../../electron/services/subscription-check
 import { articleFetchers, createMpRuntime } from '../../electron/services/mp-runtime'
 import type { MpRequestGateway } from '../../electron/services/mp-request-gateway'
 import { MP_ORIGIN } from '../../electron/services/mp-session'
+import {
+  RETIRED_PRIVATE_API_COMMANDS,
+  RETIRED_PRIVATE_API_SETTING_KEYS,
+  retiredPrivateApiResponse,
+} from '../core/retired-private-api'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -56,7 +61,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   const program = new Command()
   program.name('wx-kit')
     .description('微信百宝箱 CLI — 与 GUI 同一二进制:无参启动图形界面,带子命令进入命令行模式。\n'
-      + '输出契约:stdout 纯 JSON(数据),stderr 进度/日志;退出码 0=成功 1=业务失败 2=用法或鉴权错误。')
+      + '输出契约:stdout 纯 JSON(数据),stderr 进度/日志;退出码 0=成功 1=业务失败 2=用法错误。')
     .exitOverride()
   program.version(opts.version ?? '0.0.0-dev', '-v, --version', '输出版本号')
   program.configureOutput({
@@ -66,14 +71,13 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   program.addHelpText('after', `
 常用示例:
   wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,pdf
-  wx-kit crawl 公众号名 --count 10 --include "AI,大模型"
   wx-kit library list
   wx-kit library export --ids <id,id>
   wx-kit settings get libraryRoot
-  wx-kit protection status                         # 查看微信请求保护(零微信请求)
   wx-kit site sync --ids <id> --slug my-post        # 同步到个人站点(需先配 siteSyncPostsDir)
 
 文章库默认在 ~/Documents/wx-kit(可用 settings set libraryRoot <dir> 修改)。
+search/crawl/login/auth-status/session/subscription/protection 已停用；保留命令名仅为兼容旧脚本。
 各命令详情:wx-kit help <命令>
 
 仓库:https://github.com/monkeychen/wx-kit(可读 README.md / issues / releases 深入了解)`)
@@ -83,6 +87,9 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   const userDataDir = opts.userDataDir ?? join(homedir(), '.wx-kit')
   const settingsFor = () =>
     new SettingsService(userDataDir, defaultLibraryRoot())
+  const visibleSettings = (all: Record<string, unknown>) => Object.fromEntries(
+    Object.entries(all).filter(([name]) => !RETIRED_PRIVATE_API_SETTING_KEYS.has(name)),
+  )
   const resolveRoot = async (optOut?: string): Promise<string> =>
     optOut ?? (await settingsFor().get()).libraryRoot
   let gateway: MpRequestGateway | null = null
@@ -110,6 +117,9 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const formats = parseFormats(opts.formats)
       const root = await resolveRoot(opts.out)
       const library = new Library(root)
+      // M49：用户明确点击/执行一次 URL 下载，就是一次新的有效动作。
+      // 自动恢复旧治理状态，避免已隐藏的 protection UI 让核心下载永久卡住。
+      await mpGateway().resume()
       // commander 的 --no-video 把 opts.video 置 false；缺省为 true
       const deps = { ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
 
@@ -129,7 +139,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   program
     .command('search')
-    .description('搜索公众号，返回候选列表')
+    .description('已停用：搜索公众号')
     .argument('<name>', '公众号名称')
     .action(async (name: string) => {
       const session = getSession()
@@ -145,7 +155,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   program
     .command('auth-status')
-    .description('查询本地是否保存登录态（零微信请求；有效性需在实际操作时确认）')
+    .description('已停用：公众号后台登录态')
     .action(async () => {
       const session = getSession()
       if (!session) { outJson({ ok: true, present: false, valid: false }); return }
@@ -155,7 +165,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       })
     })
 
-  const protection = program.command('protection').description('微信请求保护（子命令:status / pause / resume）')
+  const protection = program.command('protection').description('已停用：微信请求保护')
   protection.command('status').description('查看保护状态（零微信请求）').action(async () => {
     outJson({ ok: true, protection: await mpGateway().status() })
   })
@@ -168,7 +178,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   program
     .command('crawl')
-    .description('批量爬取某公众号')
+    .description('已停用：按公众号批量下载')
     .argument('[name]', '公众号名称（或用 --fakeid）')
     .option('--fakeid <id>', '直接指定 fakeid（来自 search）')
     .option('--count <n>', '最近 N 篇')
@@ -219,7 +229,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   program
     .command('login')
-    .description('打开扫码登录窗口，持久化 session')
+    .description('已停用：公众号后台扫码登录')
     .action(async () => {
       try { await mpGateway().runAction('auth-verify', MP_ORIGIN, startFreshLogin); outJson({ ok: true }) }
       catch (e) {
@@ -230,7 +240,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     })
 
   // M27:headless 环境无法扫码,登录态从已登录机器搬运(mac login → export → scp → import)
-  const sessionCmd = program.command('session').description('登录态跨机器迁移(子命令:export / import)')
+  const sessionCmd = program.command('session').description('已停用：公众号后台登录态迁移')
   const cliSessionPath = () => join(userDataDir, 'mp-session.json')
   sessionCmd
     .command('export')
@@ -333,7 +343,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       exitCode = 0
     })
 
-  const subscription = program.command('subscription').description('公众号订阅(子命令:list / check-now / digest)')
+  const subscription = program.command('subscription').description('已停用：公众号订阅')
   subscription
     .command('list')
     .description('列出订阅账号、水位、上次/下次检查')
@@ -574,7 +584,12 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .argument('[key]', '设置键名')
     .action(async (key: string | undefined) => {
       const all = await settingsFor().get()
-      if (key === undefined) { outJson({ ok: true, settings: all }); return }
+      if (key === undefined) {
+        outJson({ ok: true, settings: visibleSettings(all as unknown as Record<string, unknown>) }); return
+      }
+      if (RETIRED_PRIVATE_API_SETTING_KEYS.has(key)) {
+        outJson(retiredPrivateApiResponse()); exitCode = 1; return
+      }
       if (!(key in all)) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: `未知设置键:${key}` } }); exitCode = 2; return }
       outJson({ ok: true, key, value: (all as unknown as Record<string, unknown>)[key] })
     })
@@ -584,16 +599,28 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .argument('<key>', '设置键名')
     .argument('<value>', '值（布尔用 true/false，格式用逗号分隔）')
     .action(async (key: string, value: string) => {
+      if (RETIRED_PRIVATE_API_SETTING_KEYS.has(key)) {
+        outJson(retiredPrivateApiResponse()); exitCode = 1; return
+      }
       const parsed = parseSettingAssignment(key, value)
       if (!parsed.ok) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: parsed.error } }); exitCode = 2; return }
       const next = await settingsFor().save(parsed.patch)
-      outJson({ ok: true, settings: next })
+      outJson({ ok: true, settings: visibleSettings(next as unknown as Record<string, unknown>) })
     })
 
   program
     .command('version')
     .description('输出版本号')
     .action(() => { process.stdout.write((opts.version ?? '0.0.0-dev') + '\n') })
+
+  // 旧命令仍在 Commander 与 CLI_COMMANDS 中注册，保证旧脚本不会误开 GUI；
+  // 在解析参数前统一短路，连 session、文件和网络 runtime 都不读取。
+  const retiredInvocation = RETIRED_PRIVATE_API_COMMANDS.has(argv[0])
+    || (argv[0] === 'help' && RETIRED_PRIVATE_API_COMMANDS.has(argv[1]))
+  if (retiredInvocation) {
+    outJson(retiredPrivateApiResponse())
+    return 1
+  }
 
   try {
     await program.parseAsync(argv, { from: 'user' })

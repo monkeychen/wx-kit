@@ -29,24 +29,6 @@ describe('SettingsService', () => {
     expect(await s.get()).toEqual({ libraryRoot: '/custom', defaultFormats: ['html'], downloadVideos: true, updateCheckEnabled: true, lastUpdateCheckAt: null, lastKnownRelease: null, historyRetentionDays: 365, listColumnWidths: { account: 132, publish: 150, download: 110 }, subscriptionAutoCheck: false, subscriptionCheckTime: '09:00', subscriptionNewArticleAction: 'notify', subscriptionScheduleMode: 'daily', subscriptionIntervalHours: 6, cliLinkPrompted: false, libraryExpandedGroups: [], librarySort: { key: 'publish', dir: 'desc' }, siteSyncEnabled: false, siteSyncPostsDir: '/Users/chenzhian/workspace/ai/dreamble/site/content/posts' })
   })
 
-  it('persists subscription settings', async () => {
-    const s = new SettingsService(dir, '/default/lib')
-    await s.save({ subscriptionAutoCheck: true, subscriptionCheckTime: '07:30', subscriptionNewArticleAction: 'download' })
-    const s2 = new SettingsService(dir, '/default/lib')
-    const v = await s2.get()
-    expect(v.subscriptionAutoCheck).toBe(true)
-    expect(v.subscriptionCheckTime).toBe('07:30')
-    expect(v.subscriptionNewArticleAction).toBe('download')
-  })
-
-  it('persists schedule mode and interval', async () => {
-    const s = new SettingsService(dir, '/default/lib')
-    await s.save({ subscriptionScheduleMode: 'interval', subscriptionIntervalHours: 4 })
-    const v = await new SettingsService(dir, '/default/lib').get()
-    expect(v.subscriptionScheduleMode).toBe('interval')
-    expect(v.subscriptionIntervalHours).toBe(4)
-  })
-
   it('persists custom list column widths', async () => {
     const s = new SettingsService(dir, '/default/lib')
     await s.save({ listColumnWidths: { account: 200, publish: 180, download: 120 } })

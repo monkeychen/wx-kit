@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { activeRequestState, type MpRequestState } from '../../src/core/mp-request-governor'
-import { MpRateLimited } from '../../src/core/mp-errors'
 import {
   MpRequestGateway,
   MpRequestProtectionError,
@@ -25,18 +24,18 @@ const transport = (json: unknown = { base_resp: { ret: 0 } }) => ({
 }) satisfies MpRequestTransport
 
 describe('MpRequestGateway', () => {
-  it('paused state performs zero transport calls', async () => {
+  it('retired private requests are rejected before state planning and transport', async () => {
     const store = new MemoryStore({
       ...activeRequestState(0), mode: 'user-paused', pausedReason: '冻结期',
     })
     const t = transport()
     const gateway = new MpRequestGateway({ store, transport: t })
     await expect(gateway.requestJson('account-search', 'https://mp.weixin.qq.com/cgi-bin/searchbiz', {}))
-      .rejects.toMatchObject({ code: 'MP_GOVERNOR_PAUSED' })
+      .rejects.toMatchObject({ code: 'MP_BACKEND_UNAVAILABLE' })
     expect(t.json).not.toHaveBeenCalled()
   })
 
-  it('all request kinds share one reservation timeline', async () => {
+  it('active article page and asset requests still share one reservation timeline', async () => {
     let now = 1_000
     const waits: number[] = []
     const t = transport()
@@ -45,24 +44,25 @@ describe('MpRequestGateway', () => {
       now: () => now, rng: () => 0,
       wait: async (ms) => { waits.push(ms); now += ms },
     })
-    await gateway.requestJson('account-search', 'https://mp.weixin.qq.com/cgi-bin/searchbiz', {})
     await gateway.fetchText('article-page', 'https://mp.weixin.qq.com/s/X', 60_000)
-    expect(t.json).toHaveBeenCalledTimes(1)
+    await gateway.fetchBinary('https://mmbiz.qpic.cn/X.png', 30_000)
     expect(t.text).toHaveBeenCalledTimes(1)
-    expect(waits.reduce((a, b) => a + b, 0)).toBe(8_000)
+    expect(t.binary).toHaveBeenCalledTimes(1)
+    expect(waits.reduce((a, b) => a + b, 0)).toBe(3_000)
   })
 
-  it('ret 200013 trips a persistent global circuit and never retries', async () => {
-    const store = new MemoryStore(activeRequestState(0))
-    const t = transport({ base_resp: { ret: 200013 } })
-    const gateway = new MpRequestGateway({ store, transport: t, now: () => 10 })
+  it('all retired request kinds share the same hard boundary', async () => {
+    const t = transport()
+    const gateway = new MpRequestGateway({ store: new MemoryStore(activeRequestState(0)), transport: t })
+    await expect(gateway.requestJson('account-search', 'https://mp.weixin.qq.com/cgi-bin/searchbiz', {}))
+      .rejects.toMatchObject({ code: 'MP_BACKEND_UNAVAILABLE' })
     await expect(gateway.requestJson('article-list', 'https://mp.weixin.qq.com/cgi-bin/appmsgpublish', {}))
-      .rejects.toBeInstanceOf(MpRateLimited)
-    expect(t.json).toHaveBeenCalledTimes(1)
-    expect(store.state.mode).toBe('rate-limited')
-    await expect(gateway.fetchText('article-page', 'https://mp.weixin.qq.com/s/X', 60_000))
-      .rejects.toMatchObject({ code: 'MP_RATE_LIMITED' })
-    expect(t.text).not.toHaveBeenCalled()
+      .rejects.toMatchObject({ code: 'MP_BACKEND_UNAVAILABLE' })
+    const action = vi.fn(async () => 'ok')
+    await expect(gateway.runAction('auth-verify', 'https://mp.weixin.qq.com', action))
+      .rejects.toMatchObject({ code: 'MP_BACKEND_UNAVAILABLE' })
+    expect(t.json).not.toHaveBeenCalled()
+    expect(action).not.toHaveBeenCalled()
   })
 
   it('HTTP 429 and high-confidence verification pages trip the same circuit', async () => {

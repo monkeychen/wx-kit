@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vite build && node tests/e2e/gui.e2e.mjs",
+    "test:e2e:live-download": "vite build && node tests/e2e/gui-live-download.e2e.mjs",
     "lint": "eslint .",
     "cli": "electron . "
   },

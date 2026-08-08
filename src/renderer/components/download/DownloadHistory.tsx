@@ -112,7 +112,9 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
                 {ev.failed > 0 && <> · <span className="fail">{ev.failed} 失败</span></>}
                 {cancelled > 0 && <> · <span className="cancel">{cancelled} 未下载</span></>}
               </div>
-              <button className="ev-again" onClick={(e) => { e.stopPropagation(); onAgain(ev) }}>复制下载项</button>
+              {!acc && (
+                <button className="ev-again" onClick={(e) => { e.stopPropagation(); onAgain(ev) }}>复制下载项</button>
+              )}
               <Popconfirm title="删除这条下载记录？" description="只删记录，不删已下载的文件。"
                 okText="删除" cancelText="取消" onConfirm={() => remove(ev.id)}>
                 <button className="ev-del" data-testid="history-del" onClick={(e) => e.stopPropagation()}>删除</button>

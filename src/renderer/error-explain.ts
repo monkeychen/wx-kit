@@ -27,8 +27,6 @@ export function explainError(err: unknown): ExplainedError {
     return { title: '微信请求处于暂停状态', hint: '如需继续，请到设置页查看原因并手动恢复请求许可。', raw }
   if (code === 'MP_REQUEST_CANCELLED')
     return { title: '请求已取消', hint: '排队中的请求没有发送到微信。', raw }
-  if (code === 'MP_NETWORK_BLOCKED')
-    return { title: '微信网络已被测试模式阻止', hint: '当前是离线验证环境，没有发出真实微信请求。', raw }
   if (code === 'AUTH_REQUIRED' || has('auth_required', '200040', '登录态'))
     return { title: '登录已过期', hint: '请重新登录公众号后台后再试。', raw }
   if (has('timeout'))

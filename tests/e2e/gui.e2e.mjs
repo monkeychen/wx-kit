@@ -1,15 +1,15 @@
 // End-to-end GUI test for wx-kit, driving the real Electron app via Playwright.
 // Covers v0.2.0 feature points (M5–M9):
-//   M5 IA (下载双模式 / 文库 / 设置导航)
+//   M5 IA (按链接下载 / 文库 / 设置导航)
 //   M6 下载闭环 + 历史 (就地阅读/文件夹 · 复制下载项 · 已存在跳过 · 失败重试)
 //   M7 反馈 (失败项话术/重试)
 //   M9 文库组织 (排序 · 筛选 · 分组 · 卡片⇄列表 · 单击选中/双击阅读 · 批量删除)
-//   + 阅读器 wxfile:// 图片/iframe · 设置库根 · 微信请求保护/彻底退出（全程网络封锁）
+//   + 阅读器 wxfile:// 图片/iframe · 设置库根 · M49 失效入口退场
 //
 // Run: npx vite build && node tests/e2e/gui.e2e.mjs   (or: npm run test:e2e)
 import { _electron as electron } from 'playwright'
 import http from 'node:http'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -59,8 +59,6 @@ async function main() {
     if (u.pathname.startsWith('/article/')) {
       const art = ARTICLES[u.pathname.slice('/article/'.length)] ?? ARTICLES.a1
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(makeHtml(server.address().port, art))
-    } else if (u.pathname === '/partition-state') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<!doctype html><title>local partition probe</title>')
     } else if (u.pathname === '/pic.png' || u.pathname === '/cover.png') {
       res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG)
     } else { res.writeHead(404); res.end('no') }
@@ -79,49 +77,25 @@ async function main() {
     JSON.stringify({
       libraryRoot,
       defaultFormats: ['cover', 'md', 'html', 'meta'],
-      subscriptionCheckTime: '22:03',
       cliLinkPrompted: true,
       updateCheckEnabled: false,
     }))
-  // v0.8.6 首次运行默认保护性暂停；fixture e2e 明确激活本地请求，
-  // 同时由 WX_KIT_BLOCK_WECHAT_NETWORK=1 保证任何微信域名都出不去。
-  writeFileSync(join(userDataDir, 'mp-request-state.json'), JSON.stringify({
-    version: 1, mode: 'active', lastRequestAt: null, nextAllowedAt: 0, updatedAt: Date.now(),
-  }))
   log('libraryRoot', libraryRoot)
-
-  // M40:seed 一个带待处理新文章的订阅号,让「展开看标题 → 挑着处理」这条链路能真跑。
-  // 刻意 subscribed:false —— 这些数据全在本地,不需要网络,也不会让「检查」真去请求微信。
-  const M40_REFS = [
-    { url: 'https://mp.weixin.qq.com/s/e2e-a', title: 'M40 待处理一', createTime: 1753600000, appmsgid: 900001, itemidx: 1, itemShowType: 0 },
-    { url: 'https://mp.weixin.qq.com/s/e2e-b', title: 'M40 待处理二(视频消息)', createTime: 1753500000, appmsgid: 900002, itemidx: 1, itemShowType: 5 },
-    { url: 'https://mp.weixin.qq.com/s/e2e-c', title: 'M40 待处理三', createTime: 1753400000, appmsgid: 900003, itemidx: 1, itemShowType: 10 },
-  ]
-  writeFileSync(join(libraryRoot, 'subscriptions.json'), JSON.stringify({
-    version: 1, lastRunAt: null, checkLog: [],
-    accounts: [{ fakeid: 'e2e-m40', nickname: 'E2E 待处理号', subscribed: false, watermark: 1753600000, lastCheckedAt: Date.now(), newRefs: M40_REFS }],
-  }))
 
   const app = await electron.launch({
     executablePath: electronPath,
     args: [projectRoot, `--user-data-dir=${userDataDir}`],
     cwd: projectRoot,
-    env: {
-      ...process.env,
-      WX_KIT_BLOCK_WECHAT_NETWORK: '1',
-      WX_KIT_TEST_FAST_REQUESTS: '1',
-    },
+    env: { ...process.env },
   })
   const win = await app.firstWindow()
   const errors = []
-  let blockedWechatRequests = 0
   win.on('pageerror', (e) => errors.push('pageerror: ' + String(e)))
   win.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()) })
   win.on('crash', () => errors.push('PAGE CRASHED'))
   const proc = app.process()
   proc.stderr?.on('data', (d) => {
     const s = String(d)
-    blockedWechatRequests += (s.match(/BLOCKED_WECHAT_NETWORK/g) ?? []).length
     if (!s.includes('IMKCFRunLoop')) process.stderr.write('[main] ' + s)
   })
 
@@ -138,6 +112,11 @@ async function main() {
   try {
     await win.waitForSelector('[data-testid="app-shell"]', { timeout: 20000 })
     assert(true, 'app shell rendered')
+    assert((await win.locator('[data-testid="mode-account"]').count()) === 0, 'M49: account download mode is absent')
+    assert((await win.locator('[data-testid="nav-订阅"]').count()) === 0, 'M49: subscriptions navigation is absent')
+    await win.evaluate(() => { location.hash = '#/subscriptions' })
+    await win.waitForSelector('textarea', { timeout: 5000 })
+    assert((await win.locator('[data-testid="nav-下载"].active').count()) === 1, 'M49: retired subscription route redirects to download')
 
     // ============ M6 · URL 批量下载 → 历史就地确认 ============
     await win.fill('textarea', [urlOf('a1'), urlOf('a2'), urlOf('a3')].join('\n'))
@@ -173,6 +152,12 @@ async function main() {
     await win.waitForSelector('input[readonly]', { timeout: 10000 })
     assert((await win.inputValue('input[readonly]')) === libraryRoot, 'settings shows the seeded library root')
     assert((await win.locator('text=下载历史').count()) >= 1, 'settings has a 下载历史 (retention/clear) section')
+    assert((await win.locator('[data-testid="mp-protection"]').count()) === 0, 'M49: request-protection settings are absent')
+    assert((await win.locator('[data-testid="mp-account"]').count()) === 0, 'M49: public-account login settings are absent')
+    assert((await win.locator('[data-testid="set-subs-auto"]').count()) === 0, 'M49: subscription settings are absent')
+    assert((await win.locator('[data-testid="about-check-update"]').count()) === 1, 'settings keeps the check-update action')
+    assert((await win.locator('[data-testid="set-update-check"]').count()) === 1, 'settings keeps the startup-check toggle')
+    assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings keeps site-sync help')
 
     // ============ M9/M23 · 文库组织(分组默认折叠 = 目录态) ============
     await win.click('[data-testid="nav-文库"]')
@@ -282,144 +267,8 @@ async function main() {
     await win.waitForSelector('[data-testid="article-card"]', { state: 'detached', timeout: 10000 })
     assert(true, 'single delete removed the last card (library empty)')
 
-    // ============ M3.5/M6 · 公众号模式（冻结期只验本地登录门，绝不复制真实 session）============
-    await win.click('[data-testid="nav-下载"]')
-    await win.click('[data-testid="mode-account"]')
-    await win.waitForSelector('[data-testid="login-gate"]', { timeout: 10000 })
-    assert(true, 'account mode checks local state only and shows login gate without a session')
-
-    // ============ M11/M12 · 订阅 ============
-    await win.click('[data-testid="nav-订阅"]')
-    await win.waitForSelector('.page-title:has-text("订阅")', { timeout: 10000 })
-    assert(true, 'subscriptions page reachable from nav (订阅 between 下载 and 文库)')
-    // 账号模式抓过的号会经历史派生到订阅页；无 session 时为空态。两者都算页面健康渲染。
-    const subsRendered = (await win.locator('[data-testid="subs-list"], .empty-state').count()) >= 1
-    assert(subsRendered, 'subscriptions page renders a list or empty-state')
-    assert((await win.locator('[data-testid="subs-check-now"]').count()) === 1, 'subscriptions page offers 检查全部')
-    // R1:每个订阅行有行内「检查」(部分检查);无订阅号时无行,跳过
-    const subsRows = await win.locator('[data-testid="subs-row"]').count()
-    if (subsRows > 0) {
-      const checkOnes = await win.locator('[data-testid="subs-check-one"]').count()
-      assert(checkOnes === subsRows, `each subscription row has inline check (rows=${subsRows}, checkOnes=${checkOnes})`)
-    }
-    // M34: 「发现新文章时」策略常驻可见(点检查时不必回忆几天前设了什么)
-    assert((await win.locator('[data-testid="subs-policy"]').count()) === 1, 'M34: subscriptions page shows the new-article policy inline')
-    const policyText = await win.locator('[data-testid="subs-policy"]').innerText()
-    assert(/自动下载|仅提示/.test(policyText), `M34: policy text names the current strategy (got: ${policyText})`)
-    // M34: 单号检查后那一行必须有反馈(无登录态时是「需重新登录」类文案,同样算说了话)
-    if (subsRows > 0) {
-      await win.locator('[data-testid="subs-check-one"]').first().click()
-      await win.waitForSelector('[data-testid="subs-row-result"]', { timeout: 20000 })
-      const rowRes = await win.locator('[data-testid="subs-row-result"]').first().innerText()
-      assert(rowRes.trim().length > 1, `M34: inline check result is non-empty (got: ${rowRes})`)
-    }
-    // ============ M40 · 待处理新文章:看得见、挑得动 ============
-    {
-      const row = win.locator('[data-testid="subs-row"]').filter({ hasText: 'E2E 待处理号' })
-      assert((await row.count()) === 1, 'M40: seeded pending account is listed')
-      assert((await row.locator('[data-testid="subs-pending"]').count()) === 0, 'M40: pending detail stays collapsed by default')
-      await row.locator('[data-testid="subs-expand"]').click()
-      await row.locator('[data-testid="subs-pending"]').waitFor({ timeout: 5000 })
-      const items = row.locator('[data-testid="subs-pending-item"]')
-      assert((await items.count()) === 3, `M40: expanding lists every pending article (got ${await items.count()})`)
-      const firstTitle = await row.locator('[data-testid="subs-pending-title"]').first().innerText()
-      assert(firstTitle.includes('M40 待处理一'), `M40: pending rows show the actual title (got: ${firstTitle})`)
-      // 类型标只给非普通图文:3 篇里 1 视频 + 1 文字 = 2 个标,普通图文那篇不标
-      const kinds = await row.locator('[data-testid="subs-pending-kind"]').allInnerTexts()
-      assert(kinds.length === 2 && kinds.includes('视频') && kinds.includes('文字'),
-        `M40: only non-ordinary kinds are tagged (got: ${JSON.stringify(kinds)})`)
-      // 默认全选 → 动作文案就是全部篇数
-      const dlAll = await row.locator('[data-testid="subs-download-new"]').innerText()
-      assert(dlAll.includes('3'), `M40: everything is selected by default (got: ${dlAll})`)
-      // 取消勾选一篇 → 动作只作用于剩下的两篇
-      await items.first().locator('input[type="checkbox"]').click()
-      const dlPicked = await row.locator('[data-testid="subs-download-new"]').innerText()
-      assert(dlPicked.includes('2'), `M40: action follows the selection (got: ${dlPicked})`)
-      // 忽略所选 → 只走掉勾上的两篇,没勾的那篇仍在待处理里
-      await row.locator('[data-testid="subs-dismiss-new"]').click()
-      await win.waitForTimeout(800)
-      const left = await row.locator('[data-testid="subs-pending-item"]').count()
-      assert(left === 1, `M40: unselected article survives a partial dismiss (left=${left})`)
-      const leftTitle = await row.locator('[data-testid="subs-pending-title"]').first().innerText()
-      assert(leftTitle.includes('M40 待处理一'), `M40: the survivor is the one left unchecked (got: ${leftTitle})`)
-    }
-
-    // M12: 可观测性元素
-    assert((await win.locator('[data-testid="subs-next-check"]').count()) === 1, 'subscriptions page shows next-check line')
-    assert((await win.locator('[data-testid="subs-open-log"]').count()) === 1, 'subscriptions page offers open-log link')
-    assert((await win.locator('[data-testid="subs-check-log"]').count()) === 1, 'subscriptions page has a check-log section')
-
-    // M47:只在本地种一份 fake session，供设置页验“彻底退出”；不复制真实 session、不访问微信。
-    writeFileSync(join(userDataDir, 'mp-session.json'), JSON.stringify({
-      token: 'offline-e2e', cookies: [], timestamp: 1785600000000,
-    }), { mode: 0o600 })
-    await app.evaluate(async ({ BrowserWindow, session }, fixturePort) => {
-      const partition = session.fromPartition('persist:mpweixin')
-      await partition.cookies.set({
-        url: 'https://mp.weixin.qq.com/', name: 'wxk_offline_e2e', value: 'old', secure: true,
-      })
-      const probe = new BrowserWindow({ show: false, webPreferences: { partition: 'persist:mpweixin' } })
-      await probe.loadURL(`http://127.0.0.1:${fixturePort}/partition-state`)
-      await probe.webContents.executeJavaScript("localStorage.setItem('wxk_offline_e2e', 'old')")
-      probe.destroy()
-    }, port)
-
-    // 设置页：M47 账号退出 + 订阅控件 + M12 调度模式切换
+    // ============ M49 · 失效功能退场，现存设置继续可用 ============
     await win.click('[data-testid="nav-设置"]')
-    await win.waitForSelector('[data-testid="set-subs-auto"]', { timeout: 10000 })
-    assert((await win.locator('[data-testid="mp-protection"]').count()) === 1, 'M46: settings exposes global WeChat request protection')
-    assert((await win.locator('[data-testid="mp-protection-mode"]').innerText()).includes('已启用保护'), 'M46: seeded active protection state is visible')
-    await win.click('[data-testid="mp-protection-pause"]')
-    await win.waitForSelector('[data-testid="mp-protection-resume"]', { timeout: 5000 })
-    assert((await win.locator('[data-testid="mp-protection-mode"]').innerText()).includes('用户暂停'), 'M46: pause is immediate and local')
-    await win.click('[data-testid="mp-protection-resume"]')
-    await win.click('.ant-popover:visible .ant-btn-primary')
-    await win.waitForSelector('[data-testid="mp-protection-pause"]', { timeout: 5000 })
-    assert((await win.locator('[data-testid="mp-protection-mode"]').innerText()).includes('已启用保护'), 'M46: resume changes permission without probing WeChat')
-    const nextRequestText = await win.locator('[data-testid="mp-protection-next"]').innerText()
-    assert(nextRequestText.includes('最早可执行：') && !nextRequestText.includes('需先手动恢复'), 'M46: protection status explains when the next request can run')
-    await win.waitForSelector('[data-testid="set-mp-relogin"]', { timeout: 5000 })
-    assert((await win.locator('[data-testid="set-mp-logout"]').count()) === 1, 'M47: logged-in account exposes relogin and logout')
-    assert((await win.locator('[data-testid="set-mp-status"]').innerText()).includes('已登录'), 'M47: account status reads only the local session')
-    assert(await win.locator('[data-testid="set-subs-time"]').inputValue() === '22:03', 'M47: custom daily check time is loaded before logout')
-    assert(await win.locator('[data-testid="format-cover"]').getAttribute('aria-checked') === 'true', 'M47: custom default formats are loaded before logout')
-
-    await win.click('[data-testid="set-mp-logout"]')
-    await win.click('.ant-popover:visible .ant-btn-primary')
-    await win.waitForSelector('[data-testid="set-mp-login"]', { timeout: 10000 })
-    assert((await win.locator('[data-testid="set-mp-status"]').innerText()).includes('未登录'), 'M47: logout refreshes account status immediately')
-    assert(!existsSync(join(userDataDir, 'mp-session.json')), 'M47: logout deletes only the local session file')
-    const settingsAfterLogout = JSON.parse(readFileSync(join(userDataDir, 'settings.json'), 'utf-8'))
-    assert(settingsAfterLogout.subscriptionCheckTime === '22:03', 'M47: logout preserves custom daily check time')
-    assert(JSON.stringify(settingsAfterLogout.defaultFormats) === JSON.stringify(['cover', 'md', 'html', 'meta']), 'M47: logout preserves custom default formats')
-    const protectionAfterLogout = JSON.parse(readFileSync(join(userDataDir, 'mp-request-state.json'), 'utf-8'))
-    assert(protectionAfterLogout.mode === 'active', 'M47: logout does not reset request protection state')
-    const partitionAfterLogout = await app.evaluate(async ({ BrowserWindow, session }, fixturePort) => {
-      const partition = session.fromPartition('persist:mpweixin')
-      const cookies = await partition.cookies.get({ url: 'https://mp.weixin.qq.com/' })
-      const probe = new BrowserWindow({ show: false, webPreferences: { partition: 'persist:mpweixin' } })
-      await probe.loadURL(`http://127.0.0.1:${fixturePort}/partition-state`)
-      const localValue = await probe.webContents.executeJavaScript("localStorage.getItem('wxk_offline_e2e')")
-      probe.destroy()
-      return { cookies: cookies.map((cookie) => cookie.name), localValue }
-    }, port)
-    assert(!partitionAfterLogout.cookies.includes('wxk_offline_e2e'), 'M47: logout really clears the persistent partition cookie jar')
-    assert(partitionAfterLogout.localValue === null, 'M47: logout really clears persistent partition local storage')
-    assert(await win.locator('[data-testid="set-subs-time"]').inputValue() === '22:03', 'M47: settings UI keeps custom time after logout')
-    assert((await win.locator('[data-testid="set-subs-action"]').count()) === 1, 'settings has new-article-action control')
-    assert((await win.locator('[data-testid="set-subs-mode"]').count()) === 1, 'settings has schedule-mode selector')
-    // 默认 daily 显示时刻控件；切到 interval 显示小时控件
-    assert((await win.locator('[data-testid="set-subs-time"]').count()) === 1, 'daily mode shows the time control')
-    await win.click('[data-testid="set-subs-mode"] label:has-text("每隔")')
-    await win.waitForSelector('[data-testid="set-subs-interval"]', { timeout: 5000 })
-    assert((await win.locator('[data-testid="set-subs-interval"]').count()) === 1, 'switching to interval mode shows the hours control')
-    // M25 R2: 设置页有「打开检查日志」入口
-    assert((await win.locator('[data-testid="set-open-checklog"]').count()) === 1, 'M25: settings offers open-check-log entry')
-    // v0.8.1: 「站点同步」旁的 ? hover 出建站指引(含 dreamble 仓库链接)
-    // M37: 更新检查入口 + 开关(真实联网结果不在 e2e 里断言,只保证入口在)
-    assert((await win.locator('[data-testid="about-check-update"]').count()) === 1, 'M37: settings offers a check-update button')
-    assert((await win.locator('[data-testid="set-update-check"]').count()) === 1, 'M37: settings has the startup-check toggle')
-    assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings offers site-sync help icon')
     await win.locator('[data-testid="site-sync-help"]').hover()
     await win.waitForSelector('.ant-tooltip-container', { timeout: 5000 })
     const tipText = await win.locator('.ant-tooltip-container').innerText()
@@ -427,7 +276,6 @@ async function main() {
 
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
-    assert(blockedWechatRequests === 0, `offline e2e attempted zero WeChat requests (blocked=${blockedWechatRequests})`)
 
     // --- M21: 关窗后 activate(等价点程序坞图标)重建窗口 ---
     await win.close()

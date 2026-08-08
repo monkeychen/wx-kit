@@ -60,5 +60,4 @@ function isGlobalStopCode(code: string): boolean {
     || code === 'MP_RATE_LIMITED'
     || code === 'MP_GOVERNOR_PAUSED'
     || code === 'MP_REQUEST_CANCELLED'
-    || code === 'MP_NETWORK_BLOCKED'
 }
