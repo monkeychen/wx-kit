@@ -66,7 +66,7 @@
 | **M46** ✅ | v0.9.0（吸收） | 隐藏请求清理 + 保护状态 UI/CLI + 网络封锁测试模式;该测试模式已随 M49 退场,有效请求栈成果保留(2026-08-02 离线完成) | 同上 |
 | **M47** ✅ | v0.9.0（吸收） | 公众号重新登录/彻底退出的底层会话清理已实现并保留；M49 隐藏产品入口、停用相关 CLI，因此不再执行真实 A→B 切换验收 | `plans/2026-08-02-m47-auth-session-reset.md` |
 | **M49** ✅ | v0.9.0 | 私有文章列表能力退场:隐藏按公众号下载/订阅/相关设置,停止后台执行链路,CLI 兼容停用,保留实现与用户数据；当前 GUI e2e + 真实 URL 下载验收通过(2026-08-08) | `plans/2026-08-08-m49-private-api-retirement.md` |
-| **M50** ✅ | v0.9.0 | 依赖安全维护与运行时回归:实时读取 28 条 Dependabot open/0 dismissed,修复直接与传递依赖,官方 npm 审计 0；待 push 后核实远端自动关闭(2026-08-08) | `plans/2026-08-08-v0.9.0-boundary-reset-and-security.md` |
+| **M50** ✅ | v0.9.0 | 依赖安全维护与运行时回归:实施时读取 28 条 Dependabot open/0 dismissed,修复直接与传递依赖；官方 npm 审计 0，正式发版推送后远端 0 open/0 dismissed(2026-08-09 核实) | `plans/2026-08-08-v0.9.0-boundary-reset-and-security.md` |
 | **M51** ✅ | v0.9.0 | 当前产品说明与发布准备:四张真实数据页面截图、README/Skill/发布草案、打包 GUI/CLI 与真实下载验收(2026-08-08) | 同上 |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`（当前开发与验收契约）。
