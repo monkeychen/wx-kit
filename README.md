@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.8.5-released-success.svg)
+![Status](https://img.shields.io/badge/v0.9.0-released-success.svg)
 
 ## 这是什么
 
@@ -17,7 +17,7 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.9.0 开发中、尚未发布）**
+> **当前能力边界（v0.9.0）**
 >
 > 微信公众平台后台的私有文章列表链路已持续不可用。因此，“按公众号下载”、公众号订阅及其设置入口已从 GUI 隐藏；`search`、`crawl`、`login`、`auth-status`、`session`、`subscription`、`protection` CLI 命令保留名称但已停用，会返回稳定错误，不会发起网络请求。旧实现和本地数据仍保留，便于未来重新评估。
 >
@@ -25,7 +25,7 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 ## 当前界面
 
-以下截图来自 v0.9.0 当前开发界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
+以下截图来自 v0.9.0 正式界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
@@ -76,11 +76,11 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.8.5：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.9.0：
 
-- Apple Silicon：`wx-kit-0.8.5-arm64.dmg`
-- Intel Mac：`wx-kit-0.8.5.dmg`
-- Windows：`wx-kit Setup 0.8.5.exe`
+- Apple Silicon：`wx-kit-0.9.0-arm64.dmg`
+- Intel Mac：`wx-kit-0.9.0.dmg`
+- Windows：`wx-kit.Setup.0.9.0.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -178,8 +178,8 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.8.5；
-- 当前开发版本：v0.9.0；M49–M51 已完成实现与本地验收，等待单独执行正式发版；
+- 最新已发布版本：v0.9.0；M49–M51 完成产品边界重置、依赖安全维护与当前说明重建；
+- 当前没有正在实施的新版本，后续候选按真实需求单独立项；
 - 完整里程碑、发布史与下一版候选统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
