@@ -13,17 +13,12 @@ describe('parseSettingAssignment', () => {
     expect(parseSettingAssignment('historyRetentionDays', '30')).toEqual({ ok: true, patch: { historyRetentionDays: 30 } })
     expect(parseSettingAssignment('historyRetentionDays', '0')).toMatchObject({ ok: false })
   })
-  it('parses boolean subscriptionAutoCheck', () => {
-    expect(parseSettingAssignment('subscriptionAutoCheck', 'true')).toEqual({ ok: true, patch: { subscriptionAutoCheck: true } })
-    expect(parseSettingAssignment('subscriptionAutoCheck', 'maybe')).toMatchObject({ ok: false })
-  })
-  it('validates HH:MM time', () => {
-    expect(parseSettingAssignment('subscriptionCheckTime', '07:30')).toEqual({ ok: true, patch: { subscriptionCheckTime: '07:30' } })
-    expect(parseSettingAssignment('subscriptionCheckTime', '25:00')).toMatchObject({ ok: false })
-  })
-  it('validates enums', () => {
-    expect(parseSettingAssignment('subscriptionNewArticleAction', 'download')).toMatchObject({ ok: true })
-    expect(parseSettingAssignment('subscriptionScheduleMode', 'weekly')).toMatchObject({ ok: false })
+  it('rejects retired subscription settings without deleting their parser implementation', () => {
+    expect(parseSettingAssignment('subscriptionAutoCheck', 'true')).toMatchObject({ ok: false, error: expect.stringContaining('MP_BACKEND_UNAVAILABLE') })
+    expect(parseSettingAssignment('subscriptionCheckTime', '07:30')).toMatchObject({ ok: false })
+    expect(parseSettingAssignment('subscriptionNewArticleAction', 'download')).toMatchObject({ ok: false })
+    expect(parseSettingAssignment('subscriptionScheduleMode', 'daily')).toMatchObject({ ok: false })
+    expect(parseSettingAssignment('subscriptionIntervalHours', '4')).toMatchObject({ ok: false })
   })
   it('rejects non-settable keys', () => {
     expect(parseSettingAssignment('listColumnWidths', '{}')).toMatchObject({ ok: false })

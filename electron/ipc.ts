@@ -34,6 +34,7 @@ import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subs
 import type { RunCheckResult } from './services/subscription-check'
 import { articleFetchers, createMpRuntime } from './services/mp-runtime'
 import { MP_ORIGIN } from './services/mp-session'
+import { PRIVATE_API_FEATURE_ENABLED, retiredPrivateApiResponse } from '../src/core/retired-private-api'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
@@ -150,6 +151,9 @@ export function registerIpc(settings: SettingsService): void {
   ipcMain.handle('download', async (event, { urls, formats }: { urls: string[]; formats: DownloadFormat[] }) => {
     const { libraryRoot, downloadVideos } = await settings.get()
     const library = new Library(libraryRoot)
+    // M49：显式 URL 下载自动开启本次请求许可；用户已无 protection 设置入口，
+    // 不能让旧的暂停状态把核心能力永久锁死。
+    await mpGateway.resume()
     const deps = {
       fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow,
       now: () => new Date().toISOString(), library, libraryRoot, downloadVideos,
@@ -173,7 +177,8 @@ export function registerIpc(settings: SettingsService): void {
     return summary
   })
 
-  // —— M3.5 批量爬取 / M47 会话重置 ——
+  // —— M3.5 批量爬取 / M47 会话重置（M49 起休眠）——
+  if (PRIVATE_API_FEATURE_ENABLED) {
   let crawlAbort: AbortController | null = null
   const runFreshLogin = async () => {
     try { await mpGateway.runAction('auth-verify', MP_ORIGIN, startFreshLogin); return { ok: true } }
@@ -395,6 +400,26 @@ export function registerIpc(settings: SettingsService): void {
     shell.showItemInFolder(logPath)
   })
 
+  new SubscriptionScheduler({
+    settings,
+    subsFor,
+    runCheck: () => runSubscriptionCheck('auto'),
+    canRun: async () => (await mpGateway.status()).mode === 'active',
+  }).start()
+  } else {
+    // 保留 IPC 名称作为兼容壳：旧渲染调用得到稳定结果，不会落进“无 handler”异常，
+    // 更不会读取 session、订阅数据或构造任何私有 API 请求。
+    const unavailable = () => retiredPrivateApiResponse()
+    for (const channel of [
+      'mp:login', 'mp:relogin', 'mp:sessionInfo', 'mp:logout', 'mp:authStatus',
+      'mp:protectionStatus', 'mp:protectionPause', 'mp:protectionResume', 'mp:search', 'mp:crawl',
+      'subscriptions:list', 'subscriptions:addAccount', 'subscriptions:setSubscribed',
+      'subscriptions:checkNow', 'subscriptions:downloadNew', 'subscriptions:dismissNew',
+      'subscriptions:openLog',
+    ]) ipcMain.handle(channel, unavailable)
+    ipcMain.on('mp:crawl:cancel', () => {})
+  }
+
   // —— M37 更新检查(只检查 + 按渠道引导,不做静默自更新;理由见 PRD-v0.8.2 R3)——
   // M39:门控决策移到 core 的 update-gate,IPC 与定时 tick 共用这一份实现
   const runUpdateCheck = async (silent: boolean): Promise<UpdateInfo | null> => {
@@ -434,11 +459,5 @@ export function registerIpc(settings: SettingsService): void {
     }
   })
 
-  new SubscriptionScheduler({
-    settings,
-    subsFor,
-    runCheck: () => runSubscriptionCheck('auto'),
-    canRun: async () => (await mpGateway.status()).mode === 'active',
-  }).start()
   new UpdateScheduler({ check: runUpdateCheck, windows: () => BrowserWindow.getAllWindows() }).start()
 }

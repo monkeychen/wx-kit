@@ -1,106 +1,105 @@
 ---
 name: wx-kit
 description: |
-  wx-kit(微信百宝箱)的安装与使用教程:下载微信公众号文章(单篇/批量/关键词筛选)、
-  管理本地文库、订阅公众号更新、导出创作素材——全部经 CLI 完成,输出纯 JSON,面向 agent 自动化。
-  当需要「下载某篇/某公众号的微信文章」「批量爬取公众号历史文章」「检查订阅号有没有更新」
-  「昨天/某天各订阅号发了什么」「把已下载文章导出为素材」时使用;发现 wx-kit 未安装时,本 skill 含自动安装路径。
-  不用于:基于文库素材的写作编排(用 wx-kit-compose)。
+  wx-kit（微信百宝箱）的安装与 CLI 使用指南：按文章 URL 下载微信公众号文章、管理本地文库、
+  导出创作素材、同步 Astro 站点，stdout 输出纯 JSON，面向 agent 自动化。
+  当用户要「下载这篇微信文章」「批量下载这些文章链接」「搜索或导出已下载文章」
+  「把文库文章同步到站点」时使用；发现 wx-kit 未安装时，本 skill 提供安装路径。
+  不用于按公众号搜索历史文章或订阅更新：这些依赖微信私有后台的能力已经停用。
+  基于文库素材写作请使用 wx-kit-compose。
 ---
 
-# wx-kit 使用指南(agent 版)
+# wx-kit 使用指南（agent 版）
 
-wx-kit 是 GUI + CLI 同一二进制的桌面应用:**无参启动图形界面,带子命令进入 CLI**。
-CLI 输出契约:**stdout 纯 JSON(数据),stderr 进度,退出码 0=成功 / 1=业务失败 / 2=用法或鉴权错误**。
+wx-kit 是 GUI + CLI 同一二进制的桌面应用：无参启动 GUI，命中 CLI 命令白名单时进入 CLI。
+CLI 契约：stdout 纯 JSON，stderr 输出进度；退出码 `0` 成功、`1` 业务失败、`2` 用法错误。
 
-## 第一步:确认安装
+## 1. 确认安装
 
 ```sh
 command -v wx-kit || ls /Applications/wx-kit.app/Contents/MacOS/wx-kit
 ```
 
-两者皆无 → 按平台安装(装完 `wx-kit --version` 应输出裸版本号):
+两者皆无时按平台安装，装完后 `wx-kit --version` 应输出裸版本号：
 
 ```sh
-# macOS(Homebrew,装完整 .app;安装名三段式「用户/tap/包」,tap 过后可用短名 wx-kit)
+# macOS：Homebrew 安装完整 .app
 brew update && brew install --cask monkeychen/wx-kit/wx-kit
-# ⚠️ 必须紧跟这步:未签名 app 带 quarantine 标记时,连 CLI 调用都会被 Gatekeeper 卡住(挂起无输出)
 xattr -cr /Applications/wx-kit.app
 
-# macOS / Linux(npm,需 Node 20+;国内网络先设 electron 镜像;装完命令名就是 wx-kit)
+# macOS / Linux：npm，需 Node 20+
 export ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/
 npm install -g @simiam/wx-kit
 ```
 
-> 升级:`brew update && brew upgrade --cask wx-kit`(brew 配方缓存在本地,先 update 否则升到旧版)/ `npm update -g @simiam/wx-kit`。
+Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/MacOS/wx-kit`。
+不要自行用软链包装 Electron 应用；macOS 上软链可能导致 Helper 子进程定位失败。需要短命令时使用 GUI 创建的 wrapper。
 
-> brew 装完后二进制在 `/Applications/wx-kit.app/Contents/MacOS/wx-kit`;首次打开 **GUI** 会引导创建
-> `~/bin/wx-kit` 快捷命令。npm 装完 `wx-kit` 直接在 PATH。
-> ⚠️ 别自己 `ln -s` 建软链——macOS 上 Electron 经软链找不到 Helper 子进程,download 会崩;要建就用 wrapper 脚本(GUI 引导创建的就是)。
-
-## 第二步:请求保护(所有微信访问都适用)
-
-```sh
-wx-kit protection status  # 零微信请求;先看全局保护是否允许出网
-```
-
-v0.8.6 首次启用请求保护时会处于 `user-paused`;**不要替用户自动解除暂停**。
-只有用户明确同意继续访问微信后才执行 `wx-kit protection resume`。若状态是 `rate-limited`,
-报告当前已全局停手,不要自行恢复、重试或定时探测。
-
-## 第三步:登录态(仅 search/crawl/subscription 需要;download 单篇不需要)
-
-```sh
-wx-kit auth-status        # 只查本地,零微信请求 → {"ok":true,"present":bool,"valid":false|null}
-```
-
-`present:false` 时分场景:
-
-- **有图形界面的机器**:`wx-kit login` 弹扫码窗,扫码后自动持久化,输出 `{"ok":true}`。
-- **headless/服务器**:在能扫码的机器上 `wx-kit login && wx-kit session export -o s.json`,
-  把文件传过来后 `wx-kit session import s.json`(只导入,返回 `valid:null`,不隐藏探测),用后删除文件。
-  ⚠️ session 文件等同登录凭证,勿入仓库、勿留存。
-
-## 原子能力速查
+## 2. 当前有效能力
 
 | 任务 | 命令 |
 |---|---|
-| 下载单篇(免登录) | `wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,meta` |
-| 搜公众号拿 fakeid | `wx-kit search <名称>` |
-| 批量爬取最近 N 篇 | `wx-kit crawl <名称> --count 10 --formats md,meta` |
-| 爬取 + 标题关键词筛选 | `wx-kit crawl <名称> --count 30 --include "AI,大模型" [--exclude "广告"]` |
-| 列文库(默认发布时间降序) | `wx-kit library list > lib.json`(JSON 可能很大,重定向到文件再解析) |
-| 最近文章清单 | `wx-kit library list`(默认 `--sort publish --order desc`,取前 N 条即最近 N 篇) |
-| 搜文库 | `wx-kit library search <关键词>` |
+| 下载一篇或多篇文章 | `wx-kit download --url <URL> [--url <URL> ...] --formats md,meta` |
+| 从文件批量下载 URL | `wx-kit download --urls-file <文件> [--no-video]` |
+| 查看文库 | `wx-kit library list` |
+| 搜索文库 | `wx-kit library search <关键词> [--account <公众号>]` |
 | 导出素材清单 | `wx-kit library export --ids <id,id>` |
-| 订阅号列表/立即检查 | `wx-kit subscription list` / `wx-kit subscription check-now` |
-| 只检查某几个号 | `wx-kit subscription check-now --accounts <fakeid,fakeid>`(fakeid 从 `subscription list` 取) |
-| **某一天各订阅号发了什么** | `wx-kit subscription digest --date <YYYY-MM-DD\|today\|yesterday>`(只查询;**「昨天」「7月23日」这类说法由你换算成 YYYY-MM-DD**,CLI 不解析自然语言) |
-| **某一天的文章直接取成素材** | 上面那条加 `--download`:缺的下、已有的跳过,**每篇带 `dir`/`contentPath` 可直接读正文** |
-| 读/写设置 | `wx-kit settings get libraryRoot` / `wx-kit settings set libraryRoot <dir>` |
-| 查看/暂停/恢复微信请求 | `wx-kit protection status` / `pause` / `resume`(三者本身均不访问微信) |
-| 同步到个人站点 | `wx-kit site sync --ids <id> --slug <slug>`(按 Astro 站点规范生成目录,纯本地) |
-| 检查有无新版本 | `wx-kit update --check`(只检查;`upgradeCommand` 按安装渠道给,`version` 命令不联网) |
+| 删除文章 | `wx-kit library remove --ids <id,id>` |
+| 重建文库索引 | `wx-kit library rebuild` |
+| 读写公开设置 | `wx-kit settings get [键]` / `wx-kit settings set <键> <值>` |
+| 同步 Astro 站点 | `wx-kit site sync --ids <id> --slug <slug>` |
+| 检查新版本 | `wx-kit update --check` |
 
-格式可选 `cover,md,html,pdf,meta`;文章落盘在库根(默认 `~/Documents/wx-kit`)按公众号分目录,每篇一个文件夹(含 `content.md`/`meta.json` 等)。
+下载格式可选 `cover,md,html,pdf,meta`。文库根目录默认是 `~/Documents/wx-kit`，也可用 `--out` 指定。
 
-**三件默认行为**(不需要额外参数):
+默认行为：
 
-- **文中视频会一并下载**(视频是内容不是格式,`--formats` 里没有它);单个可达上百 MB,批量抓取想省流量加 `--no-video`。
-- **各种消息类型都能抓**(图文 / 文字消息 / 视频消息 / 图片消息),`meta.json` 的 `itemShowType` 标明类型;
-  遇到没适配的新类型会按图文兜底并在该篇 `warnings[]` 里说明——**批处理时值得 `jq` 扫一眼 `warnings`**,
-  它是「下到了但可能不对」的唯一信号。
-- **`digest` 的 `downloaded` 字段直接决定下一步**:`true` 就读本地 `content.md`,别重复下载。
-  要正文时**别自己逐个 `download`**——直接加 `--download`,一条命令就把清单和本地路径都给齐了。
+- 文章中的图片自动本地化；视频默认下载到文章目录，可用 `--no-video` 关闭；
+- 支持当前已适配的图文、文字、视频和图片消息页面；
+- 未适配的页面形态或媒体失败会进入 `warnings[]`，批量处理后应检查该字段；
+- 同一文章已在文库时会跳过，不重复落盘。
 
-## 频控纪律(重要)
+## 3. 私有后台能力已停用
 
-微信有频率限制。wx-kit 把 GUI、CLI、订阅、文章与媒体请求收口到一个持久全局队列,
-并使用随机间隔。命中 `RATE_LIMITED`/`MP_RATE_LIMITED` 后会立即全局熔断、**不会自动重试**。
-agent 不要并发多个 crawl,不要自行 `protection resume`,也不要按“等几分钟再试”做自动探测;
-先向用户报告保护状态。即使已获准恢复,crawl 一次仍以 ≤ 30 篇为宜。
+以下命令名为了兼容旧调用仍保留，但不会执行业务逻辑，也不会访问网络：
+
+```text
+search  crawl  login  auth-status  session  subscription  protection
+```
+
+它们统一返回：
+
+```json
+{"ok":false,"error":{"code":"MP_BACKEND_UNAVAILABLE","message":"微信公众号后台已限制查询其他公众号的文章列表，该功能已停用，未发起网络请求。","alternative":"请使用 wx-kit download --url <文章链接>"}}
+```
+
+退出码为 `1`。不要尝试扫码、导入 session、恢复 protection 或自动重试；这些动作无法恢复已失效的私有文章列表链路。正确替代路径是请用户提供文章 URL，然后调用 `download --url`。
+
+旧订阅设置字段也已从 `settings get` 隐藏，写入时会被拒绝。当前可写字段：`libraryRoot`、`defaultFormats`、`historyRetentionDays`。
+
+## 4. 结果处理
+
+下载结果的核心结构：
+
+```json
+{"ok":true,"total":1,"succeeded":1,"failed":0,"items":[{"url":"...","ok":true,"id":"...","title":"...","dir":"..."}]}
+```
+
+执行后至少检查：
+
+- 顶层 `ok`、`succeeded`、`failed`；
+- 每个 `items[]` 的 `ok`、`error`、`warnings`；
+- 需要正文时确认文章目录内确实存在 `content.md`，不要只凭退出码判断内容可用。
+
+`library export` 输出的 `articles[].contentPath` 是正文绝对路径，正文不内联在 JSON 中；后续分析或写作需要再读取该文件。
+
+## 5. 平台注意事项
+
+- macOS 安装包：直接调用 `/Applications/wx-kit.app/Contents/MacOS/wx-kit`，不要用 `open -a`；
+- Windows 安装包：Electron 是 GUI 子系统程序，stdout 不回贴当前控制台，必须重定向到文件；
+- 涉及大量图片、视频或 PDF 的文章耗时较长，保留 stderr 进度，不要把进程无输出误判为挂死。
 
 ## 细节按需查
 
-- 逐命令参数与 JSON 输出结构:`references/commands.md`
-- 组合任务范例(完整命令序列):`references/recipes.md`
+- 逐命令参数与 JSON 输出：`references/commands.md`
+- 当前有效任务的完整命令序列：`references/recipes.md`

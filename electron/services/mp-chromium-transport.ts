@@ -1,7 +1,14 @@
 import type { Session } from 'electron'
 import type { MpJson } from '../../src/core/mp-types'
 import type { MpRequestTransport } from './mp-request-gateway'
-import { assertWechatNetworkAllowed, isWechatNetworkUrl } from './wechat-network-freeze'
+
+const WECHAT_HOST_SUFFIXES = ['weixin.qq.com', 'qpic.cn', 'qlogo.cn']
+function isWechatNetworkUrl(raw: string): boolean {
+  try {
+    const host = new URL(raw).hostname.toLowerCase()
+    return WECHAT_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+  } catch { return false }
+}
 
 export class MpHttpError extends Error {
   constructor(public readonly status: number, url: string) {
@@ -53,7 +60,6 @@ export class ChromiumMpTransport implements MpRequestTransport {
   private async fetch(
     url: string, timeoutMs: number, externalSignal: AbortSignal | undefined, headers: Record<string, string>,
   ): Promise<Response> {
-    assertWechatNetworkAllowed(url)
     await this.beforeRequest()
     const timeout = AbortSignal.timeout(timeoutMs)
     const signal = externalSignal ? AbortSignal.any([externalSignal, timeout]) : timeout

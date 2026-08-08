@@ -10,10 +10,9 @@ describe('explainError', () => {
     expect(explainError({ code: 'MP_RATE_LIMITED', message: 'blocked' }).hint).toContain('不会自动重试')
   })
 
-  it('maps paused, cancelled and offline-blocked protection errors', () => {
+  it('maps paused and cancelled protection errors', () => {
     expect(explainError({ code: 'MP_GOVERNOR_PAUSED', message: 'paused' }).title).toContain('暂停')
     expect(explainError({ code: 'MP_REQUEST_CANCELLED', message: 'cancelled' }).title).toContain('取消')
-    expect(explainError({ code: 'MP_NETWORK_BLOCKED', message: 'blocked' }).title).toContain('测试模式')
   })
 
   it('maps auth-expired (class, AUTH_REQUIRED string, 200040)', () => {

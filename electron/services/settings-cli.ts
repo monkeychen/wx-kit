@@ -1,11 +1,10 @@
 // CLI 设置赋值:把字符串值校验并解析成 AppSettings 的部分补丁。纯函数,无 electron。
 import { ALL_FORMATS, type DownloadFormat } from '../../src/core/types'
 import type { AppSettings } from './settings'
+import { RETIRED_PRIVATE_API_SETTING_KEYS } from '../../src/core/retired-private-api'
 
 export const SETTABLE_KEYS = [
   'libraryRoot', 'defaultFormats', 'historyRetentionDays',
-  'subscriptionAutoCheck', 'subscriptionCheckTime', 'subscriptionNewArticleAction',
-  'subscriptionScheduleMode', 'subscriptionIntervalHours',
 ] as const
 
 type ParseOk = { ok: true; patch: Partial<AppSettings> }
@@ -18,6 +17,9 @@ const intIn = (raw: string, lo: number, hi: number): number | null => {
 }
 
 export function parseSettingAssignment(key: string, raw: string): ParseOk | ParseErr {
+  if (RETIRED_PRIVATE_API_SETTING_KEYS.has(key)) {
+    return fail(`MP_BACKEND_UNAVAILABLE: ${key} 对应的公众号订阅能力已停用`)
+  }
   switch (key) {
     case 'libraryRoot':
       return raw ? { ok: true, patch: { libraryRoot: raw } } : fail('libraryRoot 不能为空')

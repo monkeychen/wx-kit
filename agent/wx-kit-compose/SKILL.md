@@ -2,9 +2,9 @@
 name: wx-kit-compose
 description: |
   用 wx-kit 的公众号文章作素材，走「取料→选题→写作」把它写成一篇新稿（带人工检查点）。
-  素材可以来自已下载的文库，也可以从「昨天/某天各订阅号发了什么」开始现取。
-  当用户想「用文库里这几篇文章写一篇」「看看昨天各号发了啥、能写点什么」「把下载的公众号文章当素材出选题/写稿」「基于 wx-kit 攒的素材写篇长文」时使用。
-  触发词：用文库文章写稿、拿这几篇当素材、基于素材选题、昨天的文章能写什么、把下载的文章写成一篇、wx-kit 素材写作。
+  素材来自已下载的本地文库、GUI 导出的素材清单，或用户明确提供 URL 后现下的文章。
+  当用户想「用文库里这几篇文章写一篇」「把下载的公众号文章当素材出选题/写稿」「基于 wx-kit 攒的素材写篇长文」时使用。
+  触发词：用文库文章写稿、拿这几篇当素材、基于素材选题、把下载的文章写成一篇、wx-kit 素材写作。
   不用于：只想下载文章不写稿（那用 wx-kit-skill）、从零无素材写作（直接用 khazix-writer）、纯标题生成（用 wechat-title）。
 ---
 
@@ -14,14 +14,14 @@ description: |
 
 把 wx-kit 的公众号文章变成创作素材，编排「取料 → 选题 → 写作」一条链，定稿后可选发到个人站点。**这是个薄编排层**：取料靠 wx-kit 的 CLI/导出文件，写作靠 `khazix-writer`（你的笔调在那儿），本 skill 只负责把素材拉过来、提选题、在两个关键点停下等你拍板。
 
-**命令细节不在这里。** 参数、输出契约、安装与登录态、错误码一律看 `wx-kit-skill`——本 skill 只说「哪一步该用什么」。
+**命令细节不在这里。** 参数、输出契约、安装与停用边界、错误码一律看 `wx-kit-skill`——本 skill 只说「哪一步该用什么」。
 
 **核心原则:人在环中。** AI 收集素材、提选题候选、出初稿;**选题和定稿权在你**。两个检查点不可绕过——不要从素材一路冲到成品。
 
 ## When to Use
 
-- 想拿文库里若干篇文章（或某天订阅自动下载的）当素材，写一篇新稿。
-- **只知道「昨天/某天各订阅号发了什么」，还没决定下哪几篇**——从这里开始就行（见流程 1-A）。
+- 想拿文库里若干篇文章当素材，写一篇新稿。
+- 用户已经给出一组文章 URL，希望下载后从中提炼选题。
 - 已在文库 GUI 多选并「导出为素材」，手里有一个 `exports/*.json`。
 - 想先从一批素材里看看「能提炼出哪些选题方向」再决定写哪个。
 
@@ -36,19 +36,16 @@ description: |
 
 先看用户手上有什么，选一条路：
 
-**A. 还没下载，只知道「昨天/某天各号发了什么」** —— 选题真正的起点
+**A. 用户已提供文章 URL，但还没下载**
 
 ```sh
-# 只看清单（不取正文）：日期你自己算，CLI 只认 YYYY-MM-DD / today / yesterday
-wx-kit subscription digest --date 2026-07-27
-# 要正文：同一条命令加 --download，缺的下、已有的跳过，每篇直接带 dir/contentPath
-wx-kit subscription digest --date 2026-07-27 --download --formats md,meta
+wx-kit download --url <URL1> --url <URL2> --formats md,meta
+# 下载完成后再从文库按结果里的 id 导出
+wx-kit library export --ids <id1>,<id2>
 ```
 
-**先不带 `--download` 看一眼清单**，和用户确认要哪几篇再取——那天可能有十几篇，
-其中多数你只是扫个标题就过了，全下会把几十 MB 和几十次请求花在没人看的文章上。
-确认后加 `--download`：清单里每篇带 `contentPath`，直接读，**不必自己逐个 `download`、
-也不必把「刚下的」和「本来就有的」两种结果合并**（那道缝 CLI 已经缝好了）。
+只下载用户明确提供的 URL。若用户只说“某公众号最近文章”或“昨天各号更新”，不要调用旧的
+`search` / `crawl` / `subscription`：这些私有后台能力已经停用。应说明边界并请用户提供文章链接。
 
 **B. GUI 已导出**：用户在文库多选 →「导出为素材」写出 `<库根>/exports/<时间戳>.json`。读最新那个。
 
@@ -56,10 +53,10 @@ wx-kit subscription digest --date 2026-07-27 --download --formats md,meta
 
 ```sh
 wx-kit library export --ids a,b,c        # 按文章 id
-wx-kit library export --since 2026-07-27 # 按下载日期（「今天订阅自动下载的」用今天）
+wx-kit library export --since 2026-07-27 # 按下载日期
 wx-kit library export --account "某号"    # 按公众号（昵称包含匹配）
 wx-kit library export --all              # 全库：没有选料器时必须显式给
-wx-kit library search <关键词>            # 按标题/内容找素材，再拿 id 去 export
+wx-kit library search <关键词>            # 按标题找素材，再拿 id 去 export
 wx-kit library list                      # 默认发布时间降序 → 取前 N 条即「最近 N 篇」
 ```
 
@@ -126,8 +123,8 @@ wx-kit site sync --ids <文章id> --slug <url-slug>     # 需先配好 siteSyncP
 - **跳过检查点直接出成品**：最常见的错。两个 🛑 必须停。
 - **未经要求就 `site sync`**：发布是对外且不可逆的，用户没说「发」就停在定稿。
 - **自作主张 `--all` 导全库**：用户没指定就先问，别一股脑全导。
-- **拿到 digest 清单就把整天的文章全下了**：先看标题、和用户确认要哪几篇，再加 `--download`。
-- **自己逐个 `download` 再去查路径**：`digest --download` 已经把清单和本地路径给齐了。
+- **为了找某公众号文章而调用旧私有命令**：`search` / `crawl` / `subscription` 已停用；请用户给 URL。
+- **下载后自己猜正文路径**：从下载结果取 id，再用 `library export` 获取可靠的 `contentPath`。
 - **没看 `itemShowType` 就把视频/文字消息当长文用**：那类「正文」只有一段描述，据此写论据等于编造。
 - **把清单里的 `contentPath` 当正文**：那是路径，要去读文件。
 - **为选题去跑 hv-analysis**：错位且慢；选题轻量内联即可。

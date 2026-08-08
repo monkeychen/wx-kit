@@ -10,6 +10,7 @@ export class MpApiError extends Error {
 }
 
 export type MpProtectionErrorCode =
+  | 'MP_BACKEND_UNAVAILABLE'
   | 'MP_GOVERNOR_PAUSED'
   | 'MP_RATE_LIMITED'
   | 'MP_COOLDOWN'

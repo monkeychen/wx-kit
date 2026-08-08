@@ -18,6 +18,11 @@
 - **纯 Node/Electron，无 Python 边车**：原型的 FastAPI + Playwright + PyInstaller 是 PyQt 时代遗留。**不要重新引入 Python / 独立 chromium / 数据库**——单一语言、单进程、单二进制。
 - **双启动模式服务于 AI agent**：CLI 输出纯 JSON 就是为了让 agent 通过 skill 调用，这是产品定位的一部分。
 - **第一阶段不做授权/激活系统**：开箱即用，不加付费门槛。后续要商业化再单独议（`electron/main.ts` 当前无 license 校验）。
+- **私有文章列表能力已退场（M49）**：微信公众平台后台已持续拒绝查询其他公众号文章列表，
+  因此 GUI 不再展示按公众号下载、订阅和相关设置；CLI 的 `search`/`crawl`/`login`/`auth-status`/
+  `session`/`subscription`/`protection` 保留命令名和旧实现，但生产入口统一返回
+  `MP_BACKEND_UNAVAILABLE`，不得重新接回网络。旧源码和用户数据保留，除非安哥重新立项，不做删除或迁移。
+  **按文章 URL 下载不依赖该私有列表能力，仍须真实验收。**
 
 ---
 
@@ -33,7 +38,7 @@
 ### 发版规约（统一，勿再不一致）
 发版只走一条路：**feat 分支 → 合 main → 在 main 打 annotated tag `vX.Y.Z` → 建 GitHub Release**。
 - **不单开 `release/*` 分支**——版本的不可变快照由 **tag** 锁定（分支会漂移、tag 不会）。历史上的 `release/v0.2.0` 是早期不一致的遗留，已删。
-- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归「项目状态」与 ROADMAP 发布史（曾追加式维护堆出 7 版重复,2026-07-17 安哥指出后清理）；⑥ commit、合 main、打 tag。
+- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。README 不复制完整发布史，统一指向 ROADMAP；若当前有效 GUI 有明显变化，重拍有效页面截图或移除过时截图，绝不能继续展示已退场页面。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归 ROADMAP 发布史；⑥ commit、合 main、打 tag。
 - **`gh release create` 中途别被中断**——它是「先建草稿 → 传附件 → 最后才 publish」，杀在中途会留下未发布的 Draft（外部不可见）。若已成 Draft，用 `gh release edit vX.Y.Z --draft=false --latest` 补发布。
 - **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
 ### 发版完成的定义（v0.6.0 起）
@@ -74,6 +79,7 @@ npm install            # 安装依赖（Node 20+）
 npm run dev            # 启动 GUI 开发模式（vite + electron）
 npm test               # 跑 vitest 单测（纯逻辑，CI 友好）
 npm run test:e2e       # 构建 + Playwright 驱动真实 Electron 跑 GUI 全流程
+npm run test:e2e:live-download # 隔离文库 + 真实微信文章 URL，验下载/历史/文库/阅读器
 npm run lint           # eslint
 npx tsc --noEmit -p tsconfig.json   # 类型检查
 npm run build          # vite build + electron-builder（出安装包）
@@ -85,11 +91,11 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 ---
 
 ## 关键约束与已知陷阱（容易重踩，务必注意）
-- **微信频控**：批量抓取默认串行 + 随机延迟（PRD §9）。已删除文章会返回 HTTP 200 错误页 → 用"解析后标题为空即视为无效文章"判定失败（见 `src/core/download-article.ts`）。
+- **按 URL 下载仍是生产能力**：多 URL 下载保持串行；已删除文章会返回 HTTP 200 错误页 → 用“解析后标题为空即视为无效文章”判定失败（见 `src/core/download-article.ts`）。不要把私有列表接口失效扩大成“所有微信文章都不能下载”。
 - **文章库**：默认在用户文档目录下（`~/Documents/wx-kit`），可在设置改。文件系统存储 + `library.json` 索引，不用数据库。
 - **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（Electron 42 仍如此），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
 - **CLI 模式必须注册 no-op `window-all-closed`**（`electron/main.ts`）：否则 PDF 用的离屏 BrowserWindow 关闭会触发 Electron 默认自动退出，截断流程。
-- **文章列表只能用 `cgi-bin/appmsgpublish`,别换回 `cgi-bin/appmsg?type=9`**(v0.8.2 R4 实录)：后者拉的是「图文素材」,**只返回 `item_show_type=0`**——实测某号 appmsg 给 370 篇/最新卡在 2026-07-17,appmsgpublish 给 770 篇/最新 07-25,文字消息(10)与视频消息(5)全在里面。旧接口没有「取全部类型」的开关(`type` 换任何值都 `ret=200002`)。**后果不只是批量少几篇:订阅检查共用 `fetchPage`,曾长期静默漏检整类消息而检查记录显示「无新文章」**。新接口是三层嵌套(`publish_page` → `publish_list[].publish_info` → `appmsgex[]`,中间两层是 JSON 字符串),且 **`begin`/`count` 按「群发组」计不是文章数**,游标必须按组数推进。
+- **休眠实现的历史约束：文章列表曾只能用 `cgi-bin/appmsgpublish`，别换回 `cgi-bin/appmsg?type=9`**(v0.8.2 R4 实录)。M49 后两者都不得从生产入口调用；下面只用于未来重新评估旧实现。后者拉的是「图文素材」,**只返回 `item_show_type=0`**——实测某号 appmsg 给 370 篇/最新卡在 2026-07-17,appmsgpublish 给 770 篇/最新 07-25,文字消息(10)与视频消息(5)全在里面。旧接口没有「取全部类型」的开关(`type` 换任何值都 `ret=200002`)。新接口是三层嵌套(`publish_page` → `publish_list[].publish_info` → `appmsgex[]`,中间两层是 JSON 字符串),且 **`begin`/`count` 按「群发组」计不是文章数**,游标必须按组数推进。
 - **文章被拒之后,列表接口不再有任何标记**(v0.8.3 R1 实测,别再花时间找):`checking` 只在**审核期间**为 1,
   审核结束后无论通过与否都归零——实测同两篇文章昨天 `checking:1`、今天 `checking:0`,而页面始终打不开
   (「此内容发送失败无法查看…涉嫌违规」)。把 6 篇的每个字段(含嵌套)做过集合对比,
@@ -106,7 +112,7 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - **打包后 CLI 走内层二进制，不是 `npx electron .`**（模式分流见 `electron/main.ts` 的 `app.isPackaged` 分支）：mac 是 `/Applications/wx-kit.app/Contents/MacOS/wx-kit <子命令>`（别用 `open -a`，拿不到 stdout/退出码），win 是 `%LOCALAPPDATA%\Programs\wx-kit\wx-kit.exe`。**Windows 坑：Electron 是 GUI 子系统程序，stdout 不回贴调用控制台**——直接在 cmd/PowerShell 跑看不到 JSON，必须重定向到文件（`> out.json`，GUI 子系统下仍生效），管道 `|` 取 stdout 不可靠。agent 集成优先 mac/Linux。
 - **`wxfile://` 协议**：阅读器读本地图片用，路径严格限制在库根内（`electron/protocol.ts` 的 `resolveWxfilePath`，含编码 `..` 穿越防护）。
 - **HTML 阅读器 iframe** 用 `sandbox`（无 `allow-scripts`）：安全，但意味着 Playwright 无法在其内部执行脚本——e2e 里 HTML 视图只断言 iframe src，图片渲染由 md 视图的 `naturalWidth>0` 等价证明。
-- **e2e 只能在主会话/本地跑**：子 agent 的沙箱解析不了 electron 二进制。Antd v6 会在两个汉字按钮文本间自动插空格（"阅 读"），写选择器时注意。
+- **e2e 只能在主会话/本地跑**：子 agent 的沙箱解析不了 electron 二进制。GUI fixture e2e 只覆盖当前有效页面，不再设置“微信网络封锁模式”；另用隔离文库执行真实文章 URL 下载验收，不能用 fixture 结果替代真实链路。Antd v6 会在两个汉字按钮文本间自动插空格（"阅 读"），写选择器时注意。
 - **commit message 含反引号/`$`/`!` 时必须用 `git commit -F <文件>`,不能用 `-m "…"`**(2026-07-26 实录):
   双引号里的反引号会被 shell 当**命令替换真的执行**。当时 message 里写了 `` `brew update` ``/`` `brew list` ``
   作说明,结果**真跑了 `brew update`**(把本机 Homebrew 从旧版升到 6.0.12、更新 4 个 tap),

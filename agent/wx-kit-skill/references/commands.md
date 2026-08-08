@@ -1,189 +1,108 @@
 # wx-kit CLI 逐命令参考
 
-> 所有输出为单行 JSON(stdout);进度走 stderr。以下结构均来自真机实测(v0.6.0)。
-> 输出较大时(如 library list)重定向到文件再解析,别经管道截断。
+> stdout 为 JSON，stderr 为进度。输出较大时重定向到文件再解析，不要用会截断数据的管道。
 
-## download — 下载文章(免登录)
-
-```sh
-wx-kit download --url <u> [--url <u2> ...] [--urls-file <file>] [--formats cover,md,html,pdf,meta] [--out <dir>]
-```
-
-- `--formats` 默认 `md,html,meta`;`--out` 缺省用设置里的库根。
-- **文中视频默认会下**(视频是内容不是格式,和图片一样不需要在 `--formats` 里选):落到 `videos/video-N.mp4`,自动取最高清档。
-  `--no-video` 可关掉——单个视频实测可达 133MB,批量抓几百篇前值得考虑。关掉时正文留一行「本文含 N 个视频(未下载)」,不静默丢弃。
-  视频下载失败时文章其余部分照常产出,失败原因出现在该篇的 `warnings[]` 里(`ok` 仍为 true——文章本体是成功的)。
-- 输出:`{"ok":true,"total":1,"succeeded":1,"failed":0,"skipped":1?,"items":[{"url","ok","id","title","dir"?,"skipped"?,"error"?}]}`
-- 已在库中的文章自动跳过(`skipped`);解析不到标题的(已删除文章)记 failed。
-- 支持常规图文、纯文字消息、图文消息/小绿书三类页面。
-
-## search — 搜公众号(需登录)
+## download — 按 URL 下载文章
 
 ```sh
-wx-kit search <名称>
+wx-kit download \
+  [--url <URL> ...] \
+  [--urls-file <文件>] \
+  [--formats cover,md,html,pdf,meta] \
+  [--no-video] \
+  [--out <文库根目录>]
 ```
 
-输出:`{"ok":true,"list":[{"fakeid","nickname","alias","signature"}]}`;多候选时用 `fakeid` 精确指定后续 crawl。
+- `--url` 可重复；也可用 `--urls-file` 逐行提供 URL；
+- `--formats` 缺省取设置中的默认格式；
+- 图片自动本地化，视频默认下载到 `videos/video-N.mp4`，`--no-video` 可关闭；
+- 已入库文章自动跳过；文章已删除或解析不到有效标题时记为失败；
+- 视频等非关键媒体失败不会抹掉已成功的正文，但会写入 `warnings[]`。
 
-## auth-status / login / session — 登录态
+结果示意：
+
+```json
+{"ok":true,"total":2,"succeeded":1,"failed":0,"skipped":1,"items":[{"url":"...","ok":true,"id":"...","title":"...","dir":"..."}]}
+```
+
+## library — 本地文库
 
 ```sh
-wx-kit auth-status                    # 只读本地:{"ok":true,"present":false,"valid":false}
-                                      # 有本地态:{"ok":true,"present":true,"valid":null,"checkedAt":...}
-wx-kit login                          # 弹扫码窗;成功 {"ok":true};用户关窗 {"ok":false,error.code:"CANCELLED"} 退出码 2
-wx-kit session export [-o <file>]     # 导出登录态(0600);无登录态 → error.code:"NO_SESSION" 退出码 1
-wx-kit session import <file>          # 只导入、不探测:{"ok":true,"valid":null,"note":"…"}
-                                      # 结构非法 → error.code:"CLI_ERROR" 退出码 2,不动既有 session
+wx-kit library list [--sort publish|download|title] [--order asc|desc] [--account <名称>] [--out <目录>]
+wx-kit library search <关键词> [--sort ...] [--order ...] [--account <名称>] [--out <目录>]
+wx-kit library export (--ids <id,id> | --since YYYY-MM-DD | --account <名称> | --all) [--out <目录>]
+wx-kit library remove --ids <id,id> [--out <目录>]
+wx-kit library rebuild [--out <目录>]
 ```
 
-`present:true`只表示本机保存了登录态,不等于微信已确认它有效;有效性在下一次用户明确发起的实际操作中确认。
+- `list` / `search` 默认按发布时间降序，空发布时间放在末尾；
+- `export` 输出 `articles[].contentPath`，指向本地 `content.md`，正文不内联；
+- `remove` 删除文章目录，并联动文库索引与历史；
+- `rebuild` 从各文章目录的 `meta.json` 重建 `library.json`。
 
-## protection — 全局微信请求保护(零微信请求)
+ArticleMeta 常用字段：
+
+```text
+id title author account publishTime sourceUrl digest downloadTime formats dir
+itemShowType videos warnings
+```
+
+`itemShowType` 是开放集合。已知值包括 `0` 图文、`5` 视频、`8` 图片、`10` 文字、`11` 发布通告。`warnings` 是“下载完成但结果可能不完整或不准确”的信号，使用素材前应检查。
+
+## site — 同步到 Astro 站点
 
 ```sh
-wx-kit protection status              # {"ok":true,"protection":{"mode","lastRequestAt","nextAllowedAt","queued",...}}
-wx-kit protection pause               # 立即阻止后续微信请求
-wx-kit protection resume              # 只恢复请求许可,本动作本身不联网
+wx-kit site sync --ids <id> --slug my-post [--posts-dir <目录>]
+wx-kit site sync --ids <id1>,<id2> --slugs <id1>=a,<id2>=b [--posts-dir <目录>]
+wx-kit site sync --account <公众号> --slugs-file <文件> [--posts-dir <目录>]
 ```
 
-- 首次升级到 v0.8.6 没有治理状态文件时会保护性进入 `user-paused`。
-- `mode:"rate-limited"`表示已检测到频控并全局熔断;不要自动 resume、重试或定时探测。
-- 只有用户明确授权继续访问微信后才可 resume。恢复后的实际请求仍服从全局队列与随机间隔。
+输出：
 
-## crawl — 批量爬取(需登录)
+```json
+{"ok":true,"postsRoot":"...","succeeded":1,"failed":0,"results":[{"id":"...","title":"...","slug":"...","ok":true,"dir":"..."}]}
+```
+
+slug 只能含小写字母、数字和连字符。目标目录存在时拒绝覆盖；有单篇失败时继续处理其余文章，最终退出码为 `1`。wx-kit 只生成内容，不自动预览或发布站点。
+
+## settings — 设置
 
 ```sh
-wx-kit crawl <名称|--fakeid <id>> (--count <n> | --from YYYY-MM-DD --to YYYY-MM-DD)
-  [--formats <csv>] [--include <kw,kw>] [--exclude <kw,kw>] [--out <dir>]
+wx-kit settings get [键]
+wx-kit settings set libraryRoot <目录>
+wx-kit settings set defaultFormats md,html,meta
+wx-kit settings set historyRetentionDays <1..3650>
 ```
 
-- `--include`/`--exclude`:按**标题**匹配(不分大小写),include 先筛、exclude 后筛(优先)。过滤在列表→下载之间,零额外请求。
-- 输出:`{"ok":true,"fakeid","listed":N,"total","succeeded","failed","skipped","filteredOut"?:M,"items":[...]}`
-  - `listed` = 过滤后进入下载的篇数;`filteredOut` = 被关键词筛掉的篇数(无过滤则缺省)。
-- 名称多候选 → `error.code:"AMBIGUOUS"` + candidates,改用 `--fakeid`;找不到 → `NOT_FOUND`。
+全量 `settings get` 不显示已退场的订阅字段。直接读取或写入旧订阅字段返回 `MP_BACKEND_UNAVAILABLE`，不会改变原有本地数据。
 
-## library — 文库(免登录)
-
-```sh
-wx-kit library list [--out <dir>]              # {"ok":true,"items":[ArticleMeta...]}
-# 排序(默认 --sort publish --order desc,即发布时间降序、最近在前;空 publishTime 恒置末尾)
-wx-kit library list --sort publish|download|title --order asc|desc [--account <名>]
-wx-kit library search <关键词> [--account <名>] # 同上,按标题过滤(同样支持 --sort/--order,默认发布降序)
-wx-kit library remove --ids <id,id>            # 删文章(文件+索引+历史联动)
-wx-kit library rebuild                         # 从各篇 meta.json 重建索引(library.json 损坏时)
-wx-kit library export --ids <id,id>            # {"ok":true,"count":N,"articles":[{...,"contentPath"}]}
-```
-
-ArticleMeta 字段:`id, title, author, account, publishTime, sourceUrl, digest, coverUrl, downloadTime, formats, dir`;
-另有 `itemShowType`(消息类型:`0` 普通图文 / `5` 视频消息 / `8` 图片消息(小绿书) / `10` 文字消息 / `11` 发布通告;
-**这是开放集合**,遇到没适配的类型会按图文兜底并在 `warnings` 里报出来)、
-`videos`(有内嵌视频才有,不含 url——直链带签名有时效)、
-`warnings`(解析/下载期的告警,有才写:「下到了但可能不对」的唯一信号)。
-含视频的文章另有 `videos: [{videoId, formatId, width, height, filesize, durationMs, path?}]`
-(**没有 url**——直链带时效签名,存下来隔次即失效;`path` 缺省表示没下到)。
-`library export` 直接在 stdout 输出素材清单,每篇含 `contentPath`(content.md 绝对路径),供下游创作/分析直接读文件(GUI 的「导出选中为素材」才是落盘成清单文件)。
-
-## site — 个人站点同步(纯本地,不联网)
-
-把文库文章按 Astro 静态站规范生成为 `content/posts/<YYYY-MM-DD>-<slug>/index.md` + 同目录图片。
-目录日期取自文章发布时间;slug 必须由调用方指定(只能小写字母/数字/连字符,站内唯一)。
-
-```sh
-# 选料同 library export:--ids / --since / --account / --all
-wx-kit site sync --ids <id> --slug my-post                    # 单篇(仅选中 1 篇时可用)
-wx-kit site sync --ids <id1>,<id2> --slugs <id1>=a,<id2>=b    # 批量:id=slug 映射(不靠位置对应)
-wx-kit site sync --account 某公众号 --slugs-file slugs.txt     # 每行 "<id> <slug>"
-wx-kit site sync ... --posts-dir <dir>                        # 覆盖设置里的 siteSyncPostsDir
-```
-
-输出 `{"ok":bool,"postsRoot","succeeded":N,"failed":N,"results":[{id,title,slug,ok,dir|error}]}`;
-有失败退出码 1(单篇失败不阻断其他篇),缺 slug/无选料器退出码 2。
-**slug 冲突不覆盖**:目标目录已存在即报错,保护已发布内容。同步后需到站点侧预览/发布(wx-kit 不代跑)。
-
-## subscription — 订阅(check-now 需登录)
-
-```sh
-wx-kit subscription list        # {"ok":true,"accounts":[{fakeid,nickname,subscribed,watermark,lastCheckedAt,newRefs}],"lastRunAt","nextCheckAt"}
-wx-kit subscription check-now   # {"ok":true,"accounts":N,"newFound":N,"failed":N,"results":[{fakeid,nickname,ok,newFound,downloaded,error?}],"failures"?:[{nickname,error}]}
-                                # results 是逐号明细:newFound=发现几篇,downloaded=其中自动下载了几篇(策略为 notify 时恒为 0)
-wx-kit subscription check-now --accounts <fakeid,fakeid>  # 只检查指定号(部分检查;fakeid 从 subscription list 取),不传=全部
-```
-
-`failures` 逐号给失败原因。若出现频控,本轮立即停止且全局熔断,不会继续查其它号或自动重试。
-检查同时落盘日志与历史,与 GUI 同源。
-
-### subscription digest — 某一天各订阅号发了什么(需登录)
-
-```sh
-wx-kit subscription digest --date 2026-07-23
-wx-kit subscription digest --date yesterday --accounts <fakeid,fakeid>
-# 顺带把缺的取回来(已下载的自动跳过),输出带本地路径 —— 要正文时用这条,别自己逐个 download
-wx-kit subscription digest --date yesterday --download
-wx-kit subscription digest --date yesterday --download --formats md,meta --no-video
-```
-
-**日期由你(agent)换算**:命令只认 `YYYY-MM-DD` / `today` / `yesterday`。
-用户说「昨天」「前天」「7月23日」「上周三」时,**你先算出 `YYYY-MM-DD` 再调用**——
-传自然语言会报 `BAD_DATE`(退出码 2)。CLI 刻意不猜:猜错会静默给出另一天的结果。
-
-输出:
-
-```jsonc
-{ "ok": true, "date": "2026-07-23", "accounts": 3, "count": 2,
-  "articles": [
-    { "account": "数字生命卡兹克", "title": "…", "publishTime": "2026-07-27T03:29:23.000Z",
-      "url": "https://mp.weixin.qq.com/s/XXX", "itemShowType": 10,
-      "downloaded": false, "id": "2647684649_1" }
-  ],
-  "failures": [{ "nickname": "甲", "error": "微信频率限制(200013)" }] }
-```
-
-逐字段:
-
-| 字段 | 怎么用 |
-|---|---|
-| `downloaded` | **决定下一步**:`true` → 这篇已在库里,用 `library list`/`search` 拿 `dir` 直接读 `content.md`;`false` → 要内容就 `wx-kit download --url <url>` |
-| `id` | 与库内同源的文章主键(`mid_idx`),可直接与 `library list` 的 `id` 对账 |
-| `itemShowType` | `0` 图文 / `5` 视频消息 / `8` 图片消息 / `10` 文字消息。**视频与文字消息没有长正文**,当素材用途不同 |
-| `dir` / `contentPath` | 文章在本地的目录与正文文件。**刚下的与本来就有的形状完全一致**,不必合并两种结果。`contentPath` **只在正文文件真存在时才有**(下载时选了 `md`);没有它就只有 `dir` |
-| `warnings` | 解析告警(未识别类型、正文疑似脚本等):「下到了但可能不对」的唯一信号,读正文前扫一眼 |
-| `error` / `unavailable` | 只在 `--download` 且这篇没拿到时出现。`unavailable: true` = 读者本就打不开(审核未通过/已删除/违规下架),**重试无用别死磕**;只有 `error` 的是真故障(网络/频控),可以再试 |
-| `articles` | **跨号合并后按发布时间降序**,不按号分组 |
-| `failures` | 某号查失败(频控/登录态);**其余号照常返回,退出码仍 0**。一个号都没查成才是 `ok:false` + 退出码 1 |
-
-**默认只查询**:不下载、不写库、**不推进订阅水位**——可以反复查同一天,不会把「新文章」标记吃掉
-(这点与 `check-now` 不同,后者是按水位问「有没有新的」)。
-
-**`--download` 的行为**:只下 `downloaded:false` 的那几篇(串行),已在库的一次请求都不发;
-`--formats` **缺省取设置里的 `defaultFormats`**(注意与 `crawl` 不同,后者缺省是固定的 `md,html,meta`);
-失败的条目**留在清单里**并带 `error`,不会静默消失。**即使带 `--download` 也不推进订阅水位。**
-digest 不记状态,所以 `unavailable` 的文章下次仍会被再试一次——想省请求就自己按这个字段跳过。
-
-**耗时**:每个号至少一次请求,且每次都服从全局随机间隔;16 个号通常需要数分钟。**订阅号多时用 `--accounts` 缩小范围**;
-stderr 有逐号进度(`[3/16] 某号 … 2 篇`),别把它当成卡死。
-
-## settings — 设置(免登录)
-
-```sh
-wx-kit settings get [键]        # 全量或单键:{"ok":true,"key","value"} / {"ok":true,"settings":{...}}
-wx-kit settings set <键> <值>   # 常用键:libraryRoot、defaultFormats(逗号分隔)
-```
-
-## 退出码
-
-`0` 成功(含 `valid:null` 这类「如实回答」);`1` 业务失败(下载失败/保护性拒绝/无 session 可导出);`2` 用法错误或需要登录(`AUTH_REQUIRED`/`CANCELLED`/`CLI_ERROR`)。
-
-## update — 检查新版本
+## update / version / help
 
 ```sh
 wx-kit update --check
-# {"ok":true,"current":"0.8.1","latest":"0.9.0","updateAvailable":true,
-#  "channel":"brew","upgradeCommand":"brew update && brew upgrade --cask wx-kit && xattr -cr /Applications/wx-kit.app",
-#  "publishedAt":"...","assets":["wx-kit-0.9.0-arm64.dmg","wx-kit-0.9.0.dmg","wx-kit.Setup.0.9.0.exe"]}
+wx-kit --version
+wx-kit --help
+wx-kit help <命令>
 ```
 
-- **只检查,不自动升级**:输出里的 `upgradeCommand` 是给人执行的(brew 渠道才有);其它渠道为 `null`,让用户去 `assets` 里下对应包。
-- `channel` 为 `brew` / `dmg` / `nsis` / `unknown`——按安装方式给不同的升级路径,别一律叫用户去下 dmg。
-- 查不到(网络不可达/GitHub 限流)→ `{"ok":false,"error":{"code":"UPDATE_CHECK_FAILED"}}` + 退出码 1。
-  **别把失败当成「已是最新」**:只有 `ok:true` 且 `updateAvailable:false` 才是已最新。
-- `version` 命令**不联网**,要查新版必须用这个命令。
+`update --check` 只查询 GitHub Release，不自动升级；`version` 不联网。
+
+## 已停用命令
+
+```text
+search  crawl  login  auth-status  session  subscription  protection
+```
+
+无论是否补齐旧参数，命令都会在解析业务参数前返回：
+
+```json
+{"ok":false,"error":{"code":"MP_BACKEND_UNAVAILABLE","message":"微信公众号后台已限制查询其他公众号的文章列表，该功能已停用，未发起网络请求。","alternative":"请使用 wx-kit download --url <文章链接>"}}
+```
+
+退出码为 `1`；不会访问微信，也不会误开 GUI。它们保留命令名和旧实现源码，仅用于兼容和未来重新评估。
+
+## 退出码
+
+- `0`：成功；
+- `1`：业务失败，例如下载失败、站点同步部分失败、私有后台能力已停用；
+- `2`：命令用法错误。

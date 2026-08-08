@@ -12,6 +12,7 @@ import {
 } from '../../src/core/mp-request-governor'
 import type { MpJson } from '../../src/core/mp-types'
 import type { MpRequestStateStore } from './mp-request-state'
+import { isRetiredPrivateRequest, retiredPrivateApiError } from '../../src/core/retired-private-api'
 
 export { MpRequestProtectionError, type MpProtectionErrorCode } from '../../src/core/mp-errors'
 
@@ -87,6 +88,9 @@ export class MpRequestGateway {
     timeoutMs = 20_000,
     signal?: AbortSignal,
   ): Promise<MpJson> {
+    // M49：私有后台链路在 transport 之前硬拒绝。即使旧 GUI/CLI/IPC 有遗漏，
+    // 也不能通过等待、恢复保护状态或直接调用网关重新访问这些接口。
+    if (isRetiredPrivateRequest(kind)) throw retiredPrivateApiError()
     const url = new URL(endpoint)
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
     return this.execute(kind, url.toString(), timeoutMs + 10_000, signal, async () => {
@@ -100,6 +104,7 @@ export class MpRequestGateway {
 
   /** 扫码登录这类由 BrowserWindow 完成的用户动作，也必须先通过同一个保护闸。 */
   runAction<T>(kind: MpRequestKind, url: string, task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (isRetiredPrivateRequest(kind)) return Promise.reject(retiredPrivateApiError())
     return this.execute(kind, url, 10 * 60_000, signal, task)
   }
 

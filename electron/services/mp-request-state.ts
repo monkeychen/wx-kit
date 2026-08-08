@@ -4,7 +4,7 @@ import { atomicWriteFile } from '../../src/core/atomic-write'
 import { withPathLock } from '../../src/core/path-lock'
 import {
   isMpRequestState,
-  protectiveRequestState,
+  activeRequestState,
   type MpRequestState,
 } from '../../src/core/mp-request-governor'
 
@@ -48,10 +48,12 @@ export class FileMpRequestStateStore implements MpRequestStateStore {
       if (!isMpRequestState(parsed)) throw new Error('shape')
       return parsed
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return protectiveRequestState()
+      // M49：请求保护已无用户恢复入口。新安装必须允许用户明确触发的 URL 下载，
+      // 不能因缺少旧治理状态文件而永久暂停。
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return activeRequestState()
       return {
-        ...protectiveRequestState(),
-        pausedReason: `微信请求保护状态文件损坏，已保护性暂停：${this.statePath}`,
+        ...activeRequestState(),
+        pausedReason: `微信请求保护状态文件损坏，已按默认状态重建：${this.statePath}`,
       }
     }
   }

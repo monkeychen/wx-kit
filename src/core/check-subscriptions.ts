@@ -37,7 +37,7 @@ export async function checkSubscriptions(accounts: SubscribedAccount[], deps: Ch
     catch (e) {
       if (e instanceof MpAuthExpired) throw e   // 登录态失效：整体中止，交上层引导重新登录
       const code = (e as { code?: string })?.code
-      if (code === 'RATE_LIMITED' || code === 'MP_GOVERNOR_PAUSED' || code === 'MP_RATE_LIMITED' || code === 'MP_NETWORK_BLOCKED') {
+      if (code === 'RATE_LIMITED' || code === 'MP_GOVERNOR_PAUSED' || code === 'MP_RATE_LIMITED') {
         throw e // 全局保护状态不是「这个号失败」；继续循环只会制造重复拒绝与误导日志
       }
       results.push({ fakeid: acc.fakeid, ok: false, newRefs: [], latest: acc.watermark, error: (e as Error).message })
