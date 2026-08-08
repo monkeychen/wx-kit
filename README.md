@@ -17,11 +17,23 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.8.6 已完成实现、尚未发布）**
+> **当前能力边界（v0.9.0 开发中、尚未发布）**
 >
 > 微信公众平台后台的私有文章列表链路已持续不可用。因此，“按公众号下载”、公众号订阅及其设置入口已从 GUI 隐藏；`search`、`crawl`、`login`、`auth-status`、`session`、`subscription`、`protection` CLI 命令保留名称但已停用，会返回稳定错误，不会发起网络请求。旧实现和本地数据仍保留，便于未来重新评估。
 >
 > **按文章 URL 下载不依赖上述私有列表能力，仍是当前主功能。**
+
+## 当前界面
+
+以下截图来自 v0.9.0 当前开发界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
+
+| URL 下载与历史 | 本地文库 |
+|---|---|
+| ![URL 下载完成并写入下载历史](docs/screenshots/download.png) | ![真实文章进入本地文库](docs/screenshots/library.png) |
+
+| Markdown 阅读器 | 有效设置 |
+|---|---|
+| ![在应用内阅读本地 Markdown 正文](docs/screenshots/reader.png) | ![只保留当前有效配置的设置页](docs/screenshots/settings.png) |
 
 ## 快速开始
 
@@ -167,7 +179,7 @@ npm run build
 ## 项目状态
 
 - 最新已发布版本：v0.8.5；
-- 当前开发版本：v0.8.6，M49 私有文章列表能力退场已完成实现与验收，尚未发布；
+- 当前开发版本：v0.9.0；M49–M51 已完成实现与本地验收，等待单独执行正式发版；
 - 完整里程碑、发布史与下一版候选统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。

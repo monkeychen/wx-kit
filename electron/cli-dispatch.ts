@@ -5,6 +5,14 @@ export const CLI_COMMANDS = new Set([
 ])
 const CLI_FLAGS = new Set(['-h', '--help', '-v', '--version'])
 
+/**
+ * Electron/Chromium 自己消费的启动参数不应继续交给 Commander。
+ * `--user-data-dir=` 主要用于打包态隔离验收，也允许用户启动完全独立的本地配置。
+ */
+export function normalizeUserArgs(argv: string[]): string[] {
+  return argv.filter((arg) => arg !== '.' && !arg.startsWith('--user-data-dir='))
+}
+
 /** argv[0] 是已知子命令，或 argv 任意位置含 help/version flag → CLI；空参 → GUI。 */
 export function isCliInvocation(argv: string[]): boolean {
   if (argv.length === 0) return false

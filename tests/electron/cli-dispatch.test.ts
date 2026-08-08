@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { isCliInvocation } from '../../electron/cli-dispatch'
+import { isCliInvocation, normalizeUserArgs } from '../../electron/cli-dispatch'
+
+describe('normalizeUserArgs', () => {
+  it('removes Electron-only user-data switch without touching CLI options', () => {
+    expect(normalizeUserArgs([
+      '.', '--user-data-dir=/tmp/wx-kit-test', 'download', '--url', 'https://example.com/article',
+    ])).toEqual(['download', '--url', 'https://example.com/article'])
+  })
+})
 
 describe('isCliInvocation', () => {
   it('subcommands are CLI', () => {

@@ -2,7 +2,7 @@
 import { app, BrowserWindow } from 'electron'
 import path, { join } from 'node:path'
 import { runCli } from '../src/cli'
-import { isCliInvocation } from './cli-dispatch'
+import { isCliInvocation, normalizeUserArgs } from './cli-dispatch'
 import { registerWxfileScheme, handleWxfileProtocol } from './protocol'
 import { registerIpc } from './ipc'
 import { SettingsService } from './services/settings'
@@ -14,7 +14,7 @@ registerWxfileScheme()
 // 打包后 argv: [exe, ...args]；开发时 argv: [electron, '.', ...args]
 function userArgs(): string[] {
   const raw = process.argv.slice(app.isPackaged ? 1 : 2)
-  return raw.filter(a => a !== '.')
+  return normalizeUserArgs(raw)
 }
 
 async function main() {

@@ -209,7 +209,7 @@ export default function Library() {
           <div className="empty-state">
             <div className="es-mark">藏</div>
             <div className="es-title">{kw || account ? '没有匹配的文章' : '文库还是空的'}</div>
-            <div>{kw || account ? '换个条件试试' : '到「下载」页粘贴链接或按公众号抓取，保存的文章会陈列在这里'}</div>
+            <div>{kw || account ? '换个条件试试' : '到「下载」页粘贴文章链接，保存的文章会陈列在这里'}</div>
           </div>
         ) : view === 'list' ? (
           /* ---- 列表视图：列头只一次，分组时各组只留分隔头（且去掉冗余的公众号列）---- */

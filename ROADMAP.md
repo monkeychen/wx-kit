@@ -6,13 +6,13 @@
 ## 当前状态
 
 - **最新发布:v0.8.5(2026-07-28,一个问题一份清单)** —— tag `v0.8.5` + GitHub Release(三平台包,标 Latest)+ brew tap。范围:M43 `subscription digest --download`(缺的下、已有的跳过,清单统一带 `dir`/`contentPath`),需求/验收 `docs/PRD-v0.8.5.md`。上一功能版 v0.8.4(2026-07-28,看得见还能挑):M39–M42,需求/验收 `docs/PRD-v0.8.4.md`。
-- **v0.8.6 M49 已完成,未发布**(2026-08-08)——公众平台私有文章列表能力持续不可用，M49 已隐藏按公众号下载、订阅及相关设置，停止后台链路，CLI 兼容停用并保留历史实现与数据；当前 GUI e2e、真实文章 URL 下载和双架构 macOS 构建均已通过。见 `docs/PRD-v0.8.6.md` 与 `docs/plans/2026-08-08-m49-private-api-retirement.md`。
-- **v0.8.7 待 M49 后重排**——订阅链接交互和 pending 失败可见随页面退场取消，README 重做并入 M49，依赖安全升级保留为候选需求；见 `docs/PRD-v0.8.7.md`。
+- **当前开发:v0.9.0(实现与本地验收完成,待正式发布)** —— M49 完成私有能力退场，M50 将官方 npm 审计清零，M51 完成当前页面截图、说明和打包态验收；GUI fixture、真实文章 URL、打包 GUI/CLI 和双架构 macOS 构建均通过。根包仍保持最新已发布版本 v0.8.5，只有正式发版时才升到 0.9.0。见 `docs/PRD-v0.9.0.md` 与 `docs/plans/2026-08-08-v0.9.0-boundary-reset-and-security.md`。
+- **v0.8.6、v0.8.7 均未发布且不再发布** —— M44–M47、M49 的有效成果由 v0.9.0 吸收；两份 PRD 仅保留历史设计与需求去向，不是当前验收契约。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(当前有效 GUI 端到端)看当前真实结果；另以隔离文库执行真实文章 URL 下载验收。私有后台命令只验收“稳定拒绝且零请求”，不再做 live 联调。
 
 ## 里程碑目录
 
-**M1–M43 已随 v0.1.0–v0.8.5 发布；M44–M47、M49 已实现，尚未随 v0.8.6 发布**。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
+**M1–M43 已随 v0.1.0–v0.8.5 发布；M44–M47、M49–M51 已由未发布的 v0.9.0 吸收并完成本地验收**。详细实现计划在 `docs/plans/`,设计依据在 `docs/superpowers/specs/`。
 
 | 里程碑 | 版本 | 范围 | 计划 / 设计 |
 |--------|------|------|------|
@@ -61,13 +61,15 @@
 | **M41** ✅ | v0.8.4 | CLI `subscription digest --date`:查已订阅号某一天发了什么(不下载、不写库、不推水位),输出带 `downloaded` 让 agent 分流;自然语言日期由 agent 换算,CLI 只认 `YYYY-MM-DD`/`today`/`yesterday`;**wx-kit-skill 三处同步是交付物不是附属**;`downloaded` 除比 id 还比 sourceUrl(存量 32 篇哈希 id 否则会被误报未下载)(2026-07-28 完成,真机验证纯查询不留痕) | `plans/2026-07-28-m41.md` |
 | **M42** ✅ | v0.8.4 | `agent/wx-kit-compose` 跟上 CLI(最后改动停在 2026-06-23/v0.4.0):补上游 `digest` 选题入口、下游可选 `site sync`、中间 `library search`/`--sort`、素材质量信号 `itemShowType`/`warnings`;`agent/README.md` 一并核对。**做法上的关键决定:不把 CLI 细节抄进 compose**(参数/契约一律指向 wx-kit-skill)——它落后二十个里程碑的根因就是抄了不会跟着变的东西,再抄一遍只是把 bug 推迟(2026-07-28 完成,命令与 flag 逐条对源码核实、真实走通取料链路) | `plans/2026-07-28-m42.md` |
 | **M43** ✅ | v0.8.5 | `subscription digest --download`:缺的下、已有的跳过,清单**统一带 `dir`/`contentPath`**(不区分刚下的与本来就有的)+ `--formats` 缺省跟设置走(与 crawl 的硬编码缺省有意不同);只读与下载切成两个 core 函数,「不带 flag 行为一字不变」由结构保证;`unavailable` 一路透传到清单(重试无用别死磕)(2026-07-28 完成,真机验证下 1 留 2/复跑零请求/水位不变) | `plans/2026-07-28-m43.md` |
-| **M44** ✅ | v0.8.6 | 全局请求治理与熔断:唯一网关、持久状态、跨 GUI/CLI 互斥、200013 零重试、排队取消与批量停手(2026-08-02 离线完成) | `plans/2026-08-02-m44-m46-request-governance.md` |
-| **M45** ✅ | v0.8.6 | Chromium 会话请求栈:后台 API/文章/媒体共用专用 Session 与 Cookie Jar,移除固定 macOS Chrome 124 和生产旁路 axios(2026-08-02 离线完成) | 同上 |
-| **M46** ✅ | v0.8.6 | 隐藏请求清理 + 保护状态 UI/CLI + 网络封锁测试模式;fixture e2e 明确验证微信请求尝试数为 0(2026-08-02 离线完成) | 同上 |
-| **M47** ✅ | v0.8.6 | 公众号重新登录/彻底退出的底层会话清理已实现并保留；M49 隐藏产品入口、停用相关 CLI，因此不再执行真实 A→B 切换验收 | `plans/2026-08-02-m47-auth-session-reset.md` |
-| **M49** ✅ | v0.8.6 | 私有文章列表能力退场:隐藏按公众号下载/订阅/相关设置,停止后台执行链路,CLI 兼容停用,保留实现与用户数据；当前 GUI e2e + 真实 URL 下载验收通过(2026-08-08) | `plans/2026-08-08-m49-private-api-retirement.md` |
+| **M44** ✅ | v0.9.0（吸收） | 全局请求治理与熔断:唯一网关、持久状态、跨 GUI/CLI 互斥、200013 零重试、排队取消与批量停手(2026-08-02 离线完成) | `plans/2026-08-02-m44-m46-request-governance.md` |
+| **M45** ✅ | v0.9.0（吸收） | Chromium 会话请求栈:后台 API/文章/媒体共用专用 Session 与 Cookie Jar,移除固定 macOS Chrome 124 和生产旁路 axios(2026-08-02 离线完成) | 同上 |
+| **M46** ✅ | v0.9.0（吸收） | 隐藏请求清理 + 保护状态 UI/CLI + 网络封锁测试模式;该测试模式已随 M49 退场,有效请求栈成果保留(2026-08-02 离线完成) | 同上 |
+| **M47** ✅ | v0.9.0（吸收） | 公众号重新登录/彻底退出的底层会话清理已实现并保留；M49 隐藏产品入口、停用相关 CLI，因此不再执行真实 A→B 切换验收 | `plans/2026-08-02-m47-auth-session-reset.md` |
+| **M49** ✅ | v0.9.0 | 私有文章列表能力退场:隐藏按公众号下载/订阅/相关设置,停止后台执行链路,CLI 兼容停用,保留实现与用户数据；当前 GUI e2e + 真实 URL 下载验收通过(2026-08-08) | `plans/2026-08-08-m49-private-api-retirement.md` |
+| **M50** ✅ | v0.9.0 | 依赖安全维护与运行时回归:实时读取 28 条 Dependabot open/0 dismissed,修复直接与传递依赖,官方 npm 审计 0；待 push 后核实远端自动关闭(2026-08-08) | `plans/2026-08-08-v0.9.0-boundary-reset-and-security.md` |
+| **M51** ✅ | v0.9.0 | 当前产品说明与发布准备:四张真实数据页面截图、README/Skill/发布草案、打包 GUI/CLI 与真实下载验收(2026-08-08) | 同上 |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`(紧急修复,实现完成待发布)、v0.8.7 `docs/PRD-v0.8.7.md`(收集中)(逐条验收看各 §4)。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`（当前开发与验收契约）。
 
 ## 版本发布史(最新在前)
 
