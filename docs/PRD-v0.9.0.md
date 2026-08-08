@@ -126,6 +126,7 @@ React Router 7.18.2、Electron Builder 26.15.3、PostCSS 8.5.26，并更新相�
 - [x] 干净 `npm ci` 可复现；`npm test`（44 个文件、389 项）、lint、typecheck、GUI fixture e2e、真实 URL e2e、build 全部通过。
 - [x] 打包后的 macOS `.app` 正常启动；内层 CLI 的真实 URL 下载和停用命令均通过。
 - [x] 三平台资产、GitHub Release 与 brew tap 全部发布并逐项核实。
+- [x] npm `@simiam/wx-kit@0.9.0` 发布为 `latest`；从官方 registry 隔离安装后，版本、停用命令与真实 URL 下载均通过。
 
 打包态证据：arm64 GUI 显示 URL 下载/文库/设置且无退场入口；内层 CLI `search` 返回
 `MP_BACKEND_UNAVAILABLE` 与退出码 1；在独立 `--user-data-dir` 中真实 `download` 成功产出 md/meta，
@@ -138,4 +139,3 @@ React Router 7.18.2、Electron Builder 26.15.3、PostCSS 8.5.26，并更新相�
 - 不通过换账号、换接口、换 Header 或自动探测尝试绕过微信限制；
 - 不把新的模拟器/RPA 监控方案直接集成进 wx-kit；
 - 不在本轮增加全文检索、整本导出、Windows CLI wrapper 等新产品能力；
-- 本版本不发布 npm 包；npm 仍是明确点名才执行的可选渠道。

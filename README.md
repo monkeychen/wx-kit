@@ -74,6 +74,8 @@ npm install -g @simiam/wx-kit
 wx-kit --version
 ```
 
+官方 npm `latest` 已发布 v0.9.0；包名带 scope，但安装后的命令仍是 `wx-kit`。
+
 ### 下载安装包
 
 前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.9.0：
@@ -178,7 +180,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.9.0；M49–M51 完成产品边界重置、依赖安全维护与当前说明重建；
+- 最新已发布版本：v0.9.0；GitHub Release、brew tap 与 npm `@simiam/wx-kit` 三个渠道均已上线；
 - 当前没有正在实施的新版本，后续候选按真实需求单独立项；
 - 完整里程碑、发布史与下一版候选统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
