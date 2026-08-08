@@ -65,6 +65,7 @@ export default function UrlMode({ onDone, prefill }: Props) {
         <div className="cfg-sec">
           <p className="sec-label">文章链接</p>
           <Input.TextArea
+            data-testid="url-input"
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={'粘贴微信公众号文章链接，每行一个，支持批量\nhttps://mp.weixin.qq.com/s/...'}

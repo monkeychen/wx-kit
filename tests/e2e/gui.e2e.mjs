@@ -115,11 +115,16 @@ async function main() {
     assert((await win.locator('[data-testid="mode-account"]').count()) === 0, 'M49: account download mode is absent')
     assert((await win.locator('[data-testid="nav-订阅"]').count()) === 0, 'M49: subscriptions navigation is absent')
     await win.evaluate(() => { location.hash = '#/subscriptions' })
-    await win.waitForSelector('textarea', { timeout: 5000 })
+    await win.waitForSelector('[data-testid="url-input"]', { timeout: 5000 })
     assert((await win.locator('[data-testid="nav-下载"].active').count()) === 1, 'M49: retired subscription route redirects to download')
+    await win.click('[data-testid="nav-文库"]')
+    await win.waitForSelector('text=到「下载」页粘贴文章链接，保存的文章会陈列在这里', { timeout: 5000 })
+    assert((await win.locator('text=按公众号抓取').count()) === 0, 'M49: empty library no longer recommends retired account crawl')
+    await win.click('[data-testid="nav-下载"]')
+    await win.waitForSelector('[data-testid="start-download"]', { timeout: 5000 })
 
     // ============ M6 · URL 批量下载 → 历史就地确认 ============
-    await win.fill('textarea', [urlOf('a1'), urlOf('a2'), urlOf('a3')].join('\n'))
+    await win.fill('[data-testid="url-input"]', [urlOf('a1'), urlOf('a2'), urlOf('a3')].join('\n'))
     await win.click('[data-testid="start-download"]')
     await win.waitForSelector('[data-testid="history-event"]', { timeout: 30000 })
     await win.waitForSelector('[data-testid="history-article"]', { timeout: 10000 })
@@ -141,7 +146,7 @@ async function main() {
     assert((await topEvent().locator('.badge-skip').count()) >= 1, 're-download marks existing articles 已存在 (skipped)')
 
     // 失败项：下一篇无标题页 → 失败 + 重试
-    await win.fill('textarea', urlOf('bad'))
+    await win.fill('[data-testid="url-input"]', urlOf('bad'))
     await win.click('[data-testid="start-download"]')
     await win.waitForSelector('[data-testid="history-event"] .fail-reason', { timeout: 20000 })
     assert(await topEvent().locator('.fail-reason').first().isVisible(), 'failed download shows a reason in history')

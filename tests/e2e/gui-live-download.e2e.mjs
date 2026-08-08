@@ -49,7 +49,7 @@ async function main() {
 
   try {
     await win.waitForSelector('[data-testid="app-shell"]', { timeout: 20_000 })
-    await win.fill('textarea', articleUrl)
+    await win.fill('[data-testid="url-input"]', articleUrl)
     await win.click('[data-testid="start-download"]')
 
     const event = win.locator('[data-testid="history-event"]').first()
