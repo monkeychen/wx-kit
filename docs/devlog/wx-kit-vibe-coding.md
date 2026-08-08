@@ -797,9 +797,11 @@ Release 的三平台资产完整、brew tap 指向这次发布。任意一个缺
   cask 语法、version、URL、SHA 与 `brew info`，不绕道 GitHub 下载 280MB 再重复运行同一应用。
 - **push 的终端提示不是最终安全状态**。`git push` 刚完成时仍打印旧的 28 条漏洞提示，但随后 Dependabot API
   已返回 0 open、0 dismissed；最终状态必须查结构化 API，不能把推送瞬间的缓存文案当结论。
-- **可选渠道不混入完成定义**。GitHub Release 与 brew tap 是必做渠道，npm 只有明确点名才发布；本版未发布 npm。
+- **可选渠道不混入默认完成定义，但明确点名后也要完整验收**。GitHub Release 与 brew tap 是必做渠道；
+  本版完成必做渠道后，安哥明确要求追加 npm，遂发布 `@simiam/wx-kit@0.9.0`，而不是把“可选”误解成“不能发”。
 
 最终结果：tag `v0.9.0` 指向发布快照；GitHub Release 为 Latest、非 Draft、非 Prerelease，三个资产大小与
-SHA-256 全部一致；brew tap 为 0.9.0 且零下载验证通过；`main` 的 GitHub Actions 成功，Dependabot 为 0。
+SHA-256 全部一致；brew tap 为 0.9.0 且零下载验证通过；npm `latest` 为 0.9.0，官方 registry 隔离安装后
+版本、停用命令和真实下载通过；`main` 的 GitHub Actions 成功，Dependabot 为 0。
 
 > 一句话：**“发布不是上传动作，而是 tag、资产、必做渠道和远端状态全部可核验；每一类证据只证明它该证明的事。”**
