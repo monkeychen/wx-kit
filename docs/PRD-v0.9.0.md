@@ -29,7 +29,7 @@ wx-kit 从“发现公众号、订阅更新、按公众号批量抓取和下载�
 - v0.8.6 不发布：M44–M47 作为未发布的底层治理成果，由 v0.9.0 选择性吸收。
 - v0.8.7 不发布：订阅相关需求取消，README 重做和安全维护迁入 v0.9.0。
 - `docs/PRD-v0.8.6.md`、`docs/PRD-v0.8.7.md` 保留为历史和需求去向记录，不删除。
-- 本文件是当前开发版本唯一验收契约。
+- 本文件是 v0.9.0 唯一验收契约。
 - `package.json`、`package-lock.json` 和安装包版本统一为 0.9.0。
 
 ### R2 · M49 私有文章列表能力退场（已完成）
@@ -85,8 +85,8 @@ GUI：
 React Router 7.18.2、Electron Builder 26.15.3、PostCSS 8.5.26，并更新相关传递依赖；官方 npm
 全量审计最终为 0。没有需要 major 升级或 dismiss 的剩余项。
 
-由于本轮按约定不 push，GitHub 仍按远端旧 lockfile 显示 28 条 open；正式发布前推送后必须重新读取
-Dependabot，确认自动关闭结果。不能把“本地已修复”写成“远端已关闭”。
+实施阶段按约定未 push，因此 GitHub 一度仍按远端旧 lockfile 显示 28 条 open。2026-08-09 正式发版
+推送后重新读取 Dependabot API，结果为 0 open、0 dismissed；本地官方 npm 审计与远端告警现已同时清零。
 
 ### R5 · M51 当前产品说明与发布准备（已完成）
 
@@ -101,7 +101,7 @@ Dependabot，确认自动关闭结果。不能把“本地已修复”写成“�
 
 - **M44–M47 · 未发布底层治理**：有效部分由 v0.9.0 吸收，失去产品载体的 UI/验收由 M49 终止。
 - **M49 · 私有文章列表能力退场**：已完成并通过当前 GUI 与真实文章 URL 验收。
-- **M50 · 依赖安全维护与运行时回归**：已完成；本地官方审计为 0，待 push 后核实远端自动关闭。
+- **M50 · 依赖安全维护与运行时回归**：已完成；本地官方审计与发布后 GitHub Dependabot 均为 0。
 - **M51 · 当前产品说明与发布准备**：已完成；有效页面截图、README/Skill、发布说明和打包应用均已验收。
 
 ## 5. 验收契约
@@ -117,10 +117,11 @@ Dependabot，确认自动关闭结果。不能把“本地已修复”写成“�
       cover/Markdown/HTML/meta、文库、历史和阅读器验收，审计无 `/cgi-bin/`。
 - [x] macOS arm64/x64 应用及 DMG 构建完成。
 
-### v0.9.0 本地验收
+### v0.9.0 完整验收
 
 - [x] 实时 Dependabot 告警已重新获取：28 open、0 dismissed，并与官方 npm 审计交叉核实。
 - [x] 本地依赖图已修复全部可达告警；官方 npm 全量审计为 0，没有无理由忽略或 dismiss。
+- [x] 正式发版推送后 Dependabot API 为 0 open、0 dismissed，远端自动关闭已核实。
 - [x] README、四张真实数据截图、Skill、ROADMAP、发布说明与当前产品边界一致。
 - [x] 干净 `npm ci` 可复现；`npm test`（44 个文件、389 项）、lint、typecheck、GUI fixture e2e、真实 URL e2e、build 全部通过。
 - [x] 打包后的 macOS `.app` 正常启动；内层 CLI 的真实 URL 下载和停用命令均通过。
