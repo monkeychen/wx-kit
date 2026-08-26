@@ -12,3 +12,4 @@ mp-session.json
 # visual brainstorm companion workspace
 .superpowers/
 dist-npm/
+.omo/
