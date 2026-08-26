@@ -13,3 +13,6 @@ mp-session.json
 .superpowers/
 dist-npm/
 .omo/
+
+# Generated analysis and delivery artifacts
+output/
