@@ -33,6 +33,7 @@ import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 import type { RunCheckResult } from './services/subscription-check'
 import { articleFetchers, createMpRuntime } from './services/mp-runtime'
+import { wereadListFn } from './services/weread-auth'
 import { MP_ORIGIN } from './services/mp-session'
 import { PRIVATE_API_FEATURE_ENABLED, retiredPrivateApiResponse } from '../src/core/retired-private-api'
 
@@ -316,10 +317,9 @@ export function registerIpc(settings: SettingsService): void {
     checkInFlight = (async () => {
       const subs = await subsFor()
       const s = await settings.get()
-      const session = getSession()
+      const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
       const result = await svcRunSubscriptionCheck(trigger, {
-        subs, settings: s, session: session ? { token: session.token } : null,
-        mpFetch: session ? makeMpFetch(mpGateway) : null,
+        subs, settings: s, list,
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
         onDownloadProgress: broadcastDlProgress,
         ...(fakeids ? { fakeids } : {}),

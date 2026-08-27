@@ -31,6 +31,7 @@ import { resolveDigestDate } from '../core/digest-date'
 import { subscriptionDigest, fetchMissing } from '../core/subscription-digest'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 import { articleFetchers, createMpRuntime } from '../../electron/services/mp-runtime'
+import { wereadListFn } from '../../electron/services/weread-auth'
 import type { MpRequestGateway } from '../../electron/services/mp-request-gateway'
 import { MP_ORIGIN } from '../../electron/services/mp-session'
 import {
@@ -383,10 +384,10 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
         return summary
       }
+      const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),
-        subs, settings: s, session: session ? { token: session.token } : null,
-        mpFetch: session ? makeMpFetch(mpGateway()) : null, downloadRefs,
+        subs, settings: s, list, downloadRefs,
         log: async (e) => {
           try { await subs.appendCheckLog(e); appendFileSync(logFilePath, formatCheckLogLine(e) + '\n') } catch { /* 留痕失败不阻断 */ }
           process.stderr.write(formatCheckLogLine(e) + '\n')

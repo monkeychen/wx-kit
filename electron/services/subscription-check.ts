@@ -11,8 +11,8 @@ import type { AppSettings } from './settings'
 export interface RunCheckDeps {
   subs: Subscriptions
   settings: Pick<AppSettings, 'defaultFormats' | 'subscriptionNewArticleAction'>
-  session: { token: string } | null
-  mpFetch: MpFetch | null
+  /** 列表取件（微信读书实现）；null = 未登录，走 no-session 早退 */
+  list: ((fakeid: string, watermark: number) => Promise<ArticleRef[]>) | null
   downloadRefs: (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource,
     onProgress?: (e: ProgressEvent) => void) => Promise<DownloadSummary>
   log: (entry: CheckLogEntry) => Promise<void>
@@ -42,12 +42,12 @@ export interface RunCheckResult {
 }
 
 export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: RunCheckDeps): Promise<RunCheckResult> {
-  const { subs, settings, session, mpFetch, downloadRefs } = deps
+  const { subs, settings, list, downloadRefs } = deps
   const check = deps.check ?? checkSubscriptions
   const emit = () => deps.onEmit?.()
   const now = () => Date.now()
 
-  if (!session || !mpFetch) {
+  if (!list) {
     await deps.log({ time: now(), trigger, accounts: 0, newFound: 0, failed: 0, note: 'no-session' })
     emit(); return { accounts: 0, newFound: 0, failed: 0, note: 'no-session', authExpired: true, results: [] }
   }
@@ -59,7 +59,7 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
     emit(); return { accounts: 0, newFound: 0, failed: 0, note: 'no-accounts', authExpired: false, results: [] }
   }
   let results
-  try { results = await check(accounts, { mpFetch, token: session.token }) }
+  try { results = await check(accounts, { list }) }
   catch (e) {
     if (e instanceof MpAuthExpired) {
       await deps.log({ time: now(), trigger, accounts: accounts.length, newFound: 0, failed: accounts.length, note: 'auth-expired' })

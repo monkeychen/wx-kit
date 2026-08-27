@@ -50,6 +50,23 @@ describe('mp request governor', () => {
     expect(state.nextAllowedAt - 10).toBe(250)
   })
 
+  it('weread kinds have their own intervals (list paced near the community-tested 2s floor)', () => {
+    // rng=0 → 取区间下界；weread-list 下界 2.5s（社区实测最小安全间隔 2s + 余量）
+    const list = reserveRequest(activeRequestState(0), 'weread-list', 10, () => 0)
+    expect(list.nextAllowedAt - 10).toBe(2_500)
+    const auth = reserveRequest(activeRequestState(0), 'weread-auth', 10, () => 0)
+    expect(auth.nextAllowedAt - 10).toBe(8_000)
+    // 上界（rng=1）：登录类动作与 MP 后台保守档一致
+    const authMax = reserveRequest(activeRequestState(0), 'weread-auth', 10, () => 1)
+    expect(authMax.nextAllowedAt - 10).toBe(15_000)
+  })
+
+  it('weread requests share the same global window as MP requests (no second pacing track)', () => {
+    const afterList = reserveRequest(activeRequestState(0), 'weread-list', 0, () => 0)
+    // 微信读书请求之后，MP 文章页请求也要等同一个窗口打开
+    expect(planRequest(afterList, 1_000)).toMatchObject({ action: 'wait' })
+  })
+
   it('keeps requests globally serial while another process owns an in-flight lease', () => {
     const state = beginRequest(activeRequestState(0), 'p1', 'article-list', 100, 5_000)
     expect(planRequest(state, 200)).toEqual({ action: 'wait', waitMs: 4_900, until: 5_100 })

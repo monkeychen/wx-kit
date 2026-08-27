@@ -102,6 +102,20 @@ export class MpRequestGateway {
     })
   }
 
+  /**
+   * 微信读书业务请求（/mp/chapters、/book/info）。与 requestJson 分开：
+   * MP 后台响应是 base_resp.ret 格式、微信读书是 errCode 格式，
+   * 错误翻译在 core/weread/parse-articles（认证失效/风控语义不同），这里只做保护闸与传输。
+   */
+  async requestWereadJson(
+    kind: Extract<MpRequestKind, 'weread-auth' | 'weread-list'>,
+    url: string,
+    timeoutMs = 20_000,
+    signal?: AbortSignal,
+  ): Promise<MpJson> {
+    return this.execute(kind, url, timeoutMs + 10_000, signal, () => this.transport.json(url, timeoutMs, signal))
+  }
+
   /** 扫码登录这类由 BrowserWindow 完成的用户动作，也必须先通过同一个保护闸。 */
   runAction<T>(kind: MpRequestKind, url: string, task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     if (isRetiredPrivateRequest(kind)) return Promise.reject(retiredPrivateApiError())

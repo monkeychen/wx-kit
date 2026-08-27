@@ -11,6 +11,9 @@ export type MpRequestKind =
   | 'article-list'
   | 'article-page'
   | 'article-asset'
+  // v0.10.0 微信读书链路：登录/续期动作与列表请求分档（列表参考社区实测 2s 最小间隔）
+  | 'weread-auth'
+  | 'weread-list'
 
 export type MpProtectionMode = 'active' | 'user-paused' | 'rate-limited'
 
@@ -40,6 +43,8 @@ export const MP_REQUEST_INTERVALS: Record<MpRequestKind, readonly [number, numbe
   'article-list': [6_000, 12_000],
   'article-page': [3_000, 7_000],
   'article-asset': [250, 750],
+  'weread-auth': [8_000, 15_000],
+  'weread-list': [2_500, 5_000],
 }
 
 export function activeRequestState(now = Date.now()): MpRequestState {

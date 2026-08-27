@@ -29,7 +29,7 @@ export class WereadClient {
     const bookId = normalizeAccountId(accountId)
     const raw = Math.floor(opts.count)
     const count = Math.max(1, Math.min(Number.isFinite(raw) ? raw : 20, 50))
-    const params = opts.offset == null
+    const params: Record<string, string | number> = opts.offset == null
       ? { bookId, count, synckey: 0 }
       : { bookId, count, offset: Math.max(0, Math.floor(opts.offset)) }
     return parseChapters(await this.fetchImpl('/mp/chapters', params), bookId)

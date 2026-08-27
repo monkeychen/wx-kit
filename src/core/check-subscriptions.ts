@@ -1,9 +1,9 @@
 // src/core/check-subscriptions.ts
 // 订阅检查编排：逐号「只列表不下载」+ 每轮打乱账号顺序；
 // 请求间隔与频控熔断统一由全局 gateway 决定，本层不再维护第二套 sleep。
-import { listArticlesSince as listSinceImpl } from './mp-client'
+// v0.10.0：列表后端抽象为注入的 list 函数（微信读书实现），本层不感知后端细节。
 import { MpAuthExpired } from './mp-errors'
-import type { ArticleRef, MpFetch } from './mp-types'
+import type { ArticleRef } from './mp-types'
 import type { SubscribedAccount } from './subscriptions'
 
 /** Fisher-Yates，返回新数组（默认账号顺序打乱用；可注入以便测试确定化）。 */
@@ -17,23 +17,20 @@ function shuffleImpl<T>(arr: T[]): T[] {
 }
 
 export interface CheckDeps {
-  mpFetch: MpFetch
-  token: string
   /** 按水位取件:返回「至少覆盖比 watermark 新的全部文章」的列表,可含旧文章(新旧过滤在本层)。 */
-  listFn?: typeof listSinceImpl
+  list: (fakeid: string, watermark: number) => Promise<ArticleRef[]>
   sleep?: (ms: number) => Promise<void>
   shuffle?: <T>(arr: T[]) => T[]
 }
 export interface AccountCheckResult { fakeid: string; ok: boolean; newRefs: ArticleRef[]; latest: number; error?: string }
 
 export async function checkSubscriptions(accounts: SubscribedAccount[], deps: CheckDeps): Promise<AccountCheckResult[]> {
-  const listFn = deps.listFn ?? listSinceImpl
   const shuffle = deps.shuffle ?? shuffleImpl
   const results: AccountCheckResult[] = []
   for (const acc of shuffle(accounts)) {   // 每轮打乱顺序：破坏「固定 fakeid 序列」指纹
     // gateway 会给每个账号首屏分配全局窗口；串行本身不再被误认为频控治理。
     let refs: ArticleRef[]
-    try { refs = await listFn(deps.mpFetch, deps.token, acc.fakeid, acc.watermark, {}) }
+    try { refs = await deps.list(acc.fakeid, acc.watermark) }
     catch (e) {
       if (e instanceof MpAuthExpired) throw e   // 登录态失效：整体中止，交上层引导重新登录
       const code = (e as { code?: string })?.code
