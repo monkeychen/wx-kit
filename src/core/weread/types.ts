@@ -1,14 +1,14 @@
 // src/core/weread/types.ts
-// 微信读书移动端（i.weread.qq.com）链路的核心类型。
-// 接口形态依据 2026-08 现行公开实现（johamwon/wechrss、rachelos/we-mp-rss#442）。
+// 微信读书 Web 端（weread.qq.com/api/auth/*）链路的核心类型。
+// 接口形态依据 we-mp-rss driver/weread_qr.py（Web 端 getLoginUid/getLoginInfo）实测。
 
-/** 登录凭据（扫码 /login 换得；0600 落盘 weread-creds.json）。 */
+/** 登录凭据（Web 端扫码 /api/auth/getLoginInfo 换得；0600 落盘 weread-creds.json）。 */
 export interface WereadCredentials {
   vid: string
   accessToken: string
   refreshToken: string
-  /** 登录时生成的设备标识；refresh 续期必须用同一个，否则签名对不上。 */
-  deviceId: string
+  /** 移动端遗留：新登录不再生成，旧文件兼容可选 */
+  deviceId?: string
   /** 显示名（登录响应 user.name）。 */
   name: string
   updatedAt: number

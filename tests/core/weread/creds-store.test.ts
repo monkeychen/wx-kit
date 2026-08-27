@@ -49,41 +49,26 @@ describe('WereadCredsStore', () => {
 })
 
 describe('refreshWereadCreds', () => {
-  it('成功：新 token + 保留 vid/deviceId，响应缺 refreshToken 时沿用旧值', async () => {
-    let seen: { body: Record<string, unknown> } | null = null
-    const http: QrFlowHttp = {
-      get: async () => { throw new Error('no get') },
-      post: async (_u, body) => { seen = { body: body as Record<string, unknown> }; return { accessToken: 'AT2', vid: '77' } },
-    }
-    const next = await refreshWereadCreds(http, creds)
-    expect(seen!.body.refreshToken).toBe('RT')
-    expect(seen!.body.kickType).toBe(1)
-    expect(next.accessToken).toBe('AT2')
-    expect(next.refreshToken).toBe('RT')   // 响应没给 → 沿用
-    expect(next.vid).toBe('77')
-    expect(next.deviceId).toBe('dev-1')
-    expect(next.name).toBe('安哥')
-  })
-  it('返回不同账号 vid → 拒绝覆盖（MpAuthExpired）', async () => {
+  it('成功：refreshToken 存在即返回原凭据（Web 端续期由业务 401 驱动）', async () => {
     const http: QrFlowHttp = {
       get: async () => ({}),
-      post: async () => ({ accessToken: 'X', vid: 'OTHER' }),
+      post: async () => { throw new Error('不该发请求') },
     }
-    await expect(refreshWereadCreds(http, creds)).rejects.toThrow(MpAuthExpired)
+    const next = await refreshWereadCreds(http, creds)
+    expect(next.refreshToken).toBe('RT')
+    expect(next.vid).toBe('77')
+    expect(next.deviceId).toBe('dev-1')
   })
-  it('缺 refreshToken/deviceId → 直接 MpAuthExpired（不发请求）', async () => {
+  it('缺 refreshToken → MpAuthExpired（不发请求）', async () => {
     const http: QrFlowHttp = {
       get: async () => { throw new Error('不该有 GET') },
       post: async () => { throw new Error('不该有 POST') },
     }
     await expect(refreshWereadCreds(http, { ...creds, refreshToken: '' })).rejects.toThrow(MpAuthExpired)
-    await expect(refreshWereadCreds(http, { ...creds, deviceId: '' })).rejects.toThrow(MpAuthExpired)
   })
-  it('登录失败（无 accessToken）→ MpAuthExpired 引导重扫', async () => {
-    const http: QrFlowHttp = {
-      get: async () => ({}),
-      post: async () => ({ errCode: -2012, errMsg: 'expired' }),
-    }
-    await expect(refreshWereadCreds(http, creds)).rejects.toThrow('微信读书登录失败')
+  it('deviceId 缺失不影响（Web 端无此概念）', async () => {
+    const http: QrFlowHttp = { get: async () => ({}), post: async () => ({}) }
+    const next = await refreshWereadCreds(http, { ...creds, deviceId: '' })
+    expect(next.vid).toBe('77')
   })
 })

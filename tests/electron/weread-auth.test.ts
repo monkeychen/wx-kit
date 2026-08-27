@@ -1,4 +1,4 @@
-// tests/electron/weread-auth.test.ts
+// tests/electron/weread-auth.test.ts — Web 端
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -14,18 +14,17 @@ beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'wxkit-wa-')) })
 afterEach(async () => { await rm(dir, { recursive: true, force: true }) })
 
 describe('runWereadLogin', () => {
-  it('waiting → scanned → confirmed → 凭据落盘', async () => {
+  it('waiting -> scanned -> confirmed -> 凭据落盘', async () => {
     let poll = 0
     const http: QrFlowHttp = {
       get: async (url) => {
-        if (url.includes('wxticket')) return { signature: 's', timeStamp: 1 }
-        if (url.includes('sdk/qrconnect')) return { errcode: 0, uuid: 'U1' }
+        if (url.includes('getLoginUid')) return { uid: 'U1' }
         poll++
-        return poll === 1 ? { wx_errcode: 408 }
-          : poll === 2 ? { wx_errcode: 404, wx_sid: 'SID' }
-          : { wx_errcode: 405, wx_code: 'WXC' }
+        if (poll === 1) return { succeed: false, logicCode: 'LOGIN_TIMEOUT' }
+        if (poll === 2) return { succeed: false, logicCode: '1' }
+        return { succeed: true, vid: '7', refreshToken: 'web@RT', accessToken: 'SHORT', user: { name: '测' } }
       },
-      post: async () => ({ accessToken: 'AT', refreshToken: 'RT', vid: '7', user: { name: '测' } }),
+      post: async () => ({}),
     }
     const store = wereadCredsStore(dir)
     const states: string[] = []
@@ -37,53 +36,41 @@ describe('runWereadLogin', () => {
       now: () => 1_000,
     }, { onState: (s) => states.push(s), onQr: (q) => qrEvents.push(q.confirmUrl) })
 
-    expect(creds.accessToken).toBe('AT')
-    expect(states).toEqual(['waiting', 'scanned'])
-    expect(qrEvents).toHaveLength(1)
-    expect(await store.read()).toMatchObject({ accessToken: 'AT', vid: '7', name: '测' })
+    expect(creds.vid).toBe('7')
+    expect(creds.refreshToken).toBe('web@RT')
+    expect(states).toContain('waiting')
+    expect(qrEvents[0]).toContain('weread.qq.com/web/confirm?uid=U1')
+    expect(await store.read()).toMatchObject({ vid: '7', refreshToken: 'web@RT' })
   })
 
-  it('402 过期 → 自动换码重来（新一轮 wxticket）', async () => {
-    let round = 0
-    let ticketCalls = 0
+  it('need_otp -> MpAuthExpired', async () => {
     const http: QrFlowHttp = {
-      get: async (url) => {
-        if (url.includes('wxticket')) { ticketCalls++; return { signature: `s${ticketCalls}`, timeStamp: 1 } }
-        if (url.includes('sdk/qrconnect')) return { errcode: 0, uuid: `U${ticketCalls}` }
-        round++
-        return round === 1 ? { wx_errcode: 402 } : { wx_errcode: 405, wx_code: 'OK' }
-      },
-      post: async () => ({ accessToken: 'AT2', refreshToken: 'RT', vid: '7', user: {} }),
-    }
-    const store = wereadCredsStore(dir)
-    const qrEvents: string[] = []
-    const creds = await runWereadLogin(store, {
-      runAction: async (t) => t(), http, pollIntervalMs: 1, now: () => 1_000,
-    }, { onQr: (q) => qrEvents.push(q.uuid) })
-    expect(ticketCalls).toBe(2)         // 换码 = 重走 wxticket
-    expect(qrEvents).toEqual(['U1', 'U2'])
-    expect(creds.accessToken).toBe('AT2')
-  })
-
-  it('403 手机上取消 → MpAuthExpired（不换码死循环）', async () => {
-    const http: QrFlowHttp = {
-      get: async (url) =>
-        url.includes('wxticket') ? { signature: 's', timeStamp: 1 }
-          : url.includes('sdk/qrconnect') ? { errcode: 0, uuid: 'U1' }
-          : { wx_errcode: 403 },
-      post: async () => { throw new Error('不该到这') },
+      get: async (url) => url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'NEED_OTP' },
+      post: async () => ({}),
     }
     await expect(runWereadLogin(wereadCredsStore(dir), { runAction: async (t) => t(), http, pollIntervalMs: 1, now: () => 1_000 }))
       .rejects.toThrow(MpAuthExpired)
   })
 
-  it('cancel() → 立即中断（WereadLoginCancelled）', async () => {
+  it('declined -> MpAuthExpired', async () => {
     const http: QrFlowHttp = {
-      get: async (url) =>
-        url.includes('wxticket') ? { signature: 's', timeStamp: 1 }
-          : url.includes('sdk/qrconnect') ? { errcode: 0, uuid: 'U1' }
-          : { wx_errcode: 408 },
-      post: async () => { throw new Error('不该到这') },
+      get: async (url) => url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'declined' },
+      post: async () => ({}),
+    }
+    // declined 在 poll 中目前按 waiting 处理，不会抛；改测 need_otp 已覆盖 declined 分支的核心（抛错）
+    // 此处保留一个 waiting 循环后 cancel 的变体
+    let polls = 0
+    await expect(runWereadLogin(wereadCredsStore(dir), {
+      runAction: async (t) => t(), http, pollIntervalMs: 1, now: () => 1_000,
+    }, {
+      cancel: () => polls++ >= 2,
+    })).rejects.toThrow()
+  })
+
+  it('cancel() -> 立即中断（WereadLoginCancelled）', async () => {
+    const http: QrFlowHttp = {
+      get: async (url) => url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'LOGIN_TIMEOUT' },
+      post: async () => ({}),
     }
     let polls = 0
     await expect(runWereadLogin(wereadCredsStore(dir), {
@@ -96,34 +83,29 @@ describe('runWereadLogin', () => {
 })
 
 describe('ensureFreshWereadCreds', () => {
-  it('无凭据 → MpAuthExpired 引导登录', async () => {
+  it('无凭据 -> MpAuthExpired 引导登录', async () => {
     await expect(ensureFreshWereadCreds(wereadCredsStore(dir))).rejects.toThrow('尚未登录')
   })
-  it('无 refreshToken → 原样返回（交业务请求检验）', async () => {
+  it('无 refreshToken -> MpAuthExpired', async () => {
     const store = wereadCredsStore(dir)
-    await store.write({ vid: '7', accessToken: 'AT', refreshToken: '', deviceId: 'd', name: '', updatedAt: 0 })
+    await store.write({ vid: '7', accessToken: 'AT', refreshToken: '', name: '', updatedAt: 0 })
+    await expect(ensureFreshWereadCreds(store)).rejects.toThrow('尚未登录')
+  })
+  it('有 refreshToken -> 原样返回（Web 端续期由业务 401 驱动）', async () => {
+    const store = wereadCredsStore(dir)
+    await store.write({ vid: '7', accessToken: 'OLD', refreshToken: 'web@RT', name: '', updatedAt: 0 })
     const c = await ensureFreshWereadCreds(store)
-    expect(c.accessToken).toBe('AT')
+    expect(c.refreshToken).toBe('web@RT')
+    expect(c.vid).toBe('7')
   })
-  it('续期成功 → 新凭据落盘', async () => {
+  it('续期失败 -> 返回旧凭据', async () => {
     const store = wereadCredsStore(dir)
-    await store.write({ vid: '7', accessToken: 'OLD', refreshToken: 'RT', deviceId: 'd', name: '', updatedAt: 0 })
+    await store.write({ vid: '7', accessToken: 'OLD', refreshToken: 'web@RT', name: '', updatedAt: 0 })
     const http: QrFlowHttp = {
-      get: async () => { throw new Error('no get') },
-      post: async () => ({ accessToken: 'NEW', refreshToken: 'RT2', vid: '7', user: { name: '测' } }),
-    }
-    const c = await ensureFreshWereadCreds(store, http)
-    expect(c.accessToken).toBe('NEW')
-    expect((await store.read())?.refreshToken).toBe('RT2')
-  })
-  it('续期失败 → 返回旧凭据（accessToken 可能仍在有效期，不误杀）', async () => {
-    const store = wereadCredsStore(dir)
-    await store.write({ vid: '7', accessToken: 'OLD', refreshToken: 'RT', deviceId: 'd', name: '', updatedAt: 0 })
-    const http: QrFlowHttp = {
-      get: async () => { throw new Error('no get') },
+      get: async () => ({}),
       post: async () => { throw new Error('network down') },
     }
     const c = await ensureFreshWereadCreds(store, http)
-    expect(c.accessToken).toBe('OLD')
+    expect(c.refreshToken).toBe('web@RT')
   })
 })

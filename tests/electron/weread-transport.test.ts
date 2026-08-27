@@ -51,7 +51,7 @@ describe('readWereadCredsFile', () => {
 })
 
 describe('WereadNodeTransport.json', () => {
-  it('带设备版本头与凭据头（有凭据时）', async () => {
+  it('带 Cookie 凭据头（有凭据时，Web 端 wr_skey=refreshToken）', async () => {
     const p = join(dir, 'creds.json')
     await writeFile(p, JSON.stringify({ vid: '77', accessToken: 'AT', refreshToken: 'R', deviceId: 'd', name: '', updatedAt: 0 }), 'utf-8')
     const t = new WereadNodeTransport(p)
@@ -62,11 +62,11 @@ describe('WereadNodeTransport.json', () => {
       return new Response(JSON.stringify({ errCode: 0, data: [] }), { status: 200 })
     }) as typeof fetch
     try {
-      const json = await t.json('https://i.weread.qq.com/book/info?bookId=x', 5000)
+      const json = await t.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)
       expect(json.errCode).toBe(0)
-      expect(seen!.headers.accessToken).toBe('AT')
-      expect(seen!.headers.vid).toBe('77')
-      expect(seen!.headers.appver).toBe('2.1.2.10245900')
+      expect(seen!.headers.Cookie).toContain('wr_vid=77')
+      expect(seen!.headers.Cookie).toContain('wr_skey=R')
+      expect(seen!.headers['User-Agent']).toContain('Mozilla')
     } finally { globalThis.fetch = origFetch }
   })
   it('无凭据也放行（扫码链路不需要登录态）', async () => {

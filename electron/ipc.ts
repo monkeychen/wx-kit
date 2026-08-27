@@ -200,7 +200,7 @@ export function registerIpc(settings: SettingsService): void {
         if (!event.sender.isDestroyed()) event.sender.send(channel, payload)
       }
       const creds = await runWereadLogin(wereadCredsStore(app.getPath('userData')), {
-        runAction: (task) => mpGateway.runAction('weread-auth', 'https://i.weread.qq.com/login', task),
+        runAction: (task) => mpGateway.runAction('weread-auth', 'https://weread.qq.com/api/auth/getLoginUid', task),
       }, {
         onQr: (qr) => send('weread:login:qr', { confirmUrl: qr.confirmUrl }),
         onState: (s) => send('weread:login:state', { state: s }),

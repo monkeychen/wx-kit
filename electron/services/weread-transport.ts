@@ -5,7 +5,6 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { MpJson } from '../../src/core/mp-types'
 import type { MpRequestTransport } from './mp-request-gateway'
-import { WEREAD_VERSION_HEADERS } from '../../src/core/weread/qr-flow'
 import type { WereadCredentials } from '../../src/core/weread/types'
 
 export const WEREAD_HOST_SUFFIXES = ['weread.qq.com'] as const
@@ -32,33 +31,27 @@ export async function readWereadCredsFile(path: string): Promise<WereadCredentia
   try { raw = await readFile(path, 'utf-8') } catch { return null }
   try {
     const v = JSON.parse(raw) as WereadCredentials
-    return v && typeof v.accessToken === 'string' && v.accessToken ? v : null
+    const hasLong = typeof v?.refreshToken === 'string' && !!v.refreshToken
+    const hasShort = typeof v?.accessToken === 'string' && !!v.accessToken
+    return v && typeof v.vid === 'string' && v.vid && (hasLong || hasShort) ? v : null
   } catch { return null }
 }
 
 export class WereadNodeTransport {
   constructor(private readonly credsPath: string) {}
 
-  private async headers(url: string): Promise<Record<string, string>> {
+  private async headers(_url: string): Promise<Record<string, string>> {
     const creds = await readWereadCredsFile(this.credsPath)
     const h: Record<string, string> = {
       Accept: 'application/json, text/plain, */*',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     }
-    
-    const host = new URL(url).hostname
-    if (host === 'i.weread.qq.com') {
-      // 移动端接口（扫码登录、凭据续期）
-      Object.assign(h, WEREAD_VERSION_HEADERS)
-      if (creds) {
-        h.accessToken = creds.accessToken
-        h.vid = creds.vid
-      }
-    } else {
-      // Web 端接口（/api/mp/cover）
-      h['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      if (creds) {
-        h.Cookie = `wr_vid=${creds.vid}; wr_skey=${creds.accessToken};`
+    if (creds) {
+      const skey = creds.refreshToken || creds.accessToken
+      h.Cookie = `wr_vid=${creds.vid}; wr_skey=${skey};`
+      if (creds.refreshToken && creds.refreshToken !== skey) {
+        h.Cookie += ` wr_rt=${encodeURIComponent(creds.refreshToken)};`
       }
     }
     return h

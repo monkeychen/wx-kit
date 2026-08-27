@@ -271,7 +271,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const store = wereadCredsStore(userDataDir)
       try {
         const creds = await runWereadLogin(store, {
-          runAction: (task) => mpGateway().runAction('weread-auth', 'https://i.weread.qq.com/login', task),
+          runAction: (task) => mpGateway().runAction('weread-auth', 'https://weread.qq.com/api/auth/getLoginUid', task),
         }, {
           onQr: (qr) => {
             void QRCode.toString(qr.confirmUrl, { type: 'terminal', small: true }).then((ascii) => {

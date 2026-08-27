@@ -106,9 +106,9 @@ async function main() {
       cliLinkPrompted: true,
       updateCheckEnabled: false,
     }))
-  // 预置微信读书凭据，使订阅/批量下载链路无需真实扫码即可走到网络请求（被 mock 接住）
+  // 预置微信读书 Web 凭据（vid + refreshToken 当 wr_skey），使订阅/批量下载链路无需真实扫码即可走到网络请求（被 mock 接住）
   writeFileSync(join(userDataDir, 'weread-creds.json'),
-    JSON.stringify({ accessToken: 'fake-e2e-token', vid: '17207435', name: 'e2e', updatedAt: Date.now() }))
+    JSON.stringify({ vid: '17207435', accessToken: 'SHORT8', refreshToken: 'web@fake-e2e-token-long-value-for-wr_skey', name: 'e2e', updatedAt: Date.now() }))
   log('libraryRoot', libraryRoot)
 
   const app = await electron.launch({
