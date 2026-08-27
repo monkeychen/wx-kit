@@ -1,7 +1,6 @@
 // src/core/mp-crawl.ts
 import { DownloadQueue, type OnProgress } from './download-queue'
-import { listArticles as listArticlesImpl } from './mp-client'
-import type { MpFetch, ArticleRef, CrawlRange, CrawlSummary, CrawlItemEvent } from './mp-types'
+import type { ArticleRef, CrawlRange, CrawlSummary, CrawlItemEvent } from './mp-types'
 import type { DownloadItemResult } from './types'
 
 export interface KeywordFilter { include?: string[]; exclude?: string[] }
@@ -23,8 +22,8 @@ export function filterRefsByTitle(refs: ArticleRef[], f?: KeywordFilter): Articl
 }
 
 export interface CrawlDeps {
-  mpFetch: MpFetch
-  token: string
+  /** 列表取件（v0.10.0 微信读书实现；账号标识归一在实现内完成）。 */
+  listFn: (fakeid: string, range: CrawlRange, opts?: { onHidden?: (n: number) => void }) => Promise<ArticleRef[]>
   downloadOne: (url: string, hint?: { appmsgid?: number; itemidx?: number }) => Promise<DownloadItemResult>
   /** 标题关键词过滤(列表后、下载前应用;见 filterRefsByTitle)。 */
   keywords?: KeywordFilter
@@ -38,20 +37,13 @@ export interface CrawlDeps {
   shouldContinue?: () => boolean
   /** 取消信号：列表开始前或下载队列阶段停止后续工作。频控不再自动退避重试。 */
   signal?: AbortSignal
-  /** 测试可注入假 listArticles。 */
-  listFn?: (
-    mpFetch: MpFetch, token: string, fakeid: string, range: CrawlRange, opts?: { sleep?: (ms: number) => Promise<void> },
-  ) => Promise<ArticleRef[]>
 }
 
 export async function crawlAccount(fakeid: string, range: CrawlRange, deps: CrawlDeps): Promise<CrawlSummary> {
-  const listFn = deps.listFn ?? listArticlesImpl
-
   let refs: ArticleRef[] = []
-  let hidden = 0                 // 读者不可访问、未列入的篇数(M38)
   if (!deps.signal?.aborted) {
     // 频控由全局 gateway 熔断并直接抛出；这里绝不在已被限制的会话上追加请求。
-    refs = await listFn(deps.mpFetch, deps.token, fakeid, range, { onHidden: (n) => { hidden += n } })
+    refs = await deps.listFn(fakeid, range)
   }
 
   const beforeFilter = refs.length
@@ -85,10 +77,10 @@ export async function crawlAccount(fakeid: string, range: CrawlRange, deps: Craw
     .slice(s.items.length)
     .map((r) => ({ url: r.url, ok: false, title: r.title, cancelled: true }))
 
-  // 「读者打不开」有两个来源:列表阶段就标出来的(hidden),和下载时才发现的(s.unavailable)。
-  // 对用户是同一件事,合并成一个数;剩下的 failed 才是真正的下载故障。
-  const unavailable = hidden + (s.unavailable ?? 0)
-  const realFailures = s.failed - (s.unavailable ?? 0)
+  // 「读者打不开」在下载阶段被发现(s.unavailable)——微信读书列表没有此类标记字段
+  // (MP 后台的 checking/ban_flag 随链路一起退场)，列表阶段无法预知。
+  const unavailable = s.unavailable ?? 0
+  const realFailures = s.failed - unavailable
   // 结果是否不及预期:count 模式看拿到几篇能读的,日期模式只要窗口内少了就算
   const shortfall = 'count' in range ? s.succeeded + s.skipped < range.count : unavailable > 0
   return {

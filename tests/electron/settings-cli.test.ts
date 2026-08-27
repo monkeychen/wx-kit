@@ -13,12 +13,15 @@ describe('parseSettingAssignment', () => {
     expect(parseSettingAssignment('historyRetentionDays', '30')).toEqual({ ok: true, patch: { historyRetentionDays: 30 } })
     expect(parseSettingAssignment('historyRetentionDays', '0')).toMatchObject({ ok: false })
   })
-  it('rejects retired subscription settings without deleting their parser implementation', () => {
-    expect(parseSettingAssignment('subscriptionAutoCheck', 'true')).toMatchObject({ ok: false, error: expect.stringContaining('MP_BACKEND_UNAVAILABLE') })
-    expect(parseSettingAssignment('subscriptionCheckTime', '07:30')).toMatchObject({ ok: false })
-    expect(parseSettingAssignment('subscriptionNewArticleAction', 'download')).toMatchObject({ ok: false })
-    expect(parseSettingAssignment('subscriptionScheduleMode', 'daily')).toMatchObject({ ok: false })
-    expect(parseSettingAssignment('subscriptionIntervalHours', '4')).toMatchObject({ ok: false })
+  it('accepts subscription settings again (v0.10.0 weread revival)', () => {
+    expect(parseSettingAssignment('subscriptionAutoCheck', 'true')).toMatchObject({ ok: true, patch: { subscriptionAutoCheck: true } })
+    expect(parseSettingAssignment('subscriptionCheckTime', '07:30')).toMatchObject({ ok: true, patch: { subscriptionCheckTime: '07:30' } })
+    expect(parseSettingAssignment('subscriptionNewArticleAction', 'download')).toMatchObject({ ok: true })
+    expect(parseSettingAssignment('subscriptionScheduleMode', 'daily')).toMatchObject({ ok: true })
+    expect(parseSettingAssignment('subscriptionIntervalHours', '4')).toMatchObject({ ok: true })
+    // 非法值仍拒绝
+    expect(parseSettingAssignment('subscriptionAutoCheck', 'yes')).toMatchObject({ ok: false })
+    expect(parseSettingAssignment('subscriptionCheckTime', '7:30')).toMatchObject({ ok: false })
   })
   it('rejects non-settable keys', () => {
     expect(parseSettingAssignment('listColumnWidths', '{}')).toMatchObject({ ok: false })

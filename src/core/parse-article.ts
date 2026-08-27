@@ -37,8 +37,9 @@ function parsePublishTime($: cheerio.CheerioAPI, html: string): string {
  * 解析公众号名。优先读 #js_name 文本；真实微信页该元素为空（运行时 JS 填充），
  * 名字藏在脚本变量里——回退读规范的 `d.nick_name = (xml ? ... : '公众号名')`，
  * 再兜底老版 `var nickname = "公众号名"`。锚定 `nick_name = (` 避开评论/游戏区里别处的 nick_name。
+ * （v0.10.0 起导出：search --url 识别账号时单独使用，不必跑整个 parseArticle。）
  */
-function parseAccount($: cheerio.CheerioAPI, html: string): string {
+export function parseAccount($: cheerio.CheerioAPI, html: string): string {
   const fromEl = $('#js_name').text().trim()
   if (fromEl) return fromEl
   const m =

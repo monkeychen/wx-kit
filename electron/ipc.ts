@@ -13,8 +13,6 @@ import { DownloadQueue } from '../src/core/download-queue'
 import { downloadArticle } from '../src/core/download-article'
 import { readArticleContent, type ReadableKind } from '../src/core/read-article'
 import { clearMpAuthState, getSession, MpAuthClearError, startFreshLogin } from './services/mp-auth'
-import { makeMpFetch } from './services/mp-fetch'
-import { searchAccount, listArticles } from '../src/core/mp-client'
 import { crawlAccount } from '../src/core/mp-crawl'
 import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
@@ -33,7 +31,13 @@ import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 import type { RunCheckResult } from './services/subscription-check'
 import { articleFetchers, createMpRuntime } from './services/mp-runtime'
-import { wereadListFn } from './services/weread-auth'
+import { makeWereadClient, wereadListFn, wereadListUrl } from './services/weread-auth'
+import { readWereadCredsFile, wereadCredsPath } from './services/weread-transport'
+import { extractArticleKeys } from '../src/core/article-keys'
+import { normalizeAccountId } from '../src/core/weread/book-id'
+import { parseAccount } from '../src/core/parse-article'
+import { HTML_TIMEOUT_MS } from '../src/core/fetch-html'
+import * as cheerio from 'cheerio'
 import { MP_ORIGIN } from './services/mp-session'
 import { PRIVATE_API_FEATURE_ENABLED, retiredPrivateApiResponse } from '../src/core/retired-private-api'
 
@@ -226,11 +230,29 @@ export function registerIpc(settings: SettingsService): void {
   ipcMain.handle('mp:protectionPause', () => mpGateway.pause())
   ipcMain.handle('mp:protectionResume', () => mpGateway.resume())
 
-  ipcMain.handle('mp:search', async (_e, name: string) => {
-    const session = getSession()
-    if (!session) return { ok: false, error: { code: 'AUTH_REQUIRED', message: '请先登录公众号后台' } }
-    try { return { ok: true, list: await searchAccount(makeMpFetch(mpGateway), session.token, name) } }
-    catch (e) {
+  ipcMain.handle('mp:search', async (_e, articleUrl: string) => {
+    // v0.10.0：语义从「按名字搜号」换成「从文章链接识别公众号」（微信读书无搜索接口）
+    const url = String(articleUrl ?? '').trim()
+    if (!/^https?:\/\/mp\.weixin\.qq\.com\//.test(url)) {
+      return { ok: false, error: { code: 'CLI_ERROR', message: '需要 mp.weixin.qq.com 的文章链接' } }
+    }
+    try {
+      const html = await mpGateway.fetchText('article-page', url, HTML_TIMEOUT_MS)
+      const keys = extractArticleKeys(html)
+      if (!keys.biz) return { ok: false, error: { code: 'NOT_FOUND', message: '页面里读不到公众号标识（可能是错误页或链接失效）' } }
+      const fakeid = normalizeAccountId(keys.biz)
+      const nickname = parseAccount(cheerio.load(html), html)
+      let verified: { title: string; coverImg: string; author: string } | null = null
+      const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
+      if (creds) {
+        try {
+          const client = makeWereadClient((path, params) => mpGateway.requestWereadJson('weread-list', wereadListUrl(path, params)))
+          const info = await client.bookInfo(fakeid)
+          if (info.title) verified = { title: info.title, coverImg: info.coverImg, author: info.author }
+        } catch { /* 校验失败不阻断识别 */ }
+      }
+      return { ok: true, list: [{ fakeid, nickname: verified?.title || nickname || fakeid, alias: '', signature: '' }] }
+    } catch (e) {
       const code = e instanceof MpAuthExpired ? 'AUTH_REQUIRED' : ((e as { code?: string }).code ?? 'MP_API_ERROR')
       return { ok: false, error: { code, message: (e as Error).message } }
     }
@@ -240,8 +262,8 @@ export function registerIpc(settings: SettingsService): void {
   ipcMain.handle('mp:crawl', async (event, { fakeid, nickname, range, formats, keywords }: { fakeid: string; nickname: string; range: CrawlRange; formats: DownloadFormat[]; keywords?: import('../src/core/mp-crawl').KeywordFilter }) => {
     const abort = new AbortController()
     crawlAbort = abort
-    const session = getSession()
-    if (!session) throw new Error('AUTH_REQUIRED')
+    const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
+    if (!creds) throw new Error('AUTH_REQUIRED')
     const { libraryRoot, downloadVideos } = await settings.get()
     const library = new Library(libraryRoot)
     const send = (ev: unknown) => { if (!event.sender.isDestroyed()) event.sender.send('mp:crawl:progress', ev) }
@@ -253,8 +275,10 @@ export function registerIpc(settings: SettingsService): void {
         send({ kind: 'note', message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB）` }),
     }
     try {
+      const client = makeWereadClient((path, params) => mpGateway.requestWereadJson('weread-list', wereadListUrl(path, params)))
       const summary = await crawlAccount(fakeid, range, {
-        mpFetch: makeMpFetch(mpGateway), token: session.token, keywords,
+        listFn: (fid, r) => client.listChaptersByRange(fid, r),
+        keywords,
         downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
         onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
         onItem: (ev) => send({ kind: 'item', ...ev }),
@@ -283,10 +307,11 @@ export function registerIpc(settings: SettingsService): void {
 
   // 订阅/新订阅一刻确定水位：能取到最新一篇就用其 createTime，否则用「现在」（秒），避免存量被当新文章
   const establishWatermark = async (fakeid: string): Promise<number> => {
-    const session = getSession()
-    if (!session) return Math.floor(Date.now() / 1000)
+    const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
+    if (!creds) return Math.floor(Date.now() / 1000)
     try {
-      const refs = await listArticles(makeMpFetch(mpGateway), session.token, fakeid, { count: 1 })
+      const client = makeWereadClient((path, params) => mpGateway.requestWereadJson('weread-list', wereadListUrl(path, params)))
+      const refs = await client.listChaptersByRange(fakeid, { count: 1 })
       return refs[0]?.createTime ?? Math.floor(Date.now() / 1000)
     } catch { return Math.floor(Date.now() / 1000) }
   }

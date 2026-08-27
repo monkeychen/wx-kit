@@ -4,18 +4,21 @@ import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { readFileSync, appendFileSync, existsSync } from 'node:fs'
+import QRCode from 'qrcode'
+import * as cheerio from 'cheerio'
 import type { DownloadFormat, DownloadSummary } from '../core/types'
 import { ALL_FORMATS } from '../core/types'
 import { Library } from '../core/library'
 import { DownloadQueue } from '../core/download-queue'
 import { downloadArticle, ArticleUnavailableError } from '../core/download-article'
-import { getSession, startFreshLogin } from '../../electron/services/mp-auth'
-import { exportSession, importSession } from '../../electron/services/session-transfer'
-import { makeMpFetch } from '../../electron/services/mp-fetch'
-import { searchAccount, listArticles } from '../core/mp-client'
+import { extractArticleKeys } from '../core/article-keys'
+import { parseAccount } from '../core/parse-article'
+import { normalizeAccountId } from '../core/weread/book-id'
 import { canonicalId } from '../core/article-id'
 import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
+import type { CrawlRange } from '../core/mp-types'
+import { HTML_TIMEOUT_MS } from '../core/fetch-html'
 import { rebuildLibrary } from '../core/rebuild-library'
 import { checkUpdate } from '../core/check-update'
 import { detectChannel, upgradeCommand } from '../core/install-channel'
@@ -31,14 +34,11 @@ import { resolveDigestDate } from '../core/digest-date'
 import { subscriptionDigest, fetchMissing } from '../core/subscription-digest'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 import { articleFetchers, createMpRuntime } from '../../electron/services/mp-runtime'
-import { wereadListFn } from '../../electron/services/weread-auth'
 import type { MpRequestGateway } from '../../electron/services/mp-request-gateway'
-import { MP_ORIGIN } from '../../electron/services/mp-session'
 import {
-  RETIRED_PRIVATE_API_COMMANDS,
-  RETIRED_PRIVATE_API_SETTING_KEYS,
-  retiredPrivateApiResponse,
-} from '../core/retired-private-api'
+  ensureFreshWereadCreds, makeWereadClient, runWereadLogin, WereadLoginCancelled,
+  wereadCredsStore, wereadListFn, wereadListUrl,
+} from '../../electron/services/weread-auth'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -72,13 +72,16 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   program.addHelpText('after', `
 常用示例:
   wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,pdf
+  wx-kit login                                      # 扫码登录微信读书(订阅/按公众号下载的前置)
+  wx-kit search --url "https://mp.weixin.qq.com/s/XXX"   # 从文章链接识别公众号
+  wx-kit crawl MP_WXS_3634850725 --count 10         # 按公众号批量下载(标识来自 search)
+  wx-kit subscription check-now                     # 检查订阅更新
   wx-kit library list
-  wx-kit library export --ids <id,id>
   wx-kit settings get libraryRoot
   wx-kit site sync --ids <id> --slug my-post        # 同步到个人站点(需先配 siteSyncPostsDir)
 
 文章库默认在 ~/Documents/wx-kit(可用 settings set libraryRoot <dir> 修改)。
-search/crawl/login/auth-status/session/subscription/protection 已停用；保留命令名仅为兼容旧脚本。
+列表后端是微信读书;按名字搜索公众号已不可用,改用 search --url 从任意文章链接识别。
 各命令详情:wx-kit help <命令>
 
 仓库:https://github.com/monkeychen/wx-kit(可读 README.md / issues / releases 深入了解)`)
@@ -88,9 +91,6 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
   const userDataDir = opts.userDataDir ?? join(homedir(), '.wx-kit')
   const settingsFor = () =>
     new SettingsService(userDataDir, defaultLibraryRoot())
-  const visibleSettings = (all: Record<string, unknown>) => Object.fromEntries(
-    Object.entries(all).filter(([name]) => !RETIRED_PRIVATE_API_SETTING_KEYS.has(name)),
-  )
   const resolveRoot = async (optOut?: string): Promise<string> =>
     optOut ?? (await settingsFor().get()).libraryRoot
   let gateway: MpRequestGateway | null = null
@@ -140,33 +140,70 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
 
   program
     .command('search')
-    .description('已停用：搜索公众号')
-    .argument('<name>', '公众号名称')
-    .action(async (name: string) => {
-      const session = getSession()
-      if (!session) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login' } }); exitCode = 2; return }
+    .description('从文章链接识别公众号（返回订阅/批量下载用的账号标识；按名字搜索已不可用）')
+    .requiredOption('--url <url>', '该公众号任意一篇文章的链接')
+    .action(async (opts) => {
+      const url = String(opts.url ?? '').trim()
+      if (!/^https?:\/\/mp\.weixin\.qq\.com\//.test(url)) {
+        outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要 mp.weixin.qq.com 的文章链接（--url）' } }); exitCode = 2; return
+      }
       try {
-        const list = await searchAccount(makeMpFetch(mpGateway()), session.token, name)
-        outJson({ ok: true, list })
+        // 抓文章页本身走 article-page（公开页，不需要登录态）——与 download 同一条保护闸
+        const html = await mpGateway().fetchText('article-page', url, HTML_TIMEOUT_MS)
+        const keys = extractArticleKeys(html)
+        if (!keys.biz) {
+          outJson({ ok: false, error: { code: 'NOT_FOUND', message: '页面里读不到公众号标识（可能是错误页或链接失效）' } }); exitCode = 1; return
+        }
+        const fakeid = normalizeAccountId(keys.biz)
+        const nickname = parseAccount(cheerio.load(html), html)
+        // 已登录时用微信读书的 /book/info 校验收录状态并拿权威名称；未登录或未收录时退回页面名
+        let verified: { title: string; coverImg: string; author: string } | null = null
+        const creds = await wereadCredsStore(userDataDir).read()
+        if (creds) {
+          try {
+            const client = makeWereadClient((path, params) => mpGateway().requestWereadJson('weread-list', wereadListUrl(path, params)))
+            const info = await client.bookInfo(fakeid)
+            if (info.title) verified = { title: info.title, coverImg: info.coverImg, author: info.author }
+          } catch { /* 校验失败不阻断识别——标识本身已确定 */ }
+        }
+        outJson({
+          ok: true,
+          account: {
+            fakeid,
+            nickname: verified?.title || nickname || fakeid,
+            ...(verified ? { wereadCover: verified.coverImg, wereadAuthor: verified.author } : {}),
+          },
+          ...(creds ? {} : { note: '尚未登录微信读书；登录后可自动校验该号是否被微信读书收录' }),
+        })
+        exitCode = 0
       } catch (e) {
-        if (e instanceof MpAuthExpired) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '登录态失效，请重新 login' } }); exitCode = 2 }
-        else { outJson({ ok: false, error: { code: (e as { code?: string }).code ?? 'MP_API_ERROR', message: (e as Error).message } }); exitCode = 1 }
+        outJson({ ok: false, error: { code: (e as { code?: string }).code ?? 'MP_API_ERROR', message: (e as Error).message } })
+        exitCode = 1
       }
     })
 
   program
     .command('auth-status')
-    .description('已停用：公众号后台登录态')
-    .action(async () => {
-      const session = getSession()
-      if (!session) { outJson({ ok: true, present: false, valid: false }); return }
-      outJson({
-        ok: true, present: true, valid: null, checkedAt: session.timestamp,
-        note: '仅确认本地保存了登录态，未访问微信验证有效性',
-      })
+    .description('查看微信读书登录态（本地读取，零网络请求；--verify 真实续期探测一次）')
+    .option('--verify', '真实调用一次微信读书续期接口验证登录态（会顺带续期）')
+    .action(async (opts) => {
+      const store = wereadCredsStore(userDataDir)
+      const creds = await store.read()
+      if (!creds) { outJson({ ok: true, present: false, valid: false }); return }
+      if (!opts.verify) {
+        outJson({ ok: true, present: true, valid: null, checkedAt: creds.updatedAt, name: creds.name, note: '仅确认本地保存了微信读书凭据；--verify 可真实探测' })
+        return
+      }
+      try {
+        const fresh = await ensureFreshWereadCreds(store)
+        outJson({ ok: true, present: true, valid: true, checkedAt: fresh.updatedAt, name: fresh.name })
+      } catch (e) {
+        if (e instanceof MpAuthExpired) { outJson({ ok: true, present: true, valid: false, name: creds.name, reason: e.message }); return }
+        throw e
+      }
     })
 
-  const protection = program.command('protection').description('已停用：微信请求保护')
+  const protection = program.command('protection').description('微信请求保护（子命令:status / pause / resume）')
   protection.command('status').description('查看保护状态（零微信请求）').action(async () => {
     outJson({ ok: true, protection: await mpGateway().status() })
   })
@@ -179,9 +216,9 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
 
   program
     .command('crawl')
-    .description('已停用：按公众号批量下载')
-    .argument('[name]', '公众号名称（或用 --fakeid）')
-    .option('--fakeid <id>', '直接指定 fakeid（来自 search）')
+    .description('按公众号批量下载（列表来自微信读书；账号标识用 search --url 获取）')
+    .argument('[account]', '账号标识（bookId / 老 fakeid 均可；不再支持按名字搜索）')
+    .option('--fakeid <id>', '同位置参数（兼容旧脚本保留）')
     .option('--count <n>', '最近 N 篇')
     .option('--from <date>', '起始日期 YYYY-MM-DD')
     .option('--to <date>', '结束日期 YYYY-MM-DD')
@@ -190,23 +227,20 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
     .option('--include <csv>', '仅下载标题含任一关键词的文章（逗号分隔）')
     .option('--exclude <csv>', '排除标题含任一关键词的文章（逗号分隔，优先于 --include）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
-    .action(async (name: string | undefined, opts) => {
-      const session = getSession()
-      if (!session) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login' } }); exitCode = 2; return }
-      const range = opts.count ? { count: Number(opts.count) }
+    .action(async (accountArg: string | undefined, opts) => {
+      const raw = String(opts.fakeid ?? accountArg ?? '').trim()
+      if (!raw) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要账号标识（用 search --url 从文章链接获取）' } }); exitCode = 2; return }
+      let fakeid: string
+      try { fakeid = normalizeAccountId(raw) }
+      catch (e) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: `账号标识无效：${(e as Error).message}` } }); exitCode = 2; return }
+      const creds = await wereadCredsStore(userDataDir).read()
+      if (!creds) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
+      const range: CrawlRange | null = opts.count ? { count: Number(opts.count) }
         : (opts.from && opts.to) ? { from: String(opts.from), to: String(opts.to) }
         : null
       if (!range) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要 --count 或 --from/--to' } }); exitCode = 2; return }
-      const mpFetch = makeMpFetch(mpGateway())
+      const client = makeWereadClient((path, params) => mpGateway().requestWereadJson('weread-list', wereadListUrl(path, params)))
       try {
-        let fakeid = opts.fakeid as string | undefined
-        if (!fakeid) {
-          if (!name) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要 <name> 或 --fakeid' } }); exitCode = 2; return }
-          const cands = await searchAccount(mpFetch, session.token, name)
-          if (cands.length === 0) { outJson({ ok: false, error: { code: 'NOT_FOUND', message: `未找到公众号：${name}` } }); exitCode = 1; return }
-          if (cands.length > 1) { outJson({ ok: false, error: { code: 'AMBIGUOUS', message: '多个匹配，请用 --fakeid', candidates: cands } }); exitCode = 2; return }
-          fakeid = cands[0].fakeid
-        }
         const formats = parseFormats(opts.formats)
         const root = await resolveRoot(opts.out)
         const library = new Library(root)
@@ -214,7 +248,7 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
         const parseKws = (csv?: string) => csv ? String(csv).split(',').map((s) => s.trim()).filter(Boolean) : undefined
         const include = parseKws(opts.include), exclude = parseKws(opts.exclude)
         const summary = await crawlAccount(fakeid, range, {
-          mpFetch, token: session.token,
+          listFn: (fid, r) => client.listChaptersByRange(fid, r),
           ...(include || exclude ? { keywords: { include, exclude } } : {}),
           downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
           onProgress: (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}\n`),
@@ -222,6 +256,7 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
         outJson(summary)
         exitCode = summary.ok ? 0 : 1
       } catch (e) {
+        if (e instanceof MpAuthExpired) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: `微信读书登录态失效：${e.message}` } }); exitCode = 2; return }
         const code = (e as { code?: string }).code ?? 'MP_API_ERROR'
         outJson({ ok: false, error: { code, message: (e as Error).message } })
         exitCode = code === 'AUTH_REQUIRED' ? 2 : 1
@@ -230,37 +265,64 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
 
   program
     .command('login')
-    .description('已停用：公众号后台扫码登录')
+    .description('扫码登录微信读书（按公众号下载与订阅的登录态；终端显示二维码）')
     .action(async () => {
-      try { await mpGateway().runAction('auth-verify', MP_ORIGIN, startFreshLogin); outJson({ ok: true }) }
-      catch (e) {
-        const cancelled = (e as Error).message === 'CANCELLED'
-        outJson({ ok: false, error: { code: cancelled ? 'CANCELLED' : ((e as { code?: string }).code ?? 'LOGIN_FAILED'), message: (e as Error).message } })
-        exitCode = cancelled ? 2 : 1
+      const store = wereadCredsStore(userDataDir)
+      try {
+        const creds = await runWereadLogin(store, {
+          runAction: (task) => mpGateway().runAction('weread-auth', 'https://i.weread.qq.com/login', task),
+        }, {
+          onQr: (qr) => {
+            void QRCode.toString(qr.confirmUrl, { type: 'terminal', small: true }).then((ascii) => {
+              process.stderr.write('\n请用微信扫码，并在手机上确认登录：\n\n' + ascii + '\n')
+              process.stderr.write(`（终端二维码扫不动时，可在浏览器打开后扫页面上的码：${qr.confirmUrl}）\n`)
+            })
+          },
+          onState: (s) => { if (s === 'scanned') process.stderr.write('已扫码，等待手机确认…\n') },
+        })
+        outJson({ ok: true, vid: creds.vid, name: creds.name })
+        exitCode = 0
+      } catch (e) {
+        if (e instanceof WereadLoginCancelled || e instanceof MpAuthExpired && e.message.includes('取消')) {
+          outJson({ ok: false, error: { code: 'CANCELLED', message: (e as Error).message } }); exitCode = 2; return
+        }
+        if (e instanceof MpAuthExpired) { outJson({ ok: false, error: { code: 'LOGIN_FAILED', message: e.message } }); exitCode = 1; return }
+        outJson({ ok: false, error: { code: (e as { code?: string }).code ?? 'LOGIN_FAILED', message: (e as Error).message } })
+        exitCode = 1
       }
     })
 
-  // M27:headless 环境无法扫码,登录态从已登录机器搬运(mac login → export → scp → import)
-  const sessionCmd = program.command('session').description('已停用：公众号后台登录态迁移')
-  const cliSessionPath = () => join(userDataDir, 'mp-session.json')
+  // 凭据跨机器搬运:headless 环境无法扫码(mac login → export → scp → import)。v0.10.0 起是微信读书凭据形态。
+  const sessionCmd = program.command('session').description('微信读书登录态跨机器迁移(子命令:export / import)')
+  const cliSessionPath = () => join(userDataDir, 'weread-creds.json')
   sessionCmd
     .command('export')
-    .description('导出当前登录态到文件(等同登录凭证,勿提交仓库/勿外传)')
-    .option('-o, --out <file>', '导出路径', './wx-kit-session.json')
+    .description('导出当前微信读书登录态到文件(等同登录凭证,勿提交仓库/勿外传)')
+    .option('-o, --out <file>', '导出路径', './wx-kit-weread-creds.json')
     .action(async (opts) => {
-      if (!getSession()) { outJson({ ok: false, error: { code: 'NO_SESSION', message: '尚未登录,先执行 wx-kit login' } }); exitCode = 1; return }
+      const store = wereadCredsStore(userDataDir)
+      if (!(await store.read())) { outJson({ ok: false, error: { code: 'NO_SESSION', message: '尚未登录,先执行 wx-kit login' } }); exitCode = 1; return }
       const outPath = String(opts.out)
-      await exportSession(cliSessionPath(), outPath)
+      const { copyFile, chmod } = await import('node:fs/promises')
+      await copyFile(cliSessionPath(), outPath)
+      await chmod(outPath, 0o600)
       outJson({ ok: true, path: outPath, warning: '此文件等同登录态,勿提交仓库、勿传给不信任的环境,用后即删' })
     })
   sessionCmd
     .command('import')
-    .description('从文件导入登录态（零微信请求；有效性在后续实际操作时确认）')
+    .description('从文件导入微信读书登录态（零微信请求；有效性在后续实际操作时确认）')
     .argument('<file>', '来自 session export 的文件')
     .action(async (file: string) => {
-      try { await importSession(file, cliSessionPath()) }
-      catch (e) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: (e as Error).message } }); exitCode = 2; return }
-      outJson({ ok: true, valid: null, note: '已导入；未访问微信探测有效性，后续实际操作将通过请求保护网关' })
+      // 读文件→按 weread 凭据形态校验→写盘(0600)。非法内容不触碰既有凭据。
+      let parsed: unknown
+      try { parsed = JSON.parse(readFileSync(file, 'utf-8')) } catch { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '文件不是合法 JSON' } }); exitCode = 2; return }
+      const v = parsed as { accessToken?: unknown; vid?: unknown; refreshToken?: unknown; deviceId?: unknown }
+      if (typeof v?.accessToken !== 'string' || !v.accessToken || typeof v?.vid !== 'string' || typeof v?.refreshToken !== 'string') {
+        outJson({ ok: false, error: { code: 'CLI_ERROR', message: '不是微信读书登录态文件（缺少 accessToken/vid 等字段；旧版 mp-session.json 已不再适用）' } }); exitCode = 2; return
+      }
+      const { writeFile } = await import('node:fs/promises')
+      await writeFile(cliSessionPath(), JSON.stringify(parsed, null, 2), { mode: 0o600 })
+      outJson({ ok: true, valid: null, note: '已导入；未访问微信读书探测有效性，后续实际操作将通过请求保护网关' })
     })
 
   const library = program.command('library').description('文章库(子命令:list / search / remove / rebuild / export)')
@@ -344,7 +406,7 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
       exitCode = 0
     })
 
-  const subscription = program.command('subscription').description('已停用：公众号订阅')
+  const subscription = program.command('subscription').description('公众号订阅(子命令:list / check-now / digest)')
   subscription
     .command('list')
     .description('列出订阅账号、水位、上次/下次检查')
@@ -371,7 +433,6 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
       const s = await settingsFor().get()
       const root = await resolveRoot(opts.out)
       const subs = new Subscriptions(root)
-      const session = getSession()
       const logFilePath = join(userDataDir, 'subscriptions-check.log')
       const fakeids = opts.accounts ? String(opts.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : undefined
       const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
@@ -415,12 +476,12 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
         outJson({ ok: false, error: { code: 'BAD_DATE', message: (e as Error).message } })
         exitCode = 2; return
       }
-      const session = getSession()
-      if (!session) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login' } }); exitCode = 2; return }
+      const creds = await wereadCredsStore(userDataDir).read()
+      if (!creds) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
       const root = await resolveRoot(o.out)
       const subs = new Subscriptions(root)
       const library = new Library(root)
-      const mpFetch = makeMpFetch(mpGateway())
+      const client = makeWereadClient((path, params) => mpGateway().requestWereadJson('weread-list', wereadListUrl(path, params)))
       const only = o.accounts ? String(o.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : null
       const accounts = (await subs.list())
         .filter((a) => a.subscribed && (!only || only.includes(a.fakeid)))
@@ -446,7 +507,7 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
 
       const result = await subscriptionDigest({
         accounts, date: when.date, fromTs: when.fromTs, toTs: when.toTs,
-        listByDate: (fakeid) => listArticles(mpFetch, session.token, fakeid, { from: when.date, to: when.date }),
+        listByDate: (fakeid) => client.listChaptersByRange(fakeid, { from: when.date, to: when.date }),
         localOf,
         // 16 个号要跑半分钟,没有逐号输出会像卡死
         onProgress: (e) => process.stderr.write(`[${e.index}/${e.total}] ${e.nickname} … ${e.count} 篇\n`),
@@ -586,10 +647,7 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
     .action(async (key: string | undefined) => {
       const all = await settingsFor().get()
       if (key === undefined) {
-        outJson({ ok: true, settings: visibleSettings(all as unknown as Record<string, unknown>) }); return
-      }
-      if (RETIRED_PRIVATE_API_SETTING_KEYS.has(key)) {
-        outJson(retiredPrivateApiResponse()); exitCode = 1; return
+        outJson({ ok: true, settings: all }); return
       }
       if (!(key in all)) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: `未知设置键:${key}` } }); exitCode = 2; return }
       outJson({ ok: true, key, value: (all as unknown as Record<string, unknown>)[key] })
@@ -600,28 +658,16 @@ search/crawl/login/auth-status/session/subscription/protection 已停用；保�
     .argument('<key>', '设置键名')
     .argument('<value>', '值（布尔用 true/false，格式用逗号分隔）')
     .action(async (key: string, value: string) => {
-      if (RETIRED_PRIVATE_API_SETTING_KEYS.has(key)) {
-        outJson(retiredPrivateApiResponse()); exitCode = 1; return
-      }
       const parsed = parseSettingAssignment(key, value)
       if (!parsed.ok) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: parsed.error } }); exitCode = 2; return }
       const next = await settingsFor().save(parsed.patch)
-      outJson({ ok: true, settings: visibleSettings(next as unknown as Record<string, unknown>) })
+      outJson({ ok: true, settings: next })
     })
 
   program
     .command('version')
     .description('输出版本号')
     .action(() => { process.stdout.write((opts.version ?? '0.0.0-dev') + '\n') })
-
-  // 旧命令仍在 Commander 与 CLI_COMMANDS 中注册，保证旧脚本不会误开 GUI；
-  // 在解析参数前统一短路，连 session、文件和网络 runtime 都不读取。
-  const retiredInvocation = RETIRED_PRIVATE_API_COMMANDS.has(argv[0])
-    || (argv[0] === 'help' && RETIRED_PRIVATE_API_COMMANDS.has(argv[1]))
-  if (retiredInvocation) {
-    outJson(retiredPrivateApiResponse())
-    return 1
-  }
 
   try {
     await program.parseAsync(argv, { from: 'user' })

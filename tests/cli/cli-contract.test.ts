@@ -29,23 +29,76 @@ beforeEach(() => {
   vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
-describe('CLI retired private API commands', () => {
-  it.each(['search', 'crawl', 'login', 'auth-status', 'session', 'subscription', 'protection'])(
-    '%s keeps CLI compatibility but exits with a stable disabled result', async (command) => {
-    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-retired-cli-'))
-    const code = await runCli([command], { userDataDir })
-    expect(code).toBe(1)
-    expect(JSON.parse(stdout)).toMatchObject({
-      ok: false,
-      error: { code: 'MP_BACKEND_UNAVAILABLE', alternative: expect.stringContaining('download --url') },
-    })
-    },
-  )
+describe('CLI revived private API commands (v0.10.0 weread backend)', () => {
+  // 不登录、零网络的契约面：各命令给出可预期的业务响应而不是停用错误
+  it('auth-status reports present:false when never logged in', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
+    const code = await runCli(['auth-status'], { userDataDir })
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, present: false, valid: false })
+  })
 
-  it('does not expose stale help for a retired command', async () => {
-    const code = await runCli(['help', 'subscription'])
+  it('crawl without login asks for login (exit 2)', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
+    const code = await runCli(['crawl', 'MP_WXS_1', '--count', '3'], { userDataDir })
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
+  })
+
+  it('crawl without account id is a usage error', async () => {
+    const code = await runCli(['crawl', '--count', '3'])
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+  })
+
+  it('search without --url is a usage error (name search is gone)', async () => {
+    const code = await runCli(['search'])
+    expect(code).toBe(2)
+  })
+
+  it('subscription check-now without login reports no-session (exit 0)', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
+    const root = mkdtempSync(join(tmpdir(), 'wxk-rev-lib-'))
+    const code = await runCli(['subscription', 'check-now', '--out', root], { userDataDir })
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session' })
+  })
+
+  it('subscription digest without login asks for login (exit 2)', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
+    const root = mkdtempSync(join(tmpdir(), 'wxk-rev-lib-'))
+    const code = await runCli(['subscription', 'digest', '--date', 'today', '--out', root], { userDataDir })
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
+  })
+
+  it('session export without login reports NO_SESSION (exit 1)', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
+    const code = await runCli(['session', 'export'], { userDataDir })
     expect(code).toBe(1)
-    expect(JSON.parse(stdout).error.code).toBe('MP_BACKEND_UNAVAILABLE')
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'NO_SESSION' } })
+  })
+
+  it('session import rejects legacy mp-session format (zero network)', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
+    const legacy = join(userDataDir, 'legacy-session.json')
+    writeFileSync(legacy, JSON.stringify({ token: '123', cookies: [{ name: 'a', value: 'b' }], timestamp: 1 }))
+    const code = await runCli(['session', 'import', legacy], { userDataDir })
+    expect(code).toBe(2)
+    expect(JSON.parse(stdout).error.message).toContain('旧版 mp-session.json')
+  })
+
+  it('protection status works without login (zero network)', async () => {
+    const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
+    const code = await runCli(['protection', 'status'], { userDataDir })
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true })
+  })
+
+  it('help shows revived commands, not 停用 markers', async () => {
+    const code = await runCli(['help', 'subscription'])
+    expect(code).toBe(0)
+    expect(stdout).not.toContain('已停用')
   })
 })
 
@@ -125,12 +178,13 @@ describe('CLI library root falls back to settings.libraryRoot', () => {
 })
 
 describe('CLI settings get/set', () => {
-  it('get returns only active settings; get <key> returns one', async () => {
+  it('get returns full settings incl. subscription keys; get <key> returns one', async () => {
     const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli-'))
     await runCli(['settings', 'get'], { userDataDir: ud })
     const result = JSON.parse(stdout)
     expect(result).toMatchObject({ ok: true, settings: { libraryRoot: expect.any(String) } })
-    expect(result.settings).not.toHaveProperty('subscriptionScheduleMode')
+    // v0.10.0：订阅键复活，settings get 不再隐藏
+    expect(result.settings).toHaveProperty('subscriptionScheduleMode')
     stdout = ''
     await runCli(['settings', 'get', 'libraryRoot'], { userDataDir: ud })
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, key: 'libraryRoot' })
@@ -141,15 +195,15 @@ describe('CLI settings get/set', () => {
     expect(code).toBe(0)
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, settings: { historyRetentionDays: 30 } })
   })
-  it('retired subscription settings return the same unavailable boundary and stay stored', async () => {
+  it('subscription settings are readable and writable again (v0.10.0)', async () => {
     const ud = mkdtempSync(join(tmpdir(), 'wxk-set-cli3-'))
     const service = new SettingsService(ud, '/unused')
     await service.save({ subscriptionIntervalHours: 4 })
-    expect(await runCli(['settings', 'get', 'subscriptionIntervalHours'], { userDataDir: ud })).toBe(1)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'MP_BACKEND_UNAVAILABLE' } })
+    expect(await runCli(['settings', 'get', 'subscriptionIntervalHours'], { userDataDir: ud })).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, key: 'subscriptionIntervalHours', value: 4 })
     stdout = ''
-    expect(await runCli(['settings', 'set', 'subscriptionIntervalHours', '8'], { userDataDir: ud })).toBe(1)
-    expect((await service.get()).subscriptionIntervalHours).toBe(4)
+    expect(await runCli(['settings', 'set', 'subscriptionIntervalHours', '8'], { userDataDir: ud })).toBe(0)
+    expect((await service.get()).subscriptionIntervalHours).toBe(8)
   })
 })
 
@@ -419,7 +473,8 @@ describe('CLI top-level help (M25 R3)', () => {
     expect(stdout).toContain('子命令:list / search / remove / rebuild / export')
     expect(stdout).toContain('子命令:get / set')
     expect(stdout).toContain('常用示例')
-    expect(stdout).toContain('search/crawl/login/auth-status/session/subscription/protection 已停用')
+    expect(stdout).not.toContain('已停用')
+    expect(stdout).toContain('search --url')
     expect(stdout).toContain('~/Documents/wx-kit')
   })
 

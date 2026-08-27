@@ -3,7 +3,7 @@
 import { checkSubscriptions } from '../../src/core/check-subscriptions'
 import { MpAuthExpired } from '../../src/core/mp-errors'
 import type { Subscriptions, CheckLogEntry, CheckFailure } from '../../src/core/subscriptions'
-import type { ArticleRef, MpFetch } from '../../src/core/mp-types'
+import type { ArticleRef } from '../../src/core/mp-types'
 import type { DownloadFormat, DownloadSummary, ProgressEvent } from '../../src/core/types'
 import type { HistorySource } from '../../src/core/download-history'
 import type { AppSettings } from './settings'

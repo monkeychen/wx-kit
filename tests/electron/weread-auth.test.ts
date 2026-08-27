@@ -6,7 +6,6 @@ import { join } from 'node:path'
 import {
   runWereadLogin, ensureFreshWereadCreds, wereadCredsStore, WereadLoginCancelled,
 } from '../../electron/services/weread-auth'
-import { WereadCredsStore } from '../../src/core/weread/creds-store'
 import type { QrFlowHttp } from '../../src/core/weread/qr-flow'
 import { MpAuthExpired } from '../../src/core/mp-errors'
 
