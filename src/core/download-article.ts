@@ -49,8 +49,24 @@ export async function downloadArticle(
     return { url, ok: true, id, skipped: true, title: existing?.title, dir: existing?.dir }
   }
 
-  const html = await deps.fetchHtml(url)
-  const parsed = parseArticle(html, url)
+  let html = await deps.fetchHtml(url)
+  let parsed = parseArticle(html, url)
+  if (!parsed.title.trim() && url.includes('/s/')) {
+    const altUrl = url.includes('~') ? url.replace(/~/g, '_') : url.includes('_') ? url.replace(/_/g, '~') : url
+    if (altUrl !== url) {
+      try {
+        const altHtml = await deps.fetchHtml(altUrl)
+        const altParsed = parseArticle(altHtml, altUrl)
+        if (altParsed.title.trim()) {
+          html = altHtml
+          parsed = altParsed
+          url = altUrl
+          // 粘贴的是短链且无 hint 时 id 是 URL 哈希，需按新 URL 重算
+          if (id.startsWith('h_')) id = articleId(url, hint)
+        }
+      } catch {}
+    }
+  }
 
   // 短链无 hint 时 id 是 URL 哈希（h_ 形态），与列表抓取/长链算出的 mid_idx 认不出同一篇。
   // 页面已到手，顺手从脚本变量补出微信主键再判一次——两条下载路径由此归一。

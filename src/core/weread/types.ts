@@ -12,6 +12,8 @@ export interface WereadCredentials {
   /** 显示名（登录响应 user.name）。 */
   name: string
   updatedAt: number
+  /** Web 端完整 Cookie（登录后 Set-Cookie 全量，含 RK/_qimei 等，列表接口需它才不 -2041） */
+  cookie?: string
 }
 
 /** 扫码登录的第一步产物：渲染层据此画二维码，uuid 供轮询。 */

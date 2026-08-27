@@ -48,13 +48,17 @@ export class WereadNodeTransport {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     }
     if (creds) {
-      const shortSkey = creds.accessToken?.trim() || ''
-      const longRt = creds.refreshToken?.trim() || ''
-      if (shortSkey) {
-        h.Cookie = `wr_vid=${creds.vid}; wr_skey=${shortSkey};`
-        if (longRt) h.Cookie += ` wr_rt=${encodeURIComponent(longRt)};`
-      } else if (longRt) {
-        h.Cookie = `wr_vid=${creds.vid}; wr_skey=${longRt};`
+      if (creds.cookie) {
+        h.Cookie = creds.cookie
+      } else {
+        const shortSkey = creds.accessToken?.trim() || ''
+        const longRt = creds.refreshToken?.trim() || ''
+        if (shortSkey) {
+          h.Cookie = `wr_vid=${creds.vid}; wr_skey=${shortSkey};`
+          if (longRt) h.Cookie += ` wr_rt=${encodeURIComponent(longRt)};`
+        } else if (longRt) {
+          h.Cookie = `wr_vid=${creds.vid}; wr_skey=${longRt};`
+        }
       }
     }
     return h

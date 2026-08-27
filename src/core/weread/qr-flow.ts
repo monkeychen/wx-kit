@@ -12,6 +12,8 @@ export const WEB_WEREAD_BASE = 'https://weread.qq.com'
 export interface QrFlowHttp {
   get: (url: string, headers?: Record<string, string>) => Promise<Record<string, unknown>>
   post: (url: string, body: unknown, headers?: Record<string, string>) => Promise<Record<string, unknown>>
+  getCookie?: (name: string) => string | undefined
+  getCookieHeader?: () => string | undefined
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'

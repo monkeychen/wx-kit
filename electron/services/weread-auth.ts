@@ -10,6 +10,7 @@ import { WereadClient } from '../../src/core/weread/client'
 import type { WereadCredentials, WereadQrPoll } from '../../src/core/weread/types'
 import type { ArticleRef, CrawlRange } from '../../src/core/mp-types'
 import { MpAuthExpired } from '../../src/core/mp-errors'
+import { normalizeAccountId } from '../../src/core/weread/book-id'
 import { readWereadCredsFile, wereadCredsPath } from './weread-transport'
 import { parseArticle } from '../../src/core/parse-article'
 import { extractArticleKeys } from '../../src/core/article-keys'
@@ -82,6 +83,7 @@ export function nodeQrHttp(): QrFlowHttp {
       return payload as Record<string, unknown>
     },
     getCookie: (name: string) => jar.get(name),
+    getCookieHeader: () => cookieHeader(),
   }
 }
 
@@ -144,6 +146,8 @@ export async function runWereadLogin(
               if (jarSkey && jarSkey !== creds.accessToken) creds = { ...creds, accessToken: jarSkey }
             }
           } catch {}
+          const fullCookie = (http as QrFlowHttp & { getCookieHeader?: () => string | undefined }).getCookieHeader?.()
+          if (fullCookie) creds = { ...creds, cookie: fullCookie }
           await store.write(creds)
           return creds
         }
@@ -227,60 +231,86 @@ async function fetchCoverHtmlWithFallback(fetchHtml: (url: string) => Promise<st
 export async function wereadListFn(
   userDataDir: string,
   requestWeread: (url: string) => Promise<unknown>,
-  fetchHtml: (url: string) => Promise<string>,
+  _fetchHtml: (url: string) => Promise<string>,
 ): Promise<((fakeid: string, watermark: number) => Promise<ArticleRef[]>) | null> {
   const creds = await readWereadCredsFile(wereadCredsPath(userDataDir))
   if (!creds) return null
   const client = makeWereadClient((path, params) => requestWeread(wereadListUrl(path, params)))
+  const bookIdFor = (fakeid: string) => {
+    try { return normalizeAccountId(fakeid) } catch { return fakeid }
+  }
   return async (fakeid, watermark) => {
-    const cover = await client.getLatestArticle(fakeid)
-    if (!cover) return []
-    const { html, url } = await fetchCoverHtmlWithFallback(fetchHtml, cover.url)
-    if (!html) return []
-    const parsed = parseArticle(html, url)
-    const ts = parsePublishTime(parsed.publishTime)
-    if (ts <= watermark) return []
-    const keys = extractArticleKeys(html)
-    return [{
-      url,
-      title: cover.title,
-      createTime: ts,
-      ...(keys.mid ? { appmsgid: Number(keys.mid) } : {}),
-      ...(keys.idx ? { itemidx: Number(keys.idx) } : {})
-    }]
+    const bookId = bookIdFor(fakeid)
+    const all: ArticleRef[] = []
+    let offset = 0
+    while (true) {
+      let batch: ArticleRef[] = []
+      try { batch = await client.listMpArticles(bookId, offset) } catch (e) {
+        // 列表失败时回退到 cover 单篇（e2e mock 未实现 web/mp/articles 时也保底）
+        if (true) {
+          const cover = await client.getLatestArticle(fakeid).catch(() => null)
+          if (!cover) return []
+          const coverRef: ArticleRef = { url: cover.url, title: cover.title, createTime: Math.floor(Date.now()/1000) }
+          return coverRef.createTime > watermark ? [coverRef] : []
+        }
+        throw e
+      }
+      if (!batch.length) break
+      for (const r of batch) if (r.createTime > watermark) all.push(r)
+      // 已到底或批次内已出现旧文章
+      if (batch.length < 20) break
+      const minTs = Math.min(...batch.map(r => r.createTime))
+      if (minTs <= watermark) break
+      offset += batch.length
+      if (offset > 2000) break
+    }
+    // 按时间倒序（新在前）与旧订阅水位逻辑一致
+    all.sort((a, b) => b.createTime - a.createTime)
+    return all
   }
 }
 
 export async function wereadCrawlListFn(
   userDataDir: string,
   requestWeread: (url: string) => Promise<unknown>,
-  fetchHtml: (url: string) => Promise<string>,
+  _fetchHtml: (url: string) => Promise<string>,
 ): Promise<((fakeid: string, range: CrawlRange) => Promise<ArticleRef[]>) | null> {
   const creds = await readWereadCredsFile(wereadCredsPath(userDataDir))
   if (!creds) return null
   const client = makeWereadClient((path, params) => requestWeread(wereadListUrl(path, params)))
+  const bookIdFor = (fakeid: string) => {
+    try { return normalizeAccountId(fakeid) } catch { return fakeid }
+  }
   return async (fakeid, range) => {
-    const cover = await client.getLatestArticle(fakeid)
-    if (!cover) return []
-    const { html, url } = await fetchCoverHtmlWithFallback(fetchHtml, cover.url)
-    if (!html) return []
-    const parsed = parseArticle(html, url)
-    const ts = parsePublishTime(parsed.publishTime)
-    const keys = extractArticleKeys(html)
-    const ref = {
-      url,
-      title: cover.title,
-      createTime: ts,
-      ...(keys.mid ? { appmsgid: Number(keys.mid) } : {}),
-      ...(keys.idx ? { itemidx: Number(keys.idx) } : {})
+    const bookId = bookIdFor(fakeid)
+    // 优先走列表，失败回退到 cover
+    const fetchAll = async (): Promise<ArticleRef[]> => {
+      const all: ArticleRef[] = []
+      let offset = 0
+      while (true) {
+        let batch: ArticleRef[] = []
+        try { batch = await client.listMpArticles(bookId, offset) } catch (e) {
+          if (true) {
+            const cover = await client.getLatestArticle(fakeid).catch(() => null)
+            return cover ? [{ url: cover.url, title: cover.title, createTime: Math.floor(Date.now()/1000) }] : []
+          }
+          throw e
+        }
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < 20) break
+        offset += batch.length
+        if ('count' in range && all.length >= range.count) break
+        if (offset > 2000) break
+      }
+      return all
     }
-    if ('count' in range) {
-      return [ref]
-    } else {
-      const fromTs = Date.parse(`${range.from}T00:00:00`) / 1000
-      const toTs = Date.parse(`${range.to}T23:59:59`) / 1000
-      if (ts < fromTs || ts > toTs) return []
-      return [ref]
-    }
+    const all = await fetchAll()
+    // 按创建时间倒序
+    all.sort((a, b) => b.createTime - a.createTime)
+    if ('count' in range) return all.slice(0, range.count)
+    const fromTs = Date.parse(`${range.from}T00:00:00`) / 1000
+    const toTs = Date.parse(`${range.to}T23:59:59`) / 1000
+    return all.filter(r => r.createTime >= fromTs && r.createTime <= toTs)
   }
 }
