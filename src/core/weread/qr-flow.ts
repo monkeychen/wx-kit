@@ -15,7 +15,7 @@ export interface QrFlowHttp {
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
-const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+const str = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '')
 
 export function webConfirmUrl(uid: string): string {
   return `${WEB_WEREAD_BASE}/web/confirm?uid=${encodeURIComponent(uid)}`
