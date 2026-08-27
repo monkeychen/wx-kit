@@ -9,9 +9,11 @@ import {
 } from '../../src/core/weread/qr-flow'
 import { WereadClient } from '../../src/core/weread/client'
 import type { WereadCredentials, WereadQrPoll } from '../../src/core/weread/types'
-import type { ArticleRef } from '../../src/core/mp-types'
+import type { ArticleRef, CrawlRange } from '../../src/core/mp-types'
 import { MpAuthExpired } from '../../src/core/mp-errors'
 import { readWereadCredsFile, wereadCredsPath } from './weread-transport'
+import { parseArticle } from '../../src/core/parse-article'
+import { extractArticleKeys } from '../../src/core/article-keys'
 
 export interface WereadLoginDeps {
   /** 扫码全流程整体走一次保护闸（内部轮询不受间隔档限制——长轮询是协议本身） */
@@ -122,7 +124,6 @@ export function wereadCredsStore(userDataDir: string): WereadCredsStore {
   return new WereadCredsStore(join(userDataDir, 'weread-creds.json'))
 }
 
-/** 业务客户端工厂：列表/详情请求逐次过 gateway 的 weread-list 档。 */
 export function makeWereadClient(
   gatewayRequest: (path: string, params: Record<string, string | number>) => Promise<unknown>,
 ): WereadClient {
@@ -130,21 +131,90 @@ export function makeWereadClient(
 }
 
 export function wereadListUrl(path: string, params: Record<string, string | number>): string {
-  const u = new URL(`https://i.weread.qq.com${path}`)
+  // Plan B: 使用 web 端域名
+  const u = new URL(`https://weread.qq.com${path}`)
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v))
   return u.toString()
 }
 
+/** 将可读时间如 "2026-08-27 10:00" 转换为 unix 时间戳（秒） */
+function parsePublishTime(pt: string): number {
+  if (!pt) return Math.floor(Date.now() / 1000)
+  const ts = Date.parse(pt.replace(' ', 'T') + '+08:00')
+  return Number.isNaN(ts) ? Math.floor(Date.now() / 1000) : Math.floor(ts / 1000)
+}
+
 /**
- * 订阅检查/批量下载共用的列表取件装配：读凭据文件判断登录态，
- * 未登录返回 null（调用方走 no-session 路径），已登录返回绑定 weread 客户端的函数。
+ * 订阅检查专用的列表取件装配（Plan B）。
+ * 每次只能取最新一篇，必须额外 fetch HTML 来确认发布时间和提取判重 keys。
  */
 export async function wereadListFn(
   userDataDir: string,
   requestWeread: (url: string) => Promise<unknown>,
+  fetchHtml: (url: string) => Promise<string>,
 ): Promise<((fakeid: string, watermark: number) => Promise<ArticleRef[]>) | null> {
   const creds = await readWereadCredsFile(wereadCredsPath(userDataDir))
   if (!creds) return null
   const client = makeWereadClient((path, params) => requestWeread(wereadListUrl(path, params)))
-  return (fakeid, watermark) => client.listChaptersSince(fakeid, watermark)
+  
+  return async (fakeid, watermark) => {
+    const cover = await client.getLatestArticle(fakeid)
+    if (!cover) return []
+    const html = await fetchHtml(cover.url).catch(() => '')
+    if (!html) return []
+    const parsed = parseArticle(html, cover.url)
+    const ts = parsePublishTime(parsed.publishTime)
+    
+    // 增量过滤：如果最新的一篇都不比水位新，那就直接返回空
+    if (ts <= watermark) return []
+    
+    const keys = extractArticleKeys(html)
+    return [{
+      url: cover.url,
+      title: cover.title,
+      createTime: ts,
+      ...(keys.mid ? { appmsgid: Number(keys.mid) } : {}),
+      ...(keys.idx ? { itemidx: Number(keys.idx) } : {})
+    }]
+  }
+}
+
+/** 
+ * 批量抓取/摘要专用的列表取件装配（Plan B）。
+ * 每次只能取最新一篇，失去爬取全量历史的能力。
+ */
+export async function wereadCrawlListFn(
+  userDataDir: string,
+  requestWeread: (url: string) => Promise<unknown>,
+  fetchHtml: (url: string) => Promise<string>,
+): Promise<((fakeid: string, range: CrawlRange) => Promise<ArticleRef[]>) | null> {
+  const creds = await readWereadCredsFile(wereadCredsPath(userDataDir))
+  if (!creds) return null
+  const client = makeWereadClient((path, params) => requestWeread(wereadListUrl(path, params)))
+  
+  return async (fakeid, range) => {
+    const cover = await client.getLatestArticle(fakeid)
+    if (!cover) return []
+    const html = await fetchHtml(cover.url).catch(() => '')
+    if (!html) return []
+    const parsed = parseArticle(html, cover.url)
+    const ts = parsePublishTime(parsed.publishTime)
+    const keys = extractArticleKeys(html)
+    const ref = {
+      url: cover.url,
+      title: cover.title,
+      createTime: ts,
+      ...(keys.mid ? { appmsgid: Number(keys.mid) } : {}),
+      ...(keys.idx ? { itemidx: Number(keys.idx) } : {})
+    }
+    
+    if ('count' in range) {
+      return [ref]
+    } else {
+      const fromTs = Date.parse(`${range.from}T00:00:00`) / 1000
+      const toTs = Date.parse(`${range.to}T23:59:59`) / 1000
+      if (ts < fromTs || ts > toTs) return []
+      return [ref]
+    }
+  }
 }

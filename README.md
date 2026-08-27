@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.9.0-released-success.svg)
+![Status](https://img.shields.io/badge/v0.10.0-dev-informational.svg)
 
 ## 这是什么
 
@@ -17,11 +17,13 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.9.0）**
+> **当前能力边界（v0.10.0，开发中）**
 >
-> 微信公众平台后台的私有文章列表链路已持续不可用。因此，“按公众号下载”、公众号订阅及其设置入口已从 GUI 隐藏；`search`、`crawl`、`login`、`auth-status`、`session`、`subscription`、`protection` CLI 命令保留名称但已停用，会返回稳定错误，不会发起网络请求。旧实现和本地数据仍保留，便于未来重新评估。
+> v0.10.0 通过**微信读书（WeRead）后端**复活了“按公众号下载”与公众号订阅能力：`search`、`crawl`、`login`、`auth-status`、`session`、`subscription`、`protection` 已重新可用。
 >
-> **按文章 URL 下载不依赖上述私有列表能力，仍是当前主功能。**
+> - 识别公众号改用「粘贴该号**任意一篇文章链接**」——微信读书无按名字搜索接口；
+> - **降级项**：微信读书 Web 端接口每次仅返回该号**最新一篇**文章，无法回补历史；因此 `crawl`/`digest` 只针对最新一篇，历史批量抓取暂不可用（日常增量订阅不受影响）；
+> - 按文章 URL 下载不依赖登录态，仍是主功能，未受影响。
 
 ## 当前界面
 
@@ -104,15 +106,19 @@ wx-kit --version
 | 检查更新 | `wx-kit update --check` |
 | 查看版本或帮助 | `wx-kit --version` / `wx-kit --help` |
 
-已停用但仍保留命令名：
+微信读书后端相关命令（v0.10.0 起复活）：
 
-```text
-search  crawl  login  auth-status  session  subscription  protection
-```
+| 目标 | 命令 |
+|---|---|
+| 扫码登录微信读书 | `wx-kit login`（终端打印二维码） |
+| 从文章链接识别公众号 | `wx-kit search --url <该号任意一篇文章链接>` |
+| 按公众号批量下载 | `wx-kit crawl <fakeid> --count N`（注：当前后端每次只取最新一篇） |
+| 检查订阅更新 | `wx-kit subscription check-now [--accounts a,b]` |
+| 查某天订阅文章 | `wx-kit subscription digest --date <日期> [--download]` |
+| 登录态迁移 | `wx-kit session export/import` |
+| 请求保护 | `wx-kit protection status/pause/resume` |
 
-这些命令统一返回 `MP_BACKEND_UNAVAILABLE` 和退出码 `1`。这是兼容性停用，不是命令拼写错误，也不会误开 GUI。
-
-CLI 契约：stdout 只输出 JSON，stderr 输出进度；退出码 `0` 表示成功，`1` 表示业务失败，`2` 表示用法错误。完整参数和示例见 [`agent/wx-kit-skill/`](agent/wx-kit-skill/)。
+CLI 契约：stdout 只输出 JSON，stderr 输出进度；退出码 `0` 表示成功，`1` 表示业务失败，`2` 表示用法错误或需先登录。完整参数和示例见 [`agent/wx-kit-skill/`](agent/wx-kit-skill/)。
 
 ### 安装包内的 CLI
 
@@ -181,7 +187,7 @@ npm run build
 ## 项目状态
 
 - 最新已发布版本：v0.9.0；GitHub Release、brew tap 与 npm `@simiam/wx-kit` 三个渠道均已上线；
-- 当前没有正在实施的新版本，后续候选按真实需求单独立项；
+- 正在开发：v0.10.0（微信读书后端复活按公众号下载与订阅），详见 [`ROADMAP.md`](ROADMAP.md)；
 - 完整里程碑、发布史与下一版候选统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。

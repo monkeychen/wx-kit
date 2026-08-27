@@ -4,7 +4,7 @@
 
 ## 内含
 
-- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**：安装（brew/npm 自动检测）、按 URL 下载、本地文库、素材导出、站点同步，以及已停用命令的兼容边界。agent 从零上手 wx-kit 看这个。
+- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**：安装（brew/npm 自动检测）、按 URL 下载、按公众号下载（微信读书后端）、订阅、本地文库、素材导出、站点同步。agent 从零上手 wx-kit 看这个。
   **它是 CLI 契约的唯一真相**——参数、输出结构、错误码只在这里维护，随每次 CLI 变更同步。
 - `wx-kit-compose/` —— 素材创作编排 skill：走「取料 → 选题 → 写作」（带两个人工检查点），定稿后可选发到个人站点；写作委派给 `khazix-writer`。
   取料的起点可以是**已下载的文库**、GUI 导出的素材清单，也可以是用户给出 URL 后新下载的文章。
@@ -29,8 +29,9 @@
 | 已下载的文库 | `library export` / `library search` / `library list` | 素材已在本地 |
 | 用户给出 URL | `download --url <URL>` → `library export --ids <id>` | 先下载，再取得稳定的正文路径 |
 
-按公众号搜索、历史抓取和订阅依赖微信私有后台，已经停用。用户没有提供文章 URL 时，应说明边界并请求链接，
-不要尝试 `search`、`crawl`、`subscription`、`login` 或 `session`。
+按公众号下载与订阅在 v0.10.0 已通过**微信读书后端**复活。用户没有提供文章 URL 时，可引导其先 `wx-kit login`，
+再用 `search --url <该号任意一篇文章链接>` 拿到 `fakeid`，然后 `crawl` / `subscription`——不必强求单个文章 URL。
+（微信读书无按名字搜索接口，识别入口是「该号任意一篇文章链接」，不是公众号名称。）
 
 ### `library export` 的清单格式
 

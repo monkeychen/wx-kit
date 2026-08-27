@@ -9,15 +9,15 @@
 ## 0. 设计总则
 
 1. **适配层隔离**：微信读书全部细节收在 `src/core/weread/`。订阅/抓取/digest 编排层的
-   语义（水位、翻到水位为止、串行、部分失败留痕）不变，只换列表函数的注入。
-2. **列表走微信读书，正文走 mp 公开页**。判重链路：微信读书条目 `originalId` → 短链 →
-   文章页 HTML 提取 `mid/idx` 补 hint → `articleId` 统一 `mid_idx` 形态。
-3. **旧 kind 永久拦截**：`auth-verify/account-search/article-list`（MP 后台私有类别）在
-   gateway transport 前的硬拒绝**保留**；微信读书走新 kind `weread-auth/weread-list`。
-   M49 的「不得重新接回」约束不被违反——旧链路一次也不会被调用。
-4. **TDD**：core/weread 全部纯逻辑（fetch/时钟/路径注入），先测后写。
-5. **Spike 是验收关卡不是前置**：解析器按 wechrss 的双形态（当前 `{data:[...]}` +
-   旧版 `reviews[].subReviews[]`）实现，真实响应到位后校准字段。
+   语义不变，只换列表函数的注入。
+2. **列表走微信读书，正文走 mp 公开页**。
+3. **退场约束保留**：旧 MP 后台私有 kind 在 gateway transport 前继续硬拒绝。
+4. **【M52 关键转向 (Plan B)】**：2026-08-26 实测确认，移动端接口 `i.weread.qq.com/mp/chapters` 
+   对墨水屏设备 token 施加了严格风控（恒返回 499 / -2041），该接口实质性阻断。
+   根据 PRD 预案，**启动 Plan B：降级为 Web 端 `/api/mp/cover` 接口**。
+   - 影响 1：**无法获取历史列表**，每次仅返回**最新一篇**文章。`crawl` 批量下载名存实亡，只能做增量订阅。
+   - 影响 2：该接口不返回发布时间（`createTime`）。必须在列表阶段额外 fetch 一次文章 HTML，提取发布时间供水位判定。
+   - 影响 3：鉴权需改为 Web Cookie 形态（`wr_vid=...; wr_skey=...`），扫码拿到的 `accessToken` 即是 `skey`。
 
 ## 1. Task 分解
 

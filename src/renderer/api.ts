@@ -63,6 +63,10 @@ export interface WxApi {
   mpSessionInfo(): Promise<MpSessionInfo>
   /** 纯本地彻底退出，不受请求频控状态影响。 */
   mpLogout(): Promise<MpAuthActionResult>
+  /** v0.10.0 微信读书扫码：二维码 confirmUrl（渲染层自行画码）与轮询状态推送 */
+  onWereadLoginQr(cb: (e: { confirmUrl: string }) => void): () => void
+  onWereadLoginState(cb: (e: { state: string }) => void): () => void
+  cancelWereadLogin(): void
   mpProtectionStatus(): Promise<MpProtectionStatus>
   mpProtectionPause(): Promise<MpProtectionStatus>
   mpProtectionResume(): Promise<MpProtectionStatus>

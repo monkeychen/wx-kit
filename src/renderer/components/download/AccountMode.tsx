@@ -73,6 +73,7 @@ export default function AccountMode({ onDone, prefill }: Props) {
     return off
   }, [])
 
+  // v0.10.0：识别入口从「按名字搜号」换成「粘贴任意一篇文章链接」（微信读书无搜索接口）
   const search = async () => {
     if (!name.trim()) return
     setSearching(true); setAccounts(null); setSelected(null)
@@ -80,10 +81,12 @@ export default function AccountMode({ onDone, prefill }: Props) {
     setSearching(false)
     if (!r.ok) {
       if (r.error?.code === 'AUTH_REQUIRED') setAuthValid(false)
-      else message.error('搜索失败：' + (r.error?.message ?? ''))
+      else message.error('识别失败：' + (r.error?.message ?? ''))
       return
     }
-    setAccounts(r.list ?? [])
+    const list = r.list ?? []
+    if (list.length) setSelected(list[0])   // 一个链接只对应一个公众号，识别即选中
+    else setAccounts([])
   }
 
   const start = async () => {
@@ -139,19 +142,13 @@ export default function AccountMode({ onDone, prefill }: Props) {
 
   return (
     <>
-      <Input.Search placeholder="输入公众号名称" enterButton="搜索" value={name}
+      <Input.Search placeholder="粘贴该公众号任意一篇文章的链接" enterButton="识别公众号" value={name}
           onChange={(e) => setName(e.target.value)} onSearch={search} loading={searching}
-          disabled={running} style={{ maxWidth: 420 }} data-testid="account-search" />
+          disabled={running} style={{ maxWidth: 480 }} data-testid="account-search" />
 
         {accounts && !selected && (
           <div className="fade-in" style={{ marginTop: 16, display: 'grid', gap: 8, maxWidth: 520 }}>
-            {accounts.length === 0 && <div className="faint">没找到这个公众号，换个名字试试。</div>}
-            {accounts.map((a) => (
-              <div key={a.fakeid} className="candidate" data-testid="candidate" onClick={() => { setSelected(a); setAccounts(null) }}>
-                <span className="c-name">{a.nickname}</span>
-                {a.signature && <span className="c-sig">{a.signature}</span>}
-              </div>
-            ))}
+            <div className="faint">链接里读不出公众号（可能是错误页或链接失效），换一篇文章的链接试试。</div>
           </div>
         )}
 

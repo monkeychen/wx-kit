@@ -12,7 +12,6 @@ import { History, eventFromSummary, type HistorySource } from '../src/core/downl
 import { DownloadQueue } from '../src/core/download-queue'
 import { downloadArticle } from '../src/core/download-article'
 import { readArticleContent, type ReadableKind } from '../src/core/read-article'
-import { clearMpAuthState, getSession, MpAuthClearError, startFreshLogin } from './services/mp-auth'
 import { crawlAccount } from '../src/core/mp-crawl'
 import { MpAuthExpired } from '../src/core/mp-errors'
 import type { CrawlRange, ArticleRef } from '../src/core/mp-types'
@@ -31,14 +30,13 @@ import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 import type { RunCheckResult } from './services/subscription-check'
 import { articleFetchers, createMpRuntime } from './services/mp-runtime'
-import { makeWereadClient, wereadListFn, wereadListUrl } from './services/weread-auth'
+import { makeWereadClient, runWereadLogin, wereadCredsStore, WereadLoginCancelled, wereadListFn, wereadCrawlListFn, wereadListUrl } from './services/weread-auth'
 import { readWereadCredsFile, wereadCredsPath } from './services/weread-transport'
 import { extractArticleKeys } from '../src/core/article-keys'
 import { normalizeAccountId } from '../src/core/weread/book-id'
 import { parseAccount } from '../src/core/parse-article'
 import { HTML_TIMEOUT_MS } from '../src/core/fetch-html'
 import * as cheerio from 'cheerio'
-import { MP_ORIGIN } from './services/mp-session'
 import { PRIVATE_API_FEATURE_ENABLED, retiredPrivateApiResponse } from '../src/core/retired-private-api'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -182,47 +180,62 @@ export function registerIpc(settings: SettingsService): void {
     return summary
   })
 
-  // —— M3.5 批量爬取 / M47 会话重置（M49 起休眠）——
+  // —— M3.5 批量爬取 / M47 会话重置（v0.10.0 起经微信读书后端复活）——
   if (PRIVATE_API_FEATURE_ENABLED) {
   let crawlAbort: AbortController | null = null
-  const runFreshLogin = async () => {
-    try { await mpGateway.runAction('auth-verify', MP_ORIGIN, startFreshLogin); return { ok: true } }
-    catch (e) {
+
+  // —— 微信读书扫码登录（v0.10.0）：二维码与状态经事件推给渲染层，invoke 在流程结束时 settle ——
+  let wereadLoginCancel = false
+  let wereadLoginRunning = false
+  ipcMain.handle('mp:login', (event) => runWereadLoginForRenderer(event, false))
+  ipcMain.handle('mp:relogin', (event) => runWereadLoginForRenderer(event, true))
+
+  async function runWereadLoginForRenderer(event: Electron.IpcMainInvokeEvent, fresh: boolean) {
+    if (wereadLoginRunning) return { ok: false, error: '已有扫码流程在进行中', code: 'LOGIN_IN_PROGRESS' }
+    wereadLoginRunning = true
+    wereadLoginCancel = false
+    try {
+      if (fresh) await wereadCredsStore(app.getPath('userData')).clear()
+      const send = (channel: string, payload: unknown) => {
+        if (!event.sender.isDestroyed()) event.sender.send(channel, payload)
+      }
+      const creds = await runWereadLogin(wereadCredsStore(app.getPath('userData')), {
+        runAction: (task) => mpGateway.runAction('weread-auth', 'https://i.weread.qq.com/login', task),
+      }, {
+        onQr: (qr) => send('weread:login:qr', { confirmUrl: qr.confirmUrl }),
+        onState: (s) => send('weread:login:state', { state: s }),
+        cancel: () => wereadLoginCancel,
+      })
+      emitSubsUpdated()
+      return { ok: true, name: creds.name }
+    } catch (e) {
       return {
         ok: false,
         error: (e as Error).message,
-        code: (e as { code?: string }).code,
-        failedSteps: e instanceof MpAuthClearError ? e.failedSteps : undefined,
+        code: e instanceof WereadLoginCancelled ? 'CANCELLED' : ((e as { code?: string }).code ?? 'LOGIN_FAILED'),
       }
-    }
+    } finally { wereadLoginRunning = false }
   }
-  ipcMain.handle('mp:login', runFreshLogin)
-  ipcMain.handle('mp:relogin', runFreshLogin)
+  ipcMain.on('weread:login:cancel', () => { wereadLoginCancel = true })
 
-  // 设置页只读本地文件，不做微信探测；“登录是否仍有效”只有用户下一次明确操作才知道。
-  ipcMain.handle('mp:sessionInfo', () => {
-    const value = getSession()
-    return { loggedIn: !!value, loginAt: value?.timestamp ?? null }
+  // 设置页只读本地文件，不做微信读书探测；“登录是否仍有效”只有用户下一次明确操作才知道。
+  ipcMain.handle('mp:sessionInfo', async () => {
+    const value = await wereadCredsStore(app.getPath('userData')).read()
+    return { loggedIn: !!value, loginAt: value?.updatedAt ?? null }
   })
 
   // 退出是纯本地安全动作：频控熔断时照样能退出，也不会改写熔断/审计状态。
+  // 微信读书凭据不占 Chromium 分区，删除凭据文件即彻底退出。
   ipcMain.handle('mp:logout', async () => {
     crawlAbort?.abort()
-    try { await clearMpAuthState(); return { ok: true } }
-    catch (e) {
-      return {
-        ok: false,
-        error: (e as Error).message,
-        code: (e as { code?: string }).code,
-        failedSteps: e instanceof MpAuthClearError ? e.failedSteps : undefined,
-      }
-    }
+    try { await wereadCredsStore(app.getPath('userData')).clear(); return { ok: true } }
+    catch (e) { return { ok: false, error: (e as Error).message, code: 'LOGOUT_FAILED' } }
   })
 
   ipcMain.handle('mp:authStatus', async () => {
-    const value = getSession()
+    const value = await wereadCredsStore(app.getPath('userData')).read()
     return value
-      ? { status: 'present' as const, checkedAt: value.timestamp, valid: null }
+      ? { status: 'present' as const, checkedAt: value.updatedAt, valid: null }
       : { status: 'missing' as const, valid: false }
   })
 
@@ -275,9 +288,10 @@ export function registerIpc(settings: SettingsService): void {
         send({ kind: 'note', message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB）` }),
     }
     try {
-      const client = makeWereadClient((path, params) => mpGateway.requestWereadJson('weread-list', wereadListUrl(path, params)))
+      const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url), fetchHtml)
+      if (!listFn) throw new Error('AUTH_REQUIRED')
       const summary = await crawlAccount(fakeid, range, {
-        listFn: (fid, r) => client.listChaptersByRange(fid, r),
+        listFn,
         keywords,
         downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
         onListed: (refs) => send({ kind: 'listed', items: refs.map((r) => ({ title: r.title, url: r.url })) }),
@@ -310,8 +324,9 @@ export function registerIpc(settings: SettingsService): void {
     const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
     if (!creds) return Math.floor(Date.now() / 1000)
     try {
-      const client = makeWereadClient((path, params) => mpGateway.requestWereadJson('weread-list', wereadListUrl(path, params)))
-      const refs = await client.listChaptersByRange(fakeid, { count: 1 })
+      const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url), fetchHtml)
+      if (!listFn) return Math.floor(Date.now() / 1000)
+      const refs = await listFn(fakeid, { count: 1 })
       return refs[0]?.createTime ?? Math.floor(Date.now() / 1000)
     } catch { return Math.floor(Date.now() / 1000) }
   }
@@ -342,7 +357,7 @@ export function registerIpc(settings: SettingsService): void {
     checkInFlight = (async () => {
       const subs = await subsFor()
       const s = await settings.get()
-      const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
+      const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url), fetchHtml)
       const result = await svcRunSubscriptionCheck(trigger, {
         subs, settings: s, list,
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,

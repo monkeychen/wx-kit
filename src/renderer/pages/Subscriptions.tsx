@@ -73,7 +73,7 @@ export default function Subscriptions() {
   const search = async () => {
     const name = kw.trim(); if (!name) return
     const r = await api.mpSearch(name)
-    if (!r.ok) { message.error(r.error?.message ?? '搜索失败'); setAuthExpired(r.error?.code === 'AUTH_REQUIRED'); return }
+    if (!r.ok) { message.error(r.error?.message ?? '识别失败'); setAuthExpired(r.error?.code === 'AUTH_REQUIRED'); return }
     setCandidates(r.list ?? [])
   }
   const add = async (c: MpAccount) => {
@@ -231,12 +231,12 @@ export default function Subscriptions() {
         </div>
 
         {authExpired && <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-          message="订阅检查需重新登录公众号后台" description="到「下载 · 按公众号」扫码登录后，订阅检查会自动恢复。" />}
+          message="订阅检查需重新登录微信读书" description="到「设置」页重新扫码登录后，订阅检查会自动恢复。" />}
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <Input placeholder="搜索公众号名称以添加订阅" value={kw} onChange={(e) => setKw(e.target.value)}
+          <Input placeholder="粘贴该公众号任意一篇文章的链接以订阅" value={kw} onChange={(e) => setKw(e.target.value)}
             onPressEnter={search} style={{ width: 280 }} data-testid="subs-search-input" allowClear />
-          <Button onClick={search} data-testid="subs-search-btn">搜索</Button>
+          <Button onClick={search} data-testid="subs-search-btn">识别</Button>
           <div style={{ flex: 1 }} />
           <Button type="primary" loading={checking} disabled={busy} onClick={checkNow} data-testid="subs-check-now">检查全部</Button>
         </div>

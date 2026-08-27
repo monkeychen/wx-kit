@@ -30,6 +30,17 @@ const api: WxApi = {
   mpRelogin: () => ipcRenderer.invoke('mp:relogin'),
   mpSessionInfo: () => ipcRenderer.invoke('mp:sessionInfo'),
   mpLogout: () => ipcRenderer.invoke('mp:logout'),
+  onWereadLoginQr: (cb) => {
+    const listener = (_e: unknown, ev: { confirmUrl: string }) => cb(ev)
+    ipcRenderer.on('weread:login:qr', listener)
+    return () => { ipcRenderer.removeListener('weread:login:qr', listener) }
+  },
+  onWereadLoginState: (cb) => {
+    const listener = (_e: unknown, ev: { state: string }) => cb(ev)
+    ipcRenderer.on('weread:login:state', listener)
+    return () => { ipcRenderer.removeListener('weread:login:state', listener) }
+  },
+  cancelWereadLogin: () => { ipcRenderer.send('weread:login:cancel') },
   mpProtectionStatus: () => ipcRenderer.invoke('mp:protectionStatus'),
   mpProtectionPause: () => ipcRenderer.invoke('mp:protectionPause'),
   mpProtectionResume: () => ipcRenderer.invoke('mp:protectionResume'),

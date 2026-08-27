@@ -1,67 +1,31 @@
 // tests/core/weread/parse-articles.test.ts
 import { describe, it, expect } from 'vitest'
-import { parseChapters, articleUrlFromEntry, urlFromReviewId, checkWereadError } from '../../../src/core/weread/parse-articles'
+import { parseCover, urlFromReviewId, checkWereadError } from '../../../src/core/weread/parse-articles'
 import { MpAuthExpired, MpApiError } from '../../../src/core/mp-errors'
 
 const BOOK = 'MP_WXS_3634850725'
 
-describe('parseChapters · 当前移动端 {data:[…]} 形态', () => {
+describe('parseCover · 当前 Web 端 /api/mp/cover 形态', () => {
   const payload = {
-    errCode: 0,
-    errMsg: '',
-    data: [
-      {
-        reviewId: `${BOOK}_4OcS7~rrtk2Lwe4P0YPiGg`,
-        title: '第一篇',
-        createTime: 1787000000,
-        mpInfo: { title: '第一篇', readNum: 1234, likeNum: 56, originalId: '4OcS7~rrtk2Lwe4P0YPiGg', content: '摘要', pic_url: 'https://pic/x.jpg' },
-      },
-      { reviewId: 'x', title: '' },   // 无 title → 跳过
-      'garbage',                       // 非对象 → 跳过
-    ],
+    avatar: 'http://wx.qlogo.cn/mmhead/123/0',
+    name: '雷一言',
+    title: '我给微信接上了自己的知识库',
+    pic: 'https://mmbiz.qpic.cn/sz_mmbiz_jpg/xxx',
+    reviewId: `${BOOK}_ASnNRsaFFzxgK1-8AblYhw`,
   }
 
-  it('解析条目并带出阅读/点赞数', () => {
-    const list = parseChapters(payload, BOOK)
-    expect(list).toHaveLength(1)
-    expect(list[0].title).toBe('第一篇')
-    expect(list[0].readNum).toBe(1234)
-    expect(list[0].likeNum).toBe(56)
-    expect(list[0].url).toBe('https://mp.weixin.qq.com/s/4OcS7~rrtk2Lwe4P0YPiGg')
-    expect(list[0].createTime).toBe(1787000000)
+  it('解析最新文章并拼接正确的原文 URL', () => {
+    const cover = parseCover(payload, BOOK)
+    expect(cover).not.toBeNull()
+    expect(cover!.title).toBe('我给微信接上了自己的知识库')
+    expect(cover!.accountName).toBe('雷一言')
+    expect(cover!.coverUrl).toBe('https://mmbiz.qpic.cn/sz_mmbiz_jpg/xxx')
+    expect(cover!.url).toBe('https://mp.weixin.qq.com/s/ASnNRsaFFzxgK1-8AblYhw')
   })
 
-  it('mpInfo.time 优先于条目 createTime', () => {
-    const list = parseChapters({ data: [{ reviewId: 'r1', title: 't', createTime: 1, mpInfo: { time: 99, originalId: 'a' } }] }, BOOK)
-    expect(list[0].createTime).toBe(99)
-  })
-
-  it('阅读数缺省时字段缺省（不是 0——0 和「没给」含义不同）', () => {
-    const list = parseChapters({ data: [{ reviewId: 'r1', title: 't', mpInfo: {} }] }, BOOK)
-    expect(list[0].readNum).toBeUndefined()
-    expect(list[0].likeNum).toBeUndefined()
-  })
-})
-
-describe('parseChapters · 旧版 reviews[].subReviews[] 形态', () => {
-  const payload = {
-    reviews: [
-      {
-        createTime: 1787000500,
-        subReviews: [
-          { review: { reviewId: 'rev-1', title: '旧版篇', mpInfo: { readNum: 7, likeNum: 2, originalId: '/s?__biz=AAA&mid=1&idx=1' } } },
-          { review: { reviewId: 'rev-2', title: '组时间兜底', createTime: 0, mpInfo: {} } },
-        ],
-      },
-    ],
-  }
-
-  it('嵌套解析 + 组时间兜底 + __biz 查询串拼长链', () => {
-    const list = parseChapters(payload, BOOK)
-    expect(list).toHaveLength(2)
-    expect(list[0].url).toBe('https://mp.weixin.qq.com/s?__biz=AAA&mid=1&idx=1')
-    expect(list[0].readNum).toBe(7)
-    expect(list[1].createTime).toBe(1787000500)
+  it('缺 reviewId 或 title 时返回 null', () => {
+    expect(parseCover({ title: 'T' }, BOOK)).toBeNull()
+    expect(parseCover({ reviewId: 'R' }, BOOK)).toBeNull()
   })
 })
 
@@ -78,25 +42,6 @@ describe('错误码翻译', () => {
     expect(() => checkWereadError({ errCode: 0 })).not.toThrow()
     expect(() => checkWereadError({})).not.toThrow()
     expect(() => checkWereadError({ errCode: '-2041' })).toThrow(MpAuthExpired)
-  })
-  it('parseChapters 直接拿到错误码也翻译', () => {
-    expect(() => parseChapters({ errCode: -2012 }, BOOK)).toThrow(MpAuthExpired)
-  })
-})
-
-describe('articleUrlFromEntry · URL 候选顺序', () => {
-  it('doc_url/docUrl/url 优先直用', () => {
-    expect(articleUrlFromEntry({ doc_url: 'https://mp.weixin.qq.com/s/a' }, {})).toBe('https://mp.weixin.qq.com/s/a')
-    expect(articleUrlFromEntry({ docUrl: 'https://x/s/b' }, {})).toBe('https://x/s/b')
-  })
-  it('originalId 四形态：完整 URL / "/s…" / "__biz=…" / 裸 token（~ 保留）', () => {
-    expect(articleUrlFromEntry({ originalId: 'https://mp.weixin.qq.com/s/z' }, {})).toBe('https://mp.weixin.qq.com/s/z')
-    expect(articleUrlFromEntry({ originalId: '/s/abc' }, {})).toBe('https://mp.weixin.qq.com/s/abc')
-    expect(articleUrlFromEntry({ originalId: '__biz=AA&mid=2&idx=3' }, {})).toBe('https://mp.weixin.qq.com/s?__biz=AA&mid=2&idx=3')
-    expect(articleUrlFromEntry({ originalId: '4OcS7~rrtk2' }, {})).toBe('https://mp.weixin.qq.com/s/4OcS7~rrtk2')
-  })
-  it('什么都没有 → 空串（调用方走 reviewId 兜底）', () => {
-    expect(articleUrlFromEntry({}, {})).toBe('')
   })
 })
 

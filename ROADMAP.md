@@ -6,7 +6,7 @@
 ## 当前状态
 
 - **最新发布:v0.9.0(2026-08-09,回到可靠的主线)** —— tag `v0.9.0` + GitHub Release(三平台包,标 Latest)+ brew tap + npm `@simiam/wx-kit`。M49 让私有文章列表能力退场，M50 将官方 npm 审计清零，M51 重建当前页面说明与发布证据；有效闭环为“明确文章 URL → 下载 → 本地文库 → 阅读/导出/站点同步”。需求/验收 `docs/PRD-v0.9.0.md`，发布说明 `docs/releases/v0.9.0.md`。
-- **当前开发:无** —— v0.9.0 已完成；下一版不预设功能，候选项按真实需求单独立项。
+- **当前开发:v0.10.0 (微信读书后端)** —— M52(Core/CLI) 与 M53(GUI) 正在进行，基于微信读书 Web API 恢复订阅与批量下载能力。
 - **v0.8.6、v0.8.7 均未发布且不再发布** —— M44–M47、M49 的有效成果由 v0.9.0 吸收；两份 PRD 仅保留历史设计与需求去向，不是当前验收契约。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(当前有效 GUI 端到端)看当前真实结果；另以隔离文库执行真实文章 URL 下载验收。私有后台命令只验收“稳定拒绝且零请求”，不再做 live 联调。
 
@@ -68,6 +68,8 @@
 | **M49** ✅ | v0.9.0 | 私有文章列表能力退场:隐藏按公众号下载/订阅/相关设置,停止后台执行链路,CLI 兼容停用,保留实现与用户数据；当前 GUI e2e + 真实 URL 下载验收通过(2026-08-08) | `plans/2026-08-08-m49-private-api-retirement.md` |
 | **M50** ✅ | v0.9.0 | 依赖安全维护与运行时回归:实施时读取 28 条 Dependabot open/0 dismissed,修复直接与传递依赖；官方 npm 审计 0，正式发版推送后远端 0 open/0 dismissed(2026-08-09 核实) | `plans/2026-08-08-v0.9.0-boundary-reset-and-security.md` |
 | **M51** ✅ | v0.9.0 | 当前产品说明与发布准备:四张真实数据页面截图、README/Skill/发布草案、打包 GUI/CLI 与真实下载验收(2026-08-08) | 同上 |
+| **M52** ✅ | v0.10.0 | 微信读书后端 core + CLI 复活：weread 适配层、gateway 域名路由、判重兜底、七个命令组复活、单测 | `plans/2026-08-26-m52-weread-backend.md` |
+| **M53** ✅ | v0.10.0 | GUI 复活：二维码登录组件、AccountMode/Subscriptions/Settings 恢复接线 | 同上 |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`（当前开发与验收契约）。
 

@@ -37,7 +37,7 @@ import { articleFetchers, createMpRuntime } from '../../electron/services/mp-run
 import type { MpRequestGateway } from '../../electron/services/mp-request-gateway'
 import {
   ensureFreshWereadCreds, makeWereadClient, runWereadLogin, WereadLoginCancelled,
-  wereadCredsStore, wereadListFn, wereadListUrl,
+  wereadCredsStore, wereadListFn, wereadListUrl, wereadCrawlListFn
 } from '../../electron/services/weread-auth'
 
 function defaultLibraryRoot(): string {
@@ -239,7 +239,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         : (opts.from && opts.to) ? { from: String(opts.from), to: String(opts.to) }
         : null
       if (!range) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要 --count 或 --from/--to' } }); exitCode = 2; return }
-      const client = makeWereadClient((path, params) => mpGateway().requestWereadJson('weread-list', wereadListUrl(path, params)))
+      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url), mpArticleFetchers().fetchHtml)
+      if (!listFn) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
       try {
         const formats = parseFormats(opts.formats)
         const root = await resolveRoot(opts.out)
@@ -248,7 +249,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         const parseKws = (csv?: string) => csv ? String(csv).split(',').map((s) => s.trim()).filter(Boolean) : undefined
         const include = parseKws(opts.include), exclude = parseKws(opts.exclude)
         const summary = await crawlAccount(fakeid, range, {
-          listFn: (fid, r) => client.listChaptersByRange(fid, r),
+          listFn,
           ...(include || exclude ? { keywords: { include, exclude } } : {}),
           downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
           onProgress: (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}\n`),
@@ -445,7 +446,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
         return summary
       }
-      const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
+      const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url), mpArticleFetchers().fetchHtml)
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),
         subs, settings: s, list, downloadRefs,
@@ -481,7 +482,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const root = await resolveRoot(o.out)
       const subs = new Subscriptions(root)
       const library = new Library(root)
-      const client = makeWereadClient((path, params) => mpGateway().requestWereadJson('weread-list', wereadListUrl(path, params)))
+      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url), mpArticleFetchers().fetchHtml)
+      if (!listFn) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
       const only = o.accounts ? String(o.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : null
       const accounts = (await subs.list())
         .filter((a) => a.subscribed && (!only || only.includes(a.fakeid)))
@@ -507,7 +509,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
       const result = await subscriptionDigest({
         accounts, date: when.date, fromTs: when.fromTs, toTs: when.toTs,
-        listByDate: (fakeid) => client.listChaptersByRange(fakeid, { from: when.date, to: when.date }),
+        listByDate: (fakeid) => listFn(fakeid, { from: when.date, to: when.date }),
         localOf,
         // 16 个号要跑半分钟,没有逐号输出会像卡死
         onProgress: (e) => process.stderr.write(`[${e.index}/${e.total}] ${e.nickname} … ${e.count} 篇\n`),
