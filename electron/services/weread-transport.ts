@@ -13,8 +13,14 @@ export const WEREAD_HOST_SUFFIXES = ['weread.qq.com'] as const
 export function isWereadUrl(raw: string): boolean {
   try {
     const host = new URL(raw).hostname.toLowerCase()
-    return WEREAD_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+    if (WEREAD_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) return true
   } catch { return false }
+  // e2e：WXKIT_WEREAD_BASE 把 weread 接口指到本地 mock 时，这些请求也要走 Node 设备传输。
+  // Chromium 传输会给 json 注入 mp.weixin 的 Referer，而 Chromium 对 https→http 的跨源
+  // Referer 直接取消请求，mock 收不到；Node fetch 无 Referer、无此限制。
+  const base = process.env.WXKIT_WEREAD_BASE
+  if (!base) return false
+  try { return raw.startsWith(new URL(base).origin) } catch { return false }
 }
 
 export function wereadCredsPath(userDataDir: string): string {

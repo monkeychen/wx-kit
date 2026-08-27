@@ -131,8 +131,9 @@ export function makeWereadClient(
 }
 
 export function wereadListUrl(path: string, params: Record<string, string | number>): string {
-  // Plan B: 使用 web 端域名
-  const u = new URL(`https://weread.qq.com${path}`)
+  // Plan B: 使用 web 端域名。WXKIT_WEREAD_BASE 仅供 e2e 把请求指到本地 mock（默认生产域名）。
+  const base = (process.env.WXKIT_WEREAD_BASE ?? 'https://weread.qq.com').replace(/\/$/, '')
+  const u = new URL(`${base}${path}`)
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v))
   return u.toString()
 }

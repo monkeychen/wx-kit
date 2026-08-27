@@ -23,6 +23,18 @@ describe('isWereadUrl', () => {
   it('坏 URL → false', () => {
     expect(isWereadUrl('not a url')).toBe(false)
   })
+  it('WXKIT_WEREAD_BASE 覆盖时，本地 mock 也算 weread 路由（走 Node 传输）', () => {
+    const prev = process.env.WXKIT_WEREAD_BASE
+    try {
+      process.env.WXKIT_WEREAD_BASE = 'http://127.0.0.1:9999'
+      expect(isWereadUrl('http://127.0.0.1:9999/api/mp/cover?bookId=x')).toBe(true)
+      expect(isWereadUrl('https://weread.qq.com/api/mp/cover?bookId=x')).toBe(true)
+      expect(isWereadUrl('https://mp.weixin.qq.com/s/abc')).toBe(false)
+    } finally {
+      if (prev === undefined) delete process.env.WXKIT_WEREAD_BASE
+      else process.env.WXKIT_WEREAD_BASE = prev
+    }
+  })
 })
 
 describe('readWereadCredsFile', () => {

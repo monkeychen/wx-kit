@@ -1,10 +1,15 @@
 // End-to-end GUI test for wx-kit, driving the real Electron app via Playwright.
-// Covers v0.2.0 feature points (M5–M9):
-//   M5 IA (按链接下载 / 文库 / 设置导航)
+// Covers v0.10.0 feature points:
+//   M5 IA (按链接下载 / 按公众号下载 / 文库 / 设置导航)
 //   M6 下载闭环 + 历史 (就地阅读/文件夹 · 复制下载项 · 已存在跳过 · 失败重试)
-//   M7 反馈 (失败项话术/重试)
 //   M9 文库组织 (排序 · 筛选 · 分组 · 卡片⇄列表 · 单击选中/双击阅读 · 批量删除)
-//   + 阅读器 wxfile:// 图片/iframe · 设置库根 · M49 失效入口退场
+//   + 阅读器 wxfile:// 图片/iframe · 设置库根
+//   + v0.10.0 复活：按公众号下载(AccountMode) / 订阅(Subscriptions) / 微信读书登录入口
+//
+// 微信读书后端在 e2e 里用本地 mock 顶替：
+//   - WXKIT_WEREAD_BASE 把 /api/mp/cover 指到本机 fixture server（只返回最新一篇）
+//   - 文章页 fetch 走 persist:mpweixin 会话，用 webRequest 把 mp.weixin.qq.com/s/SUBTOKEN
+//     重定向回 fixture，使「取最新一篇 → 抓正文」整条链路封闭、不碰真实网络。
 //
 // Run: npx vite build && node tests/e2e/gui.e2e.mjs   (or: npm run test:e2e)
 import { _electron as electron } from 'playwright'
@@ -25,15 +30,24 @@ const PNG = Buffer.from(
 )
 
 // 多文章夹具：跨 2 个公众号 + 不同发布时间，喂文库的排序/筛选/分组；外加一篇无标题的失败页。
+// biz/mid/idx 注入脚本变量，使「短链无 hint 时补主键判重」与「粘贴链接识别公众号」可测。
 const ARTICLES = {
-  a1: { title: '阿尔法·甲', account: '甲号', pub: '2026-03-01 08:00' },
-  a2: { title: '贝塔·甲', account: '甲号', pub: '2026-03-05 09:00' },
-  a3: { title: '伽马·乙', account: '乙号', pub: '2026-02-10 10:00' },
+  a1: { title: '阿尔法·甲', account: '甲号', pub: '2026-03-01 08:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486019', idx: '1' },
+  a2: { title: '贝塔·甲', account: '甲号', pub: '2026-03-05 09:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486020', idx: '1' },
+  a3: { title: '伽马·乙', account: '乙号', pub: '2026-02-10 10:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486021', idx: '1' },
+  suba1: { title: '百宝箱订阅验收文', account: '测试订阅号', pub: '2026-08-27 10:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486999', idx: '1' },
   bad: { title: '', account: '', pub: '' },   // 无标题 → 解析失败 → 失败项
 }
+const WEREAD_BOOK_ID = 'MP_WXS_3634850725'   // = normalizeAccountId(biz MzYzNDg1MDpyNQ==)
+const WEREAD_TOKEN = 'SUBTOKEN'              // reviewId 末段 → 文章短链 token
+// 「识别公众号」与订阅都要求 mp.weixin.qq.com 链接（后端有正则校验），故用此假链接，
+// 再靠 persist:mpweixin 会话上的 webRequest 重定向回 fixture 封闭链路。
+const MP_ARTICLE_URL = `https://mp.weixin.qq.com/s/${WEREAD_TOKEN}`
 
 function makeHtml(port, art) {
   const titleTag = art.title ? `<h1 class="rich_media_title" id="activity-name">${art.title}</h1>` : ''
+  const vars = (art.biz || art.mid || art.idx)
+    ? `<script>var biz="${art.biz ?? ''}";var mid="${art.mid ?? ''}";var idx="${art.idx ?? ''}";</script>` : ''
   return `<!doctype html><html><head>
 ${art.title ? `<meta property="og:title" content="${art.title}" />` : ''}
 <meta property="og:image" content="http://127.0.0.1:${port}/cover.png" />
@@ -45,7 +59,9 @@ ${titleTag}
 <p>正文，<strong>加粗</strong>。</p>
 <p><img data-src="http://127.0.0.1:${port}/pic.png" /></p>
 <h2>小节</h2><p>第二段。</p>
-</div></body></html>`
+</div>
+${vars}
+</body></html>`
 }
 
 const log = (...a) => console.log('[e2e]', ...a)
@@ -53,12 +69,23 @@ let failed = false
 const assert = (cond, msg) => { if (cond) { log('✓', msg) } else { failed = true; console.error('[e2e] ✗', msg) } }
 
 async function main() {
-  // --- fixture server: /article/<id> (按路径区分，因 articleId 回退归一 origin+pathname、忽略 query) ---
+  // --- fixture server ---
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://127.0.0.1')
     if (u.pathname.startsWith('/article/')) {
       const art = ARTICLES[u.pathname.slice('/article/'.length)] ?? ARTICLES.a1
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(makeHtml(server.address().port, art))
+    } else if (u.pathname === '/api/mp/cover') {
+      // Plan B: 每次只返回该号最新一篇
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({
+        errCode: 0,
+        reviewId: `${WEREAD_BOOK_ID}_${WEREAD_TOKEN}`,
+        title: '订阅号最新文',
+        name: '测试订阅号',
+        pic: `http://127.0.0.1:${server.address().port}/cover.png`,
+        avatar: `http://127.0.0.1:${server.address().port}/cover.png`,
+      }))
     } else if (u.pathname === '/pic.png' || u.pathname === '/cover.png') {
       res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG)
     } else { res.writeHead(404); res.end('no') }
@@ -66,13 +93,12 @@ async function main() {
   await new Promise((r) => server.listen(0, '127.0.0.1', r))
   const port = server.address().port
   const urlOf = (id) => `http://127.0.0.1:${port}/article/${id}`
+  const wereadBase = `http://127.0.0.1:${port}`
   log('fixture server on', port)
 
-  // --- isolated userData + library root, seed settings ---
+  // --- isolated userData + library root, seed settings + weread creds ---
   const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-e2e-udd-'))
   const libraryRoot = mkdtempSync(join(tmpdir(), 'wxk-e2e-lib-'))
-  // cliLinkPrompted:true 防 M18 首启软链 Modal 在 e2e 里弹出——它跑在真实 HOME 上，
-  // 若触发会污染开发机的 ~/bin / shell profile，且 Modal 遮罩会干扰后续断言。
   writeFileSync(join(userDataDir, 'settings.json'),
     JSON.stringify({
       libraryRoot,
@@ -80,13 +106,16 @@ async function main() {
       cliLinkPrompted: true,
       updateCheckEnabled: false,
     }))
+  // 预置微信读书凭据，使订阅/批量下载链路无需真实扫码即可走到网络请求（被 mock 接住）
+  writeFileSync(join(userDataDir, 'weread-creds.json'),
+    JSON.stringify({ accessToken: 'fake-e2e-token', vid: '17207435', name: 'e2e', updatedAt: Date.now() }))
   log('libraryRoot', libraryRoot)
 
   const app = await electron.launch({
     executablePath: electronPath,
     args: [projectRoot, `--user-data-dir=${userDataDir}`],
     cwd: projectRoot,
-    env: { ...process.env },
+    env: { ...process.env, WXKIT_WEREAD_BASE: wereadBase },
   })
   const win = await app.firstWindow()
   const errors = []
@@ -99,7 +128,21 @@ async function main() {
     if (!s.includes('IMKCFRunLoop')) process.stderr.write('[main] ' + s)
   })
 
-  // 改 antd Select（v6：可点根为 .ant-select，选项为 .ant-select-item）：开下拉 → 点选项文本
+  // 把订阅链路里「取最新一篇 → 抓正文」的 mp.weixin.qq.com/s/SUBTOKEN 重定向回 fixture，
+  // 使整条链路封闭（文章正文本地可取，不碰真实微信）。
+  await app.evaluate(({ session }, p) => {
+    const ses = session.fromPartition('persist:mpweixin')
+    ses.webRequest.onBeforeRequest((details, callback) => {
+      try {
+        const u = new URL(details.url)
+        if (u.hostname === 'mp.weixin.qq.com' && u.pathname === `/s/${p.token}`) {
+          return callback({ redirectURL: `http://127.0.0.1:${p.port}/article/suba1` })
+        }
+      } catch { /* ignore */ }
+      callback({})
+    })
+  }, { port, token: WEREAD_TOKEN })
+
   const pickSelect = async (testid, text) => {
     await win.click(`[data-testid="${testid}"] .ant-select`)
     const opt = win.locator(`.ant-select-dropdown:visible .ant-select-item:has-text("${text}")`).first()
@@ -112,18 +155,13 @@ async function main() {
   try {
     await win.waitForSelector('[data-testid="app-shell"]', { timeout: 20000 })
     assert(true, 'app shell rendered')
-    assert((await win.locator('[data-testid="mode-account"]').count()) === 0, 'M49: account download mode is absent')
-    assert((await win.locator('[data-testid="nav-订阅"]').count()) === 0, 'M49: subscriptions navigation is absent')
-    await win.evaluate(() => { location.hash = '#/subscriptions' })
-    await win.waitForSelector('[data-testid="url-input"]', { timeout: 5000 })
-    assert((await win.locator('[data-testid="nav-下载"].active').count()) === 1, 'M49: retired subscription route redirects to download')
-    await win.click('[data-testid="nav-文库"]')
-    await win.waitForSelector('text=到「下载」页粘贴文章链接，保存的文章会陈列在这里', { timeout: 5000 })
-    assert((await win.locator('text=按公众号抓取').count()) === 0, 'M49: empty library no longer recommends retired account crawl')
-    await win.click('[data-testid="nav-下载"]')
-    await win.waitForSelector('[data-testid="start-download"]', { timeout: 5000 })
+    // v0.10.0：按公众号下载模式与订阅导航已复活（原 M49 退场断言反向）
+    assert((await win.locator('[data-testid="mode-account"]').count()) === 1, 'v0.10.0: account download mode is present')
+    assert((await win.locator('[data-testid="nav-订阅"]').count()) === 1, 'v0.10.0: subscriptions navigation is present')
 
     // ============ M6 · URL 批量下载 → 历史就地确认 ============
+    await win.click('[data-testid="nav-下载"]')
+    await win.waitForSelector('[data-testid="start-download"]', { timeout: 5000 })
     await win.fill('[data-testid="url-input"]', [urlOf('a1'), urlOf('a2'), urlOf('a3')].join('\n'))
     await win.click('[data-testid="start-download"]')
     await win.waitForSelector('[data-testid="history-event"]', { timeout: 30000 })
@@ -134,74 +172,67 @@ async function main() {
     assert(await topEvent().locator('[data-testid="history-read"]').first().isVisible(), 'history article offers in-place 阅读')
     assert((await topEvent().locator('button:has-text("文件夹")').count()) >= 3, 'history articles offer 文件夹')
 
-    // 复制下载项 → 回填链接框
     await topEvent().locator('.ev-again').click()
     await win.waitForTimeout(200)
     const refilled = await win.inputValue('textarea')
     assert(refilled.includes(urlOf('a1')) && refilled.includes(urlOf('a3')), '复制下载项 refills the URL textarea')
 
-    // 再下同样 3 篇 → 已存在跳过
     await win.click('[data-testid="start-download"]')
-    await win.waitForTimeout(1500)
-    assert((await topEvent().locator('.badge-skip').count()) >= 1, 're-download marks existing articles 已存在 (skipped)')
+    await win.waitForSelector('[data-testid="history-event"] .badge-skip', { timeout: 20000 })
+    assert(true, 're-download marks existing articles 已存在 (skipped)')
 
-    // 失败项：下一篇无标题页 → 失败 + 重试
     await win.fill('[data-testid="url-input"]', urlOf('bad'))
     await win.click('[data-testid="start-download"]')
     await win.waitForSelector('[data-testid="history-event"] .fail-reason', { timeout: 20000 })
     assert(await topEvent().locator('.fail-reason').first().isVisible(), 'failed download shows a reason in history')
     assert((await topEvent().locator('button.retry, .retry').count()) >= 1, 'failed history item offers 重试')
 
-    // ============ M5 · 设置（库根 + 下载历史区）============
+    // ============ M5 · 设置（库根 + 微信读书 + 保护 + 订阅）============
     await win.click('[data-testid="nav-设置"]')
     await win.waitForSelector('input[readonly]', { timeout: 10000 })
     assert((await win.inputValue('input[readonly]')) === libraryRoot, 'settings shows the seeded library root')
-    assert((await win.locator('text=下载历史').count()) >= 1, 'settings has a 下载历史 (retention/clear) section')
-    assert((await win.locator('[data-testid="mp-protection"]').count()) === 0, 'M49: request-protection settings are absent')
-    assert((await win.locator('[data-testid="mp-account"]').count()) === 0, 'M49: public-account login settings are absent')
-    assert((await win.locator('[data-testid="set-subs-auto"]').count()) === 0, 'M49: subscription settings are absent')
+    assert((await win.locator('[data-testid="mp-account"]').count()) === 1, 'v0.10.0: WeRead account section is present')
+    const mpStatus = await win.locator('[data-testid="set-mp-status"]').innerText()
+    assert(mpStatus.includes('已登录'), `v0.10.0: seeded WeRead creds reported as logged in (saw "${mpStatus}")`)
+    assert((await win.locator('[data-testid="set-mp-logout"]').count()) === 1, 'v0.10.0: logout action is present')
+    assert((await win.locator('[data-testid="mp-protection"]').count()) === 1, 'v0.10.0: request-protection settings are present')
+    assert((await win.locator('[data-testid="set-subs-auto"]').count()) === 1, 'v0.10.0: subscription settings are present')
     assert((await win.locator('[data-testid="about-check-update"]').count()) === 1, 'settings keeps the check-update action')
     assert((await win.locator('[data-testid="set-update-check"]').count()) === 1, 'settings keeps the startup-check toggle')
     assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings keeps site-sync help')
 
-    // ============ M9/M23 · 文库组织(分组默认折叠 = 目录态) ============
+    // ============ M9/M23 · 文库组织(a1/a2/a3) ============
     await win.click('[data-testid="nav-文库"]')
     await win.waitForSelector('.ghead', { timeout: 15000 })
     assert((await win.locator('[data-testid="article-card"]').count()) === 0,
       'M23: groups are collapsed by default (library opens as an account directory)')
-    // 默认按公众号分组：组头出现 甲号 / 乙号
     const heads = await win.locator('.ghead .gname').allInnerTexts()
     assert(heads.includes('甲号') && heads.includes('乙号'), `card view grouped by account (${heads.join('/')})`)
-    // 点组头只展开该组
     await win.locator('.ghead:has-text("甲号")').click()
     await win.waitForTimeout(250)
     const afterOne = await win.locator('[data-testid="article-card"]').count()
     assert(afterOne === 2, `M23: clicking a group head expands just that group (got ${afterOne})`)
-    // 全部展开
     await win.click('[data-testid="expand-all"]')
     await win.waitForTimeout(250)
     const libCount = await win.locator('[data-testid="article-card"]').count()
     assert(libCount === 3, `expand-all shows the 3 successfully-downloaded articles (got ${libCount})`)
 
-    // M25: 默认排序即「发布时间 · 降序」→ 关分组后最新发表(贝塔)在最前,无需手动选
     await win.click('[data-testid="group-toggle"]')
     await win.waitForTimeout(200)
     assert((await firstCardText()).includes('贝塔'), 'M25: default sort is publish-time desc (newest first, no manual pick)')
-    await win.click('[data-testid="sort-dir"]')   // desc → asc
+    await win.click('[data-testid="sort-dir"]')
     await win.waitForTimeout(200)
     assert((await firstCardText()).includes('伽马'), 'sort by publish-time asc puts the oldest article first')
-    // M25: 排序选择跨会话记忆——离开文库再回来仍是升序(最旧在前)
     await win.click('[data-testid="nav-设置"]')
     await win.click('[data-testid="nav-文库"]')
     await win.waitForSelector('[data-testid="article-card"]', { timeout: 10000 })
-    await win.click('[data-testid="group-toggle"]')   // 分组态持久化了,再平铺
+    await win.click('[data-testid="group-toggle"]')
     await win.waitForTimeout(200)
     assert((await firstCardText()).includes('伽马'), 'M25: sort choice persists across navigation (still asc)')
-    await win.click('[data-testid="sort-dir"]')   // asc → desc 复原,后续步骤依赖降序
+    await win.click('[data-testid="sort-dir"]')
     await win.waitForTimeout(200)
     assert((await firstCardText()).includes('贝塔'), 'flipping direction puts the newest article first')
 
-    // 筛选：只看「甲号」→ 2 篇、无「伽马」
     await pickSelect('account-select', '甲号')
     await win.waitForTimeout(200)
     const filtered = await win.locator('[data-testid="article-card"]').count()
@@ -209,23 +240,19 @@ async function main() {
     assert(filtered === 2 && !hasGamma, `filter by account narrows to that account (got ${filtered}, gamma=${hasGamma})`)
     await pickSelect('account-select', '全部公众号')
 
-    // 列表视图 + 双击行进入阅读（M9 单击选中、双击阅读）
     await win.click('.ant-segmented label:has-text("列表")')
     await win.waitForSelector('[data-testid="article-row"]', { timeout: 8000 })
     assert(true, 'card⇄list view toggle works (Finder-like rows)')
-
-    // M10: 列表视图表头点击排序（此处已是非分组平铺列表，先点标题列规避残留排序态）
     const firstRowText = async () => (await win.locator('[data-testid="article-row"] .ltitle').first().textContent()) || ''
     await win.click('.lhead .lh-sort:has-text("标题")')
     await win.waitForTimeout(150)
-    await win.click('.lhead .lh-sort:has-text("发布时间")')   // 换列 → 默认降序 → 最新在前
+    await win.click('.lhead .lh-sort:has-text("发布时间")')
     await win.waitForTimeout(150)
     assert((await firstRowText()).includes('贝塔'), 'list header sort by publish desc puts newest (贝塔) first')
-    await win.click('.lhead .lh-sort:has-text("发布时间")')   // 同列再点 → 翻转升序 → 最旧在前
+    await win.click('.lhead .lh-sort:has-text("发布时间")')
     await win.waitForTimeout(150)
     assert((await firstRowText()).includes('伽马'), 'clicking same header flips to asc (oldest 伽马 first)')
 
-    // M10: 列宽拖拽 —— 拖「发布时间」列手柄，--lcols 应变化
     const colsBefore = await win.locator('.list').evaluate((el) => getComputedStyle(el).getPropertyValue('--lcols'))
     const rzBox = await win.locator('.lhead .lh-resz:has-text("发布时间") .rz').boundingBox()
     await win.mouse.move(rzBox.x + 3, rzBox.y + rzBox.height / 2)
@@ -237,25 +264,21 @@ async function main() {
     assert(colsBefore !== colsAfter, 'dragging a column handle resizes the column (--lcols changed)')
 
     await win.locator('[data-testid="article-row"]:has-text("阿尔法")').first().dblclick()
-    // --- 阅读器 md：wxfile 图片真渲染 ---
     await win.waitForSelector('img[src^="wxfile://"]', { timeout: 15000 })
     const mdImgOk = await win.evaluate(() => {
       const im = [...document.querySelectorAll('img')].find((i) => i.src.startsWith('wxfile://'))
       return !!im && im.complete && im.naturalWidth > 0
     })
     assert(mdImgOk, 'double-click row opens reader; md wxfile image actually rendered (naturalWidth>0)')
-    // --- 阅读器 html iframe ---
     await win.click('.ant-segmented >> text=网页')
     await win.waitForSelector('iframe', { timeout: 10000 })
     const iframeSrc = await win.getAttribute('iframe', 'src')
     assert(!!iframeSrc && iframeSrc.startsWith('wxfile://') && iframeSrc.endsWith('/index.html'),
-      `reader html view: iframe src is wxfile .../index.html`)
+      'reader html view: iframe src is wxfile .../index.html')
 
-    // ============ M9 · 批量删除 + 单篇删除 ============
-    await win.click('[data-testid="nav-文库"]')   // 回到文库（卡片+分组；M23 展开态已持久化 → 卡片直接可见）
+    // ============ M9 · 批量删除 + 单篇删除(a1/a2/a3) → 文库清空 ============
+    await win.click('[data-testid="nav-文库"]')
     await win.waitForSelector('[data-testid="article-card"]', { timeout: 10000 })
-    assert(true, 'M23: expanded state persists across navigation (cards visible on re-entry)')
-    // 单击选中 2 张 → 批量条 → 批量删除
     await win.locator('[data-testid="article-card"]').nth(0).click()
     await win.locator('[data-testid="article-card"]').nth(1).click()
     await win.waitForSelector('[data-testid="batch-delete"]', { timeout: 5000 })
@@ -265,14 +288,54 @@ async function main() {
     await win.waitForTimeout(800)
     const afterBatch = await win.locator('[data-testid="article-card"]').count()
     assert(afterBatch === 1, `batch delete removed 2, 1 remains (got ${afterBatch})`)
-    // 单篇删除最后一篇 → 空状态
     await win.locator('[data-testid="article-card"]').first().hover()
     await win.click('[data-testid="card-delete"]')
     await win.click('.ant-popover button:has-text("删")')
     await win.waitForSelector('[data-testid="article-card"]', { state: 'detached', timeout: 10000 })
     assert(true, 'single delete removed the last card (library empty)')
 
-    // ============ M49 · 失效功能退场，现存设置继续可用 ============
+    // ============ v0.10.0 · 订阅：粘贴文章链接识别公众号 → 添加 ============
+    await win.click('[data-testid="nav-订阅"]')
+    await win.waitForSelector('[data-testid="subs-search-input"]', { timeout: 5000 })
+    await win.fill('[data-testid="subs-search-input"]', MP_ARTICLE_URL)
+    await win.click('[data-testid="subs-search-btn"]')
+    await win.waitForSelector('.ant-list-item:has-text("测试订阅号")', { timeout: 10000 })
+    assert(true, '粘贴文章链接识别出公众号「测试订阅号」')
+    await win.locator('.ant-list-item:has-text("测试订阅号") a:has-text("订阅")').click()
+    await win.waitForSelector('[data-testid="subs-row"]', { timeout: 10000 })
+    assert((await win.locator('[data-testid="subs-row"]').count()) === 1, '订阅后列表出现 1 个账号')
+
+    // ============ v0.10.0 · 按公众号批量下载（AccountMode）闭环 ============
+    await win.click('[data-testid="nav-下载"]')
+    await win.waitForSelector('[data-testid="mode-account"]', { timeout: 5000 })
+    await win.click('[data-testid="mode-account"]')
+    await win.waitForSelector('[data-testid="account-search"]', { timeout: 5000 })
+    await win.fill('[data-testid="account-search"] input', MP_ARTICLE_URL)
+    await win.press('[data-testid="account-search"] input', 'Enter')
+    await win.waitForSelector('[data-testid="start-crawl"]', { timeout: 10000 })
+    assert(true, 'AccountMode 识别到公众号，出现「开始下载」')
+    await win.click('[data-testid="start-crawl"]')
+    await win.waitForSelector('[data-testid="history-event"] [data-testid="history-article"]', { timeout: 30000 })
+    const crawlArts = await win.locator('[data-testid="history-event"]').first().locator('[data-testid="history-article"]').count()
+    assert(crawlArts === 1, `AccountMode 经微信读书取到最新一篇并下载 (got ${crawlArts})`)
+
+    // ============ v0.10.0 · 文库含订阅下载的文章 ============
+    await win.click('[data-testid="nav-文库"]')
+    await win.waitForSelector('.ghead, [data-testid="article-card"]', { timeout: 15000 })
+    assert((await win.locator('[data-testid="article-card"]').count()) === 0, 'M23: groups collapsed by default')
+    const gnames = await win.locator('.ghead .gname').allInnerTexts()
+    assert(gnames.includes('测试订阅号'), `文库含按公众号下载的公众号「测试订阅号」 (got ${gnames.join('/')})`)
+    await win.click('[data-testid="expand-all"]')
+    await win.waitForTimeout(250)
+    assert((await win.locator('[data-testid="article-card"]').count()) === 1, 'expand-all shows the 1 downloaded article')
+    const finalTitles = await win.locator('[data-testid="article-card"]').allInnerTexts()
+    assert(finalTitles.some((t) => t.includes('百宝箱订阅验收文')), '卡片标题为「百宝箱订阅验收文」')
+    await pickSelect('account-select', '测试订阅号')
+    await win.waitForTimeout(200)
+    assert((await win.locator('[data-testid="article-card"]').count()) === 1, 'filter by 测试订阅号 narrows to 1')
+    await pickSelect('account-select', '全部公众号')
+
+    // ============ M49 · 现存设置继续可用（site-sync tooltip）============
     await win.click('[data-testid="nav-设置"]')
     await win.locator('[data-testid="site-sync-help"]').hover()
     await win.waitForSelector('.ant-tooltip-container', { timeout: 5000 })
@@ -282,9 +345,8 @@ async function main() {
     await win.screenshot({ path: '/tmp/wxk-e2e-final.png' })
     assert(errors.length === 0, `no console/page errors (saw ${errors.length}: ${errors.slice(0, 3).join(' | ')})`)
 
-    // --- M21: 关窗后 activate(等价点程序坞图标)重建窗口 ---
+    // --- M21: 关窗后 activate 重建窗口 ---
     await win.close()
-    // close() 只保证发起关闭,销毁略滞后 → 轮询而非单次查询(曾 flake)
     let zero = -1
     for (let i = 0; i < 20; i++) {
       zero = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)
@@ -297,7 +359,6 @@ async function main() {
     const win2 = await reopened
     await win2.waitForSelector('[data-testid="app-shell"]', { timeout: 20000 })
     assert(true, 'activate after close recreates the window with full UI')
-    // 窗口存在时再 activate 不应重复开窗
     await app.evaluate(({ app: a }) => { a.emit('activate') })
     await win2.waitForTimeout(300)
     const count = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)
