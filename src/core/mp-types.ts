@@ -29,6 +29,12 @@ export interface ArticleRef {
    */
   appmsgid?: number
   itemidx?: number
+  /**
+   * 阅读/点赞数（v0.10.0 微信读书链路新增数据）：列表接口给了才有。
+   * MP 后台时代拿不到别人号的阅读数——这是两条链路唯一的能力增量。
+   */
+  readNum?: number
+  likeNum?: number
 }
 
 export type CrawlRange = { count: number } | { from: string; to: string }

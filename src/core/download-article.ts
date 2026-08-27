@@ -5,6 +5,7 @@ import type { DownloadFormat, DownloadItemResult } from './types'
 import { articleId, type ArticleIdHint } from './article-id'
 import { articleDirName, dedupeDirName, sanitizeName } from './paths'
 import { parseArticle } from './parse-article'
+import { extractArticleKeys } from './article-keys'
 import { exportArticle, type ExportDeps } from './exporter'
 import { Library } from './library'
 
@@ -42,7 +43,7 @@ export async function downloadArticle(
   /** 列表给的文章主键；缺省时只能从 URL 推断（短链推不出，见 articleId） */
   hint?: ArticleIdHint,
 ): Promise<DownloadItemResult> {
-  const id = articleId(url, hint)
+  let id = articleId(url, hint)
   if (await deps.library.has(id)) {
     const existing = await deps.library.get(id)
     return { url, ok: true, id, skipped: true, title: existing?.title, dir: existing?.dir }
@@ -50,6 +51,21 @@ export async function downloadArticle(
 
   const html = await deps.fetchHtml(url)
   const parsed = parseArticle(html, url)
+
+  // 短链无 hint 时 id 是 URL 哈希（h_ 形态），与列表抓取/长链算出的 mid_idx 认不出同一篇。
+  // 页面已到手，顺手从脚本变量补出微信主键再判一次——两条下载路径由此归一。
+  // 存量 h_ 条目无法回溯归一（哈希不可逆），属历史限制。
+  if (id.startsWith('h_')) {
+    const keys = extractArticleKeys(html)
+    if (keys.mid && keys.idx) {
+      const canonical = `${keys.mid}_${keys.idx}`
+      if (await deps.library.has(canonical)) {
+        const existing = await deps.library.get(canonical)
+        return { url, ok: true, id: canonical, skipped: true, title: existing?.title, dir: existing?.dir }
+      }
+      id = canonical
+    }
+  }
 
   if (!parsed.title.trim()) {
     // 判定逻辑不变（标题为空仍是手动粘链接时的唯一防线），但把原因说准:

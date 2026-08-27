@@ -138,8 +138,7 @@ describe('用列表主键判重(M36)', () => {
   })
 })
 
-describe('打不开的文章要说清原因(M38)', () => {
-  const page = (body: string) => `<!doctype html><html><head></head><body>${body}</body></html>`
+describe('打不开的文章要说清原因(M38)', () => {  const page = (body: string) => `<!doctype html><html><head></head><body>${body}</body></html>`
 
   it('审核未通过的错误页 → 说明是审核未通过,而不是 no title parsed', async () => {
     const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-una1-')),
@@ -159,5 +158,52 @@ describe('打不开的文章要说清原因(M38)', () => {
     const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-una3-')), page('<div>页面不存在</div>'))
     await expect(downloadArticle('https://mp.weixin.qq.com/s/X', ['meta'], deps))
       .rejects.toThrow(/no title parsed/)
+  })
+})
+
+describe('短链判重兜底：页面脚本补出 mid_idx(v0.10.0)', () => {
+  // 真实页面(3.2MB)确认的脚本形态；空串形态也真实存在
+  const WITH_KEYS = `<!doctype html><html><head>
+    <meta property="og:title" content="键测试" />
+  </head><body>
+    <h1 id="activity-name">键测试</h1>
+    <span id="js_name">测试公众号</span>
+    <em id="publish_time">2026-08-26 08:00</em>
+    <div id="js_content"><p>正文</p></div>
+    <script>var biz = "MzYzNDg1MDcyNQ=="; var mid = "2247486019"; var idx = "1";</script>
+  </body></html>`
+
+  it('无 hint 的短链：下载后 id 归一为 mid_idx(不再是 h_ 哈希)', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-key1-')), WITH_KEYS)
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/SomeShortToken', ['meta'], deps)
+    expect(r.id).toBe('2247486019_1')
+    expect(r.id!.startsWith('h_')).toBe(false)
+  })
+
+  it('库里已有该 mid_idx（长链或列表下载过）→ 短链再来即跳过', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-key2-'))
+    const deps = makeDeps(root, WITH_KEYS)
+    await deps.library.add({
+      id: '2247486019_1', title: '已有记录', author: 'a', account: 'acc',
+      publishTime: '2026-08-25 10:00', sourceUrl: 'https://mp.weixin.qq.com/s?__biz=X&mid=2247486019&idx=1&sn=y',
+      digest: '', coverUrl: '', downloadTime: '2026-08-25T00:00:00Z', formats: ['md'], dir: '/tmp/old',
+    })
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/OtherToken', ['meta'], deps)
+    expect(r.skipped).toBe(true)
+    expect(r.id).toBe('2247486019_1')
+    expect(r.title).toBe('已有记录')
+  })
+
+  it('页面没有脚本变量 → id 保持 h_ 哈希形态(老行为不变)', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-key3-')), VALID_HTML)
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/NoKeysHere', ['meta'], deps)
+    expect(r.id!.startsWith('h_')).toBe(true)
+  })
+
+  it('有 hint 时 hint 优先(页面脚本不影响判重)', async () => {
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-key4-')), WITH_KEYS)
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/Whatever', ['meta'], deps,
+      { appmsgid: 999, itemidx: 2 })
+    expect(r.id).toBe('999_2')
   })
 })
