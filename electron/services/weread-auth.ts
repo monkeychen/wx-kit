@@ -23,23 +23,46 @@ export interface WereadLoginDeps {
 }
 
 export function nodeQrHttp(): QrFlowHttp {
+  const jar = new Map<string, string>()
+  const parseSetCookie = (res: Response) => {
+    const cookies: string[] = []
+    const getSetCookie = (res.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie
+    if (typeof getSetCookie === 'function') {
+      cookies.push(...getSetCookie.call(res.headers))
+    } else {
+      const single = res.headers.get('set-cookie')
+      if (single) cookies.push(single)
+    }
+    for (const c of cookies) {
+      const m = /^([^=]+)=([^;]*)/.exec(c)
+      if (m) jar.set(m[1].trim(), decodeURIComponent(m[2].trim()))
+    }
+  }
+  const cookieHeader = () => {
+    if (!jar.size) return undefined
+    return [...jar.entries()].map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('; ')
+  }
   const getJson = async (url: string, headers?: Record<string, string>) => {
+    const cookie = cookieHeader()
     const res = await fetch(url, {
       headers: {
         Accept: 'application/json, text/plain, */*',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Origin: 'https://weread.qq.com',
         Referer: 'https://weread.qq.com/',
+        ...(cookie ? { Cookie: cookie } : {}),
         ...headers,
       },
       signal: AbortSignal.timeout(25_000),
     })
+    parseSetCookie(res)
     if (!res.ok) throw new Error(`weread qr-flow HTTP ${res.status}: ${url.slice(0, 80)}`)
     return await res.json() as Record<string, unknown>
   }
   return {
     get: getJson,
     post: async (url, body, headers) => {
+      const cookie = cookieHeader()
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -48,14 +71,17 @@ export function nodeQrHttp(): QrFlowHttp {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           Origin: 'https://weread.qq.com',
           Referer: 'https://weread.qq.com/',
+          ...(cookie ? { Cookie: cookie } : {}),
           ...headers,
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(25_000),
       })
+      parseSetCookie(res)
       const payload = await res.json().catch(() => { throw new Error(`weread login 响应非 JSON（HTTP ${res.status}）`) })
       return payload as Record<string, unknown>
     },
+    getCookie: (name: string) => jar.get(name),
   }
 }
 
@@ -95,7 +121,29 @@ export async function runWereadLogin(
           throw e
         }
         if (poll.state === 'confirmed') {
-          const creds = (poll as { state: 'confirmed'; creds: WereadCredentials }).creds
+          let creds = (poll as { state: 'confirmed'; creds: WereadCredentials }).creds
+          try {
+            const verify = async () => {
+              try {
+                const r = await http.get('https://weread.qq.com/web/shelf/sync?userVid=&synckey=0')
+                const err = (r as Record<string, unknown>).errCode ?? (r as Record<string, unknown>).errcode ?? 0
+                return !err
+              } catch { return false }
+            }
+            if (!(await verify())) {
+              try {
+                await http.post('https://weread.qq.com/web/login/renewal', { rq: '%2Fweb%2Fbook%2Fread', ql: true })
+                if (await verify()) {
+                  const newSkey = http.getCookie?.('wr_skey')
+                  const newRt = http.getCookie?.('wr_rt')
+                  if (newSkey) creds = { ...creds, accessToken: newSkey, refreshToken: newRt ? decodeURIComponent(newRt) : creds.refreshToken }
+                }
+              } catch {}
+            } else {
+              const jarSkey = http.getCookie?.('wr_skey')
+              if (jarSkey && jarSkey !== creds.accessToken) creds = { ...creds, accessToken: jarSkey }
+            }
+          } catch {}
           await store.write(creds)
           return creds
         }
@@ -148,6 +196,34 @@ function parsePublishTime(pt: string): number {
   return Number.isNaN(ts) ? Math.floor(Date.now() / 1000) : Math.floor(ts / 1000)
 }
 
+async function fetchCoverHtmlWithFallback(fetchHtml: (url: string) => Promise<string>, coverUrl: string): Promise<{ html: string; url: string }> {
+  let html = await fetchHtml(coverUrl).catch(() => '')
+  if (html) {
+    try {
+      const parsed = parseArticle(html, coverUrl)
+      if (parsed.title) return { html, url: coverUrl }
+    } catch {}
+  }
+  // Token may contain ~ vs _ confusion (weread reviewId vs mp short link)
+  if (coverUrl.includes('/s/')) {
+    const [base, token] = coverUrl.split('/s/')
+    if (token) {
+      const altToken = token.includes('~') ? token.replace(/~/g, '_') : token.replace(/_/g, '~')
+      if (altToken !== token) {
+        const altUrl = `${base}/s/${altToken}`
+        const altHtml = await fetchHtml(altUrl).catch(() => '')
+        if (altHtml) {
+          try {
+            const altParsed = parseArticle(altHtml, altUrl)
+            if (altParsed.title) return { html: altHtml, url: altUrl }
+          } catch {}
+        }
+      }
+    }
+  }
+  return { html, url: coverUrl }
+}
+
 export async function wereadListFn(
   userDataDir: string,
   requestWeread: (url: string) => Promise<unknown>,
@@ -159,14 +235,14 @@ export async function wereadListFn(
   return async (fakeid, watermark) => {
     const cover = await client.getLatestArticle(fakeid)
     if (!cover) return []
-    const html = await fetchHtml(cover.url).catch(() => '')
+    const { html, url } = await fetchCoverHtmlWithFallback(fetchHtml, cover.url)
     if (!html) return []
-    const parsed = parseArticle(html, cover.url)
+    const parsed = parseArticle(html, url)
     const ts = parsePublishTime(parsed.publishTime)
     if (ts <= watermark) return []
     const keys = extractArticleKeys(html)
     return [{
-      url: cover.url,
+      url,
       title: cover.title,
       createTime: ts,
       ...(keys.mid ? { appmsgid: Number(keys.mid) } : {}),
@@ -186,13 +262,13 @@ export async function wereadCrawlListFn(
   return async (fakeid, range) => {
     const cover = await client.getLatestArticle(fakeid)
     if (!cover) return []
-    const html = await fetchHtml(cover.url).catch(() => '')
+    const { html, url } = await fetchCoverHtmlWithFallback(fetchHtml, cover.url)
     if (!html) return []
-    const parsed = parseArticle(html, cover.url)
+    const parsed = parseArticle(html, url)
     const ts = parsePublishTime(parsed.publishTime)
     const keys = extractArticleKeys(html)
     const ref = {
-      url: cover.url,
+      url,
       title: cover.title,
       createTime: ts,
       ...(keys.mid ? { appmsgid: Number(keys.mid) } : {}),
