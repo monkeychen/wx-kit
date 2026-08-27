@@ -38,14 +38,16 @@ export async function readWereadCredsFile(path: string): Promise<WereadCredentia
 }
 
 export class WereadNodeTransport {
-  constructor(private readonly credsPath: string) {}
+  constructor(
+    private readonly credsPath: string,
+    private readonly doFetch: typeof fetch = globalThis.fetch,
+  ) {}
 
   private async headers(_url: string): Promise<Record<string, string>> {
     const creds = await readWereadCredsFile(this.credsPath)
     const h: Record<string, string> = {
       Accept: 'application/json, text/plain, */*',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     }
     if (creds) {
       if (creds.cookie) {
@@ -67,7 +69,7 @@ export class WereadNodeTransport {
   async json(url: string, timeoutMs: number, signal?: AbortSignal): Promise<MpJson> {
     const timeout = AbortSignal.timeout(timeoutMs)
     const sig = signal ? AbortSignal.any([signal, timeout]) : timeout
-    const res = await fetch(url, { headers: await this.headers(url), signal: sig })
+    const res = await this.doFetch(url, { headers: await this.headers(url), signal: sig })
     if (res.status === 401 || res.status === 403) {
       throw Object.assign(new Error(`微信读书 HTTP ${res.status}（登录态可能失效）`), { status: res.status })
     }
@@ -86,8 +88,9 @@ export class RoutingTransport implements MpRequestTransport {
   constructor(
     credsPath: string,
     private readonly fallback: MpRequestTransport,
+    wereadTransport?: WereadNodeTransport,
   ) {
-    this.weread = new WereadNodeTransport(credsPath)
+    this.weread = wereadTransport ?? new WereadNodeTransport(credsPath)
   }
 
   async json(url: string, timeoutMs: number, signal?: AbortSignal): Promise<MpJson> {

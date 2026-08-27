@@ -8,12 +8,11 @@ import {
 } from '../../src/core/weread/qr-flow'
 import { WereadClient } from '../../src/core/weread/client'
 import type { WereadCredentials, WereadQrPoll } from '../../src/core/weread/types'
+import { normalizeAccountId } from '../../src/core/weread/book-id'
 import type { ArticleRef, CrawlRange } from '../../src/core/mp-types'
 import { MpAuthExpired } from '../../src/core/mp-errors'
-import { normalizeAccountId } from '../../src/core/weread/book-id'
 import { readWereadCredsFile, wereadCredsPath } from './weread-transport'
-import { parseArticle } from '../../src/core/parse-article'
-import { extractArticleKeys } from '../../src/core/article-keys'
+import { wereadCookieHeader } from './weread-net'
 
 export interface WereadLoginDeps {
   runAction: <T>(task: () => Promise<T>) => Promise<T>
@@ -106,7 +105,7 @@ export async function runWereadLogin(
 
   return deps.runAction(async () => {
     for (;;) {
-      try { await http.get('https://weread.qq.com/', { Accept: 'text/html,*/*' }) } catch {}
+      try { await http.get('https://weread.qq.com/', { Accept: 'text/html,*/*' }) } catch { /* 首页预热拿指纹 Cookie；失败不阻断扫码链路 */ }
       const uid = await getLoginUid(http)
       const confirmUrl = webConfirmUrl(uid)
       hooks.onQr?.({ uuid: uid, confirmUrl })
@@ -125,30 +124,12 @@ export async function runWereadLogin(
         }
         if (poll.state === 'confirmed') {
           let creds = (poll as { state: 'confirmed'; creds: WereadCredentials }).creds
+          // 登录产生的全量 Cookie 落在 Chromium 分区 jar 里；导出成字符串随凭据落盘，
+          // 供业务请求与 session export/import 使用。jar 为空（纯 Node 单测）时保持 JSON 字段。
           try {
-            const verify = async () => {
-              try {
-                const r = await http.get('https://weread.qq.com/web/shelf/sync?userVid=&synckey=0')
-                const err = (r as Record<string, unknown>).errCode ?? (r as Record<string, unknown>).errcode ?? 0
-                return !err
-              } catch { return false }
-            }
-            if (!(await verify())) {
-              try {
-                await http.post('https://weread.qq.com/web/login/renewal', { rq: '%2Fweb%2Fbook%2Fread', ql: true })
-                if (await verify()) {
-                  const newSkey = http.getCookie?.('wr_skey')
-                  const newRt = http.getCookie?.('wr_rt')
-                  if (newSkey) creds = { ...creds, accessToken: newSkey, refreshToken: newRt ? decodeURIComponent(newRt) : creds.refreshToken }
-                }
-              } catch {}
-            } else {
-              const jarSkey = http.getCookie?.('wr_skey')
-              if (jarSkey && jarSkey !== creds.accessToken) creds = { ...creds, accessToken: jarSkey }
-            }
-          } catch {}
-          const fullCookie = (http as QrFlowHttp & { getCookieHeader?: () => string | undefined }).getCookieHeader?.()
-          if (fullCookie) creds = { ...creds, cookie: fullCookie }
+            const fullCookie = await wereadCookieHeader()
+            if (fullCookie) creds = { ...creds, cookie: fullCookie }
+          } catch { /* 非 Electron 环境（单测）无分区 jar */ }
           await store.write(creds)
           return creds
         }
@@ -189,129 +170,87 @@ export function makeWereadClient(
 }
 
 export function wereadListUrl(path: string, params: Record<string, string | number>): string {
+  // Plan B：WXKIT_WEREAD_BASE 仅供 e2e 把请求指到本地 mock（默认生产域名）
   const base = (process.env.WXKIT_WEREAD_BASE ?? 'https://weread.qq.com').replace(/\/$/, '')
   const u = new URL(`${base}${path}`)
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v))
   return u.toString()
 }
 
-function parsePublishTime(pt: string): number {
-  if (!pt) return Math.floor(Date.now() / 1000)
-  const ts = Date.parse(pt.replace(' ', 'T') + '+08:00')
-  return Number.isNaN(ts) ? Math.floor(Date.now() / 1000) : Math.floor(ts / 1000)
+/** 列表分页上限（每页 20，200 页 ≈ 4000 篇），防御性兜底避免死循环 */
+const MAX_LIST_PAGES = 200
+const PAGE_SIZE = 20
+
+function normalizeBookId(fakeid: string): string {
+  try { return normalizeAccountId(fakeid) } catch { return fakeid }
 }
 
-async function fetchCoverHtmlWithFallback(fetchHtml: (url: string) => Promise<string>, coverUrl: string): Promise<{ html: string; url: string }> {
-  let html = await fetchHtml(coverUrl).catch(() => '')
-  if (html) {
-    try {
-      const parsed = parseArticle(html, coverUrl)
-      if (parsed.title) return { html, url: coverUrl }
-    } catch {}
+async function listAllArticles(client: WereadClient, bookId: string): Promise<ArticleRef[]> {
+  const all: ArticleRef[] = []
+  for (let page = 0; page < MAX_LIST_PAGES; page++) {
+    const batch = await client.listMpArticles(bookId, page * PAGE_SIZE)
+    if (!batch.length) break
+    all.push(...batch)
+    if (batch.length < PAGE_SIZE) break
   }
-  // Token may contain ~ vs _ confusion (weread reviewId vs mp short link)
-  if (coverUrl.includes('/s/')) {
-    const [base, token] = coverUrl.split('/s/')
-    if (token) {
-      const altToken = token.includes('~') ? token.replace(/~/g, '_') : token.replace(/_/g, '~')
-      if (altToken !== token) {
-        const altUrl = `${base}/s/${altToken}`
-        const altHtml = await fetchHtml(altUrl).catch(() => '')
-        if (altHtml) {
-          try {
-            const altParsed = parseArticle(altHtml, altUrl)
-            if (altParsed.title) return { html: altHtml, url: altUrl }
-          } catch {}
-        }
-      }
-    }
-  }
-  return { html, url: coverUrl }
+  all.sort((x, y) => y.createTime - x.createTime)
+  return all
 }
 
+/** 列表失败（-2041 等）时回退 cover 单篇——增量订阅的保底路径 */
+async function fallbackToCover(client: WereadClient, fakeid: string): Promise<ArticleRef[]> {
+  const cover = await client.getLatestArticle(fakeid).catch(() => null)
+  if (!cover) return []
+  const token = cover.reviewId.split('_').pop() || ''
+  return [{ url: cover.url || `https://mp.weixin.qq.com/s/${token}`, title: cover.title, createTime: Math.floor(Date.now() / 1000) }]
+}
+
+/**
+ * 订阅检查专用的列表取件装配。优先 web/mp/articles 全量分页（需 Chromium 栈会话），
+ * 失败回退 cover 最新一篇；按水位增量过滤。
+ */
 export async function wereadListFn(
   userDataDir: string,
   requestWeread: (url: string) => Promise<unknown>,
-  _fetchHtml: (url: string) => Promise<string>,
 ): Promise<((fakeid: string, watermark: number) => Promise<ArticleRef[]>) | null> {
   const creds = await readWereadCredsFile(wereadCredsPath(userDataDir))
   if (!creds) return null
   const client = makeWereadClient((path, params) => requestWeread(wereadListUrl(path, params)))
-  const bookIdFor = (fakeid: string) => {
-    try { return normalizeAccountId(fakeid) } catch { return fakeid }
-  }
   return async (fakeid, watermark) => {
-    const bookId = bookIdFor(fakeid)
-    const all: ArticleRef[] = []
-    let offset = 0
-    while (true) {
-      let batch: ArticleRef[] = []
-      try { batch = await client.listMpArticles(bookId, offset) } catch (e) {
-        // 列表失败时回退到 cover 单篇（e2e mock 未实现 web/mp/articles 时也保底）
-        if (true) {
-          const cover = await client.getLatestArticle(fakeid).catch(() => null)
-          if (!cover) return []
-          const coverRef: ArticleRef = { url: cover.url, title: cover.title, createTime: Math.floor(Date.now()/1000) }
-          return coverRef.createTime > watermark ? [coverRef] : []
-        }
-        throw e
-      }
-      if (!batch.length) break
-      for (const r of batch) if (r.createTime > watermark) all.push(r)
-      // 已到底或批次内已出现旧文章
-      if (batch.length < 20) break
-      const minTs = Math.min(...batch.map(r => r.createTime))
-      if (minTs <= watermark) break
-      offset += batch.length
-      if (offset > 2000) break
+    const bookId = normalizeBookId(fakeid)
+    try {
+      const all = await listAllArticles(client, bookId)
+      return all.filter((r) => r.createTime > watermark)
+    } catch {
+      // 列表任何失败（-2041 风控 / 接口下线 / 网络异常）都不阻塞订阅——回退 cover 单篇增量
+      const covers = await fallbackToCover(client, fakeid)
+      return covers.filter((r) => r.createTime > watermark)
     }
-    // 按时间倒序（新在前）与旧订阅水位逻辑一致
-    all.sort((a, b) => b.createTime - a.createTime)
-    return all
   }
 }
 
+/**
+ * 批量抓取/摘要专用的列表取件装配。全量分页后按 count/日期裁剪；列表不可用时回退 cover 单篇。
+ */
 export async function wereadCrawlListFn(
   userDataDir: string,
   requestWeread: (url: string) => Promise<unknown>,
-  _fetchHtml: (url: string) => Promise<string>,
 ): Promise<((fakeid: string, range: CrawlRange) => Promise<ArticleRef[]>) | null> {
   const creds = await readWereadCredsFile(wereadCredsPath(userDataDir))
   if (!creds) return null
   const client = makeWereadClient((path, params) => requestWeread(wereadListUrl(path, params)))
-  const bookIdFor = (fakeid: string) => {
-    try { return normalizeAccountId(fakeid) } catch { return fakeid }
-  }
   return async (fakeid, range) => {
-    const bookId = bookIdFor(fakeid)
-    // 优先走列表，失败回退到 cover
-    const fetchAll = async (): Promise<ArticleRef[]> => {
-      const all: ArticleRef[] = []
-      let offset = 0
-      while (true) {
-        let batch: ArticleRef[] = []
-        try { batch = await client.listMpArticles(bookId, offset) } catch (e) {
-          if (true) {
-            const cover = await client.getLatestArticle(fakeid).catch(() => null)
-            return cover ? [{ url: cover.url, title: cover.title, createTime: Math.floor(Date.now()/1000) }] : []
-          }
-          throw e
-        }
-        if (!batch.length) break
-        all.push(...batch)
-        if (batch.length < 20) break
-        offset += batch.length
-        if ('count' in range && all.length >= range.count) break
-        if (offset > 2000) break
-      }
-      return all
+    const bookId = normalizeBookId(fakeid)
+    let all: ArticleRef[]
+    try {
+      all = await listAllArticles(client, bookId)
+    } catch {
+      // 同订阅：列表不可用即回退 cover 单篇，批量能力随接口恢复自动回归
+      all = await fallbackToCover(client, fakeid)
     }
-    const all = await fetchAll()
-    // 按创建时间倒序
-    all.sort((a, b) => b.createTime - a.createTime)
     if ('count' in range) return all.slice(0, range.count)
     const fromTs = Date.parse(`${range.from}T00:00:00`) / 1000
     const toTs = Date.parse(`${range.to}T23:59:59`) / 1000
-    return all.filter(r => r.createTime >= fromTs && r.createTime <= toTs)
+    return all.filter((r) => r.createTime >= fromTs && r.createTime <= toTs)
   }
 }

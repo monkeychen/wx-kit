@@ -31,6 +31,7 @@ import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subs
 import type { RunCheckResult } from './services/subscription-check'
 import { articleFetchers, createMpRuntime } from './services/mp-runtime'
 import { makeWereadClient, runWereadLogin, wereadCredsStore, WereadLoginCancelled, wereadListFn, wereadCrawlListFn, wereadListUrl } from './services/weread-auth'
+import { buildWereadQrFlowHttp } from './services/weread-net'
 import { readWereadCredsFile, wereadCredsPath } from './services/weread-transport'
 import { extractArticleKeys } from '../src/core/article-keys'
 import { normalizeAccountId } from '../src/core/weread/book-id'
@@ -201,6 +202,9 @@ export function registerIpc(settings: SettingsService): void {
       }
       const creds = await runWereadLogin(wereadCredsStore(app.getPath('userData')), {
         runAction: (task) => mpGateway.runAction('weread-auth', 'https://weread.qq.com/api/auth/getLoginUid', task),
+        // 登录必须经 Chromium 网络栈：weread 按发起端指纹给会话分级，Node fetch 拿到降级会话
+        // （业务列表恒 -2041）。见 weread-net.ts 头注。
+        http: buildWereadQrFlowHttp(),
       }, {
         onQr: (qr) => send('weread:login:qr', { confirmUrl: qr.confirmUrl }),
         onState: (s) => send('weread:login:state', { state: s }),
@@ -288,7 +292,7 @@ export function registerIpc(settings: SettingsService): void {
         send({ kind: 'note', message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB）` }),
     }
     try {
-      const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url), fetchHtml)
+      const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
       if (!listFn) throw new Error('AUTH_REQUIRED')
       const summary = await crawlAccount(fakeid, range, {
         listFn,
@@ -324,7 +328,7 @@ export function registerIpc(settings: SettingsService): void {
     const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
     if (!creds) return Math.floor(Date.now() / 1000)
     try {
-      const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url), fetchHtml)
+      const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
       if (!listFn) return Math.floor(Date.now() / 1000)
       const refs = await listFn(fakeid, { count: 1 })
       return refs[0]?.createTime ?? Math.floor(Date.now() / 1000)
@@ -357,7 +361,7 @@ export function registerIpc(settings: SettingsService): void {
     checkInFlight = (async () => {
       const subs = await subsFor()
       const s = await settings.get()
-      const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url), fetchHtml)
+      const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
       const result = await svcRunSubscriptionCheck(trigger, {
         subs, settings: s, list,
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,

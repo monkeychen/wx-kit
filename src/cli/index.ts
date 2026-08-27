@@ -39,6 +39,7 @@ import {
   ensureFreshWereadCreds, makeWereadClient, runWereadLogin, WereadLoginCancelled,
   wereadCredsStore, wereadListFn, wereadListUrl, wereadCrawlListFn
 } from '../../electron/services/weread-auth'
+import { buildWereadQrFlowHttp } from '../../electron/services/weread-net'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -239,7 +240,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         : (opts.from && opts.to) ? { from: String(opts.from), to: String(opts.to) }
         : null
       if (!range) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要 --count 或 --from/--to' } }); exitCode = 2; return }
-      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url), mpArticleFetchers().fetchHtml)
+      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
       if (!listFn) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
       try {
         const formats = parseFormats(opts.formats)
@@ -272,6 +273,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       try {
         const creds = await runWereadLogin(store, {
           runAction: (task) => mpGateway().runAction('weread-auth', 'https://weread.qq.com/api/auth/getLoginUid', task),
+          // 登录走 Chromium 网络栈（CLI 同一 Electron 主进程），理由同 weread-net.ts 头注
+          http: buildWereadQrFlowHttp(),
         }, {
           onQr: (qr) => {
             void QRCode.toString(qr.confirmUrl, { type: 'terminal', small: true }).then((ascii) => {
@@ -446,7 +449,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
         return summary
       }
-      const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url), mpArticleFetchers().fetchHtml)
+      const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),
         subs, settings: s, list, downloadRefs,
@@ -482,7 +485,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const root = await resolveRoot(o.out)
       const subs = new Subscriptions(root)
       const library = new Library(root)
-      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url), mpArticleFetchers().fetchHtml)
+      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
       if (!listFn) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
       const only = o.accounts ? String(o.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : null
       const accounts = (await subs.list())

@@ -51,42 +51,41 @@ describe('readWereadCredsFile', () => {
 })
 
 describe('WereadNodeTransport.json', () => {
-  it('带 Cookie 凭据头（有凭据时，Web 端 wr_skey=refreshToken）', async () => {
+  it('带 Cookie 凭据头（wr_skey 短值 + wr_rt 长值）', async () => {
     const p = join(dir, 'creds.json')
     await writeFile(p, JSON.stringify({ vid: '77', accessToken: 'AT', refreshToken: 'R', deviceId: 'd', name: '', updatedAt: 0 }), 'utf-8')
-    const t = new WereadNodeTransport(p)
     const origFetch = globalThis.fetch
     let seen: { url: string; headers: Record<string, string> } | null = null
-    globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    const stub = (async (url: string | URL, init?: RequestInit) => {
       seen = { url: String(url), headers: init!.headers as Record<string, string> }
       return new Response(JSON.stringify({ errCode: 0, data: [] }), { status: 200 })
     }) as typeof fetch
+    const t = new WereadNodeTransport(p, stub)
     try {
       const json = await t.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)
       expect(json.errCode).toBe(0)
       expect(seen!.headers.Cookie).toContain('wr_vid=77')
       expect(seen!.headers.Cookie).toContain('wr_skey=AT')
       expect(seen!.headers.Cookie).toContain('wr_rt=')
-      expect(seen!.headers['User-Agent']).toContain('Mozilla')
     } finally { globalThis.fetch = origFetch }
   })
   it('无凭据也放行（扫码链路不需要登录态）', async () => {
-    const t = new WereadNodeTransport(join(dir, 'none.json'))
     const origFetch = globalThis.fetch
     let headers: Record<string, string> | null = null
-    globalThis.fetch = (async (_u: string | URL, init?: RequestInit) => {
+    const stub = (async (_u: string | URL, init?: RequestInit) => {
       headers = init!.headers as Record<string, string>
       return new Response('{}', { status: 200 })
     }) as typeof fetch
+    const t = new WereadNodeTransport(join(dir, 'none.json'), stub)
     try {
       await t.json('https://i.weread.qq.com/wxticket?nonceStr=weread', 5000)
       expect(headers!.accessToken).toBeUndefined()
     } finally { globalThis.fetch = origFetch }
   })
   it('HTTP 401/403 → 带 status 的错误（登录态失效语义）', async () => {
-    const t = new WereadNodeTransport(join(dir, 'none.json'))
     const origFetch = globalThis.fetch
-    globalThis.fetch = (async () => new Response('', { status: 401 })) as typeof fetch
+    const stub = (async () => new Response('', { status: 401 })) as typeof fetch
+    const t = new WereadNodeTransport(join(dir, 'none.json'), stub)
     try {
       await expect(t.json('https://i.weread.qq.com/mp/chapters', 5000)).rejects.toMatchObject({ status: 401 })
     } finally { globalThis.fetch = origFetch }
@@ -101,14 +100,11 @@ describe('RoutingTransport', () => {
   })
 
   it('weread 域名的 json 走 Node 设备传输（无凭据时也能到达 fetch）', async () => {
-    const t = new RoutingTransport(wereadCredsPath(dir), mkFallback())
-    const origFetch = globalThis.fetch
     let called = false
-    globalThis.fetch = (async () => { called = true; return new Response('{"errCode":0}', { status: 200 }) }) as typeof fetch
-    try {
-      await t.json('https://i.weread.qq.com/mp/chapters?bookId=x', 5000)
-      expect(called).toBe(true)
-    } finally { globalThis.fetch = origFetch }
+    const stub = (async () => { called = true; return new Response('{"errCode":0}', { status: 200 }) }) as unknown as typeof fetch
+    const t = new RoutingTransport(wereadCredsPath(dir), mkFallback(), new WereadNodeTransport(wereadCredsPath(dir), stub))
+    await t.json('https://i.weread.qq.com/mp/chapters?bookId=x', 5000)
+    expect(called).toBe(true)
   })
   it('mp.weixin 的 json/text 走 Chromium fallback', async () => {
     const t = new RoutingTransport(wereadCredsPath(dir), mkFallback())

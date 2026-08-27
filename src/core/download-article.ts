@@ -64,7 +64,7 @@ export async function downloadArticle(
           // 粘贴的是短链且无 hint 时 id 是 URL 哈希，需按新 URL 重算
           if (id.startsWith('h_')) id = articleId(url, hint)
         }
-      } catch {}
+      } catch { /* 换 token 重取失败则维持原标题为空的原判 */ }
     }
   }
 
