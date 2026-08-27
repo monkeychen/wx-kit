@@ -18,6 +18,7 @@ describe('runWereadLogin', () => {
     let poll = 0
     const http: QrFlowHttp = {
       get: async (url) => {
+        if (url === 'https://weread.qq.com/' || url === 'https://weread.qq.com') return {}
         if (url.includes('getLoginUid')) return { uid: 'U1' }
         poll++
         if (poll === 1) return { succeed: false, logicCode: 'LOGIN_TIMEOUT' }
@@ -45,7 +46,7 @@ describe('runWereadLogin', () => {
 
   it('need_otp -> MpAuthExpired', async () => {
     const http: QrFlowHttp = {
-      get: async (url) => url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'NEED_OTP' },
+      get: async (url) => url === 'https://weread.qq.com/' || url === 'https://weread.qq.com' ? {} : url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'NEED_OTP' },
       post: async () => ({}),
     }
     await expect(runWereadLogin(wereadCredsStore(dir), { runAction: async (t) => t(), http, pollIntervalMs: 1, now: () => 1_000 }))
@@ -54,7 +55,7 @@ describe('runWereadLogin', () => {
 
   it('declined -> MpAuthExpired', async () => {
     const http: QrFlowHttp = {
-      get: async (url) => url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'declined' },
+      get: async (url) => url === 'https://weread.qq.com/' || url === 'https://weread.qq.com' ? {} : url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'declined' },
       post: async () => ({}),
     }
     // declined 在 poll 中目前按 waiting 处理，不会抛；改测 need_otp 已覆盖 declined 分支的核心（抛错）
@@ -69,7 +70,7 @@ describe('runWereadLogin', () => {
 
   it('cancel() -> 立即中断（WereadLoginCancelled）', async () => {
     const http: QrFlowHttp = {
-      get: async (url) => url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'LOGIN_TIMEOUT' },
+      get: async (url) => url === 'https://weread.qq.com/' || url === 'https://weread.qq.com' ? {} : url.includes('getLoginUid') ? { uid: 'U1' } : { succeed: false, logicCode: 'LOGIN_TIMEOUT' },
       post: async () => ({}),
     }
     let polls = 0

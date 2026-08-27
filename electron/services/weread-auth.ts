@@ -106,6 +106,7 @@ export async function runWereadLogin(
 
   return deps.runAction(async () => {
     for (;;) {
+      try { await http.get('https://weread.qq.com/', { Accept: 'text/html,*/*' }) } catch {}
       const uid = await getLoginUid(http)
       const confirmUrl = webConfirmUrl(uid)
       hooks.onQr?.({ uuid: uid, confirmUrl })
