@@ -65,7 +65,8 @@ describe('WereadNodeTransport.json', () => {
       const json = await t.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)
       expect(json.errCode).toBe(0)
       expect(seen!.headers.Cookie).toContain('wr_vid=77')
-      expect(seen!.headers.Cookie).toContain('wr_skey=R')
+      expect(seen!.headers.Cookie).toContain('wr_skey=AT')
+      expect(seen!.headers.Cookie).toContain('wr_rt=')
       expect(seen!.headers['User-Agent']).toContain('Mozilla')
     } finally { globalThis.fetch = origFetch }
   })
