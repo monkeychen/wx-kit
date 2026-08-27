@@ -81,3 +81,19 @@
 - Web 端 `getLoginInfo` 长轮询 70s 挂起：`nodeQrHttp` 超时设 70s+，`runWereadLogin` 的 `pollTimeoutMs` 300s 内不判过期，`LOGIN_TIMEOUT` 逻辑码视为 waiting（对齐 we-mp-rss）。
 - `wr_skey` 短值被 `-2012` 拒：始终用 `refreshToken` 当 `wr_skey`，短值仅作诊断日志，不入 Cookie。
 - 旧 `weread-creds.json`（含 `deviceId`）兼容：`readWereadCredsFile` 宽松解析，缺 `refreshToken` 时视为无效凭据，引导重扫。
+
+## 4. 实施结果与最终边界（2026-08-27 当日收口）
+
+已落地（提交 `3f43749`→`afbdfa4` 链）：
+1. 登录换 Web 端协议后连修三处真机问题：`webLoginVid` 为数字、会话 Cookie 全量落盘、
+   `reviewId` token 中 `~↔_` 与 mp 短链不一致时自动换写重取。
+2. **网络栈指纹分级**（当日核心发现）：微信读书按请求发起端给会话分级——
+   系统 Chrome 可全量列表；Electron 自带栈与 Node undici 即使凭据正确也恒 `-2041`。
+   同一 Cookie 双栈对照 + Playwright 系统复用均验证。据此把登录与业务统一迁入
+   Electron 分区栈（`weread-net.ts`，persist:weread），并以「列表失败即回退 cover 单篇」保订阅。
+3. 列表分页实现完备（每页 20，上限 200 页），接口一旦放开即自动获得批量能力。
+
+**最终边界**：「按公众号下载历史 N>1 篇」在纯 Electron/Node 架构内无解，
+详见 AGENTS.md 关键约束「网络栈指纹分级」。增量订阅（cover → 水位 → 自动下载）
+不受影响，为 v0.10.0 实际交付形态。历史回补如需突破，候选路径：系统 Chrome CDP
+自动化 spike 或等待官方放开——均需单独立项决策。
