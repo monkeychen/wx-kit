@@ -89,8 +89,8 @@ async function main() {
 
     await win.click('[data-testid="nav-设置"]')
     await win.waitForSelector('[data-testid="set-download-videos"]', { timeout: 10_000 })
-    assert((await win.locator('[data-testid="mp-account"]').count()) === 0, '设置页不含已退场账号入口')
-    assert((await win.locator('[data-testid="set-subs-auto"]').count()) === 0, '设置页不含已退场订阅配置')
+    assert((await win.locator('[data-testid="mp-account"]').count()) === 1, '设置页含微信读书账号入口')
+    assert((await win.locator('[data-testid="set-subs-auto"]').count()) === 1, '设置页含订阅配置')
     await settleUi(win, true)
     await win.screenshot({ path: join(outputDir, 'settings.png') })
 

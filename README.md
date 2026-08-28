@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.10.0-dev-informational.svg)
+![Status](https://img.shields.io/badge/v0.10.0-released-success.svg)
 
 ## 这是什么
 
@@ -17,7 +17,7 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.10.0，开发中）**
+> **当前能力边界（v0.10.0）**
 >
 > v0.10.0 通过**微信读书（WeRead）后端**复活了公众号订阅能力：`search`、`login`、`auth-status`、`session`、`subscription`、`protection` 已重新可用。
 >
@@ -80,11 +80,11 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.9.0：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.0：
 
-- Apple Silicon：`wx-kit-0.9.0-arm64.dmg`
-- Intel Mac：`wx-kit-0.9.0.dmg`
-- Windows：`wx-kit.Setup.0.9.0.exe`
+- Apple Silicon：`wx-kit-0.10.0-arm64.dmg`
+- Intel Mac：`wx-kit-0.10.0.dmg`
+- Windows：`wx-kit.Setup.0.10.0.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -185,9 +185,8 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.9.0；GitHub Release、brew tap 与 npm `@simiam/wx-kit` 三个渠道均已上线；
-- 正在开发：v0.10.0（微信读书后端复活公众号订阅；按公众号批量下载因列表接口被服务端封禁而停用），详见 [`ROADMAP.md`](ROADMAP.md)；
-- 完整里程碑、发布史与下一版候选统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
+- 最新已发布版本：v0.10.0；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 本轮未发，落后于 GitHub/brew 属预期）；
+- 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
 
