@@ -45,7 +45,7 @@ wx-kit library export --ids <id1>,<id2>
 ```
 
 只下载用户明确提供的 URL。若用户只说“某公众号最近文章”或“昨天各号更新”，不要调用旧的
-`search` / `crawl` / `subscription`：这些私有后台能力已经停用。应说明边界并请用户提供文章链接。
+`crawl`（按公众号批量下载）已停用。`search --url` 与 `subscription`（订阅/检查）在 v0.10.0 经微信读书后端复活可用（需 `wx-kit login`）；取某号最新文章用 `subscription check-now`。
 
 **B. GUI 已导出**：用户在文库多选 →「导出为素材」写出 `<库根>/exports/<时间戳>.json`。读最新那个。
 
@@ -123,7 +123,7 @@ wx-kit site sync --ids <文章id> --slug <url-slug>     # 需先配好 siteSyncP
 - **跳过检查点直接出成品**：最常见的错。两个 🛑 必须停。
 - **未经要求就 `site sync`**：发布是对外且不可逆的，用户没说「发」就停在定稿。
 - **自作主张 `--all` 导全库**：用户没指定就先问，别一股脑全导。
-- **为了找某公众号文章而调用旧私有命令**：`search` / `crawl` / `subscription` 已停用；请用户给 URL。
+- **调用已停用的 `crawl`**：返回 `MP_BACKEND_UNAVAILABLE`；要取文章请用户给 URL 走 `download`，或订阅该号用 `subscription`。
 - **下载后自己猜正文路径**：从下载结果取 id，再用 `library export` 获取可靠的 `contentPath`。
 - **没看 `itemShowType` 就把视频/文字消息当长文用**：那类「正文」只有一段描述，据此写论据等于编造。
 - **把清单里的 `contentPath` 当正文**：那是路径，要去读文件。

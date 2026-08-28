@@ -186,7 +186,7 @@ npm run build
 ## 项目状态
 
 - 最新已发布版本：v0.9.0；GitHub Release、brew tap 与 npm `@simiam/wx-kit` 三个渠道均已上线；
-- 正在开发：v0.10.0（微信读书后端复活按公众号下载与订阅），详见 [`ROADMAP.md`](ROADMAP.md)；
+- 正在开发：v0.10.0（微信读书后端复活公众号订阅；按公众号批量下载因列表接口被服务端封禁而停用），详见 [`ROADMAP.md`](ROADMAP.md)；
 - 完整里程碑、发布史与下一版候选统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
