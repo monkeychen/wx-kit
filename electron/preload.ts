@@ -45,19 +45,13 @@ const api: WxApi = {
   mpProtectionPause: () => ipcRenderer.invoke('mp:protectionPause'),
   mpProtectionResume: () => ipcRenderer.invoke('mp:protectionResume'),
   mpSearch: (name) => ipcRenderer.invoke('mp:search', name),
-  mpCrawl: (fakeid, nickname, range, formats, keywords) => ipcRenderer.invoke('mp:crawl', { fakeid, nickname, range, formats, keywords }),
   historyList: (offset, limit) => ipcRenderer.invoke('history:list', { offset, limit }),
   historyRemove: (id) => ipcRenderer.invoke('history:remove', id),
   historyClear: () => ipcRenderer.invoke('history:clear'),
-  onCrawlProgress: (cb) => {
-    const listener = (_e: unknown, ev: Parameters<typeof cb>[0]) => cb(ev)
-    ipcRenderer.on('mp:crawl:progress', listener)
-    return () => { ipcRenderer.removeListener('mp:crawl:progress', listener) }
-  },
-  mpCancelCrawl: () => ipcRenderer.send('mp:crawl:cancel'),
   subscriptionsList: () => ipcRenderer.invoke('subscriptions:list'),
   subscriptionsAddAccount: (fakeid, nickname) => ipcRenderer.invoke('subscriptions:addAccount', { fakeid, nickname }),
   subscriptionsSetSubscribed: (fakeid, nickname, subscribed) => ipcRenderer.invoke('subscriptions:setSubscribed', { fakeid, nickname, subscribed }),
+  subscriptionsRemove: (fakeid) => ipcRenderer.invoke('subscriptions:remove', fakeid),
   subscriptionsCheckNow: (fakeids) => ipcRenderer.invoke('subscriptions:checkNow', fakeids),
   subscriptionsDownloadNew: (fakeid, ids) => ipcRenderer.invoke('subscriptions:downloadNew', fakeid, ids),
   subscriptionsDismissNew: (fakeid, ids) => ipcRenderer.invoke('subscriptions:dismissNew', fakeid, ids),

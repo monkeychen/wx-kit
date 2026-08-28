@@ -38,7 +38,7 @@ import { normalizeAccountId } from '../src/core/weread/book-id'
 import { parseAccount } from '../src/core/parse-article'
 import { HTML_TIMEOUT_MS } from '../src/core/fetch-html'
 import * as cheerio from 'cheerio'
-import { PRIVATE_API_FEATURE_ENABLED, retiredPrivateApiResponse } from '../src/core/retired-private-api'
+import { PRIVATE_API_FEATURE_ENABLED, RETIRED_PRIVATE_API_COMMANDS, retiredPrivateApiError, retiredPrivateApiResponse } from '../src/core/retired-private-api'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
@@ -277,6 +277,7 @@ export function registerIpc(settings: SettingsService): void {
 
   ipcMain.on('mp:crawl:cancel', () => { crawlAbort?.abort() })
   ipcMain.handle('mp:crawl', async (event, { fakeid, nickname, range, formats, keywords }: { fakeid: string; nickname: string; range: CrawlRange; formats: DownloadFormat[]; keywords?: import('../src/core/mp-crawl').KeywordFilter }) => {
+    if (RETIRED_PRIVATE_API_COMMANDS.has('crawl')) throw retiredPrivateApiError()
     const abort = new AbortController()
     crawlAbort = abort
     const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
@@ -377,13 +378,17 @@ export function registerIpc(settings: SettingsService): void {
   ipcMain.handle('subscriptions:list', async () => {
     const { events } = await (await historyFor()).list(0, 1_000_000)
     const subs = await subsFor()
-    const merged = mergeAccounts(accountsFromHistory(events), await subs.list())
+    const merged = mergeAccounts(accountsFromHistory(events), await subs.list(), await subs.removedFakeids())
     const s = await settings.get()
     const lastRunAt = await subs.getLastRunAt()
     const nextCheckTime = s.subscriptionAutoCheck
       ? nextCheckAt(Date.now(), lastRunAt, { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours })
       : null
     return { accounts: merged, authExpired: subsAuthExpired, lastRunAt, checkLog: await subs.getCheckLog(), nextCheckAt: nextCheckTime }
+  })
+  ipcMain.handle('subscriptions:remove', async (_e, fakeid: string) => {
+    await (await subsFor()).removeAccount(fakeid)
+    emitSubsUpdated()
   })
   ipcMain.handle('subscriptions:addAccount', async (_e, { fakeid, nickname }: { fakeid: string; nickname: string }) => {
     await (await subsFor()).addAccount({ fakeid, nickname, subscribed: true, watermark: await establishWatermark(fakeid) })

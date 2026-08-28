@@ -2,7 +2,7 @@
 import type { ArticleMeta, DownloadFormat, DownloadSummary, ProgressEvent } from '../core/types'
 import type { AppSettings } from '../../electron/services/settings'
 import type { ReadableKind } from '../core/read-article'
-import type { MpAccount, CrawlSummary, CrawlItemStatus } from '../core/mp-types'
+import type { MpAccount } from '../core/mp-types'
 import type { HistoryEvent } from '../core/download-history'
 import type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
 import type { SyncSummary } from '../core/site-sync'
@@ -26,11 +26,6 @@ export interface MpAuthActionResult { ok: boolean; error?: string; code?: string
 export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null; checkLog: CheckLogEntry[]; nextCheckAt: number | null }
 export interface SubscriptionDownloadProgress { fakeid: string; total: number; done: number; phase: string }
 
-export interface CrawlRangeInput { count?: number; from?: string; to?: string }
-export type CrawlEvent =
-  | { kind: 'listed'; items: { title: string; url: string }[] }
-  | { kind: 'item'; index: number; status: CrawlItemStatus; error?: string }
-  | { kind: 'done'; summary: CrawlSummary }
 
 export type CliLinkStatus = 'linked' | 'unlinked' | 'conflict'
 export interface CliLinkInfo { supported: boolean; status: CliLinkStatus; inPath: boolean; dir: string }
@@ -71,9 +66,6 @@ export interface WxApi {
   mpProtectionPause(): Promise<MpProtectionStatus>
   mpProtectionResume(): Promise<MpProtectionStatus>
   mpSearch(name: string): Promise<{ ok: boolean; list?: MpAccount[]; error?: { code: string; message: string } }>
-  mpCrawl(fakeid: string, nickname: string, range: CrawlRangeInput, formats: DownloadFormat[], keywords?: { include?: string[]; exclude?: string[] }): Promise<CrawlSummary>
-  onCrawlProgress(cb: (e: CrawlEvent) => void): () => void
-  mpCancelCrawl(): void
   // —— M6 下载历史 ——
   historyList(offset: number, limit: number): Promise<{ events: HistoryEvent[]; total: number }>
   historyRemove(id: string): Promise<void>
@@ -82,6 +74,7 @@ export interface WxApi {
   subscriptionsList(): Promise<SubscriptionsState>
   subscriptionsAddAccount(fakeid: string, nickname: string): Promise<void>
   subscriptionsSetSubscribed(fakeid: string, nickname: string, subscribed: boolean): Promise<void>
+  subscriptionsRemove(fakeid: string): Promise<void>
   /** M34:返回逐号明细(此前 IPC 把返回值丢了,渲染层想提示也无从提示) */
   subscriptionsCheckNow(fakeids?: string[]): Promise<RunCheckResult>
   /**

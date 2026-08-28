@@ -88,13 +88,14 @@ jq -r '.articles[] | "\(.title)\t\(.contentPath)"' digest.json
 
 - 微信读书**无按名字搜索接口**——识别公众号必须用「该号任意一篇文章链接」，不是公众号名称；
 - 登录态存于本机 `weread-creds.json`，会自动续期；headless 环境用 `wx-kit session export`/`import` 搬运；
-- `crawl <fakeid> --count N` 当前后端**每次只返回最新一篇**（历史无法回补），仅适合「抓该号刚发的那篇」；日常增量订阅用 `subscription check-now`。
+- `crawl` 已停用（列表接口被服务端按账号封禁）；要某号最新一篇用 `subscription check-now`，增量订阅不变。
 
 ## 失败处理
 
 | 现象 | 含义 | 动作 |
 |---|---|---|
-| `AUTH_REQUIRED` | 用 search/crawl/subscription 前未登录微信读书 | 先 `wx-kit login` 再重试 |
+| `AUTH_REQUIRED` | 用 search/subscription 前未登录微信读书 | 先 `wx-kit login` 再重试 |
+| `MP_BACKEND_UNAVAILABLE` | `crawl` 已停用（服务端封禁列表） | 用 `subscription check-now` 拿最新一篇，或 `download --url` |
 | `NOT_FOUND` | 文章链接读不出公众号标识（错误页/失效） | 换该号的另一篇文章链接重试 |
 | 单篇 failed，提示文章不可访问 | 文章已删除、审核失败或违规下架 | 报告并跳过，不自动重试 |
 | 单篇 failed，网络错误 | 文章页面或媒体下载失败 | 保留错误，等待用户决定是否重试 |

@@ -38,17 +38,17 @@ describe('CLI revived private API commands (v0.10.0 weread backend)', () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, present: false, valid: false })
   })
 
-  it('crawl without login asks for login (exit 2)', async () => {
+  it('crawl is retired (2026-08-28): stable refusal, zero network, exit 2', async () => {
     const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
     const code = await runCli(['crawl', 'MP_WXS_1', '--count', '3'], { userDataDir })
     expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'MP_BACKEND_UNAVAILABLE' } })
   })
 
-  it('crawl without account id is a usage error', async () => {
+  it('crawl without account id also hits the retired gate', async () => {
     const code = await runCli(['crawl', '--count', '3'])
     expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'CLI_ERROR' } })
+    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'MP_BACKEND_UNAVAILABLE' } })
   })
 
   it('search without --url is a usage error (name search is gone)', async () => {

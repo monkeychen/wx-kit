@@ -6,6 +6,7 @@ import { atomicWriteFile } from './atomic-write'
 import { withPathLock } from './path-lock'
 import type { ArticleRef } from './mp-types'
 import { mergeNewRefs, removeRefs } from './subscription-refs'
+import { normalizeAccountId } from './weread/book-id'
 import type { HistoryEvent } from './download-history'
 
 export interface SubscribedAccount {
@@ -37,26 +38,41 @@ export function formatCheckLogLine(e: CheckLogEntry): string {
   return line
 }
 
-interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: SubscribedAccount[]; checkLog: CheckLogEntry[] }
+interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: SubscribedAccount[]; checkLog: CheckLogEntry[]; removedFakeids?: string[] }
+
+/**
+ * 账号标识归一：v0.8.x 下载历史里是 base64 fakeid（如 MzE5ODk2NjUwOA==），v0.10.0 起是
+ * `MP_WXS_<数字>`。同一公众号两种形态会在订阅列表里呈现为「同名重复行」（用户实测踩到），
+ * 故所有入口统一归一到 MP_WXS_ 形态；无法归一的非法形态原样保留，不让脏数据炸掉列表。
+ */
+export function normalizeAccountKey(fakeid: string): string {
+  try { return normalizeAccountId(fakeid) } catch { return fakeid }
+}
 
 /** 从下载历史抽出去重的「按公众号抓取」账号（fakeid → nickname，后出现的昵称覆盖）。纯函数。 */
 export function accountsFromHistory(events: HistoryEvent[]): { fakeid: string; nickname: string }[] {
   const seen = new Map<string, string>()
   for (const ev of events) {
-    if (ev.source.kind === 'account') seen.set(ev.source.fakeid, ev.source.nickname)
+    if (ev.source.kind === 'account') seen.set(normalizeAccountKey(ev.source.fakeid), ev.source.nickname)
   }
   return [...seen.entries()].map(([fakeid, nickname]) => ({ fakeid, nickname }))
 }
 
-/** 合并「历史派生账号」与「已存订阅」：已存的保留其状态；仅在历史里的补成未订阅空态。纯函数。 */
+/** 合并「历史派生账号」与「已存订阅」：已存的保留其状态；仅在历史里的补成未订阅空态；被显式删除过的不出现。纯函数。 */
 export function mergeAccounts(
-  fromHistory: { fakeid: string; nickname: string }[], stored: SubscribedAccount[],
+  fromHistory: { fakeid: string; nickname: string }[], stored: SubscribedAccount[], removedFakeids: string[] = [],
 ): SubscribedAccount[] {
+  const removed = new Set(removedFakeids.map(normalizeAccountKey))
   const byId = new Map<string, SubscribedAccount>()
-  for (const a of stored) byId.set(a.fakeid, a)
+  for (const a of stored) {
+    const key = normalizeAccountKey(a.fakeid)
+    if (!removed.has(key)) byId.set(key, a)
+  }
   for (const h of fromHistory) {
-    if (!byId.has(h.fakeid)) {
-      byId.set(h.fakeid, { fakeid: h.fakeid, nickname: h.nickname, subscribed: false, watermark: 0, lastCheckedAt: null, newRefs: [] })
+    const key = normalizeAccountKey(h.fakeid)
+    if (removed.has(key)) continue
+    if (!byId.has(key)) {
+      byId.set(key, { fakeid: key, nickname: h.nickname, subscribed: false, watermark: 0, lastCheckedAt: null, newRefs: [] })
     }
   }
   return [...byId.values()]
@@ -84,21 +100,57 @@ export class Subscriptions {
     })
   }
   private find(d: SubscriptionsFile, fakeid: string): SubscribedAccount | undefined {
-    return d.accounts.find((a) => a.fakeid === fakeid)
+    const key = normalizeAccountKey(fakeid)
+    return d.accounts.find((a) => normalizeAccountKey(a.fakeid) === key)
   }
 
-  async list(): Promise<SubscribedAccount[]> { return (await this.read()).accounts }
+  /** 读入时按归一 id 合并重复行（历史双形态遗留）：水位取 max、newRefs 合并、昵称取非空。 */
+  async list(): Promise<SubscribedAccount[]> {
+    const d = await this.read()
+    const byId = new Map<string, SubscribedAccount>()
+    for (const a of d.accounts) {
+      const key = normalizeAccountKey(a.fakeid)
+      const ex = byId.get(key)
+      if (!ex) { byId.set(key, { ...a, fakeid: key }); continue }
+      ex.watermark = Math.max(ex.watermark, a.watermark)
+      ex.newRefs = mergeNewRefs(ex.newRefs, a.newRefs)
+      ex.nickname = ex.nickname || a.nickname
+      ex.subscribed = ex.subscribed || a.subscribed
+      ex.lastCheckedAt = Math.max(ex.lastCheckedAt ?? 0, a.lastCheckedAt ?? 0) || null
+    }
+    return [...byId.values()]
+  }
   async getLastRunAt(): Promise<number | null> { return (await this.read()).lastRunAt }
   async setLastRunAt(t: number): Promise<void> { await this.mutate((d) => { d.lastRunAt = t }) }
 
-  /** 新增或更新账号身份/订阅态/水位；已存则保留 newRefs 与 lastCheckedAt。 */
+  /** 新增或更新账号身份/订阅态/水位；已存则保留 newRefs 与 lastCheckedAt。重新订阅会撤销之前的删除标记。 */
   async addAccount(acc: { fakeid: string; nickname: string; subscribed: boolean; watermark: number }): Promise<void> {
+    const key = normalizeAccountKey(acc.fakeid)
     await this.mutate((d) => {
+      d.removedFakeids = (d.removedFakeids ?? []).filter((f) => normalizeAccountKey(f) !== key)
       const ex = this.find(d, acc.fakeid)
       if (ex) { ex.nickname = acc.nickname; ex.subscribed = acc.subscribed; ex.watermark = acc.watermark }
-      else d.accounts.push({ ...acc, lastCheckedAt: null, newRefs: [] })
+      else d.accounts.push({ ...acc, fakeid: key, lastCheckedAt: null, newRefs: [] })
     })
   }
+
+  /**
+   * 删除订阅账号：写删除标记 + 从 accounts 移除。删除标记必须持久化——
+   * 下载历史派生的行（mergeAccounts）否则会在下次 list 时原样回来，删了等于没删。
+   */
+  async removeAccount(fakeid: string): Promise<void> {
+    const key = normalizeAccountKey(fakeid)
+    await this.mutate((d) => {
+      d.accounts = d.accounts.filter((a) => normalizeAccountKey(a.fakeid) !== key)
+      d.removedFakeids = [...new Set([...(d.removedFakeids ?? []), key])]
+    })
+  }
+
+  /** mergeAccounts 用：这些账号被用户显式删除过，即使下载历史里还有也不应再出现。 */
+  async removedFakeids(): Promise<string[]> {
+    return (await this.read()).removedFakeids ?? []
+  }
+
   async setSubscribed(fakeid: string, subscribed: boolean): Promise<void> {
     await this.mutate((d) => { const a = this.find(d, fakeid); if (a) a.subscribed = subscribed })
   }

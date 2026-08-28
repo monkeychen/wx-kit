@@ -1,7 +1,7 @@
 # wx-kit CLI 逐命令参考
 
 > stdout 为 JSON，stderr 为进度。输出较大时重定向到文件再解析，不要用会截断数据的管道。
-> v0.10.0 起，按公众号下载与订阅依赖**微信读书（WeRead）后端**复活；`search`/`crawl`/`login`/`auth-status`/`subscription`/`session`/`protection` 全部恢复可用。
+> v0.10.0 起，订阅依赖**微信读书（WeRead）后端**复活；`search`/`login`/`auth-status`/`subscription`/`session`/`protection` 可用。`crawl` 因列表接口被服务端按账号封禁（2026-08-28）再度停用。
 
 ## 登录前置：login
 
@@ -9,7 +9,7 @@
 wx-kit login          # 终端打印二维码，微信扫码并手机确认；成功后输出 { ok, vid, name }
 ```
 
-- 未登录时 `search`/`crawl`/`subscription`/`digest` 会返回 `AUTH_REQUIRED`（退出码 2）；
+- 未登录时 `search`/`subscription`/`digest` 会返回 `AUTH_REQUIRED`（退出码 2）；
 - 凭据存于 `<用户数据目录>/weread-creds.json`，自动续期；CLI 下无法扫码的 headless 环境可用 `session export/import` 搬运；
 - GUI 下登录在「设置 → 微信读书」页内扫码，不另开窗口。
 
@@ -33,31 +33,16 @@ wx-kit search --url <该公众号任意一篇文章的链接>
 
 读不到公众号标识（错误页/失效链接）时返回 `NOT_FOUND`（退出码 1）。
 
-## crawl — 按公众号批量下载
+## crawl — 按公众号批量下载（已停用）
 
-```sh
-wx-kit crawl <fakeid> \
-  [--count <N> | --from <YYYY-MM-DD> --to <YYYY-MM-DD>] \
-  [--formats cover,md,html,pdf,meta] [--no-video] \
-  [--include <csv>] [--exclude <csv>] \
-  [-o <文库根目录>]
+```bash
+wx-kit crawl <fakeid> --count N
+# → { "ok": false, "error": { "code": "MP_BACKEND_UNAVAILABLE", ... } }（退出码 2，零网络请求）
 ```
 
-- `fakeid` 由 `search --url` 取得（bookId / 老 fakeid 形式均可）；
-- `--count N` 取「最近 N 篇」，`--from/--to` 取日期范围；
-- 图片自动本地化，视频默认下载，`--no-video` 关闭；`--include/--exclude` 按标题关键词过滤；
-- 已入库文章自动跳过。
-
-> **能力边界（v0.10.0 已知降级）**：微信读书 Web 端接口每次仅返回该号**最新一篇**文章，无法回补历史。因此 `crawl` 实际只会拿到最近发布的一篇；`--count`/`--from/--to` 在旧 MP 后端下才有意义，当前后端下仅最新一篇会被处理。日常**增量订阅**用 `subscription` 子命令。
-
-输出为 `crawlAccount` 汇总：
-
-```json
-{ "ok": true, "total": 1, "succeeded": 1, "skipped": 0, "failed": 0,
-  "filteredOut": 0, "unavailable": 0, "items": [ { "url": "...", "title": "...", "ok": true } ] }
-```
-
-`unavailable` 表示作者已下架/发布失败的读者本就看不到的篇目（非下载故障），混在 `failed` 里会误导，单独计数。
+> **停用（2026-08-28）**：微信读书列表接口被服务端**按账号**封禁，历史批量下载无解。
+> 命令名保留是为了给旧脚本一个稳定的拒绝响应。要拿某号最新一篇：`subscription check-now`
+> 或粘贴该文链接走 `download --url`。识别账号仍用 `search --url <文章链接>`。
 
 ## subscription — 公众号订阅
 

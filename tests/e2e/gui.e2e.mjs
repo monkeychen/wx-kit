@@ -4,7 +4,7 @@
 //   M6 下载闭环 + 历史 (就地阅读/文件夹 · 复制下载项 · 已存在跳过 · 失败重试)
 //   M9 文库组织 (排序 · 筛选 · 分组 · 卡片⇄列表 · 单击选中/双击阅读 · 批量删除)
 //   + 阅读器 wxfile:// 图片/iframe · 设置库根
-//   + v0.10.0 复活：按公众号下载(AccountMode) / 订阅(Subscriptions) / 微信读书登录入口
+//   + v0.10.0：订阅(Subscriptions) / 微信读书登录入口；按公众号下载入口已停用（断言不存在）
 //
 // 微信读书后端在 e2e 里用本地 mock 顶替：
 //   - WXKIT_WEREAD_BASE 把 /api/mp/cover 指到本机 fixture server（只返回最新一篇）
@@ -155,9 +155,9 @@ async function main() {
   try {
     await win.waitForSelector('[data-testid="app-shell"]', { timeout: 20000 })
     assert(true, 'app shell rendered')
-    // v0.10.0：按公众号下载模式与订阅导航已复活（原 M49 退场断言反向）
-    assert((await win.locator('[data-testid="mode-account"]').count()) === 1, 'v0.10.0: account download mode is present')
-    assert((await win.locator('[data-testid="nav-订阅"]').count()) === 1, 'v0.10.0: subscriptions navigation is present')
+    // 2026-08-28：按公众号批量下载入口已停用（列表接口服务端封禁），订阅保留
+    assert((await win.locator('[data-testid="mode-account"]').count()) === 0, 'account download mode is absent (retired)')
+    assert((await win.locator('[data-testid="nav-订阅"]').count()) === 1, 'subscriptions navigation is present')
 
     // ============ M6 · URL 批量下载 → 历史就地确认 ============
     await win.click('[data-testid="nav-下载"]')
@@ -305,35 +305,22 @@ async function main() {
     await win.waitForSelector('[data-testid="subs-row"]', { timeout: 10000 })
     assert((await win.locator('[data-testid="subs-row"]').count()) === 1, '订阅后列表出现 1 个账号')
 
-    // ============ v0.10.0 · 按公众号批量下载（AccountMode）闭环 ============
-    await win.click('[data-testid="nav-下载"]')
-    await win.waitForSelector('[data-testid="mode-account"]', { timeout: 5000 })
-    await win.click('[data-testid="mode-account"]')
-    await win.waitForSelector('[data-testid="account-search"]', { timeout: 5000 })
-    await win.fill('[data-testid="account-search"] input', MP_ARTICLE_URL)
-    await win.press('[data-testid="account-search"] input', 'Enter')
-    await win.waitForSelector('[data-testid="start-crawl"]', { timeout: 10000 })
-    assert(true, 'AccountMode 识别到公众号，出现「开始下载」')
-    await win.click('[data-testid="start-crawl"]')
-    await win.waitForSelector('[data-testid="history-event"] [data-testid="history-article"]', { timeout: 30000 })
-    const crawlArts = await win.locator('[data-testid="history-event"]').first().locator('[data-testid="history-article"]').count()
-    assert(crawlArts === 1, `AccountMode 经微信读书取到最新一篇并下载 (got ${crawlArts})`)
-
-    // ============ v0.10.0 · 文库含订阅下载的文章 ============
-    await win.click('[data-testid="nav-文库"]')
-    await win.waitForSelector('.ghead, [data-testid="article-card"]', { timeout: 15000 })
-    assert((await win.locator('[data-testid="article-card"]').count()) === 0, 'M23: groups collapsed by default')
-    const gnames = await win.locator('.ghead .gname').allInnerTexts()
-    assert(gnames.includes('测试订阅号'), `文库含按公众号下载的公众号「测试订阅号」 (got ${gnames.join('/')})`)
-    await win.click('[data-testid="expand-all"]')
-    await win.waitForTimeout(250)
-    assert((await win.locator('[data-testid="article-card"]').count()) === 1, 'expand-all shows the 1 downloaded article')
-    const finalTitles = await win.locator('[data-testid="article-card"]').allInnerTexts()
-    assert(finalTitles.some((t) => t.includes('百宝箱订阅验收文')), '卡片标题为「百宝箱订阅验收文」')
-    await pickSelect('account-select', '测试订阅号')
-    await win.waitForTimeout(200)
-    assert((await win.locator('[data-testid="article-card"]').count()) === 1, 'filter by 测试订阅号 narrows to 1')
-    await pickSelect('account-select', '全部公众号')
+    // ============ 2026-08-28 · 订阅行内能力：删除标记 + 行内检查状态隔离 ============
+    await win.locator('[data-testid="subs-row"]').first().hover()
+    await win.locator('[data-testid="subs-remove"]').first().click()
+    await win.locator('.ant-popover button:has-text("删")').click()
+    await win.waitForTimeout(600)
+    assert((await win.locator('[data-testid="subs-row"]').count()) === 0, '删除订阅后行消失')
+    // 重新订阅回来（验证删除标记可被再订阅撤销），供下一阶段检查
+    await win.fill('[data-testid="subs-search-input"]', MP_ARTICLE_URL)
+    await win.click('[data-testid="subs-search-btn"]')
+    await win.waitForSelector('.ant-list-item:has-text("测试订阅号")', { timeout: 10000 })
+    await win.locator('.ant-list-item:has-text("测试订阅号") a:has-text("订阅")').click()
+    await win.waitForSelector('[data-testid="subs-row"]', { timeout: 10000 })
+    assert(true, '删除后重新订阅成功（删除标记被撤销）')
+    await win.locator('[data-testid="subs-check-one"]').first().click()
+    await win.waitForSelector('[data-testid="subs-row-result"]', { timeout: 30000 })
+    assert(true, '行内「检查」只影响本行并落结果')
 
     // ============ M49 · 现存设置继续可用（site-sync tooltip）============
     await win.click('[data-testid="nav-设置"]')

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Switch, Button, Spin, Alert, message, List, Tag, Modal, Checkbox } from 'antd'
-import { LoadingOutlined, SettingOutlined } from '@ant-design/icons'
+import { Input, Switch, Button, Spin, Alert, message, List, Tag, Modal, Checkbox, Popconfirm } from 'antd'
+import { LoadingOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import type { SubscribedAccount, CheckLogEntry, PerAccountResult, RunCheckResult } from '../api'
 import type { NewArticleAction } from '../../../electron/services/settings'
@@ -20,6 +20,9 @@ export default function Subscriptions() {
   const [authExpired, setAuthExpired] = useState(false)
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
+  // 行内单号检查的状态按 fakeid 记（此前是全局布尔：点任一行「检查」整页进加载态，
+  // 观感如同触发了全部检查——用户实测反馈，2026-08-28 修）
+  const [checkingIds, setCheckingIds] = useState<string[]>([])
   const [kw, setKw] = useState('')
   const [candidates, setCandidates] = useState<MpAccount[]>([])
   const [checkLog, setCheckLog] = useState<CheckLogEntry[]>([])
@@ -99,7 +102,7 @@ export default function Subscriptions() {
   }
   // R1 部分检查:只查这一个号(in-flight 共享:正在跑时全入口置灰并入同一次运行)
   const checkOne = async (a: SubscribedAccount) => {
-    setChecking(true)
+    setCheckingIds((prev) => (prev.includes(a.fakeid) ? prev : [...prev, a.fakeid]))
     try {
       const r = await api.subscriptionsCheckNow([a.fakeid])
       applyResults(r); await load()
@@ -111,7 +114,16 @@ export default function Subscriptions() {
         fakeid: a.fakeid, nickname: a.nickname, ok: false, newFound: 0, downloaded: 0,
         error: (e as Error).message,
       } }))
-    } finally { setChecking(false) }
+    } finally {
+      setCheckingIds((prev) => prev.filter((x) => x !== a.fakeid))
+    }
+  }
+
+  /** 删除订阅账号（带持久化删除标记：下载历史派生的行不会再回来）。 */
+  const removeAccount = async (a: SubscribedAccount) => {
+    await api.subscriptionsRemove(a.fakeid)
+    message.success(`已删除「${a.nickname}」`)
+    await load()
   }
   /**
    * 当前选中的待处理文章。**收起时选择即全部**——所以行内动作永远只有一个含义，
@@ -274,10 +286,19 @@ export default function Subscriptions() {
             <List dataSource={accounts} data-testid="subs-list" renderItem={(a) => {
               const dl = dls[a.fakeid]
               const downloadingThis = dl != null && dl.phase !== 'done'
-              // R1:每行「检查」单号;与顶部「检查全部」共享 in-flight(checking/dl 时全置灰并入同一次运行)
-              const checkEl = checking || busy
-                ? <span key="ck" className="faint" data-testid="subs-check-one">检查</span>
-                : <a key="ck" data-testid="subs-check-one" onClick={() => checkOne(a)}>检查</a>
+              // R1:每行「检查」单号;行内 busy 只看本行(checkingIds),不再牵动整页
+              const thisChecking = checkingIds.includes(a.fakeid)
+              const checkEl = thisChecking
+                ? <span key="ck" className="faint" data-testid="subs-check-one"><LoadingOutlined /> 检查中</span>
+                : busy
+                  ? <span key="ck" className="faint" data-testid="subs-check-one">检查</span>
+                  : <a key="ck" data-testid="subs-check-one" onClick={() => checkOne(a)}>检查</a>
+              const removeEl = (
+                <Popconfirm key="rm" title={`删除「${a.nickname}」？`} description="删除后该号的订阅与检查状态一并移除；再次订阅会重新添加。"
+                  okText="删除" cancelText="取消" onConfirm={() => removeAccount(a)}>
+                  <a data-testid="subs-remove" aria-label={`删除 ${a.nickname}`}><DeleteOutlined /></a>
+                </Popconfirm>
+              )
               // 行内动作作用于「当前选择」：收起时选择即全部，展开后随勾选变化。
               // 一次只有一个含义，不并列摆「下载全部」与「下载所选」两套按钮。
               const open = !!expanded[a.fakeid]
@@ -286,7 +307,7 @@ export default function Subscriptions() {
               const igLabel = open ? `忽略所选 ${picked} 篇` : '忽略'
               const idle = !busy && picked > 0
               const actions = downloadingThis
-                ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>, checkEl]
+                ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>, checkEl, removeEl]
                 : a.newRefs.length > 0
                   ? [
                       idle
@@ -300,8 +321,8 @@ export default function Subscriptions() {
                   // 刚检查完这一行时,行内结果态已经把话说清了;再挂个「无新文章」会和
                   // 「已自动下载 N 篇」并列显示,读起来自相矛盾
                   : rowRes[a.fakeid]?.ok
-                    ? [checkEl]
-                    : [<span key="none" className="faint">无新文章</span>, checkEl]
+                    ? [checkEl, removeEl]
+                    : [<span key="none" className="faint">无新文章</span>, checkEl, removeEl]
               return (
               <List.Item data-testid="subs-row" actions={actions}>
                 <List.Item.Meta

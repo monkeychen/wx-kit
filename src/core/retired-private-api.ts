@@ -2,14 +2,13 @@ import { MpRequestProtectionError } from './mp-errors'
 import type { MpRequestKind } from './mp-request-governor'
 
 /**
- * v0.10.0：按公众号下载与订阅已通过微信读书后端复活（M52），命令与设置全部恢复可用。
- * 下面的 RETIRED 集合随之清空；导出与字段保留，让 CLI 的过滤逻辑无需分支判断。
- * 注意 isRetiredPrivateRequest 仍然有效：MP 后台私有接口（auth-verify/account-search/article-list
- * 三类 kind）在 gateway transport 之前继续硬拒绝——M49 的「不得重新接回」约束不被微信读书链路触碰。
+ * v0.10.0：订阅经由微信读书后端复活（M52）；「按公众号批量下载」因列表接口被服务端
+ * 按账号封禁（2026-08-27 spike 终局，见 AGENTS.md）于 2026-08-28 再度停用——只退命令入口，
+ * 不动 isRetiredPrivateRequest 的 MP 后台三类 kind 硬拒（M49 约束照旧）。
  */
 export const PRIVATE_API_FEATURE_ENABLED = true
 
-export const RETIRED_PRIVATE_API_COMMANDS: ReadonlySet<string> = new Set()
+export const RETIRED_PRIVATE_API_COMMANDS: ReadonlySet<string> = new Set(['crawl'])
 
 export const RETIRED_PRIVATE_API_SETTING_KEYS: ReadonlySet<string> = new Set()
 

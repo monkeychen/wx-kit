@@ -19,10 +19,10 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 > **当前能力边界（v0.10.0，开发中）**
 >
-> v0.10.0 通过**微信读书（WeRead）后端**复活了“按公众号下载”与公众号订阅能力：`search`、`crawl`、`login`、`auth-status`、`session`、`subscription`、`protection` 已重新可用。
+> v0.10.0 通过**微信读书（WeRead）后端**复活了公众号订阅能力：`search`、`login`、`auth-status`、`session`、`subscription`、`protection` 已重新可用。
 >
 > - 识别公众号改用「粘贴该号**任意一篇文章链接**」——微信读书无按名字搜索接口；
-> - **降级项**：微信读书 Web 端接口每次仅返回该号**最新一篇**文章，无法回补历史；因此 `crawl`/`digest` 只针对最新一篇，历史批量抓取暂不可用（日常增量订阅不受影响）；
+> - **降级项**：微信读书列表接口被服务端按账号限制，每次仅返回该号**最新一篇**文章；「按公众号批量下载」入口已移除（CLI `crawl` 稳定拒绝），`digest` 只针对最新一篇；日常增量订阅不受影响；
 > - 按文章 URL 下载不依赖登录态，仍是主功能，未受影响。
 
 ## 当前界面
@@ -112,7 +112,6 @@ wx-kit --version
 |---|---|
 | 扫码登录微信读书 | `wx-kit login`（终端打印二维码） |
 | 从文章链接识别公众号 | `wx-kit search --url <该号任意一篇文章链接>` |
-| 按公众号批量下载 | `wx-kit crawl <fakeid> --count N`（注：当前后端每次只取最新一篇） |
 | 检查订阅更新 | `wx-kit subscription check-now [--accounts a,b]` |
 | 查某天订阅文章 | `wx-kit subscription digest --date <日期> [--download]` |
 | 登录态迁移 | `wx-kit session export/import` |

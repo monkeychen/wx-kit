@@ -15,8 +15,8 @@ describe('M52 weread revival boundary', () => {
     expect(PRIVATE_API_FEATURE_ENABLED).toBe(true)
   })
 
-  it('no CLI command or setting key stays retired', () => {
-    expect([...RETIRED_PRIVATE_API_COMMANDS]).toEqual([])
+  it('crawl command re-retired (2026-08-28, server-side list gating); setting keys stay clear', () => {
+    expect([...RETIRED_PRIVATE_API_COMMANDS]).toEqual(['crawl'])
     expect([...RETIRED_PRIVATE_API_SETTING_KEYS]).toEqual([])
   })
 

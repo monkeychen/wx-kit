@@ -15,10 +15,9 @@ import { extractArticleKeys } from '../core/article-keys'
 import { parseAccount } from '../core/parse-article'
 import { normalizeAccountId } from '../core/weread/book-id'
 import { canonicalId } from '../core/article-id'
-import { crawlAccount } from '../core/mp-crawl'
 import { MpAuthExpired } from '../core/mp-errors'
-import type { CrawlRange } from '../core/mp-types'
 import { HTML_TIMEOUT_MS } from '../core/fetch-html'
+import { RETIRED_PRIVATE_API_COMMANDS, retiredPrivateApiResponse } from '../core/retired-private-api'
 import { rebuildLibrary } from '../core/rebuild-library'
 import { checkUpdate } from '../core/check-update'
 import { detectChannel, upgradeCommand } from '../core/install-channel'
@@ -75,7 +74,6 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   wx-kit download --url "https://mp.weixin.qq.com/s/XXX" --formats md,pdf
   wx-kit login                                      # 扫码登录微信读书(订阅/按公众号下载的前置)
   wx-kit search --url "https://mp.weixin.qq.com/s/XXX"   # 从文章链接识别公众号
-  wx-kit crawl MP_WXS_3634850725 --count 10         # 按公众号批量下载(标识来自 search)
   wx-kit subscription check-now                     # 检查订阅更新
   wx-kit library list
   wx-kit settings get libraryRoot
@@ -217,8 +215,8 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   program
     .command('crawl')
-    .description('按公众号批量下载（列表来自微信读书；账号标识用 search --url 获取）')
-    .argument('[account]', '账号标识（bookId / 老 fakeid 均可；不再支持按名字搜索）')
+    .description('按公众号批量下载（当前不可用：微信读书列表接口受服务端限制，见 README 能力边界）')
+    .argument('[account]', '账号标识（已停用，仅为兼容保留参数）')
     .option('--fakeid <id>', '同位置参数（兼容旧脚本保留）')
     .option('--count <n>', '最近 N 篇')
     .option('--from <date>', '起始日期 YYYY-MM-DD')
@@ -228,40 +226,10 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
     .option('--include <csv>', '仅下载标题含任一关键词的文章（逗号分隔）')
     .option('--exclude <csv>', '排除标题含任一关键词的文章（逗号分隔，优先于 --include）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
-    .action(async (accountArg: string | undefined, opts) => {
-      const raw = String(opts.fakeid ?? accountArg ?? '').trim()
-      if (!raw) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要账号标识（用 search --url 从文章链接获取）' } }); exitCode = 2; return }
-      let fakeid: string
-      try { fakeid = normalizeAccountId(raw) }
-      catch (e) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: `账号标识无效：${(e as Error).message}` } }); exitCode = 2; return }
-      const creds = await wereadCredsStore(userDataDir).read()
-      if (!creds) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
-      const range: CrawlRange | null = opts.count ? { count: Number(opts.count) }
-        : (opts.from && opts.to) ? { from: String(opts.from), to: String(opts.to) }
-        : null
-      if (!range) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '需要 --count 或 --from/--to' } }); exitCode = 2; return }
-      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
-      if (!listFn) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
-      try {
-        const formats = parseFormats(opts.formats)
-        const root = await resolveRoot(opts.out)
-        const library = new Library(root)
-        const ddeps = { ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: opts.video !== false }
-        const parseKws = (csv?: string) => csv ? String(csv).split(',').map((s) => s.trim()).filter(Boolean) : undefined
-        const include = parseKws(opts.include), exclude = parseKws(opts.exclude)
-        const summary = await crawlAccount(fakeid, range, {
-          listFn,
-          ...(include || exclude ? { keywords: { include, exclude } } : {}),
-          downloadOne: (url, hint) => downloadArticle(url, formats, ddeps, hint),
-          onProgress: (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}\n`),
-        })
-        outJson(summary)
-        exitCode = summary.ok ? 0 : 1
-      } catch (e) {
-        if (e instanceof MpAuthExpired) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: `微信读书登录态失效：${e.message}` } }); exitCode = 2; return }
-        const code = (e as { code?: string }).code ?? 'MP_API_ERROR'
-        outJson({ ok: false, error: { code, message: (e as Error).message } })
-        exitCode = code === 'AUTH_REQUIRED' ? 2 : 1
+    .action(async () => {
+      // 2026-08-28 停用（服务端按账号封禁列表，批量无解，见 AGENTS.md）；命令名保留给稳定拒绝，零网络
+      if (RETIRED_PRIVATE_API_COMMANDS.has('crawl')) {
+        outJson(retiredPrivateApiResponse()); exitCode = 2; return
       }
     })
 

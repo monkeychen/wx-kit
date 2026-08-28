@@ -68,8 +68,8 @@
 | **M49** ✅ | v0.9.0 | 私有文章列表能力退场:隐藏按公众号下载/订阅/相关设置,停止后台执行链路,CLI 兼容停用,保留实现与用户数据；当前 GUI e2e + 真实 URL 下载验收通过(2026-08-08) | `plans/2026-08-08-m49-private-api-retirement.md` |
 | **M50** ✅ | v0.9.0 | 依赖安全维护与运行时回归:实施时读取 28 条 Dependabot open/0 dismissed,修复直接与传递依赖；官方 npm 审计 0，正式发版推送后远端 0 open/0 dismissed(2026-08-09 核实) | `plans/2026-08-08-v0.9.0-boundary-reset-and-security.md` |
 | **M51** ✅ | v0.9.0 | 当前产品说明与发布准备:四张真实数据页面截图、README/Skill/发布草案、打包 GUI/CLI 与真实下载验收(2026-08-08) | 同上 |
-| **M52** ✅ | v0.10.0 | 微信读书后端 core + CLI 复活：weread 适配层、gateway 域名路由、判重兜底、七个命令组复活、单测 | `plans/2026-08-26-m52-weread-backend.md` |
-| **M53** ✅ | v0.10.0 | GUI 复活：二维码登录组件、AccountMode/Subscriptions/Settings 恢复接线 | 同上 |
+| **M52** ✅ | v0.10.0 | 微信读书后端 core + CLI 复活：weread 适配层、gateway 域名路由、判重兜底、七个命令组复活、单测；**2026-08-27 列表接口被服务端按账号封禁（spike 终局，见 AGENTS.md），2026-08-28 起 `crawl` 再度停用，仅订阅/最新一篇保留** | `plans/2026-08-26-m52-weread-backend.md`、`plans/2026-08-27-fix-weread-web-login.md`、`plans/2026-08-28-v0.10.0-scope-tighten.md` |
+| **M53** ✅ | v0.10.0 | GUI 复活：二维码登录组件、Subscriptions/Settings 恢复接线；**2026-08-28 按公众号下载入口随列表封禁一并移除（订阅页补删除与行内检查隔离）** | 同上 |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`（当前开发与验收契约）。
 

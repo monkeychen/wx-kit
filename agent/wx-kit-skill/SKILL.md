@@ -31,7 +31,6 @@ Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/Ma
 | 扫码登录 | `wx-kit login` (终端会显示二维码，必须扫码登录微信读书才能抓公众号列表) |
 | 识别公众号 | `wx-kit search --url <公众号的任意一篇文章链接>` (返回该公众号的标识 ID) |
 | 下载一篇或多篇文章 | `wx-kit download --url <URL> [--url <URL> ...] --formats md,meta` |
-| 批量下载/抓取 | `wx-kit crawl <标识ID> --count 10` (注意: 当前接口限制每次只能获取该号的**最新一篇**文章) |
 | 从文件批量下载 URL | `wx-kit download --urls-file <文件> [--no-video]` |
 | 检查订阅更新 | `wx-kit subscription check-now` |
 | 获取单日订阅摘要 | `wx-kit subscription digest --date today --download` |
@@ -46,7 +45,7 @@ Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/Ma
 
 默认行为：
 
-- 必须先登录微信读书 (`wx-kit login`)，才能使用 `search`, `crawl`, `subscription` 命令。
+- 必须先登录微信读书 (`wx-kit login`)，才能使用 `search`, `subscription` 命令（`crawl` 已停用）。
 - 文章中的图片自动本地化；视频默认下载到文章目录，可用 `--no-video` 关闭；
 - 同一文章已在文库时会跳过，不重复落盘。
 
