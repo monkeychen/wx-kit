@@ -21,7 +21,7 @@ import { resolveUpdateCheck } from '../src/core/update-gate'
 import { detectChannel, upgradeCommand, pickAsset } from '../src/core/install-channel'
 import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } from '../src/core/material-export'
 import { syncToSite } from '../src/core/site-sync'
-import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
+import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, initialWatermark, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { refId } from '../src/core/subscription-refs'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
@@ -324,16 +324,18 @@ export function registerIpc(settings: SettingsService): void {
   }
   let subsAuthExpired = false
 
-  // 订阅/新订阅一刻确定水位：能取到最新一篇就用其 createTime，否则用「现在」（秒），避免存量被当新文章
+  // 订阅/新订阅一刻确定水位：能取到最新一篇就用 initialWatermark（其 createTime - 1，
+  // 让最新一篇首检可见），否则用「现在」（秒），避免存量被当新文章
   const establishWatermark = async (fakeid: string): Promise<number> => {
+    const nowSec = () => Math.floor(Date.now() / 1000)
     const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
-    if (!creds) return Math.floor(Date.now() / 1000)
+    if (!creds) return nowSec()
     try {
       const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
-      if (!listFn) return Math.floor(Date.now() / 1000)
+      if (!listFn) return nowSec()
       const refs = await listFn(fakeid, { count: 1 })
-      return refs[0]?.createTime ?? Math.floor(Date.now() / 1000)
-    } catch { return Math.floor(Date.now() / 1000) }
+      return initialWatermark(refs[0]?.createTime, nowSec())
+    } catch { return nowSec() }
   }
 
   const downloadRefs = async (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource, onProgress?: (e: import('../src/core/types').ProgressEvent) => void) => {

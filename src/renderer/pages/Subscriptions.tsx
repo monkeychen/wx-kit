@@ -248,7 +248,7 @@ export default function Subscriptions() {
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <Input placeholder="粘贴该公众号任意一篇文章的链接以订阅" value={kw} onChange={(e) => setKw(e.target.value)}
             onPressEnter={search} style={{ width: 280 }} data-testid="subs-search-input" allowClear />
-          <Button onClick={search} data-testid="subs-search-btn">识别</Button>
+          <Button type="primary" onClick={search} data-testid="subs-search-btn">识别</Button>
           <div style={{ flex: 1 }} />
           <Button type="primary" loading={checking} disabled={busy} onClick={checkNow} data-testid="subs-check-now">检查全部</Button>
         </div>

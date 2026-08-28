@@ -41,6 +41,16 @@ export function formatCheckLogLine(e: CheckLogEntry): string {
 interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: SubscribedAccount[]; checkLog: CheckLogEntry[]; removedFakeids?: string[] }
 
 /**
+ * 新订阅的初始水位。取最新一篇 createTime 减 1 秒，让最新一篇能在首次检查时被投递
+ * （检查用严格 `createTime > watermark`，若水位恰好等于最新一篇的 createTime，它会卡在
+ * 边界上被永久滤掉——用户正是拿那篇文章来订阅的，首检却显示「没有新文章」）。
+ * 取不到最新一篇时用「现在」，避免把全部存量当新文章回灌。
+ */
+export function initialWatermark(latestCreateTime: number | null | undefined, nowSec: number): number {
+  return latestCreateTime != null ? latestCreateTime - 1 : nowSec
+}
+
+/**
  * 账号标识归一：v0.8.x 下载历史里是 base64 fakeid（如 MzE5ODk2NjUwOA==），v0.10.0 起是
  * `MP_WXS_<数字>`。同一公众号两种形态会在订阅列表里呈现为「同名重复行」（用户实测踩到），
  * 故所有入口统一归一到 MP_WXS_ 形态；无法归一的非法形态原样保留，不让脏数据炸掉列表。

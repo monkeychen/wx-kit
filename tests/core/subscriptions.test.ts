@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Subscriptions, mergeAccounts, accountsFromHistory, normalizeAccountKey, type SubscribedAccount } from '../../src/core/subscriptions'
+import { Subscriptions, mergeAccounts, accountsFromHistory, normalizeAccountKey, initialWatermark, type SubscribedAccount } from '../../src/core/subscriptions'
 import type { HistoryEvent } from '../../src/core/download-history'
 
 let dir: string
@@ -37,6 +37,20 @@ describe('双形态去重', () => {
   it('accountsFromHistory 归一 fakeid', () => {
     const ev = { id: 'e1', time: 0, source: { kind: 'account', fakeid: 'MzE5ODk2NjUwOA==', nickname: '猫笔刀', range: { count: 1 } }, formats: ['md'], items: [] } as unknown as HistoryEvent
     expect(accountsFromHistory([ev])).toEqual([{ fakeid: 'MP_WXS_3198966508', nickname: '猫笔刀' }])
+  })
+})
+
+describe('initialWatermark（新订阅首检可见最新一篇）', () => {
+  it('有最新一篇：水位 = createTime - 1，严格 > 比较能放行最新一篇', () => {
+    expect(initialWatermark(1787878950, 100)).toBe(1787878949)
+    // 检查侧语义：最新一篇(1787878950) > 水位(1787878949) → 被投递；更早的(1787792518)被滤掉
+    const watermark = initialWatermark(1787878950, 100)
+    expect(1787878950 > watermark).toBe(true)
+    expect(1787792518 > watermark).toBe(false)
+  })
+  it('取不到最新一篇（null/undefined）：用「现在」，不回灌存量', () => {
+    expect(initialWatermark(null, 1787910912)).toBe(1787910912)
+    expect(initialWatermark(undefined, 1787910912)).toBe(1787910912)
   })
 })
 
