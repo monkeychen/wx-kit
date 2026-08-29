@@ -16,3 +16,9 @@ dist-npm/
 
 # Generated analysis and delivery artifacts
 output/
+.agents/
+.agents
+.claude/
+.claude
+.workbuddy/
+.workbuddy
