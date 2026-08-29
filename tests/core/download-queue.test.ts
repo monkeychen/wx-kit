@@ -76,6 +76,12 @@ describe('DownloadQueue', () => {
     expect(events).toContainEqual(expect.objectContaining({ phase: 'images', message: '下载图片 1/2', completed: 0 }))
   })
 
+  it('keeps the queued URL when downloader resolves an alternate short link', async () => {
+    const q = new DownloadQueue(async () => ({ url: 'https://mp.weixin.qq.com/s/token_with_underscore', ok: true }))
+    const summary = await q.run(['https://mp.weixin.qq.com/s/token~with~underscore'])
+    expect(summary.items[0].url).toBe('https://mp.weixin.qq.com/s/token~with~underscore')
+  })
+
   it('handles empty url list', async () => {
     const q = new DownloadQueue(async (u) => ({ url: u, ok: true }), () => {})
     expect(await q.run([])).toMatchObject({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0 })

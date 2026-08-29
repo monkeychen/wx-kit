@@ -31,7 +31,9 @@ export class DownloadQueue {
         const r = await this.downloadOne(url, hint, (stage) => {
           this.onProgress({ total, completed: i, currentUrl: url, phase: stage.phase, message: stage.message })
         })
-        items.push(r)
+        // 下载器可能为兼容短链把 `~` 换成 `_` 后重取；汇总仍属于原队列任务，
+        // 否则订阅待处理按原 URL 清理时会漏掉已完成项。
+        items.push({ ...r, url })
         this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'save' })
       } catch (err) {
         // 「读者打不开」与「下载失败」对用户是两回事:前者重试也没用,不该让人以为工具坏了
