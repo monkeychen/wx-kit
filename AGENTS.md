@@ -22,10 +22,10 @@
   - **列表接口为服务端账号级封禁（2026-08-27 三轮 spike 终局，勿再凿）**：微信读书「公众号文章列表」（`web/mp/articles`，移动端 `mp/chapters` 同源）按**账号+端点**维度限制，与客户端无关——最终判别实验：真 Chrome 窗口全新扫码登录（renewal 正常轮换、身份健康）后列表仍 `-2041`。此前「网络栈指纹」归因已被该实验否定（同一份 Cookie 曾在系统 Chrome 通过、在 Electron/undici 失败，实为账号限制窗口期的巧合叠加）。**「按公众号批量下载历史 N>1」在本产品内无解**：列表失败自动回退 `cover` 最新一篇；增量订阅不受影响。恢复条件只能是官方放开；系统 Chrome CDP 自动化 spike 已做（`scripts/spike-weread-login-chrome.mjs`）并证伪，勿重复投入。
   - **重要降级**：列表受限期间每次仅返回公众号**最新一篇**文章，无法全量回补历史，仅适用于增量订阅。
   - **交互变更**：微信读书无按名称搜索接口，所有「搜号/找号」入口（GUI 和 CLI `search`）均改为「**传入该号的任意一篇文章链接**」来识别公众号。
-- **版本基线已重置为 v0.9.0（2026-08-08）**：v0.8.6、v0.8.7 从未发布，也不得补发；
-  M44–M47 的有效底层治理与 M49 的能力退场统一由 v0.9.0 吸收。当前验收契约只看
-  `docs/PRD-v0.9.0.md`，两份旧 PRD 只保留历史设计和需求去向。v0.9.0 于 2026-08-09 正式发布，
-  根包版本已统一为 0.9.0。
+- **版本基线：v0.8.6、v0.8.7 从未发布，也不得补发（2026-08-08 定）**；
+  M44–M47 的有效底层治理与 M49 的能力退场统一由 v0.9.0（2026-08-09 发布）吸收。
+  **当前版本与当前验收契约一律看 `ROADMAP.md` 的「当前状态」与 PRD 索引行**——本文只放不可回退
+  的版本决策，不复述「当前是哪一版」，避免第二真相源随发版漂移（根包版本以 `package.json` 为准）。
 
 ---
 
@@ -41,7 +41,7 @@
 ### 发版规约（统一，勿再不一致）
 发版只走一条路：**feat 分支 → 合 main → 在 main 打 annotated tag `vX.Y.Z` → 建 GitHub Release**。
 - **不单开 `release/*` 分支**——版本的不可变快照由 **tag** 锁定（分支会漂移、tag 不会）。历史上的 `release/v0.2.0` 是早期不一致的遗留，已删。
-- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。README 不复制完整发布史，统一指向 ROADMAP；若当前有效 GUI 有明显变化，重拍有效页面截图或移除过时截图，绝不能继续展示已退场页面。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归 ROADMAP 发布史；⑥ commit、合 main、打 tag。
+- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。README 不复制完整发布史，统一指向 ROADMAP；若当前有效 GUI 有明显变化，重拍有效页面截图或移除过时截图，绝不能继续展示已退场页面。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归 ROADMAP 发布史；⑥ commit、合 main、打 tag。**推送后本地 `git fetch --tags` 一次**——不拉的话本地 `git describe` 仍停在上一版，下次发版算基线和核实版本时都会被误导（v0.10.0 就漏了这一步，远端有 tag、本地没有）。
 - **`gh release create` 中途别被中断**——它是「先建草稿 → 传附件 → 最后才 publish」，杀在中途会留下未发布的 Draft（外部不可见）。若已成 Draft，用 `gh release edit vX.Y.Z --draft=false --latest` 补发布。
 - **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
 ### 发版完成的定义（v0.6.0 起）
