@@ -9,6 +9,7 @@ import type { UrlPrefill } from '../../pages/Download'
 const PHASE_LABEL: Record<ProgressEvent['phase'], string> = {
   fetch: '抓取页面',
   images: '下载图片',
+  video: '下载视频',
   export: '导出格式',
   save: '写入文章库',
   done: '已完成',

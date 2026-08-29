@@ -24,7 +24,10 @@ export interface MpSessionInfo { loggedIn: boolean; loginAt: number | null }
 export interface MpAuthActionResult { ok: boolean; error?: string; code?: string; failedSteps?: string[] }
 
 export interface SubscriptionsState { accounts: SubscribedAccount[]; authExpired: boolean; lastRunAt: number | null; checkLog: CheckLogEntry[]; nextCheckAt: number | null }
-export interface SubscriptionDownloadProgress { fakeid: string; total: number; done: number; phase: string }
+export interface SubscriptionDownloadProgress {
+  fakeid: string; total: number; done: number; phase: string
+  allTotal?: number; allDone?: number; nickname?: string
+}
 
 
 export type CliLinkStatus = 'linked' | 'unlinked' | 'conflict'
@@ -82,6 +85,7 @@ export interface WxApi {
    * 返回值里的 `kept` 是**没下成、仍留在待处理里等重试**的篇数——失败不该静默消失。
    */
   subscriptionsDownloadNew(fakeid: string, ids?: string[]): Promise<{ downloaded: number; skipped: number; failed: number; kept: number } | undefined>
+  subscriptionsDownloadAllNew(): Promise<{ accounts: number; total: number; downloaded: number; skipped: number; failed: number; kept: number }>
   subscriptionsDismissNew(fakeid: string, ids?: string[]): Promise<void>
   subscriptionsOpenLog(): Promise<void>
   onSubscriptionsUpdated(cb: () => void): () => void

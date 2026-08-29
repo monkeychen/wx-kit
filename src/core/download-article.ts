@@ -15,6 +15,7 @@ export interface DownloadArticleDeps extends ExportDeps {
   libraryRoot: string
   /** 是否下载文中视频（设置项，默认 true）。视频是内容不是格式，故不走 formats。 */
   downloadVideos?: boolean
+  onProgress?: (stage: { phase: import('./types').ProgressPhase; message?: string }) => void
 }
 
 /**
@@ -49,6 +50,7 @@ export async function downloadArticle(
     return { url, ok: true, id, skipped: true, title: existing?.title, dir: existing?.dir }
   }
 
+  deps.onProgress?.({ phase: 'fetch', message: '获取正文' })
   let html = await deps.fetchHtml(url)
   let parsed = parseArticle(html, url)
   if (!parsed.title.trim() && url.includes('/s/')) {
@@ -101,6 +103,7 @@ export async function downloadArticle(
 
   // 视频这类非致命失败要浮到调用方（CLI JSON / GUI 结果区），否则只剩 ok:true 在误导
   const warnings: string[] = []
+  deps.onProgress?.({ phase: 'export', message: '生成文件' })
   const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats, downloadVideos: deps.downloadVideos },
     { ...deps, onWarning: (m) => { warnings.push(m); deps.onWarning?.(m) } })
   await deps.library.add(meta)

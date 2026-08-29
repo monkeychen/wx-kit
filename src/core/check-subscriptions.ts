@@ -22,7 +22,7 @@ export interface CheckDeps {
   sleep?: (ms: number) => Promise<void>
   shuffle?: <T>(arr: T[]) => T[]
 }
-export interface AccountCheckResult { fakeid: string; ok: boolean; newRefs: ArticleRef[]; latest: number; error?: string }
+export interface AccountCheckResult { fakeid: string; ok: boolean; newRefs: ArticleRef[]; latest: number; latestArticleId?: string; error?: string }
 
 export async function checkSubscriptions(accounts: SubscribedAccount[], deps: CheckDeps): Promise<AccountCheckResult[]> {
   const shuffle = deps.shuffle ?? shuffleImpl
@@ -40,9 +40,14 @@ export async function checkSubscriptions(accounts: SubscribedAccount[], deps: Ch
       results.push({ fakeid: acc.fakeid, ok: false, newRefs: [], latest: acc.watermark, error: (e as Error).message })
       continue
     }
-    const newRefs = refs.filter((r) => r.createTime > acc.watermark).sort((a, b) => b.createTime - a.createTime)
+    const latestArticleId = refs.find((r) => r.sourceId)?.sourceId
+    // cover 只给最新文章身份、没有发布时间。发现时间会随每次请求变化，不能拿来和水位比较。
+    const newRefs = latestArticleId != null
+      ? (acc.latestArticleId === latestArticleId ? [] : refs)
+      : refs.filter((r) => r.createTime > acc.watermark)
+    newRefs.sort((a, b) => b.createTime - a.createTime)
     const latest = refs.reduce((mx, r) => Math.max(mx, r.createTime), acc.watermark)
-    results.push({ fakeid: acc.fakeid, ok: true, newRefs, latest })
+    results.push({ fakeid: acc.fakeid, ok: true, newRefs, latest, ...(latestArticleId != null ? { latestArticleId } : {}) })
   }
   return results
 }

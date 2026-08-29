@@ -20,6 +20,8 @@ export interface ArticleRef {
   url: string
   title: string
   createTime: number      // unix 秒
+  /** 来源提供的稳定文章身份。`cover` 没有发布时间时，用它而非 createTime 判断是否更新。 */
+  sourceId?: string
   /** 消息类型(M36):0 图文 / 5 视频 / 8 图文消息 / 10 文字 / 11…;列表接口直接给,不必猜 */
   itemShowType?: number
   /**

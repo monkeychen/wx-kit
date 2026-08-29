@@ -22,6 +22,8 @@ export interface RunCheckDeps {
   fakeids?: string[]
   /** M34:自动下载的进度回调。定时检查没有 event.sender,故由调用方(ipc)决定怎么发(广播)。 */
   onDownloadProgress?: (e: { fakeid: string; total: number; done: number; phase: string }) => void
+  /** v0.10.0 旧订阅没有 cover 游标时，用本地文库建立基线，避免升级后把已下载文章再报一次。 */
+  isRefDownloaded?: (ref: ArticleRef) => Promise<boolean>
 }
 /** M34:逐号明细。汇总数说不出「这一行新增了几篇」,而反馈要落在被操作的对象上。 */
 export interface PerAccountResult {
@@ -80,18 +82,22 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
       perAccount.push({ fakeid: r.fakeid, nickname, ok: false, newFound: 0, downloaded: 0, error })
       continue
     }
-    await subs.updateWatermark(r.fakeid, r.latest)
-    if (r.newRefs.length === 0) {
+    const account = accounts.find((a) => a.fakeid === r.fakeid)
+    const migratedDuplicate = !!(r.latestArticleId && !account?.latestArticleId && r.newRefs.length === 1
+      && await deps.isRefDownloaded?.(r.newRefs[0]))
+    const newRefs = migratedDuplicate ? [] : r.newRefs
+    await subs.updateWatermark(r.fakeid, r.latest, r.latestArticleId)
+    if (newRefs.length === 0) {
       perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: 0, downloaded: 0 })
       continue
     }
-    newFound += r.newRefs.length
-    const total = r.newRefs.length
+    newFound += newRefs.length
+    const total = newRefs.length
     let downloaded = 0
     if (settings.subscriptionNewArticleAction === 'download') {
       // 自动下载的进度此前完全不可见(手动下载有进度条,自动下载连一条事件都不发)
       deps.onDownloadProgress?.({ fakeid: r.fakeid, total, done: 0, phase: 'start' })
-      const summary = await downloadRefs(r.newRefs, settings.defaultFormats,
+      const summary = await downloadRefs(newRefs, settings.defaultFormats,
         { kind: 'account', nickname, fakeid: r.fakeid, range: { count: total } },
         (e) => deps.onDownloadProgress?.({ fakeid: r.fakeid, total, done: e.completed, phase: e.phase }))
       deps.onDownloadProgress?.({ fakeid: r.fakeid, total, done: total, phase: 'done' })
@@ -99,12 +105,12 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
       // 而自动模式下用户根本没看着屏幕,连「刚才失败了」都不知道。
       // 读者本就打不开的(unavailable)不留 —— 重试无用,留着只会变成永远清不掉的红点。
       const doneUrls = new Set(summary.items.filter((i) => i.ok || i.unavailable).map((i) => i.url))
-      const kept = r.newRefs.filter((x) => !doneUrls.has(x.url))
+      const kept = newRefs.filter((x) => !doneUrls.has(x.url))
       if (kept.length) await subs.setPendingRefs(r.fakeid, kept)
       else await subs.clearNewRefs(r.fakeid)
       downloaded = summary.succeeded
     } else {
-      await subs.addNewRefs(r.fakeid, r.newRefs)
+      await subs.addNewRefs(r.fakeid, newRefs)
     }
     perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: total, downloaded })
   }

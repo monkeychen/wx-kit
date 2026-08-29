@@ -21,9 +21,10 @@ import { resolveUpdateCheck } from '../src/core/update-gate'
 import { detectChannel, upgradeCommand, pickAsset } from '../src/core/install-channel'
 import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } from '../src/core/material-export'
 import { syncToSite } from '../src/core/site-sync'
-import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, initialWatermark, type CheckLogEntry } from '../src/core/subscriptions'
+import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { refId } from '../src/core/subscription-refs'
+import { collectPendingDownloads } from '../src/core/subscription-batch'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { UpdateScheduler } from './services/update-scheduler'
 import { SettingsService } from './services/settings'
@@ -324,25 +325,14 @@ export function registerIpc(settings: SettingsService): void {
   }
   let subsAuthExpired = false
 
-  // 订阅/新订阅一刻确定水位：能取到最新一篇就用 initialWatermark（其 createTime - 1，
-  // 让最新一篇首检可见），否则用「现在」（秒），避免存量被当新文章
-  const establishWatermark = async (fakeid: string): Promise<number> => {
-    const nowSec = () => Math.floor(Date.now() / 1000)
-    const creds = await readWereadCredsFile(wereadCredsPath(app.getPath('userData')))
-    if (!creds) return nowSec()
-    try {
-      const listFn = await wereadCrawlListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
-      if (!listFn) return nowSec()
-      const refs = await listFn(fakeid, { count: 1 })
-      return initialWatermark(refs[0]?.createTime, nowSec())
-    } catch { return nowSec() }
-  }
+  // cover 以 reviewId 判重；订阅时不探测已封禁的列表端点，首次成功检查自然投递最新一篇。
+  const establishWatermark = async (): Promise<number> => Math.floor(Date.now() / 1000)
 
   const downloadRefs = async (refs: ArticleRef[], formats: DownloadFormat[], source: HistorySource, onProgress?: (e: import('../src/core/types').ProgressEvent) => void) => {
     const { libraryRoot, downloadVideos } = await settings.get()
     const library = new Library(libraryRoot)
     const ddeps = { fetchHtml, fetchBinary, BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot, downloadVideos }
-    const queue = new DownloadQueue((url, hint) => downloadArticle(url, formats, ddeps, hint), onProgress)
+    const queue = new DownloadQueue((url, hint, report) => downloadArticle(url, formats, { ...ddeps, onProgress: report }, hint), onProgress)
     // 必须把列表给的文章主键(mid/idx)透传下去:订阅拿到的是**短链** `s/XXXX`,
     // 没有 hint 就只能退化成路径哈希 id,于是同一篇经「按公众号」抓时算另一篇 → 重复下载。
     // 这正是 M36 为 crawl 修过的那个 bug,当时漏了这个调用点(真实库里已积下 32 篇哈希 id)。
@@ -364,9 +354,12 @@ export function registerIpc(settings: SettingsService): void {
     checkInFlight = (async () => {
       const subs = await subsFor()
       const s = await settings.get()
+      const library = new Library(s.libraryRoot)
+      const downloadedUrls = new Set((await library.list()).map((article) => article.sourceUrl))
       const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
       const result = await svcRunSubscriptionCheck(trigger, {
         subs, settings: s, list,
+        isRefDownloaded: async (ref) => downloadedUrls.has(ref.url),
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
         onDownloadProgress: broadcastDlProgress,
         ...(fakeids ? { fakeids } : {}),
@@ -393,16 +386,16 @@ export function registerIpc(settings: SettingsService): void {
     emitSubsUpdated()
   })
   ipcMain.handle('subscriptions:addAccount', async (_e, { fakeid, nickname }: { fakeid: string; nickname: string }) => {
-    await (await subsFor()).addAccount({ fakeid, nickname, subscribed: true, watermark: await establishWatermark(fakeid) })
+    await (await subsFor()).addAccount({ fakeid, nickname, subscribed: true, watermark: await establishWatermark() })
     emitSubsUpdated()
   })
   ipcMain.handle('subscriptions:setSubscribed', async (_e, { fakeid, nickname, subscribed }: { fakeid: string; nickname: string; subscribed: boolean }) => {
     const subs = await subsFor()
     const ex = (await subs.list()).find((a) => a.fakeid === fakeid)
     if (!ex) {
-      await subs.addAccount({ fakeid, nickname, subscribed, watermark: subscribed ? await establishWatermark(fakeid) : 0 })
+      await subs.addAccount({ fakeid, nickname, subscribed, watermark: subscribed ? await establishWatermark() : 0 })
     } else {
-      if (subscribed && ex.watermark === 0) await subs.updateWatermark(fakeid, await establishWatermark(fakeid))
+      if (subscribed && ex.watermark === 0) await subs.updateWatermark(fakeid, await establishWatermark())
       await subs.setSubscribed(fakeid, subscribed)
     }
     emitSubsUpdated()
@@ -434,6 +427,31 @@ export function registerIpc(settings: SettingsService): void {
     emitProgress(total, 'done')
     emitSubsUpdated()
     return { downloaded: summary.succeeded, skipped: summary.skipped, failed: summary.failed, kept: total - done.size }
+  })
+  ipcMain.handle('subscriptions:downloadAllNew', async (event) => {
+    const subs = await subsFor()
+    const groups = collectPendingDownloads(await subs.list())
+    const total = groups.reduce((sum, group) => sum + group.refs.length, 0)
+    let downloaded = 0, skipped = 0, failed = 0, kept = 0, doneBefore = 0
+    for (const group of groups) {
+      const summary = await downloadRefs(group.refs, (await settings.get()).defaultFormats,
+        { kind: 'account', nickname: group.nickname, fakeid: group.fakeid, range: { count: group.refs.length } },
+        (e) => {
+          if (!event.sender.isDestroyed()) event.sender.send('subscriptions:download:progress', {
+            fakeid: group.fakeid, total: group.refs.length, done: e.completed, phase: e.phase,
+            allTotal: total, allDone: doneBefore + e.completed, nickname: group.nickname,
+          })
+        })
+      const completed = new Set(summary.items.filter((item) => item.ok || item.unavailable).map((item) => item.url))
+      await subs.removeNewRefs(group.fakeid, group.refs.filter((ref) => completed.has(ref.url)).map(refId))
+      downloaded += summary.succeeded
+      skipped += summary.skipped
+      failed += summary.failed
+      kept += group.refs.length - completed.size
+      doneBefore += summary.items.length
+    }
+    emitSubsUpdated()
+    return { accounts: groups.length, total, downloaded, skipped, failed, kept }
   })
   ipcMain.handle('subscriptions:dismissNew', async (_e, fakeid: string, ids?: string[]) => {
     const subs = await subsFor()

@@ -28,6 +28,7 @@ export default function Subscriptions() {
   const [checkLog, setCheckLog] = useState<CheckLogEntry[]>([])
   const [nextCheckAt, setNextCheckAt] = useState<number | null>(null)
   const [dls, setDls] = useState<Record<string, DlState>>({})
+  const [bulkDl, setBulkDl] = useState<(DlState & { nickname: string }) | null>(null)
   const [rowRes, setRowRes] = useState<Record<string, PerAccountResult>>({})
   const [policy, setPolicy] = useState<NewArticleAction | null>(null)
   // 展开/勾选按 fakeid 存:收起再展开不该丢掉刚才的选择
@@ -35,6 +36,10 @@ export default function Subscriptions() {
   const [selected, setSelected] = useState<Record<string, string[]>>({})
   // 下载进度：无条件按 fakeid 记账。此前只认「自己触发的那个号」，自动下载（无本地 dl 记录）的进度被整个丢弃。
   useEffect(() => api.onSubscriptionDownloadProgress((e) => {
+    if (e.allTotal != null) {
+      setBulkDl({ total: e.allTotal, done: e.allDone ?? 0, phase: e.phase, nickname: e.nickname ?? '' })
+      return
+    }
     setDls((prev) => ({ ...prev, [e.fakeid]: { total: e.total, done: e.done, phase: e.phase } }))
   }), [])
 
@@ -159,7 +164,22 @@ export default function Subscriptions() {
     if (!ids.length) return
     await api.subscriptionsDismissNew(a.fakeid, ids); await load()
   }
-  const busy = Object.keys(dls).length > 0
+  const downloadAll = async () => {
+    setBulkDl({ total: pendingTotal, done: 0, phase: 'start', nickname: '' })
+    try {
+      const r = await api.subscriptionsDownloadAllNew()
+      const skipped = r.skipped ? `，${r.skipped} 篇已在库中` : ''
+      if (r.kept > 0) message.warning(`已下载 ${r.downloaded} 篇${skipped}，${r.kept} 篇未成功（仍在待处理里）`)
+      else message.success(`已下载 ${r.downloaded} 篇${skipped}`)
+      await load()
+    } catch (e) {
+      message.error('批量下载失败：' + (e as Error).message)
+    } finally { setBulkDl(null) }
+  }
+  const pendingGroups = accounts.filter((a) => a.subscribed && a.newRefs.length > 0)
+  const pendingTotal = pendingGroups.reduce((sum, a) => sum + a.newRefs.length, 0)
+  const busy = Object.keys(dls).length > 0 || bulkDl != null
+  const phaseText = (phase: string) => ({ fetch: '获取正文', images: '下载图片', video: '下载视频', export: '生成文件', save: '保存完成' }[phase] ?? '准备下载')
 
   const toggleExpand = (a: SubscribedAccount) => {
     setExpanded((prev) => ({ ...prev, [a.fakeid]: !prev[a.fakeid] }))
@@ -250,6 +270,9 @@ export default function Subscriptions() {
             onPressEnter={search} style={{ width: 280 }} data-testid="subs-search-input" allowClear />
           <Button type="primary" onClick={search} data-testid="subs-search-btn">识别</Button>
           <div style={{ flex: 1 }} />
+          {pendingTotal > 0 && <Button loading={bulkDl != null} disabled={busy && bulkDl == null} onClick={downloadAll} data-testid="subs-download-all">
+            {bulkDl ? `${phaseText(bulkDl.phase)} ${bulkDl.done}/${bulkDl.total}${bulkDl.nickname ? ` · ${bulkDl.nickname}` : ''}` : `下载全部待处理新文章（${pendingTotal} 篇，${pendingGroups.length} 个公众号）`}
+          </Button>}
           <Button type="primary" loading={checking} disabled={busy} onClick={checkNow} data-testid="subs-check-now">检查全部</Button>
         </div>
 

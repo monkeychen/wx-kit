@@ -66,6 +66,16 @@ describe('DownloadQueue', () => {
     expect(events.some(e => e.currentUrl === 'ok1' && e.phase === 'save')).toBe(true)
   })
 
+  it('forwards an article sub-stage before the item completes', async () => {
+    const events: ProgressEvent[] = []
+    const q = new DownloadQueue(async (url, _hint, report) => {
+      report?.({ phase: 'images', message: '下载图片 1/2' })
+      return { url, ok: true }
+    }, (event) => events.push(event))
+    await q.run(['article'])
+    expect(events).toContainEqual(expect.objectContaining({ phase: 'images', message: '下载图片 1/2', completed: 0 }))
+  })
+
   it('handles empty url list', async () => {
     const q = new DownloadQueue(async (u) => ({ url: u, ok: true }), () => {})
     expect(await q.run([])).toMatchObject({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0 })

@@ -9,6 +9,7 @@ import { writeCover } from './export-cover'
 import { writePdfFromHtml } from './export-pdf'
 import { buildImageMap, rewriteImageRefs } from '../image-localizer'
 import { downloadVideos } from './export-video'
+import type { ProgressPhase } from '../types'
 
 export interface ExportDeps {
   /** 下载二进制（图片/封面） */
@@ -20,6 +21,7 @@ export interface ExportDeps {
   onVideoProgress?: (e: { index: number; total: number; video: import('../parse-video').MpVideoSource }) => void
   /** 非致命问题的上报（如视频下载失败）：文章其余部分照常产出，但用户不该靠翻文件才发现 */
   onWarning?: (message: string) => void
+  onProgress?: (stage: { phase: ProgressPhase; message?: string }) => void
 }
 
 export interface ExportInput {
@@ -47,7 +49,9 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
   // 图片本地化（md/html/pdf 需要）
   if (needImages && parsed.imageUrls.length) {
     const downloaded = new Map<string, { data: Buffer; contentType: string }>()
-    for (const url of parsed.imageUrls) {
+    for (let i = 0; i < parsed.imageUrls.length; i++) {
+      const url = parsed.imageUrls[i]
+      deps.onProgress?.({ phase: 'images', message: `下载图片 ${i + 1}/${parsed.imageUrls.length}` })
       try { downloaded.set(url, await deps.fetchBinary(url)) } catch { /* 跳过坏图 */ }
     }
     if (downloaded.size) {
@@ -68,8 +72,12 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
 
   // 视频：必须在写 md/html 之前（正文要引用它），且必须在本次流程内下完
   // ——直链带 auth_key/dis_t 签名有时效，存下来隔次再下必然失效。
+  if (wantVideo && parsed.videos.length) deps.onProgress?.({ phase: 'video', message: `下载视频 0/${parsed.videos.length}` })
   const { records: videoRecords, htmlSuffix, mdSuffix, warnings } = await downloadVideos(
-    parsed.videos, dir, wantVideo, deps.fetchBinary, deps.onVideoProgress,
+    parsed.videos, dir, wantVideo, deps.fetchBinary, (event) => {
+      deps.onProgress?.({ phase: 'video', message: `下载视频 ${event.index}/${event.total}` })
+      deps.onVideoProgress?.(event)
+    },
   )
   if (videoRecords.length) meta.videos = videoRecords
   for (const w of warnings) deps.onWarning?.(w)

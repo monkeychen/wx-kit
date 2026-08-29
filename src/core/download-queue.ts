@@ -5,7 +5,8 @@ import { ArticleUnavailableError } from './download-article'
 
 /** 队列条目：光有 URL 时无法判重（短链认不出与长链是同一篇），故允许带上列表给的主键 */
 export type QueueItem = string | ({ url: string } & ArticleIdHint)
-export type DownloadOne = (url: string, hint?: ArticleIdHint) => Promise<DownloadItemResult>
+export type ArticleStage = { phase: import('./types').ProgressPhase; message?: string }
+export type DownloadOne = (url: string, hint?: ArticleIdHint, report?: (stage: ArticleStage) => void) => Promise<DownloadItemResult>
 export type OnProgress = (e: ProgressEvent) => void
 
 export class DownloadQueue {
@@ -27,7 +28,9 @@ export class DownloadQueue {
         : {}
       this.onProgress({ total, completed: i, currentUrl: url, phase: 'fetch' })
       try {
-        const r = await this.downloadOne(url, hint)
+        const r = await this.downloadOne(url, hint, (stage) => {
+          this.onProgress({ total, completed: i, currentUrl: url, phase: stage.phase, message: stage.message })
+        })
         items.push(r)
         this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'save' })
       } catch (err) {

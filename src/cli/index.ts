@@ -405,13 +405,14 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const s = await settingsFor().get()
       const root = await resolveRoot(opts.out)
       const subs = new Subscriptions(root)
+      const downloadedUrls = new Set((await new Library(root).list()).map((article) => article.sourceUrl))
       const logFilePath = join(userDataDir, 'subscriptions-check.log')
       const fakeids = opts.accounts ? String(opts.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : undefined
       const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
         const library = new Library(root)
         // 订阅检查没有 --no-video 开关，按设置走（与 GUI 的定时检查一致）
         const ddeps = { ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow, now: () => new Date().toISOString(), library, libraryRoot: root, downloadVideos: s.downloadVideos }
-        const queue = new DownloadQueue((url, hint) => downloadArticle(url, formats, ddeps, hint))
+        const queue = new DownloadQueue((url, hint, report) => downloadArticle(url, formats, { ...ddeps, onProgress: report }, hint))
         // 透传列表给的文章主键:订阅拿到的是短链,没 hint 会退化成哈希 id → 与「按公众号」抓的同一篇算两篇
         const summary = await queue.run(refs.map((r) => ({ url: r.url, appmsgid: r.appmsgid, itemidx: r.itemidx })))
         try { await new History(root, s.historyRetentionDays).append(eventFromSummary(randId(), Date.now(), source, formats, summary)) } catch { /* 历史是辅助记录，写失败不阻断 */ }
@@ -420,7 +421,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),
-        subs, settings: s, list, downloadRefs,
+        subs, settings: s, list, isRefDownloaded: async (ref) => downloadedUrls.has(ref.url), downloadRefs,
         log: async (e) => {
           try { await subs.appendCheckLog(e); appendFileSync(logFilePath, formatCheckLogLine(e) + '\n') } catch { /* 留痕失败不阻断 */ }
           process.stderr.write(formatCheckLogLine(e) + '\n')

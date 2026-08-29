@@ -78,13 +78,13 @@ describe('Subscriptions.removeAccount（删除标记持久化）', () => {
       version: 1, lastRunAt: null,
       accounts: [
         { fakeid: 'MzE5ODk2NjUwOA==', nickname: '', subscribed: false, watermark: 50, lastCheckedAt: 10, newRefs: [] },
-        { fakeid: 'MP_WXS_3198966508', nickname: '猫笔刀', subscribed: true, watermark: 80, lastCheckedAt: 20, newRefs: [{ url: 'https://mp.weixin.qq.com/s/x', title: 'x', createTime: 1 }] },
+        { fakeid: 'MP_WXS_3198966508', nickname: '猫笔刀', subscribed: true, watermark: 80, latestArticleId: 'review-1', lastCheckedAt: 20, newRefs: [{ url: 'https://mp.weixin.qq.com/s/x', title: 'x', createTime: 1 }] },
       ],
       checkLog: [],
     }), 'utf-8')
     const rows = await new Subscriptions(dir).list()
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ fakeid: 'MP_WXS_3198966508', nickname: '猫笔刀', subscribed: true, watermark: 80, lastCheckedAt: 20 })
+    expect(rows[0]).toMatchObject({ fakeid: 'MP_WXS_3198966508', nickname: '猫笔刀', subscribed: true, watermark: 80, latestArticleId: 'review-1', lastCheckedAt: 20 })
     expect(rows[0].newRefs).toHaveLength(1)
   })
   it('mergeAccounts 过滤被显式删除的历史派生行', () => {

@@ -54,6 +54,7 @@ const api: WxApi = {
   subscriptionsRemove: (fakeid) => ipcRenderer.invoke('subscriptions:remove', fakeid),
   subscriptionsCheckNow: (fakeids) => ipcRenderer.invoke('subscriptions:checkNow', fakeids),
   subscriptionsDownloadNew: (fakeid, ids) => ipcRenderer.invoke('subscriptions:downloadNew', fakeid, ids),
+  subscriptionsDownloadAllNew: () => ipcRenderer.invoke('subscriptions:downloadAllNew'),
   subscriptionsDismissNew: (fakeid, ids) => ipcRenderer.invoke('subscriptions:dismissNew', fakeid, ids),
   subscriptionsOpenLog: () => ipcRenderer.invoke('subscriptions:openLog'),
   onSubscriptionsUpdated: (cb) => {

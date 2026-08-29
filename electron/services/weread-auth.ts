@@ -202,12 +202,18 @@ async function fallbackToCover(client: WereadClient, fakeid: string): Promise<Ar
   const cover = await client.getLatestArticle(fakeid).catch(() => null)
   if (!cover) return []
   const token = cover.reviewId.split('_').pop() || ''
-  return [{ url: cover.url || `https://mp.weixin.qq.com/s/${token}`, title: cover.title, createTime: Math.floor(Date.now() / 1000) }]
+  return [{
+    url: cover.url || `https://mp.weixin.qq.com/s/${token}`,
+    title: cover.title,
+    // cover 没有发布时间；这个时间只用于待处理列表排序与展示，判重必须使用 reviewId。
+    createTime: Math.floor(Date.now() / 1000),
+    sourceId: cover.reviewId,
+  }]
 }
 
 /**
- * 订阅检查专用的列表取件装配。优先 web/mp/articles 全量分页（需 Chromium 栈会话），
- * 失败回退 cover 最新一篇；按水位增量过滤。
+ * 订阅检查专用取件器。列表端点已确认服务端封禁，生产订阅直接取 cover 最新一篇。
+ * `watermark` 为兼容旧调用保留；cover 的新旧判断由上层按 reviewId 完成。
  */
 export async function wereadListFn(
   userDataDir: string,
@@ -216,17 +222,7 @@ export async function wereadListFn(
   const creds = await readWereadCredsFile(wereadCredsPath(userDataDir))
   if (!creds) return null
   const client = makeWereadClient((path, params) => requestWeread(wereadListUrl(path, params)))
-  return async (fakeid, watermark) => {
-    const bookId = normalizeBookId(fakeid)
-    try {
-      const all = await listAllArticles(client, bookId)
-      return all.filter((r) => r.createTime > watermark)
-    } catch {
-      // 列表任何失败（-2041 风控 / 接口下线 / 网络异常）都不阻塞订阅——回退 cover 单篇增量
-      const covers = await fallbackToCover(client, fakeid)
-      return covers.filter((r) => r.createTime > watermark)
-    }
-  }
+  return async (fakeid, _watermark) => fallbackToCover(client, fakeid)
 }
 
 /**

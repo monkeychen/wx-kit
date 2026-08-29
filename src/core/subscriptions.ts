@@ -14,6 +14,8 @@ export interface SubscribedAccount {
   nickname: string
   subscribed: boolean
   watermark: number            // unix 秒；createTime > watermark 即「新」
+  /** latest-only 来源（当前为微信读书 cover）的最近已见文章身份；旧文件缺省为 null。 */
+  latestArticleId?: string | null
   lastCheckedAt: number | null // unix ms
   newRefs: ArticleRef[]        // 已发现、待下载/忽略的新文章
 }
@@ -126,6 +128,7 @@ export class Subscriptions {
       ex.newRefs = mergeNewRefs(ex.newRefs, a.newRefs)
       ex.nickname = ex.nickname || a.nickname
       ex.subscribed = ex.subscribed || a.subscribed
+      ex.latestArticleId = ex.latestArticleId ?? a.latestArticleId ?? null
       ex.lastCheckedAt = Math.max(ex.lastCheckedAt ?? 0, a.lastCheckedAt ?? 0) || null
     }
     return [...byId.values()]
@@ -170,8 +173,15 @@ export class Subscriptions {
    * 此前 lastCheckedAt 只在 setNewRefs 里写 → 自动下载模式和「无新文章」永远不写，
    * 页面于是显示「尚未检查」而右边同时显示检查结果，自相矛盾（M34 修）。
    */
-  async updateWatermark(fakeid: string, watermark: number): Promise<void> {
-    await this.mutate((d) => { const a = this.find(d, fakeid); if (a) { a.watermark = watermark; a.lastCheckedAt = Date.now() } })
+  async updateWatermark(fakeid: string, watermark: number, latestArticleId?: string): Promise<void> {
+    await this.mutate((d) => {
+      const a = this.find(d, fakeid)
+      if (a) {
+        a.watermark = watermark
+        if (latestArticleId != null) a.latestArticleId = latestArticleId
+        a.lastCheckedAt = Date.now()
+      }
+    })
   }
   /**
    * 把本轮发现的新文章**并入**待处理列表(M40)。

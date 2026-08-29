@@ -1,10 +1,10 @@
 // tests/electron/weread-auth.test.ts — Web 端
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  runWereadLogin, ensureFreshWereadCreds, wereadCredsStore, WereadLoginCancelled,
+  runWereadLogin, ensureFreshWereadCreds, wereadCredsStore, WereadLoginCancelled, wereadListFn,
 } from '../../electron/services/weread-auth'
 import type { QrFlowHttp } from '../../src/core/weread/qr-flow'
 import { MpAuthExpired } from '../../src/core/mp-errors'
@@ -108,5 +108,24 @@ describe('ensureFreshWereadCreds', () => {
     }
     const c = await ensureFreshWereadCreds(store, http)
     expect(c.refreshToken).toBe('web@RT')
+  })
+})
+
+describe('wereadListFn（订阅 latest-only）', () => {
+  it('只请求 cover，并把 reviewId 作为稳定文章身份', async () => {
+    await writeFile(join(dir, 'weread-creds.json'), JSON.stringify({
+      vid: '7', refreshToken: 'web@RT', accessToken: 'AT', name: '', updatedAt: 0,
+    }))
+    const urls: string[] = []
+    const list = await wereadListFn(dir, async (url) => {
+      urls.push(url)
+      return { reviewId: 'MP_WXS_7_token-1', title: '最新文章', name: '测试号' }
+    })
+
+    const refs = await list?.('MP_WXS_7', 0)
+
+    expect(urls).toHaveLength(1)
+    expect(urls[0]).toContain('/api/mp/cover')
+    expect(refs?.[0]).toMatchObject({ sourceId: 'MP_WXS_7_token-1' })
   })
 })
