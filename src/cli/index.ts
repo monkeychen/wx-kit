@@ -31,6 +31,7 @@ import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine }
 import { nextCheckAt } from '../core/subscription-schedule'
 import { resolveDigestDate } from '../core/digest-date'
 import { subscriptionDigest, fetchMissing } from '../core/subscription-digest'
+import { sourceUrlKey } from '../core/subscription-refs'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 import { articleFetchers, createMpRuntime } from '../../electron/services/mp-runtime'
 import type { MpRequestGateway } from '../../electron/services/mp-request-gateway'
@@ -405,7 +406,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const s = await settingsFor().get()
       const root = await resolveRoot(opts.out)
       const subs = new Subscriptions(root)
-      const downloadedUrls = new Set((await new Library(root).list()).map((article) => article.sourceUrl))
+      const downloadedUrls = new Set((await new Library(root).list()).map((article) => sourceUrlKey(article.sourceUrl)))
       const logFilePath = join(userDataDir, 'subscriptions-check.log')
       const fakeids = opts.accounts ? String(opts.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : undefined
       const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
@@ -421,7 +422,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),
-        subs, settings: s, list, isRefDownloaded: async (ref) => downloadedUrls.has(ref.url), downloadRefs,
+        subs, settings: s, list, isRefDownloaded: async (ref) => downloadedUrls.has(sourceUrlKey(ref.url)), downloadRefs,
         log: async (e) => {
           try { await subs.appendCheckLog(e); appendFileSync(logFilePath, formatCheckLogLine(e) + '\n') } catch { /* 留痕失败不阻断 */ }
           process.stderr.write(formatCheckLogLine(e) + '\n')

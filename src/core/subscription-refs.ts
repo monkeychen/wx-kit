@@ -6,13 +6,24 @@
 // 今天看不出来只是因为用户只能全下或全忽略,pending 从不留存(见 docs/PRD-v0.8.4.md R4)。
 import type { ArticleRef } from './mp-types'
 
+/** 微信短链的 `~`/`_` 是同一 token 的兼容形态，下载器也会在两者间回退。 */
+export function sourceUrlKey(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl)
+    if (url.hostname === 'mp.weixin.qq.com' && url.pathname.startsWith('/s/')) {
+      return `${url.origin}${url.pathname.replace(/~/g, '_')}`
+    }
+  } catch { /* 非 URL 保持原值 */ }
+  return rawUrl
+}
+
 /**
  * 一篇待处理文章的身份。用微信自己的文章主键 `mid_idx`,**与文库判重同源**
  * (AGENTS.md:同一篇在短链/长链下 URL 形态不同,光看 URL 认不出是同一篇)。
  * 列表没给主键的老数据退回 url —— 宁可退化成「按 URL 认」,也不另造一套身份体系。
  */
 export function refId(ref: ArticleRef): string {
-  return ref.appmsgid != null && ref.itemidx != null ? `${ref.appmsgid}_${ref.itemidx}` : ref.url
+  return ref.appmsgid != null && ref.itemidx != null ? `${ref.appmsgid}_${ref.itemidx}` : sourceUrlKey(ref.url)
 }
 
 /**

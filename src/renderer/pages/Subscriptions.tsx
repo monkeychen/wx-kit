@@ -8,9 +8,9 @@ import type { NewArticleAction } from '../../../electron/services/settings'
 import type { MpAccount } from '../../core/mp-types'
 import { refId } from '../../core/subscription-refs'
 import { kindTag } from '../../core/message-kind'
+import { updatePerAccountProgress, type PerAccountDownloadState } from '../subscription-progress'
 
 /** 下载进度按 fakeid 存:手动下载与检查里的自动下载共用同一套 UI（M34） */
-interface DlState { total: number; done: number; phase: string }
 /** 行内结果态展示多久后淡出；失败态不自动清（失败信息值钱，留到下次检查） */
 const RESULT_TTL_MS = 8000
 
@@ -27,8 +27,8 @@ export default function Subscriptions() {
   const [candidates, setCandidates] = useState<MpAccount[]>([])
   const [checkLog, setCheckLog] = useState<CheckLogEntry[]>([])
   const [nextCheckAt, setNextCheckAt] = useState<number | null>(null)
-  const [dls, setDls] = useState<Record<string, DlState>>({})
-  const [bulkDl, setBulkDl] = useState<(DlState & { nickname: string }) | null>(null)
+  const [dls, setDls] = useState<Record<string, PerAccountDownloadState>>({})
+  const [bulkDl, setBulkDl] = useState<(PerAccountDownloadState & { nickname: string }) | null>(null)
   const [rowRes, setRowRes] = useState<Record<string, PerAccountResult>>({})
   const [policy, setPolicy] = useState<NewArticleAction | null>(null)
   // 展开/勾选按 fakeid 存:收起再展开不该丢掉刚才的选择
@@ -40,7 +40,7 @@ export default function Subscriptions() {
       setBulkDl({ total: e.allTotal, done: e.allDone ?? 0, phase: e.phase, nickname: e.nickname ?? '' })
       return
     }
-    setDls((prev) => ({ ...prev, [e.fakeid]: { total: e.total, done: e.done, phase: e.phase } }))
+    setDls((prev) => updatePerAccountProgress(prev, e))
   }), [])
 
   const load = async () => {

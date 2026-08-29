@@ -6,6 +6,7 @@ import type { Subscriptions, CheckLogEntry, CheckFailure } from '../../src/core/
 import type { ArticleRef } from '../../src/core/mp-types'
 import type { DownloadFormat, DownloadSummary, ProgressEvent } from '../../src/core/types'
 import type { HistorySource } from '../../src/core/download-history'
+import { refId } from '../../src/core/subscription-refs'
 import type { AppSettings } from './settings'
 
 export interface RunCheckDeps {
@@ -83,6 +84,13 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
       continue
     }
     const account = accounts.find((a) => a.fakeid === r.fakeid)
+    const downloadedPendingIds: string[] = []
+    if (account && deps.isRefDownloaded) {
+      for (const pending of account.newRefs) {
+        if (await deps.isRefDownloaded(pending)) downloadedPendingIds.push(refId(pending))
+      }
+      if (downloadedPendingIds.length) await subs.removeNewRefs(r.fakeid, downloadedPendingIds)
+    }
     const migratedDuplicate = !!(r.latestArticleId && !account?.latestArticleId && r.newRefs.length === 1
       && await deps.isRefDownloaded?.(r.newRefs[0]))
     const newRefs = migratedDuplicate ? [] : r.newRefs

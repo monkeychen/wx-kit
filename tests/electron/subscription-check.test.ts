@@ -26,4 +26,28 @@ describe('runSubscriptionCheck 旧订阅迁移', () => {
     expect(addNewRefs).not.toHaveBeenCalled()
     expect(updateWatermark).toHaveBeenCalledWith(account.fakeid, 200, 'review-1')
   })
+
+  it('same cover identity removes an already-downloaded historical pending item', async () => {
+    const removeNewRefs = vi.fn(async () => {})
+    const existing = {
+      ...account,
+      latestArticleId: 'review-1',
+      newRefs: [{ url: 'https://mp.weixin.qq.com/s/token~x', title: '旧文', createTime: 200, sourceId: 'review-1' }],
+    }
+    const subs = {
+      list: async () => [existing], updateWatermark: async () => {}, removeNewRefs,
+      setLastRunAt: async () => {},
+    } as unknown as Subscriptions
+    await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
+      list: async () => [],
+      check: async () => [{ fakeid: existing.fakeid, ok: true, latest: 200, latestArticleId: 'review-1', newRefs: [] }],
+      isRefDownloaded: async () => true,
+      downloadRefs: async () => ({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0, items: [] }),
+      log: async () => {},
+    })
+
+    expect(removeNewRefs).toHaveBeenCalledWith(existing.fakeid, ['https://mp.weixin.qq.com/s/token_x'])
+  })
 })

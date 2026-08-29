@@ -23,7 +23,7 @@ import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } 
 import { syncToSite } from '../src/core/site-sync'
 import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
-import { refId } from '../src/core/subscription-refs'
+import { refId, sourceUrlKey } from '../src/core/subscription-refs'
 import { collectPendingDownloads } from '../src/core/subscription-batch'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { UpdateScheduler } from './services/update-scheduler'
@@ -355,11 +355,11 @@ export function registerIpc(settings: SettingsService): void {
       const subs = await subsFor()
       const s = await settings.get()
       const library = new Library(s.libraryRoot)
-      const downloadedUrls = new Set((await library.list()).map((article) => article.sourceUrl))
+      const downloadedUrls = new Set((await library.list()).map((article) => sourceUrlKey(article.sourceUrl)))
       const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
       const result = await svcRunSubscriptionCheck(trigger, {
         subs, settings: s, list,
-        isRefDownloaded: async (ref) => downloadedUrls.has(ref.url),
+        isRefDownloaded: async (ref) => downloadedUrls.has(sourceUrlKey(ref.url)),
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
         onDownloadProgress: broadcastDlProgress,
         ...(fakeids ? { fakeids } : {}),
