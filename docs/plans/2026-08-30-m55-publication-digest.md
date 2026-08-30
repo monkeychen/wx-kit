@@ -1,9 +1,8 @@
-# M55 · 基于真实发表时间的订阅日报设计
+# M55 · 基于真实发表时间的订阅日报
 
 ## 目标
 
-让 `wx-kit subscription digest --date <日期>` 准确回答“已订阅公众号在该日期新发表了哪些文章”，
-并用 `downloaded` 标识本地状态；显式增加 `--download` 时，仅下载尚未入库的文章。
+让 `wx-kit subscription digest --date <日期>` 准确回答“已订阅公众号在该日期新发表了哪些文章”，并用 `downloaded` 标识本地状态；显式增加 `--download` 时，仅下载尚未入库的文章。
 
 ## 已确认边界
 
@@ -12,28 +11,27 @@
 - 每次只能发现 cover 当前最新一篇。若同一公众号在两次刷新之间连续发表多篇，被覆盖的早一篇无法找回。
 - 提高检查频率只能降低漏检概率，不能消除该边界；产品与 CLI 输出必须如实说明。
 
-## 核心设计
+## 实现设计
 
-### 1. 持久化订阅文章发现记录
+### T1 · 持久化订阅文章发现记录
 
 在文章库根目录新增 `subscription-articles.json`，继续使用原子写和路径锁，不引入数据库。
 
 ```ts
 interface SubscriptionArticleRecord {
-  sourceId: string       // cover reviewId，稳定身份
+  sourceId: string
   fakeid: string
   nickname: string
   title: string
   url: string
-  publishedAt: number    // 从公开文章页解析的 Unix 秒，绝不使用检查时刻冒充
-  discoveredAt: number   // 本机首次发现时刻，Unix 毫秒
+  publishedAt: number
+  discoveredAt: number
 }
 ```
 
-记录按 `sourceId` 去重；同一身份再次出现只允许更新标题、URL、昵称，不改首次发现时间。`downloaded`
-不落盘，查询时从 `library.json` 实时派生，避免删除文章后状态漂移。
+记录按 `sourceId` 去重；同一身份再次出现只更新标题、URL、昵称，不改首次发现时间。`downloaded` 不落盘，查询时从 `library.json` 实时派生，避免删除文章后状态漂移。
 
-### 2. 发现与时间补全
+### T2 · 发现与时间补全
 
 抽出共享的“刷新每个订阅号最新文章”编排，供订阅检查和 `digest` 使用：
 
@@ -44,28 +42,24 @@ interface SubscriptionArticleRecord {
 5. 解析不到时间或页面请求失败时，该账号本轮记失败，不写伪时间、不吞掉身份，后续可重试；
 6. 成功后写发现记录，再交给既有 `reviewId` 游标判断、待处理和自动下载流程。
 
-订阅策略为自动下载时，时间补全与正文下载可能各读取一次文章页。本版不引入跨流程 HTML 缓存，优先保证
-状态边界清晰；后续若真实性能数据证明必要，再单独优化。
+订阅策略为自动下载时，时间补全与正文下载可能各读取一次文章页。本版不引入跨流程 HTML 缓存，优先保证状态边界清晰；后续若真实性能数据证明必要，再单独优化。
 
-### 3. digest 语义
+### T3 · digest 语义
 
-`subscription digest` 保留现有命令与参数，但数据来源改为发现记录：
+`subscription digest` 保留现有命令与参数：
 
 ```sh
 wx-kit subscription digest --date today
 wx-kit subscription digest --date today --download
 ```
 
-执行时先刷新指定账号的最新 cover，将首次发现文章补全并写入记录；随后按北京时间自然日过滤
-`publishedAt`。查询不推进订阅水位、不修改 `newRefs`、不触发设置中的自动下载策略。
+执行时先刷新指定账号的最新 cover，将首次发现文章补全并写入记录；随后按北京时间自然日过滤 `publishedAt`。查询不推进订阅水位、不修改 `newRefs`、不触发设置中的自动下载策略。
 
-输出继续包含 `account/title/publishTime/url/id/downloaded/dir/contentPath/warnings/error/unavailable`；新增
-顶层 `coverageNote`，明确“每号仅捕获刷新时最新一篇，可能漏掉两次刷新间被覆盖的文章”。
+输出继续包含 `account/title/publishTime/url/id/downloaded/dir/contentPath/warnings/error/unavailable`；新增顶层 `coverageNote`，明确“每号仅捕获刷新时最新一篇，可能漏掉两次刷新间被覆盖的文章”。
 
-`--download` 继续只处理 `downloaded:false` 的条目；下载成功后返回统一的本地路径形状。无 `--download`
-时不写文库。
+`--download` 继续只处理 `downloaded:false` 的条目；下载成功后返回统一的本地路径形状。无 `--download` 时不写文库。
 
-### 4. 旧数据与兼容
+### T4 · 旧数据与文档
 
 - 不迁移 `subscriptions.json`、`library.json`、`history.json`。
 - 新文件不存在时视为空记录；首次刷新会从当前 cover 开始积累，不能反推历史。

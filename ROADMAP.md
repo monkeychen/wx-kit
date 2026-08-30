@@ -6,7 +6,7 @@
 ## 当前状态
 
 - **最新发布:v0.10.0(2026-08-28,订阅经微信读书复活)** —— tag `v0.10.0` + GitHub Release(三平台包,标 Latest)+ brew tap。M52/M53 用微信读书 Web 后端重建订阅闭环(扫码登录、识别、检查/自动下载、新旧标识归一、删除、行内检查隔离、首检水位修正)；但列表接口被服务端按账号封禁(2026-08-27 spike 三轮证伪客户端手段,见 AGENTS.md),「按公众号批量下载」再停用——GUI 入口移除、CLI `crawl` 稳定拒绝,能力边界收缩为「订阅 + 最新一篇」。需求/验收 `docs/PRD-v0.10.0.md` §6,发布说明 `docs/releases/v0.10.0.md`。
-- **当前开发:v0.10.1（M54 已完成；M55 设计待确认）** —— M54 完成 `cover` 身份游标、全量待处理下载与进度反馈；M55 将 `subscription digest` 改为基于公开文章页真实发表时间的本地发现记录，保留 latest-only 无法找回两次刷新间被覆盖文章的边界。需求/验收 `docs/PRD-v0.10.1.md`，M55 设计 `docs/superpowers/specs/2026-08-30-m55-publication-digest-design.md`。
+- **当前开发:v0.10.1（M54 已完成；M55 设计待确认）** —— M54 完成 `cover` 身份游标、全量待处理下载与进度反馈；M55 将 `subscription digest` 改为基于公开文章页真实发表时间的本地发现记录，保留 latest-only 无法找回两次刷新间被覆盖文章的边界。需求/验收 `docs/PRD-v0.10.1.md`，M55 计划 `docs/plans/2026-08-30-m55-publication-digest.md`。
 - **v0.8.6、v0.8.7 均未发布且不再发布** —— M44–M47、M49 的有效成果由 v0.9.0 吸收；两份 PRD 仅保留历史设计与需求去向，不是当前验收契约。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(当前有效 GUI 端到端)看当前真实结果；另以隔离文库执行真实文章 URL 下载验收。私有后台命令只验收“稳定拒绝且零请求”，不再做 live 联调。
 
@@ -71,7 +71,7 @@
 | **M52** ✅ | v0.10.0 | 微信读书后端 core + CLI 复活：weread 适配层、gateway 域名路由、判重兜底、七个命令组复活、单测；**2026-08-27 列表接口被服务端按账号封禁（spike 终局，见 AGENTS.md），2026-08-28 起 `crawl` 再度停用，仅订阅/最新一篇保留** | `plans/2026-08-26-m52-weread-backend.md`、`plans/2026-08-27-fix-weread-web-login.md`、`plans/2026-08-28-v0.10.0-scope-tighten.md` |
 | **M53** ✅ | v0.10.0 | GUI 复活：二维码登录组件、Subscriptions/Settings 恢复接线；**2026-08-28 按公众号下载入口随列表封禁一并移除（订阅页补删除与行内检查隔离）** | 同上 |
 | **M54** ✅ | v0.10.1 | 订阅可靠性与批量交付：`cover` 稳定身份游标、首次投递/重复检查修复、下载全部待处理新文章、移除无效列表探测、下载阶段可见（2026-08-29 完成） | `plans/2026-08-29-m54-subscription-reliability.md` |
-| **M55** 🟡 | v0.10.1 | 订阅日报：新 cover 读取公开文章页补真实发表时间，持久化发现记录；`subscription digest --date [--download]` 按发表日期查询并可补缺 | `superpowers/specs/2026-08-30-m55-publication-digest-design.md` |
+| **M55** 🟡 | v0.10.1 | 订阅日报：新 cover 读取公开文章页补真实发表时间，持久化发现记录；`subscription digest --date [--download]` 按发表日期查询并可补缺 | `plans/2026-08-30-m55-publication-digest.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`（当前验收契约）。
 

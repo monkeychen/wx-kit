@@ -83,7 +83,7 @@ v0.10.0 在微信读书列表接口被服务端封禁后，保留 `/api/mp/cover
 
 **方案**：`cover` 首次出现新 `reviewId` 时读取公开文章页，从 `ct/createTime` 解析真实发表时间并写入独立
 发现记录；`digest --date` 先刷新当前 cover，再按真实发表日期查询记录。详细数据模型、错误语义与兼容边界见
-`docs/superpowers/specs/2026-08-30-m55-publication-digest-design.md`。
+`docs/plans/2026-08-30-m55-publication-digest.md`。
 
 **能力边界**：每个公众号每次只看见最新一篇；两次刷新间连续发表多篇时，较早且已被覆盖的文章无法找回。
 
