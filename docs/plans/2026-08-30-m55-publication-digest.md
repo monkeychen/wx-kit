@@ -120,4 +120,4 @@ wx-kit subscription digest --date 2026-08-29
 - 现场证据（本机临时产物，不含凭据）：`/tmp/wxkit-m55-verify-1BNFSB/report.json`；备份 `/tmp/wxkit-m55-verify-1BNFSB/legacy-backup-bbv7VF/`。
 - 独立审查提出的资源错误吞没、账号改名漏查、cover HTTP 鉴权停止问题均补回归修复，最终复核无新增发现。
 - [x] 成功业务响应后同步 Chromium Cookie jar 到凭据文件；401/403 不覆盖凭据，快照写入失败不改变成功结果。单测已覆盖。
-- [ ] 真实跨进程重复刷新：旧实现第二个独立 CLI 进程返回 HTTP 401。Cookie 快照回写源码已修复，需在下一次有效扫码登录后复验连续进程，未将该真实场景标成通过。
+- [x] 真实跨进程重复刷新：有效扫码登录后，两个独立隔离 CLI 进程仅通过第一个进程持久化的凭据连续刷新 cover 均成功。当前服务响应未轮换 Cookie；轮换快照回写由传输层单测覆盖。
