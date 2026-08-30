@@ -2,7 +2,7 @@
 
 > stdout 为 JSON，stderr 为进度。输出较大时重定向到文件再解析，不要用会截断数据的管道。
 > v0.10.0 起，订阅依赖**微信读书（WeRead）后端**复活；`search`/`login`/`auth-status`/`subscription`/`session`/`protection` 可用。`crawl` 因列表接口被服务端按账号封禁（2026-08-28）再度停用。
-> 下述 digest 契约从 v0.10.1 / M55 源码生效；不要假定已发布 v0.10.0 也支持纯本地日报。
+> 下述 digest 契约从 v0.10.1 / M55 生效。
 
 ## 登录前置：login
 

@@ -5,8 +5,8 @@
 
 ## 当前状态
 
-- **最新发布:v0.10.0(2026-08-28,订阅经微信读书复活)** —— tag `v0.10.0` + GitHub Release(三平台包,标 Latest)+ brew tap。M52/M53 用微信读书 Web 后端重建订阅闭环(扫码登录、识别、检查/自动下载、新旧标识归一、删除、行内检查隔离、首检水位修正)；但列表接口被服务端按账号封禁(2026-08-27 spike 三轮证伪客户端手段,见 AGENTS.md),「按公众号批量下载」再停用——GUI 入口移除、CLI `crawl` 稳定拒绝,能力边界收缩为「订阅 + 最新一篇」。需求/验收 `docs/PRD-v0.10.0.md` §6,发布说明 `docs/releases/v0.10.0.md`。
-- **当前开发:v0.10.1（M54、M55 已完成，待发版）** —— M55 日报以 `library.json.publishTime` 为唯一文章来源，默认（含 today）纯本地，仅今天显式 `--download` 刷新下载并重读文库；缺失时间保留正文并告警。单测/lint/tsc、双架构构建、GUI fixture e2e、打包本地查询及真实跨进程连续 cover 刷新均已通过。Cookie 快照会在成功业务响应后持久化，避免独立 CLI 继续使用陈旧会话。验收详情见 `docs/plans/2026-08-30-m55-publication-digest.md`，需求见 `docs/PRD-v0.10.1.md`。
+- **最新发布:v0.10.1(2026-08-30,订阅日报与会话续用)** —— tag `v0.10.1` + GitHub Release(三平台包,标 Latest)+ brew tap。M55 将 digest 改为按 `library.json.publishTime` 的北京时间本地查询，只有今天显式 `--download` 才刷新并下载；补真实发表时间解析、未知时间告警、账号稳定身份、Cookie 快照持久化与独立进程验证。M54 的订阅可靠性、全量待处理下载和阶段反馈一并包含。微信读书列表仍按账号封禁，每号只返回最新一篇，latest-only 漏检边界保留。需求/验收 `docs/PRD-v0.10.1.md`，发布说明 `docs/releases/v0.10.1.md`。
+- **当前开发:暂无** —— 下一版候选见文末「下一步 / 候选」。
 - **v0.8.6、v0.8.7 均未发布且不再发布** —— M44–M47、M49 的有效成果由 v0.9.0 吸收；两份 PRD 仅保留历史设计与需求去向，不是当前验收契约。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(当前有效 GUI 端到端)看当前真实结果；另以隔离文库执行真实文章 URL 下载验收。私有后台命令只验收“稳定拒绝且零请求”，不再做 live 联调。
 
@@ -71,11 +71,13 @@
 | **M52** ✅ | v0.10.0 | 微信读书后端 core + CLI 复活：weread 适配层、gateway 域名路由、判重兜底、七个命令组复活、单测；**2026-08-27 列表接口被服务端按账号封禁（spike 终局，见 AGENTS.md），2026-08-28 起 `crawl` 再度停用，仅订阅/最新一篇保留** | `plans/2026-08-26-m52-weread-backend.md`、`plans/2026-08-27-fix-weread-web-login.md`、`plans/2026-08-28-v0.10.0-scope-tighten.md` |
 | **M53** ✅ | v0.10.0 | GUI 复活：二维码登录组件、Subscriptions/Settings 恢复接线；**2026-08-28 按公众号下载入口随列表封禁一并移除（订阅页补删除与行内检查隔离）** | 同上 |
 | **M54** ✅ | v0.10.1 | 订阅可靠性与批量交付：`cover` 稳定身份游标、首次投递/重复检查修复、下载全部待处理新文章、移除无效列表探测、下载阶段可见（2026-08-29 完成） | `plans/2026-08-29-m54-subscription-reliability.md` |
-| **M55** | v0.10.1 | 已实施：本地发表日期日报、仅今天显式刷新下载、未知时间告警、账号改名身份匹配；首次真实刷新通过，跨进程二次刷新 HTTP 401 待复验 | `plans/2026-08-30-m55-publication-digest.md` |
+| **M55** ✅ | v0.10.1 | 本地发表日期日报、仅今天显式刷新下载、未知时间告警、账号改名身份匹配、Cookie 快照持久化与跨进程复验（2026-08-30 完成） | `plans/2026-08-30-m55-publication-digest.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`（当前验收契约）。
 
 ## 版本发布史(最新在前)
+
+- **v0.10.1 · 2026-08-30 · 订阅日报与会话续用** —— M55 将 `subscription digest` 改为按 `library.json.publishTime` 的北京时间本地查询，默认零网络；仅今天显式 `--download` 才刷新 cover、下载缺失文章并重读文库。补真实发表时间解析、未知时间告警、账号稳定身份、Cookie 快照持久化与独立进程验证；M54 的订阅可靠性、全量待处理下载和阶段反馈一并包含。列表封禁的 latest-only 漏检边界保持不变。发布说明 `docs/releases/v0.10.1.md`，复盘 devlog §49–§51。
 
 - **v0.10.0 · 2026-08-28 · 订阅回来了,批量下载留在那里** —— v0.9.0 因 MP 后台私有接口被封而退场的订阅,这一版经**微信读书 Web 后端**重建闭环:扫码登录(应用内/CLI 二维码)、粘贴文章链接识别、检查/自动下载、`search/login/auth-status/subscription/session/protection` 命令组恢复。实施中两次事实反转:移动端列表接口被风控 → 降级 Web 端 `/api/mp/cover`(最新一篇)→ spike 三轮(undici / Electron 栈 / 真 Chrome 全登录)证伪「网络栈指纹」归因,确认列表接口是**服务端按账号封禁**、与客户端无关——据此按号批量下载再度停用(GUI 入口移除、CLI `crawl` 稳定拒绝),边界如实收缩为「订阅 + 最新一篇」。订阅页顺手修四件用户实测问题:新旧标识(base64 fakeid vs `MP_WXS_`)同名重复行归一、每行可删除(持久化标记、历史派生行不复活)、行内检查只作用本行(修全局 loading)、首检水位 off-by-one(订阅后首检必报「没有新文章」)。发布说明 `docs/releases/v0.10.0.md`,复盘 devlog §46–§47。
 - **v0.9.0 · 2026-08-09 · 回到可靠的主线** —— 微信公众平台私有文章列表接口持续拒绝访问后，产品不再让用户面对一条不可交付的链路：隐藏按公众号下载、订阅和相关设置，停用私有后台 CLI 但保留命令名、旧实现与历史数据；URL 下载、文库、阅读器、素材导出和站点同步继续可用。M44–M47 中对当前路径有价值的 Chromium 请求栈与安全边界保留，M50 同步修复直接和传递依赖并把官方 npm 审计清零，M51 用真实文章重拍四张当前页面截图并完成打包 GUI/CLI 验收。GitHub Release、brew tap 与 npm `@simiam/wx-kit` 均已发布；发布说明 `docs/releases/v0.9.0.md`，复盘 devlog §43–§45。

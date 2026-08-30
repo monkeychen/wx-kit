@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.10.0-released-success.svg)
+![Status](https://img.shields.io/badge/v0.10.1-released-success.svg)
 
 ## 这是什么
 
@@ -17,12 +17,12 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.10.0）**
+> **当前能力边界（v0.10.1）**
 >
-> v0.10.0 通过**微信读书（WeRead）后端**复活了公众号订阅能力：`search`、`login`、`auth-status`、`session`、`subscription`、`protection` 已重新可用。
+> v0.10.1 在 v0.10.0 的**微信读书（WeRead）后端**订阅能力上，补充了可靠的本地发表日期日报和独立 CLI 进程 Cookie 会话续用：
 >
 > - 识别公众号改用「粘贴该号**任意一篇文章链接**」——微信读书无按名字搜索接口；
-> - **降级项**：微信读书列表接口被服务端按账号限制，每次仅返回该号**最新一篇**文章；「按公众号批量下载」入口已移除（CLI `crawl` 稳定拒绝），`digest` 只针对最新一篇；日常增量订阅不受影响；
+> - **降级项**：微信读书列表接口被服务端按账号限制，每次仅返回该号**最新一篇**文章；「按公众号批量下载」入口已移除（CLI `crawl` 稳定拒绝），自动订阅与日报无法找回两次刷新间被覆盖的文章；
 > - 按文章 URL 下载不依赖登录态，仍是主功能，未受影响。
 
 ## 当前界面
@@ -76,15 +76,15 @@ npm install -g @simiam/wx-kit
 wx-kit --version
 ```
 
-官方 npm `latest` 已发布 v0.9.0；包名带 scope，但安装后的命令仍是 `wx-kit`。
+官方 npm `latest` 仍按渠道规约维护；包名带 scope，但安装后的命令仍是 `wx-kit`。
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.0：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.1：
 
-- Apple Silicon：`wx-kit-0.10.0-arm64.dmg`
-- Intel Mac：`wx-kit-0.10.0.dmg`
-- Windows：`wx-kit.Setup.0.10.0.exe`
+- Apple Silicon：`wx-kit-0.10.1-arm64.dmg`
+- Intel Mac：`wx-kit-0.10.1.dmg`
+- Windows：`wx-kit.Setup.0.10.1.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -120,8 +120,7 @@ wx-kit --version
 
 CLI 契约：stdout 只输出 JSON，stderr 输出进度；退出码 `0` 表示成功，`1` 表示业务失败，`2` 表示用法错误或需先登录。完整参数和示例见 [`agent/wx-kit-skill/`](agent/wx-kit-skill/)。
 
-M55 为 v0.10.1 的源码改动，尚未发布；已发布 v0.10.0 的 digest 仍是旧的联网查询。
-新行为以 `library.json.publishTime` 按北京时间筛选，默认（包括 today）纯本地、无需登录。
+v0.10.1 的 digest 以 `library.json.publishTime` 按北京时间筛选，默认（包括 today）纯本地、无需登录。
 仅今天允许显式 `--download`，会刷新最新 cover、下载缺失文章并重读文库，不受自动检查时间或自动下载设置影响；
 非今天加该选项会在联网前返回 `DOWNLOAD_TODAY_ONLY`（退出码 2）。清单只代表本地保存内容，无法保证捕获
 两次刷新间被 cover 覆盖的文章。无法确定发表时间时保留正文并告警，日报不将其归入任意日期，
@@ -193,7 +192,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.10.0；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 本轮未发，落后于 GitHub/brew 属预期）；
+- 最新已发布版本：v0.10.1；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
