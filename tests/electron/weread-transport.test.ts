@@ -90,6 +90,22 @@ describe('WereadNodeTransport.json', () => {
       await expect(t.json('https://i.weread.qq.com/mp/chapters', 5000)).rejects.toMatchObject({ status: 401 })
     } finally { globalThis.fetch = origFetch }
   })
+  it('仅成功响应后同步 Chromium Cookie 快照，401 不覆盖凭据', async () => {
+    const p = join(dir, 'creds.json')
+    await writeFile(p, JSON.stringify({ vid: '77', accessToken: 'AT', refreshToken: 'RT', name: '', updatedAt: 0, cookie: 'old=1' }), 'utf-8')
+    const sync = vi.fn(async () => {})
+    const ok = new WereadNodeTransport(p, (async () => new Response('{"errCode":0}', { status: 200 })) as typeof fetch, sync)
+    await ok.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)
+    expect(sync).toHaveBeenCalledTimes(1)
+    const denied = new WereadNodeTransport(p, (async () => new Response('', { status: 401 })) as typeof fetch, sync)
+    await expect(denied.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)).rejects.toMatchObject({ status: 401 })
+    expect(sync).toHaveBeenCalledTimes(1)
+  })
+  it('Cookie 快照落盘失败不把已经成功的业务请求改判失败', async () => {
+    const sync = vi.fn(async () => { throw new Error('disk full') })
+    const t = new WereadNodeTransport(join(dir, 'none.json'), (async () => new Response('{"errCode":0}', { status: 200 })) as typeof fetch, sync)
+    await expect(t.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)).resolves.toMatchObject({ errCode: 0 })
+  })
 })
 
 describe('RoutingTransport', () => {

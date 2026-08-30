@@ -4,8 +4,9 @@ import { MpRequestAudit } from './mp-request-audit'
 import { MpRequestGateway } from './mp-request-gateway'
 import { FileMpRequestStateStore } from './mp-request-state'
 import { getMpElectronSession, hydrateMpCookies } from './mp-session'
-import { wereadSessionFetch, getWereadElectronSession, WEREAD_PARTITION } from './weread-net'
+import { wereadSessionFetch, getWereadElectronSession, WEREAD_PARTITION, wereadCookieHeader } from './weread-net'
 import { RoutingTransport, wereadCredsPath, WereadNodeTransport } from './weread-transport'
+import { WereadCredsStore } from '../../src/core/weread/creds-store'
 import { FETCH_TIMEOUT_MS, HTML_TIMEOUT_MS } from '../../src/core/fetch-html'
 
 /** 一个进程只构造一个 runtime；持久 state/lease 再把 GUI 与独立 CLI 进程收口到一起。 */
@@ -29,9 +30,13 @@ export function createMpRuntime(userDataDir: string): MpRequestGateway {
         wereadSessionFetch()(url, init) as unknown as Promise<Response>
     } catch { return globalThis.fetch }
   })()
-  const wereadNode = new WereadNodeTransport(wereadCredsPath(userDataDir), doFetch as typeof fetch)
+  const credsPath = wereadCredsPath(userDataDir)
+  const wereadNode = new WereadNodeTransport(credsPath, doFetch as typeof fetch, async () => {
+    const cookie = await wereadCookieHeader()
+    await new WereadCredsStore(credsPath).updateCookie(cookie)
+  })
   void WEREAD_PARTITION
-  const transport = new RoutingTransport(wereadCredsPath(userDataDir), chromium, wereadNode)
+  const transport = new RoutingTransport(credsPath, chromium, wereadNode)
   const audit = new MpRequestAudit(userDataDir)
   // 审计是辅助证据；磁盘写日志失败不能把已做出的保护决定改成另一种业务错误。
 

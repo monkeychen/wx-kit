@@ -46,6 +46,14 @@ describe('WereadCredsStore', () => {
     expect(await store.read()).toBeNull()
     await store.clear()
   })
+  it('成功请求后的 Cookie 快照只在变化时写回，保留其它登录字段', async () => {
+    const store = new WereadCredsStore(join(dir, 'weread-creds.json'))
+    await store.write({ ...creds, cookie: 'old=1' })
+    expect(await store.updateCookie('new=2', 99)).toBe(true)
+    expect(await store.read()).toMatchObject({ ...creds, cookie: 'new=2', updatedAt: 99 })
+    expect(await store.updateCookie('new=2', 100)).toBe(false)
+    expect((await store.read())?.updatedAt).toBe(99)
+  })
 })
 
 describe('refreshWereadCreds', () => {

@@ -41,6 +41,7 @@ export class WereadNodeTransport {
   constructor(
     private readonly credsPath: string,
     private readonly doFetch: typeof fetch = globalThis.fetch,
+    private readonly afterSuccess?: () => Promise<void>,
   ) {}
 
   private async headers(_url: string): Promise<Record<string, string>> {
@@ -74,7 +75,10 @@ export class WereadNodeTransport {
       throw Object.assign(new Error(`微信读书 HTTP ${res.status}（登录态可能失效）`), { status: res.status })
     }
     if (!res.ok) throw Object.assign(new Error(`微信读书请求 HTTP ${res.status}: ${url}`), { status: res.status })
-    return await res.json() as MpJson
+    const payload = await res.json() as MpJson
+    // Set-Cookie 已由 Chromium 分区写入 jar；同步失败不应把已经成功的业务请求改判失败。
+    await this.afterSuccess?.().catch(() => {})
+    return payload
   }
 }
 

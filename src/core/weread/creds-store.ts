@@ -1,6 +1,7 @@
 // src/core/weread/creds-store.ts
 // 微信读书凭据的落盘与续期。凭据文件即登录凭证——一律 0600（沿用 mp-session.json 的纪律）。
-import { readFile, writeFile, rm } from 'node:fs/promises'
+import { readFile, writeFile, rename, rm, unlink } from 'node:fs/promises'
+import { withPathLock } from '../path-lock'
 import type { WereadCredentials } from './types'
 import { MpAuthExpired } from '../mp-errors'
 
@@ -18,8 +19,30 @@ export class WereadCredsStore {
     } catch { throw new Error(`微信读书凭据文件损坏: ${this.path} — 删除后重新扫码登录即可`) }
   }
 
+  private async writeAtomic(creds: WereadCredentials): Promise<void> {
+    const temp = `${this.path}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`
+    try {
+      await writeFile(temp, JSON.stringify(creds, null, 2), { mode: 0o600 })
+      await rename(temp, this.path)
+    } catch (error) {
+      await unlink(temp).catch(() => {})
+      throw error
+    }
+  }
+
   async write(creds: WereadCredentials): Promise<void> {
-    await writeFile(this.path, JSON.stringify(creds, null, 2), { mode: 0o600 })
+    await withPathLock(this.path, () => this.writeAtomic(creds))
+  }
+
+  /** 成功请求后把 Chromium jar 快照持久化，供下一独立进程使用。 */
+  async updateCookie(cookie: string, now = Date.now()): Promise<boolean> {
+    if (!cookie.trim()) return false
+    return withPathLock(this.path, async () => {
+      const creds = await this.read()
+      if (!creds || creds.cookie === cookie) return false
+      await this.writeAtomic({ ...creds, cookie, updatedAt: now })
+      return true
+    })
   }
 
   async clear(): Promise<void> {
