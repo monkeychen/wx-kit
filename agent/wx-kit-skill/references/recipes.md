@@ -1,7 +1,7 @@
 # 当前有效任务范例
 
 > 每个范例都是完整命令序列。`jq` 只用于展示 JSON 解析，可替换为任意解析器。
-> v0.10.0 起，按公众号下载与订阅依赖**微信读书后端**复活；首次用这些能力前需 `login`。
+> 联网刷新订阅需要微信读书登录；以下本地 digest 示例对应 v0.10.1 / M55 源码，无需登录，已发布 v0.10.0 尚不具备此契约。
 
 ## 1. 全新机器下载第一篇文章（不需要登录）
 
@@ -79,9 +79,16 @@ FAKEID=$(jq -r '.account.fakeid' acct.json)
 wx-kit subscription check-now --accounts "$FAKEID" > check.json
 jq '{accounts,newFound,failed,results,note}' check.json
 
-# (d) 查某一天该号发了什么（--download 顺带补齐未下载的）
-wx-kit subscription digest --date 2026-08-27 --download --accounts "$FAKEID" > digest.json
+# (d) 从本地文库查该号指定日期发表的文章（无须登录、零网络）
+wx-kit subscription digest --date 2026-08-27 --accounts "$FAKEID" > digest.json
 jq -r '.articles[] | "\(.title)\t\(.contentPath)"' digest.json
+
+# (e) 今天只查本地也不需要 --download
+wx-kit subscription digest --date today --accounts "$FAKEID" > today.json
+
+# (f) 用户明确要求刷新下载时才执行：仅今天允许，不依赖全局自动下载策略
+wx-kit subscription digest --date today --download --accounts "$FAKEID" --formats md,meta --no-video > refreshed.json
+jq '{ok,count,unknownPublishTimeCount,coverageNote,failures,articles}' refreshed.json
 ```
 
 要点：
@@ -89,12 +96,15 @@ jq -r '.articles[] | "\(.title)\t\(.contentPath)"' digest.json
 - 微信读书**无按名字搜索接口**——识别公众号必须用「该号任意一篇文章链接」，不是公众号名称；
 - 登录态存于本机 `weread-creds.json`，会自动续期；headless 环境用 `wx-kit session export`/`import` 搬运；
 - `crawl` 已停用（列表接口被服务端按账号封禁）；要某号最新一篇用 `subscription check-now`，增量订阅不变。
+- 不得把过去日期与 `--download` 组合来回补历史；已有文库日报无法列出从未保存的漏文。
+- `unknownPublishTimeCount` 不为零时应告知有文章无法归入日期；它不是指定日期的缺失篇数。
 
 ## 失败处理
 
 | 现象 | 含义 | 动作 |
 |---|---|---|
-| `AUTH_REQUIRED` | 用 search/subscription 前未登录微信读书 | 先 `wx-kit login` 再重试 |
+| `AUTH_REQUIRED` | 联网刷新需要微信读书登录 | 显式下载前先登录；纯本地 digest 不要求登录 |
+| `DOWNLOAD_TODAY_ONLY` | 非今天的日期与 `--download` 组合 | 去掉 flag 查询历史文库；只有今天允许刷新下载 |
 | `MP_BACKEND_UNAVAILABLE` | `crawl` 已停用（服务端封禁列表） | 用 `subscription check-now` 拿最新一篇，或 `download --url` |
 | `NOT_FOUND` | 文章链接读不出公众号标识（错误页/失效） | 换该号的另一篇文章链接重试 |
 | 单篇 failed，提示文章不可访问 | 文章已删除、审核失败或违规下架 | 报告并跳过，不自动重试 |

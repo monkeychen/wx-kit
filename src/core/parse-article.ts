@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio'
 import type { ParsedArticle } from './types'
 import { extractMpVideos } from './parse-video'
 import { kindOf, readItemShowType, unknownKindWarning, type MessageKind } from './message-kind'
+import { parsePublicationTime } from './publication-time'
 
 function meta($: cheerio.CheerioAPI, prop: string): string {
   return $(`meta[property="${prop}"]`).attr('content')?.trim() ?? ''
@@ -25,10 +26,10 @@ function formatCnTime(ms: number): string {
  */
 function parsePublishTime($: cheerio.CheerioAPI, html: string): string {
   const fromEl = $('#publish_time').text().trim()
-  if (fromEl) return fromEl
-  const readable = html.match(/createTime\s*=\s*['"](\d{4}-\d{2}-\d{2} \d{2}:\d{2})['"]/)
-  if (readable) return readable[1]
-  const unix = html.match(/(?:\bct|oriCreateTime|createTimestamp)\s*=\s*['"](\d{10})['"]/)
+  if (parsePublicationTime(fromEl) != null) return fromEl
+  const readable = html.match(/\bcreateTime\s*=\s*['"]([^'"]+)['"]/)
+  if (readable && parsePublicationTime(readable[1]) != null) return readable[1]
+  const unix = html.match(/(?:\bct|\boriCreateTime|\bcreateTimestamp)\s*=\s*['"]?(\d{10})(?!\d)/)
   if (unix) return formatCnTime(Number(unix[1]) * 1000)
   return ''
 }

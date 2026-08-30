@@ -64,12 +64,12 @@ describe('CLI revived private API commands (v0.10.0 weread backend)', () => {
     expect(JSON.parse(stdout)).toMatchObject({ ok: true, note: 'no-session' })
   })
 
-  it('subscription digest without login asks for login (exit 2)', async () => {
+  it('subscription digest without login queries the empty local library (exit 0)', async () => {
     const userDataDir = mkdtempSync(join(tmpdir(), 'wxk-rev-cli-'))
     const root = mkdtempSync(join(tmpdir(), 'wxk-rev-lib-'))
     const code = await runCli(['subscription', 'digest', '--date', 'today', '--out', root], { userDataDir })
-    expect(code).toBe(2)
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'AUTH_REQUIRED' } })
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, count: 0, articles: [] })
   })
 
   it('session export without login reports NO_SESSION (exit 1)', async () => {

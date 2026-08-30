@@ -2,6 +2,7 @@
 
 > stdout 为 JSON，stderr 为进度。输出较大时重定向到文件再解析，不要用会截断数据的管道。
 > v0.10.0 起，订阅依赖**微信读书（WeRead）后端**复活；`search`/`login`/`auth-status`/`subscription`/`session`/`protection` 可用。`crawl` 因列表接口被服务端按账号封禁（2026-08-28）再度停用。
+> 下述 digest 契约从 v0.10.1 / M55 源码生效；不要假定已发布 v0.10.0 也支持纯本地日报。
 
 ## 登录前置：login
 
@@ -9,7 +10,8 @@
 wx-kit login          # 终端打印二维码，微信扫码并手机确认；成功后输出 { ok, vid, name }
 ```
 
-- 未登录时 `search`/`subscription`/`digest` 会返回 `AUTH_REQUIRED`（退出码 2）；
+- 刷新 cover 需要登录；`digest --download` 有订阅账号但未登录时返回 `AUTH_REQUIRED`（退出码 2）。
+- `subscription list` 与默认 `subscription digest --date` 只读本地，无需登录；
 - 凭据存于 `<用户数据目录>/weread-creds.json`，自动续期；CLI 下无法扫码的 headless 环境可用 `session export/import` 搬运；
 - GUI 下登录在「设置 → 微信读书」页内扫码，不另开窗口。
 
@@ -48,13 +50,31 @@ wx-kit crawl <fakeid> --count N
 
 ```sh
 wx-kit subscription list                      # 列出订阅账号、水位、上次/下次检查
-wx-kit subscription check-now [--accounts a,b] # 立即检查全部(或指定)订阅号的新文章并下载
-wx-kit subscription digest --date <YYYY-MM-DD|today|yesterday> [--download] [--accounts a,b]
+wx-kit subscription check-now [--accounts a,b] # 检查更新，是否自动下载由设置决定
+wx-kit subscription digest --date <YYYY-MM-DD|today|yesterday> [--accounts a,b] [--out <目录>]
+wx-kit subscription digest --date today --download [--accounts a,b] [--formats md,meta] [--no-video] [--out <目录>]
 ```
 
 - `list`：返回 `accounts[]`（含 `fakeid`/`nickname`/水位）、`lastRunAt`、`nextCheckAt`；
-- `check-now`：对每个订阅号调微信读书取最新一篇，比水位新则下载；返回逐号明细 `results[]`、`newFound`、`failed`，并带 `note`（如「仅最新一篇可用，历史无法回补」）；
-- `digest --date`：查已订阅号在某一天发了什么；默认只查询，`--download` 顺带把缺的文章下下来（输出带本地 `contentPath`）。
+- `check-now`：按稳定文章身份检查更新，按设置提示或自动下载；返回逐号明细 `results[]`、`newFound`、`failed`。
+- `digest --date`：只读本地订阅与文库，按 `publishTime` 的北京时间自然日筛选，默认零网络（today 也一样）。
+- `--accounts` 从 `subscription list` 取 fakeid，兼容旧标识，默认全部已订阅账号。查询优先匹配文库 `accountId`，其次长链 `__biz`，历史数据两者皆无时才按本地订阅昵称精确匹配。新下载会保存已知账号身份，避免改名后漏查；缺少身份的旧短链条目仍可能受昵称变更影响。
+- `--download` 只允许北京时间今天或等于今天的具体日期；非今天返回 `DOWNLOAD_TODAY_ONLY`、退出码 2，在联网前拒绝。
+- 显式下载先读取所选账号的最新 cover，下载文库缺失文章，再重新读库筛选今天；最新 cover 若是旧文仍可能保存，但不会算作今天发表。
+- 显式下载不受全局自动下载策略影响，不修改订阅游标、`newRefs`、调度和设置；请求仍受串行、间隔与全局熔断保护。
+- `--formats` 缺省跟随设置，`--no-video` 关闭视频；二者仅在 `--download` 时生效。
+- 缺失或无效 `publishTime` 不阻断正文保存；日报排除该文章，返回 `unknownPublishTimeCount` 和 `warnings`。
+  该计数覆盖所选账号范围，不是查询当天的漏文数；不能用 `downloadTime` 代填。
+- 日报正常（含空清单）退出码 0；刷新/下载有失败则保留本地清单，`ok:false`、退出码 1，错误放 `failures[]`。
+
+结果示意（`digest`，字段示例）：
+
+```json
+{"ok":true,"date":"2026-08-30","accounts":1,"count":1,"articles":[{"id":"2247483817_1","account":"示例号","title":"示例文章","publishTime":"2026-08-30T02:00:00.000Z","url":"https://mp.weixin.qq.com/s/EXAMPLE","downloaded":true,"dir":"/library/article","contentPath":"/library/article/content.md"}],"unknownPublishTimeCount":0,"coverageNote":"清单仅覆盖本地已保存文章；两次刷新间被 cover 覆盖的文章可能漏检。"}
+```
+
+`articles` 仅来自文库；`contentPath` 只在 Markdown 文件确实存在时返回；未下载或未知日期不混入文章清单。
+`failures` 含账号昵称、错误，适用时附 `fakeid/url/code/unavailable`。不要用“有本地文章”判断刷新成功。
 
 结果示意（`check-now`）：
 
@@ -141,11 +161,11 @@ wx-kit settings set subscriptionAutoCheck true
 wx-kit settings set subscriptionScheduleMode daily|interval
 wx-kit settings set subscriptionCheckTime 09:00
 wx-kit settings set subscriptionIntervalHours 12
-wx-kit settings set subscriptionPolicy download|notify
+wx-kit settings set subscriptionNewArticleAction download|notify
 wx-kit settings set downloadVideos true|false
 ```
 
-订阅相关字段（`subscriptionAutoCheck`/`subscriptionScheduleMode`/`subscriptionCheckTime`/`subscriptionIntervalHours`/`subscriptionPolicy`/`downloadVideos`）在 v0.10.0 已复活，可直接读写；`settings get` 不再对它们返回 `MP_BACKEND_UNAVAILABLE`。
+订阅相关字段（`subscriptionAutoCheck`/`subscriptionScheduleMode`/`subscriptionCheckTime`/`subscriptionIntervalHours`/`subscriptionNewArticleAction`/`downloadVideos`）在 v0.10.0 已复活，可直接读写；`settings get` 不再对它们返回 `MP_BACKEND_UNAVAILABLE`。
 
 ## update / version / help
 

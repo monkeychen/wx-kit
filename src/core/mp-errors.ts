@@ -22,3 +22,12 @@ export class MpRequestProtectionError extends Error {
     this.name = 'MpRequestProtectionError'
   }
 }
+
+/** 所有下载层都必须保留全局停止信号，不能把它当作普通坏图或坏链接吞掉。 */
+export function globalRequestStopCode(error: unknown): string | undefined {
+  const value = error as { code?: string; status?: number } | null
+  if (value?.status === 429) return 'RATE_LIMITED'
+  const code = value?.code
+  return code && ['RATE_LIMITED', 'MP_RATE_LIMITED', 'MP_GOVERNOR_PAUSED', 'MP_REQUEST_CANCELLED', 'AUTH_REQUIRED'].includes(code)
+    ? code : undefined
+}

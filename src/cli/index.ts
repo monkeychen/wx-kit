@@ -10,11 +10,10 @@ import type { DownloadFormat, DownloadSummary } from '../core/types'
 import { ALL_FORMATS } from '../core/types'
 import { Library } from '../core/library'
 import { DownloadQueue } from '../core/download-queue'
-import { downloadArticle, ArticleUnavailableError } from '../core/download-article'
+import { downloadArticle } from '../core/download-article'
 import { extractArticleKeys } from '../core/article-keys'
 import { parseAccount } from '../core/parse-article'
 import { normalizeAccountId } from '../core/weread/book-id'
-import { canonicalId } from '../core/article-id'
 import { MpAuthExpired } from '../core/mp-errors'
 import { HTML_TIMEOUT_MS } from '../core/fetch-html'
 import { RETIRED_PRIVATE_API_COMMANDS, retiredPrivateApiResponse } from '../core/retired-private-api'
@@ -27,17 +26,18 @@ import { syncToSite } from '../core/site-sync'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
 import { History, eventFromSummary, type HistorySource } from '../core/download-history'
-import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine } from '../core/subscriptions'
+import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, normalizeAccountKey } from '../core/subscriptions'
 import { nextCheckAt } from '../core/subscription-schedule'
 import { resolveDigestDate } from '../core/digest-date'
-import { subscriptionDigest, fetchMissing } from '../core/subscription-digest'
+import { subscriptionDigest, type DigestFailure } from '../core/subscription-digest'
+import { refreshDigest } from '../core/refresh-digest'
 import { sourceUrlKey } from '../core/subscription-refs'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
 import { articleFetchers, createMpRuntime } from '../../electron/services/mp-runtime'
 import type { MpRequestGateway } from '../../electron/services/mp-request-gateway'
 import {
   ensureFreshWereadCreds, makeWereadClient, runWereadLogin, WereadLoginCancelled,
-  wereadCredsStore, wereadListFn, wereadListUrl, wereadCrawlListFn
+  wereadCredsStore, wereadListFn, wereadListUrl
 } from '../../electron/services/weread-auth'
 import { buildWereadQrFlowHttp } from '../../electron/services/weread-net'
 
@@ -435,91 +435,71 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
 
   subscription
     .command('digest')
-    .description('查已订阅公众号「某一天」发布了什么(默认只查询;加 --download 顺带把缺的下下来)')
-    .requiredOption('--date <date>', 'YYYY-MM-DD / today / yesterday(「昨天」「7月23日」等表达请先自行换算)')
-    .option('--accounts <csv>', '只查指定公众号(逗号分隔 fakeid,默认全部已订阅;号多时耗时明显)')
-    .option('--download', '把清单里还没下载的下下来(已下载的自动跳过),输出带本地路径')
-    .option('--formats <csv>', '仅配合 --download:cover,md,html,pdf,meta(默认取设置里的 defaultFormats)')
-    .option('--no-video', '仅配合 --download:不下载文中内嵌视频(默认按设置;单个视频可达上百 MB)')
+    .description('按发表日期查询本地订阅文章（默认零网络；仅今天可加 --download 刷新并下载）')
+    .requiredOption('--date <date>', '北京时间 YYYY-MM-DD / today / yesterday')
+    .option('--accounts <csv>', '指定订阅公众号 fakeid（逗号分隔；默认全部已订阅账号）')
+    .option('--download', '仅限今天：刷新最新 cover、下载缺失文章，再从文库返回当天清单')
+    .option('--formats <csv>', '仅配合 --download:cover,md,html,pdf,meta(默认跟随设置)')
+    .option('--no-video', '仅配合 --download:不下载文中视频')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (o) => {
+      const now = Date.now()
       let when
-      try { when = resolveDigestDate(String(o.date)) }
-      catch (e) {
-        // 明确报错而不是猜:猜错会静默给出另一天的结果,用户根本不会发现
-        outJson({ ok: false, error: { code: 'BAD_DATE', message: (e as Error).message } })
+      try { when = resolveDigestDate(String(o.date), now) }
+      catch (error) {
+        outJson({ ok: false, error: { code: 'BAD_DATE', message: (error as Error).message } })
         exitCode = 2; return
       }
-      const creds = await wereadCredsStore(userDataDir).read()
-      if (!creds) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
+      if (o.download && when.date !== resolveDigestDate('today', now).date) {
+        outJson({ ok: false, error: {
+          code: 'DOWNLOAD_TODAY_ONLY',
+          message: '--download 仅支持北京时间今天；当前 cover 无法回补历史，请去掉 --download 查询本地文库。',
+        } })
+        exitCode = 2; return
+      }
       const root = await resolveRoot(o.out)
       const subs = new Subscriptions(root)
       const library = new Library(root)
-      const listFn = await wereadCrawlListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
-      if (!listFn) { outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login（扫码登录微信读书）' } }); exitCode = 2; return }
-      const only = o.accounts ? String(o.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : null
-      const accounts = (await subs.list())
-        .filter((a) => a.subscribed && (!only || only.includes(a.fakeid)))
-        .map((a) => ({ fakeid: a.fakeid, nickname: a.nickname }))
+      const only = o.accounts
+        ? String(o.accounts).split(',').map((id) => normalizeAccountKey(id.trim())).filter(Boolean)
+        : null
+      const accounts = (await subs.list()).filter((a) => a.subscribed && (!only || only.includes(a.fakeid)))
+      let failures: DigestFailure[] = []
 
-      // 判「已下载」一次性把库读进内存:library.has 每次都重读文件,16 个号会读上百次。
-      // **除了 id 还要按 sourceUrl 兜一层**:v0.8.4 之前订阅下载没透传文章主键,
-      // 那批文章的 id 是路径哈希(真实库里 32/267 篇),光比 id 会把它们误报成「没下载」,
-      // 于是 agent 照着 downloaded:false 又下一遍 —— 正是 digest 最该避免的事。
-      const stored = await library.list()
-      const byId = new Map(stored.map((a) => [canonicalId(a.id), a]))
-      const byUrl = new Map(stored.map((a) => [a.sourceUrl, a]))
-      const localOf = async (id: string, url: string) => {
-        const m = byId.get(canonicalId(id)) ?? byUrl.get(url)
-        if (!m) return null
-        return {
-          dir: m.dir,
-          // 只在正文文件真会存在时给路径 —— 给个指向不存在文件的路径比不给更糟
-          ...(m.formats.includes('md') ? { contentPath: join(m.dir, 'content.md') } : {}),
-          ...(m.warnings?.length ? { warnings: m.warnings } : {}),
+      // 纯本地分支不检查凭据、不构造网关；全局自动下载设置不改变本次明确的 flag。
+      if (o.download && accounts.length) {
+        const settings = await settingsFor().get()
+        const formats = o.formats ? parseFormats(String(o.formats)) : settings.defaultFormats
+        if (!await wereadCredsStore(userDataDir).read()) {
+          outJson({ ok: false, error: { code: 'AUTH_REQUIRED', message: '请先执行 wx-kit login，再刷新下载；不带 --download 的本地查询无需登录。' } })
+          exitCode = 2; return
         }
-      }
-
-      const result = await subscriptionDigest({
-        accounts, date: when.date, fromTs: when.fromTs, toTs: when.toTs,
-        listByDate: (fakeid) => listFn(fakeid, { from: when.date, to: when.date }),
-        localOf,
-        // 16 个号要跑半分钟,没有逐号输出会像卡死
-        onProgress: (e) => process.stderr.write(`[${e.index}/${e.total}] ${e.nickname} … ${e.count} 篇\n`),
-      })
-
-      // --download:把缺的取回来。**只在显式要求时才构造下载依赖**——
-      // 不带这个 flag 时这段整个不执行,「行为一字不变」由结构保证而不是靠 if 里的自觉。
-      if (o.download) {
-        const s = await settingsFor().get()
-        // 缺省跟设置里的 defaultFormats 走(与 crawl 的硬编码 'md,html,meta' **有意不同**:
-        // 「我平时下什么就下什么」比记住一串字面量更符合直觉。别顺手统一成硬编码)
-        const formats = o.formats ? parseFormats(String(o.formats)) : s.defaultFormats
-        const ddeps = {
-          ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow,
-          now: () => new Date().toISOString(), library, libraryRoot: root,
-          downloadVideos: o.video === false ? false : s.downloadVideos,
+        const client = makeWereadClient((path, params) =>
+          mpGateway().requestWereadJson('weread-list', wereadListUrl(path, params)))
+        const deps = {
+          ...mpArticleFetchers(), BrowserWindowCtor: BrowserWindow, library, libraryRoot: root,
+          now: () => new Date().toISOString(),
+          downloadVideos: o.video === false ? false : settings.downloadVideos,
         }
-        result.articles = await fetchMissing(result.articles, {
-          download: async (url, hint) => {
-            try {
-              const r = await downloadArticle(url, formats, ddeps, hint)
-              return { ok: true, ...(r.dir ? { dir: r.dir } : {}), ...(r.warnings ? { warnings: r.warnings } : {}) }
-            } catch (e) {
-              // 「读者本就打不开」与真故障分开:前者重试无用(v0.8.3 的结论)
-              return {
-                ok: false, error: (e as Error).message,
-                ...(e instanceof ArticleUnavailableError ? { unavailable: true } : {}),
-              }
-            }
-          },
-          ...(formats.includes('md') ? { contentPathOf: (dir: string) => join(dir, 'content.md') } : {}),
-          onProgress: (e) => process.stderr.write(`↓ [${e.index}/${e.total}] ${e.title}\n`),
+        failures = await refreshDigest(accounts, {
+          latest: (fakeid) => client.getLatestArticle(fakeid),
+          readLibrary: () => library.list(),
+          download: (account, url, hint, report) => downloadArticle(url, formats, { ...deps, accountId: account.fakeid, onProgress: report }, hint),
+          onAccount: (account, index, total) => process.stderr.write(`[${index}/${total}] 刷新 ${account.nickname}\n`),
+          onProgress: (event) => process.stderr.write(`↓ ${event.message ?? event.phase}\n`),
         })
       }
 
+      // 下载后重读；日期过滤只依据入库的真实发表时间，不能筛选 cover 的发现时间。
+      const result = subscriptionDigest({
+        accounts, date: when.date, library: await library.list(),
+        contentPathOf: (article) => {
+          const path = join(article.dir, 'content.md')
+          return article.formats.includes('md') && existsSync(path) ? path : undefined
+        },
+      })
+      if (failures.length) { result.ok = false; result.failures = failures }
       outJson(result)
-      // 一个号都没查成不是「部分成功」,给非 0 退出码让 agent 能分辨
       exitCode = result.ok ? 0 : 1
     })
 

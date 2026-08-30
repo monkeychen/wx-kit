@@ -28,6 +28,8 @@ export interface ArticleMeta {
   title: string
   author: string
   account: string
+  /** 公众号稳定身份，新条目可保存；旧条目缺省时仍兼容昵称/URL 匹配。 */
+  accountId?: string
   publishTime: string
   sourceUrl: string
   digest: string

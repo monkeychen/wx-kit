@@ -4,6 +4,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { MpVideoSource } from '../parse-video'
+import { globalRequestStopCode } from '../mp-errors'
 
 /** meta.json 里记的视频明细。**不含 url**——直链带 auth_key/dis_t 签名有时效。 */
 export interface VideoRecord {
@@ -86,6 +87,7 @@ export async function downloadVideos(
       // md 是纯文本,只能给可点链接;附上参数,免得点开才发现是 480p
       mdParts.push(`[📹 视频 ${i + 1}（${v.width}×${v.height}, ${formatDuration(v.durationMs)}）](${rel})`)
     } catch (e) {
+      if (globalRequestStopCode(e)) throw e
       // 视频失败不该拖垮整篇(其余格式已写好),但必须说出来——两处正文都写,并上报告警
       const why = (e as Error).message
       const note = `📹 视频 ${i + 1} 下载失败（${spec(v)}）：${why}`

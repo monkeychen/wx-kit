@@ -3,6 +3,8 @@
 wx-kit 是 GUI + CLI 同一二进制的桌面应用：无参启动 GUI，命中 CLI 命令白名单时进入 CLI。
 CLI 契约：stdout 纯 JSON，stderr 输出进度；退出码 `0` 成功、`1` 业务失败、`2` 用法错误。
 
+本文含 v0.10.1 / M55 的源码行为；已发布 v0.10.0 的 digest 不具备下述纯本地查询契约，使用前核对版本/源码来源。
+
 ## 1. 确认安装
 
 ```sh
@@ -28,12 +30,13 @@ Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/Ma
 
 | 任务 | 命令 |
 |---|---|
-| 扫码登录 | `wx-kit login` (终端会显示二维码，必须扫码登录微信读书才能抓公众号列表) |
+| 扫码登录 | `wx-kit login`（刷新订阅最新 cover 前需要；本地日报无需登录） |
 | 识别公众号 | `wx-kit search --url <公众号的任意一篇文章链接>` (返回该公众号的标识 ID) |
 | 下载一篇或多篇文章 | `wx-kit download --url <URL> [--url <URL> ...] --formats md,meta` |
 | 从文件批量下载 URL | `wx-kit download --urls-file <文件> [--no-video]` |
 | 检查订阅更新 | `wx-kit subscription check-now` |
-| 获取单日订阅摘要 | `wx-kit subscription digest --date today --download` |
+| 查询文库中某天发表的订阅文章 | `wx-kit subscription digest --date <日期>`（默认零网络，包括 today） |
+| 刷新下载后查询今天的文库日报 | `wx-kit subscription digest --date today --download`（仅今天允许） |
 | 跨机器同步凭据 | `wx-kit session export -o ./creds.json` / `wx-kit session import ./creds.json` |
 | 查看文库 | `wx-kit library list` |
 | 搜索文库 | `wx-kit library search <关键词> [--account <公众号>]` |
@@ -45,7 +48,9 @@ Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/Ma
 
 默认行为：
 
-- 必须先登录微信读书 (`wx-kit login`)，才能使用 `search`, `subscription` 命令（`crawl` 已停用）。
+- 联网刷新 cover 需要微信读书登录；`subscription list` 和不带 `--download` 的 `subscription digest` 不需要登录。
+- `digest --date` 按北京时间的真实发表日期筛选 `library.json`，与下载时间无关；不读取调度状态决定是否联网。
+- 只有用户明确要求刷新下载时才加 `--download`，它仅支持今天（或等于今天的具体日期），不受自动下载设置影响。
 - 文章中的图片自动本地化；视频默认下载到文章目录，可用 `--no-video` 关闭；
 - 同一文章已在文库时会跳过，不重复落盘。
 
@@ -62,6 +67,11 @@ Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/Ma
 - 顶层 `ok`、`succeeded`、`failed`；
 - 每个 `items[]` 的 `ok`、`error`、`warnings`；
 - 需要正文时确认文章目录内确实存在 `content.md`，不要只凭退出码判断内容可用。
+
+digest 使用 `count/articles` 而非下载命令的 `total/items`。检查 `ok`、`failures`、`unknownPublishTimeCount` 和
+`coverageNote`：未知发表时间的文章仍保存正文但不归入任何日期；计数覆盖所选账号全库，不是当天漏文数。
+日报只列已入库文章（`downloaded:true`）。刷新失败即使返回部分本地文章，也会 `ok:false`、退出码 1。
+每号 cover 只有最新一篇，无法补回两次刷新间被覆盖的文章；不要将文库日报说成完整发布史。
 
 `library export` 输出的 `articles[].contentPath` 是正文绝对路径，正文不内联在 JSON 中；后续分析或写作需要再读取该文件。
 

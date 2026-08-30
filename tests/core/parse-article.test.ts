@@ -25,6 +25,10 @@ describe('parseArticle', () => {
 })
 
 describe('parseArticle publishTime fallback', () => {
+  it('无效展示时间应回退到不带引号的 Unix 秒，不使用下载时间', () => {
+    const html = '<h1 id="activity-name">T</h1><em id="publish_time">未知</em><script>var ct = 1779415680;</script>'
+    expect(parseArticle(html, 'x').publishTime).toBe('2026-05-22 10:08')
+  })
   // 真实微信页：#publish_time 元素为空（运行时 JS 填充），时间藏在脚本变量里
   it('falls back to the human-readable createTime var when #publish_time is empty', () => {
     const html =

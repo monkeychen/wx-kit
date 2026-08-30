@@ -1,6 +1,6 @@
 # M55 · 基于本地文库发表日期的订阅日报
 
-> 2026-08-30 确认的最终方案，需求契约见 `docs/PRD-v0.10.1.md` R4。此文描述待实施行为；当前进度只在 `ROADMAP.md` 维护。
+> 2026-08-30 确认的最终方案，需求契约见 `docs/PRD-v0.10.1.md` R4。实现与验收见末节；当前进度只在 `ROADMAP.md` 维护。
 > 本方案替代此前“新增发现日志、每次 digest 都刷新 cover”的设计。不新增 `subscription-articles.json`。
 
 ## 目标与数据来源
@@ -14,7 +14,7 @@
 
 ## CLI 契约
 
-以下命令均为 M55 实施后的行为：
+以下命令为 M55 源码行为（尚未发布）：
 
 ```sh
 # 今天也默认纯本地，不联网、不下载
@@ -53,6 +53,7 @@ wx-kit subscription digest --date 2026-08-29
 - `articles` 保留 `account/title/publishTime/url/id/downloaded/dir/contentPath/warnings` 等既有字段；
   来源均为当前文库条目，因此 `downloaded:true`。只有实际存在对应正文文件时才给 `contentPath`。
 - `count` 只计日期匹配的文库条目。刷新/下载失败另列于 `failures`，不将未知时间或未入库文章混入日报清单。
+- 文库元数据新增可选 `accountId`，下载时保存已知账号 ID 或页面 biz，查询优先按稳定身份匹配，防止公众号改名后漏查；旧条目仍兼容长链 biz 和昵称，不强制迁移。
 - `coverageNote` 明确说明清单基于本地保存内容，无法保证捕获两次刷新之间被 cover 覆盖的文章。
 - 日期非法保持 `BAD_DATE`、退出码 2；非今天的下载请求用明确的参数错误码与退出码 2。
 - 纯本地查询正常完成（包括空清单）退出码 0，无需登录。显式刷新未登录返回 `AUTH_REQUIRED`、退出码 2；
@@ -65,38 +66,39 @@ wx-kit subscription digest --date 2026-08-29
 涉及 `src/core/digest-date.ts`、`src/core/subscription-digest.ts`、`src/cli/index.ts`，测试落在
 `tests/core/digest-date.test.ts`、`tests/core/subscription-digest.test.ts`、`tests/cli/cli-contract.test.ts`。
 
-- [ ] 先写行为测试：发表日期和下载日期不同时按前者筛选；北京时间跨日正确；具体日期等于 today 时允许下载。
-- [ ] 增加无凭据本地查询、零网络、文件不变测试；过去/未来日期加 `--download` 必须在请求前拒绝。
-- [ ] 将日报纯查询改为从文库元数据选择文章，保留账号筛选和本地路径；移除纯查询分支对 weread 登录与列表取件器的依赖。
-- [ ] 测试通过后接入 CLI；使用注入时钟固定“今天”，不读取调度时间来决定查询副作用。
+- [x] 先写行为测试：发表日期和下载日期不同时按前者筛选；北京时间跨日正确；具体日期等于 today 时允许下载。
+- [x] 增加无凭据本地查询、零网络、文件不变测试；过去/未来日期加 `--download` 必须在请求前拒绝。
+- [x] 将日报纯查询改为从文库元数据选择文章，保留账号筛选和本地路径；移除纯查询分支对 weread 登录与列表取件器的依赖。
+- [x] 测试通过后接入 CLI；使用注入时钟固定“今天”，不读取调度时间来决定查询副作用。
 
 ### T2 · 今天显式刷新并下载
 
 涉及 `src/cli/index.ts`、`electron/services/weread-auth.ts`，复用 `src/core/download-queue.ts`、
 `src/core/download-article.ts` 与 `src/core/subscription-refs.ts` 的身份、短链兼容和请求保护。
 
-- [ ] 先写行为测试：只刷新所选账号、已有文章跳过、下载后重读文库、旧发表日期不进入今天清单。
-- [ ] 验证全局自动下载设置开/关时显式 flag 行为相同；订阅游标、pending 与调度状态前后不变。
-- [ ] 仅在合法 `--download` 分支构造 cover 与下载依赖；不访问 `/web/mp/articles` 或旧 MP 后台接口。
-- [ ] 保持串行和现有间隔；记录刷新/下载失败，触发全局请求保护后停止后续请求，不以空清单掩盖故障。
+- [x] 先写行为测试：只刷新所选账号、已有文章跳过、下载后重读文库、旧发表日期不进入今天清单。
+- [x] 验证全局自动下载设置开/关时显式 flag 行为相同；订阅游标、pending 与调度状态前后不变。
+- [x] 仅在合法 `--download` 分支构造 cover 与下载依赖；不访问 `/web/mp/articles` 或旧 MP 后台接口。
+- [x] 保持串行和现有间隔；记录刷新/下载失败，触发全局请求保护后停止后续请求，不以空清单掩盖故障。
+- [x] 保护错误不得被图片、封面、视频或替代短链的容错逻辑吞掉；公众号改名后的新下载仍能按稳定 ID 查到。
 
 ### T3 · 缺失发表时间的可见性
 
 涉及 `src/core/parse-article.ts`、`src/core/download-article.ts`、`src/core/subscription-digest.ts`，
 测试覆盖解析、成功保存正文但有告警、日报排除未知日期与告警计数。
 
-- [ ] 先写测试：空值与不可解析时间不误归日期，无法确定发表时间不阻断正文保存。
-- [ ] 加固时间解析并通过现有 `warnings` 传递缺失时间信息，不建立“非空才能入库”的硬拒绝规则。
-- [ ] 对已确认的少量历史空值安排定向补全：先备份，依据原文证据更新 `meta.json` 和 `library.json`；
+- [x] 先写测试：空值与不可解析时间不误归日期，无法确定发表时间不阻断正文保存。
+- [x] 加固时间解析并通过现有 `warnings` 传递缺失时间信息，不建立“非空才能入库”的硬拒绝规则。
+- [x] 对已确认的少量历史空值安排定向补全：先备份，依据原文证据更新 `meta.json` 和 `library.json`；
   若无法获取真实日期则保留空值与报告。不得在普通查询或启动时隐藏联网，不新增长期修复命令。
 
 ### T4 · 文档与验收
 
-- [ ] CLI 实现同批刷新 `README.md`、`agent/wx-kit-skill/SKILL.md`、`references/commands.md`、
+- [x] CLI 实现同批刷新 `README.md`、`agent/wx-kit-skill/SKILL.md`、`references/commands.md`、
   `references/recipes.md`，必要时同步 `agent/wx-kit-compose/` 中的调用示例。
-- [ ] 删除使用过去日期搭配 `--download` 的有效范例；注明本地查询不要求登录，日期不触发隐式下载。
-- [ ] 更新 PRD 验收、ROADMAP 与 devlog；区分已确认设计、代码实现、自动测试和真实链路结果。
-- [ ] 执行 test、lint、tsc、build；CLI 隔离测试证明默认零请求。真实 cover/下载验收另行记录，不能用 fixture 代替。
+- [x] 删除使用过去日期搭配 `--download` 的有效范例；注明本地查询不要求登录，日期不触发隐式下载。
+- [x] 更新 PRD 验收、ROADMAP 与 devlog；区分已确认设计、代码实现、自动测试和真实链路结果。
+- [x] 执行 test、lint、tsc、build；CLI 隔离测试证明默认零请求。真实 cover/下载验收另行记录，不能用 fixture 代替。
 
 ## 非目标与被替代方案
 
@@ -105,4 +107,16 @@ wx-kit subscription digest --date 2026-08-29
 - 不把 `newRefs` 作为第二份日报文章来源；本版不扩展成包含所有未下载/忽略文章的发布日志。
 - 不要求 `publishTime` 永远非空，不用下载时间补假值，不因日期缺失拒绝保存正文。
 - 不新增 `library repair-publish-time` 命令，不改变既有订阅调度与 GUI 操作语义。
-- README 与 agent skill 当前描述仍对应已实现 CLI；上述新契约须在实现同批更新，不能提前宣称可用。
+- README 与 agent skill 已随源码更新，并注明已发布 v0.10.0 不具备该新契约；不提前修改发布版本号。
+
+## 执行与验收记录（2026-08-30）
+
+- 源码：本地日报、今天显式刷新、未知日期告警、稳定账号身份、全局停止错误传播均已实施。
+- 自动验证：`npm test` 62 文件/519 项通过，`npm run lint`、`npx tsc --noEmit -p tsconfig.json` 退出码 0。
+- 时区验证：日期与日报用例分别在 UTC、America/Los_Angeles 下通过，结果均为北京时间。
+- 构建与 GUI：`npm run build` 双架构 DMG 退出码 0；`node tests/e2e/gui.e2e.mjs` ALL PASSED。未签名与 chunk 大小提示为现有构建限制。
+- 真实链路：临时文库内首次 cover 刷新、公开页下载、发表时间与账号身份落盘成功；打包 CLI 无凭据查询真实发表日期成功，查询前后文库/订阅文件不变、未产生微信请求审计。
+- 存量数据：两篇空时间文章依据原文解析和 ID 核对补齐，只更新对应 meta 与 library 的发表时间，备份在本次验收临时目录内。
+- 现场证据（本机临时产物，不含凭据）：`/tmp/wxkit-m55-verify-1BNFSB/report.json`；备份 `/tmp/wxkit-m55-verify-1BNFSB/legacy-backup-bbv7VF/`。
+- 独立审查提出的资源错误吞没、账号改名漏查、cover HTTP 鉴权停止问题均补回归修复，最终复核无新增发现。
+- [ ] 真实跨进程重复刷新：第二个独立 CLI 进程返回 HTTP 401，未把该项标成通过。错误明细/退出码及本地查询已验证；连续登录态仍需单独复验。

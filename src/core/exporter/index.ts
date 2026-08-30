@@ -10,6 +10,7 @@ import { writePdfFromHtml } from './export-pdf'
 import { buildImageMap, rewriteImageRefs } from '../image-localizer'
 import { downloadVideos } from './export-video'
 import type { ProgressPhase } from '../types'
+import { globalRequestStopCode } from '../mp-errors'
 
 export interface ExportDeps {
   /** 下载二进制（图片/封面） */
@@ -32,6 +33,7 @@ export interface ExportInput {
   formats: DownloadFormat[]
   /** 是否下载文中视频（内容的一部分，不是格式）。缺省视为 true。 */
   downloadVideos?: boolean
+  accountId?: string
 }
 
 /** 按所选格式导出一篇文章，返回最终 meta。调用方保证 dir 尚不存在或可写。 */
@@ -52,7 +54,8 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
     for (let i = 0; i < parsed.imageUrls.length; i++) {
       const url = parsed.imageUrls[i]
       deps.onProgress?.({ phase: 'images', message: `下载图片 ${i + 1}/${parsed.imageUrls.length}` })
-      try { downloaded.set(url, await deps.fetchBinary(url)) } catch { /* 跳过坏图 */ }
+      try { downloaded.set(url, await deps.fetchBinary(url)) }
+      catch (error) { if (globalRequestStopCode(error)) throw error /* 普通坏图仍可跳过 */ }
     }
     if (downloaded.size) {
       await mkdir(join(dir, 'images'), { recursive: true })
@@ -64,10 +67,11 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
     contentHtml = contentHtml.replace(/ data-src="[^"]*"/g, '')
   }
 
-  const meta = buildMeta({ parsed, id, sourceUrl, dir, formats, now: deps.now() })
+  const meta = buildMeta({ parsed, id, sourceUrl, dir, formats, now: deps.now(), accountId: input.accountId })
 
   if (formats.includes('cover') && parsed.coverUrl) {
-    try { const { data, contentType } = await deps.fetchBinary(parsed.coverUrl); await writeCover(dir, data, contentType) } catch { /* 封面失败不致命 */ }
+    try { const { data, contentType } = await deps.fetchBinary(parsed.coverUrl); await writeCover(dir, data, contentType) }
+    catch (error) { if (globalRequestStopCode(error)) throw error /* 普通封面失败不致命 */ }
   }
 
   // 视频：必须在写 md/html 之前（正文要引用它），且必须在本次流程内下完

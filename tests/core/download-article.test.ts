@@ -71,6 +71,16 @@ describe('downloadArticle', () => {
     expect(entries.filter((e: string) => e !== 'library.json')).toHaveLength(0)
   })
 
+  it.each(['', '2026-02-30 08:00'])('发表时间 %s 不可信时仍保存正文且将告警写入文库和元数据', async (date) => {
+    const deps = makeDeps(root, VALID_HTML.replace('2026-02-25 08:00', date))
+    const result = await downloadArticle(TEST_URL, ['md', 'meta'], deps)
+    expect(result.ok).toBe(true)
+    expect(readFileSync(join(result.dir!, 'content.md'), 'utf8')).toContain('正文')
+    expect(result.warnings?.join('')).toContain('发表时间')
+    expect((await deps.library.list())[0].warnings?.join('')).toContain('发表时间')
+    expect(JSON.parse(readFileSync(join(result.dir!, 'meta.json'), 'utf8')).warnings.join('')).toContain('发表时间')
+  })
+
   it('dedup returns skipped without refetching', async () => {
     // First download — succeeds with VALID_HTML
     const deps1 = makeDeps(root, VALID_HTML)

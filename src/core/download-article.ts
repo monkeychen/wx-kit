@@ -8,6 +8,9 @@ import { parseArticle } from './parse-article'
 import { extractArticleKeys } from './article-keys'
 import { exportArticle, type ExportDeps } from './exporter'
 import { Library } from './library'
+import { parsePublicationTime } from './publication-time'
+import { globalRequestStopCode } from './mp-errors'
+import { normalizeAccountId } from './weread/book-id'
 
 export interface DownloadArticleDeps extends ExportDeps {
   fetchHtml: (url: string) => Promise<string>
@@ -15,6 +18,7 @@ export interface DownloadArticleDeps extends ExportDeps {
   libraryRoot: string
   /** 是否下载文中视频（设置项，默认 true）。视频是内容不是格式，故不走 formats。 */
   downloadVideos?: boolean
+  accountId?: string
   onProgress?: (stage: { phase: import('./types').ProgressPhase; message?: string }) => void
 }
 
@@ -66,7 +70,10 @@ export async function downloadArticle(
           // 粘贴的是短链且无 hint 时 id 是 URL 哈希，需按新 URL 重算
           if (id.startsWith('h_')) id = articleId(url, hint)
         }
-      } catch { /* 换 token 重取失败则维持原标题为空的原判 */ }
+      } catch (error) {
+        if (globalRequestStopCode(error)) throw error
+        // 普通换 token 重取失败仍维持原标题为空的判定。
+      }
     }
   }
 
@@ -95,6 +102,9 @@ export async function downloadArticle(
       : new Error(`${message}: ${url}`)
   }
 
+  if (parsePublicationTime(parsed.publishTime) == null) {
+    parsed.warnings.push('未解析到有效发表时间，正文已保存；该文章暂不归入按发表日期查询的日报。')
+  }
   const accountDir = join(deps.libraryRoot, sanitizeName(parsed.account || 'unknown'))
   const datePrefix = parsed.publishTime.slice(0, 10)
   const base = articleDirName(datePrefix, parsed.title)
@@ -103,8 +113,13 @@ export async function downloadArticle(
 
   // 视频这类非致命失败要浮到调用方（CLI JSON / GUI 结果区），否则只剩 ok:true 在误导
   const warnings: string[] = []
+  let accountId: string | undefined
+  const rawAccountId = deps.accountId ?? extractArticleKeys(html).biz
+  if (rawAccountId) {
+    try { accountId = normalizeAccountId(rawAccountId) } catch { /* 无可靠身份时仍保存正文 */ }
+  }
   deps.onProgress?.({ phase: 'export', message: '生成文件' })
-  const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats, downloadVideos: deps.downloadVideos },
+  const meta = await exportArticle({ parsed, id, sourceUrl: url, dir, formats, downloadVideos: deps.downloadVideos, accountId },
     { ...deps, onWarning: (m) => { warnings.push(m); deps.onWarning?.(m) } })
   await deps.library.add(meta)
 

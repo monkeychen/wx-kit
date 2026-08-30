@@ -10,6 +10,7 @@ export interface BuildMetaInput {
   dir: string
   formats: DownloadFormat[]
   now: string
+  accountId?: string
 }
 
 export function buildMeta(input: BuildMetaInput): ArticleMeta {
@@ -19,6 +20,7 @@ export function buildMeta(input: BuildMetaInput): ArticleMeta {
     title: parsed.title,
     author: parsed.author,
     account: parsed.account,
+    ...(input.accountId ? { accountId: input.accountId } : {}),
     publishTime: parsed.publishTime,
     sourceUrl,
     digest: parsed.digest,

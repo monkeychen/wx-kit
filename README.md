@@ -113,11 +113,19 @@ wx-kit --version
 | 扫码登录微信读书 | `wx-kit login`（终端打印二维码） |
 | 从文章链接识别公众号 | `wx-kit search --url <该号任意一篇文章链接>` |
 | 检查订阅更新 | `wx-kit subscription check-now [--accounts a,b]` |
-| 查某天订阅文章 | `wx-kit subscription digest --date <日期> [--download]` |
+| 按发表日期查本地订阅文章（M55） | `wx-kit subscription digest --date <日期>` |
+| 刷新下载后查今天（M55） | `wx-kit subscription digest --date today --download` |
 | 登录态迁移 | `wx-kit session export/import` |
 | 请求保护 | `wx-kit protection status/pause/resume` |
 
 CLI 契约：stdout 只输出 JSON，stderr 输出进度；退出码 `0` 表示成功，`1` 表示业务失败，`2` 表示用法错误或需先登录。完整参数和示例见 [`agent/wx-kit-skill/`](agent/wx-kit-skill/)。
+
+M55 为 v0.10.1 的源码改动，尚未发布；已发布 v0.10.0 的 digest 仍是旧的联网查询。
+新行为以 `library.json.publishTime` 按北京时间筛选，默认（包括 today）纯本地、无需登录。
+仅今天允许显式 `--download`，会刷新最新 cover、下载缺失文章并重读文库，不受自动检查时间或自动下载设置影响；
+非今天加该选项会在联网前返回 `DOWNLOAD_TODAY_ONLY`（退出码 2）。清单只代表本地保存内容，无法保证捕获
+两次刷新间被 cover 覆盖的文章。无法确定发表时间时保留正文并告警，日报不将其归入任意日期，
+通过 `unknownPublishTimeCount` 报告所选账号范围内的未知日期条目数；失败详情见 `failures`。
 
 ### 安装包内的 CLI
 

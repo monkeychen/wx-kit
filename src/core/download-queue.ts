@@ -2,6 +2,7 @@
 import type { DownloadItemResult, DownloadSummary, ProgressEvent } from './types'
 import type { ArticleIdHint } from './article-id'
 import { ArticleUnavailableError } from './download-article'
+import { globalRequestStopCode } from './mp-errors'
 
 /** 队列条目：光有 URL 时无法判重（短链认不出与长链是同一篇），故允许带上列表给的主键 */
 export type QueueItem = string | ({ url: string } & ArticleIdHint)
@@ -38,7 +39,8 @@ export class DownloadQueue {
       } catch (err) {
         // 「读者打不开」与「下载失败」对用户是两回事:前者重试也没用,不该让人以为工具坏了
         const unavailable = err instanceof ArticleUnavailableError
-        const errorCode = (err as { code?: string }).code
+        const stopCode = globalRequestStopCode(err)
+        const errorCode = stopCode ?? (err as { code?: string }).code
         const code = unavailable ? 'ARTICLE_UNAVAILABLE' : (errorCode ?? 'DOWNLOAD_FAILED')
         items.push({
           url, ok: false, ...(unavailable ? { unavailable: true } : {}),
@@ -46,7 +48,7 @@ export class DownloadQueue {
         })
         this.onProgress({ total, completed: i + 1, currentUrl: url, phase: 'failed' })
         // 频控/全局保护不是单篇故障：当前项如实记录，其余尚未发出的条目留给调用方标记未下载。
-        if (isGlobalStopCode(code)) break
+        if (stopCode) break
       }
     }
 
@@ -58,11 +60,4 @@ export class DownloadQueue {
 
     return { ok: failed === 0, total, succeeded, failed, skipped, ...(unavailable ? { unavailable } : {}), items }
   }
-}
-
-function isGlobalStopCode(code: string): boolean {
-  return code === 'RATE_LIMITED'
-    || code === 'MP_RATE_LIMITED'
-    || code === 'MP_GOVERNOR_PAUSED'
-    || code === 'MP_REQUEST_CANCELLED'
 }
