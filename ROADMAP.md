@@ -5,8 +5,8 @@
 
 ## 当前状态
 
-- **最新发布:v0.10.1(2026-08-30,订阅日报与会话续用)** —— tag `v0.10.1` + GitHub Release(三平台包,标 Latest)+ brew tap。M55 将 digest 改为按 `library.json.publishTime` 的北京时间本地查询，只有今天显式 `--download` 才刷新并下载；补真实发表时间解析、未知时间告警、账号稳定身份、Cookie 快照持久化与独立进程验证。M54 的订阅可靠性、全量待处理下载和阶段反馈一并包含。微信读书列表仍按账号封禁，每号只返回最新一篇，latest-only 漏检边界保留。需求/验收 `docs/PRD-v0.10.1.md`，发布说明 `docs/releases/v0.10.1.md`。
-- **当前开发:v0.10.2(M56 已实现并验收,待发版)** —— 需求/验收 `docs/PRD-v0.10.2.md`,计划 `plans/2026-09-04-m56-subscription-visibility.md`。发版走标准流程(feat → main → tag → GitHub Release + brew tap,README 同批刷新)。Windows CLI stdout 与公式保真推迟(2026-09-04 安哥定)。
+- **最新发布:v0.10.2(2026-09-04,订阅自动下载可感知与文库直达)** —— tag `v0.10.2` + GitHub Release(三平台包,标 Latest)+ brew tap。M56 将自动下载明细持久落盘(四状态:刚下载/文库已有/失败/不可访问)、订阅页行内摘要与记录弹窗、CLI `list` recentLog / `check-now` articles;订阅页每号常驻文库入口(身份匹配筛选);修阅读器 HTML 视图外链(ERR_BLOCKED_BY_RESPONSE),外链统一走系统浏览器;补齐 v0.10.1 三条验收遗留。需求/验收 `docs/PRD-v0.10.2.md`,发布说明 `docs/releases/v0.10.2.md`。
+- **当前开发:暂无** —— 下一版候选见文末「下一步 / 候选」(公式保真为下一版首选项,Windows CLI stdout 随 Windows agent 场景铺开时做)。
 - **v0.8.6、v0.8.7 均未发布且不再发布** —— M44–M47、M49 的有效成果由 v0.9.0 吸收；两份 PRD 仅保留历史设计与需求去向，不是当前验收契约。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(当前有效 GUI 端到端)看当前真实结果；另以隔离文库执行真实文章 URL 下载验收。私有后台命令只验收“稳定拒绝且零请求”，不再做 live 联调。
 
@@ -78,6 +78,7 @@
 
 ## 版本发布史(最新在前)
 
+- **v0.10.2 · 2026-09-04 · 自动下载看得见,订阅直达文库** —— M56 把「系统已经知道的事」持久地告诉用户:自动下载明细落进 checkLog(四状态,「文库已有」不冒充「刚下载」),行内摘要/记录弹窗/CLI `recentLog` 同源可查——安哥的痛点「每天自动下载了什么,用户完全不知道」的根因是数据层没有落点,不是 UI 缺展示位。订阅页每号常驻文库入口,按身份筛选(改名不失联)。实施中踩出一条红线:渲染层 import 带 node 内建的 core 模块会被 vite-plugin-electron-renderer 转成 require shim 致页面白屏,纯函数已挪至零依赖模块(devlog §52)。顺手修阅读器 HTML 视图外链被微信嵌入限制响应头阻断的 bug,外链统一交系统浏览器。发布说明 `docs/releases/v0.10.2.md`,复盘 devlog §52。
 - **v0.10.1 · 2026-08-30 · 订阅日报与会话续用** —— M55 将 `subscription digest` 改为按 `library.json.publishTime` 的北京时间本地查询，默认零网络；仅今天显式 `--download` 才刷新 cover、下载缺失文章并重读文库。补真实发表时间解析、未知时间告警、账号稳定身份、Cookie 快照持久化与独立进程验证；M54 的订阅可靠性、全量待处理下载和阶段反馈一并包含。列表封禁的 latest-only 漏检边界保持不变。发布说明 `docs/releases/v0.10.1.md`，复盘 devlog §49–§51。
 
 - **v0.10.0 · 2026-08-28 · 订阅回来了,批量下载留在那里** —— v0.9.0 因 MP 后台私有接口被封而退场的订阅,这一版经**微信读书 Web 后端**重建闭环:扫码登录(应用内/CLI 二维码)、粘贴文章链接识别、检查/自动下载、`search/login/auth-status/subscription/session/protection` 命令组恢复。实施中两次事实反转:移动端列表接口被风控 → 降级 Web 端 `/api/mp/cover`(最新一篇)→ spike 三轮(undici / Electron 栈 / 真 Chrome 全登录)证伪「网络栈指纹」归因,确认列表接口是**服务端按账号封禁**、与客户端无关——据此按号批量下载再度停用(GUI 入口移除、CLI `crawl` 稳定拒绝),边界如实收缩为「订阅 + 最新一篇」。订阅页顺手修四件用户实测问题:新旧标识(base64 fakeid vs `MP_WXS_`)同名重复行归一、每行可删除(持久化标记、历史派生行不复活)、行内检查只作用本行(修全局 loading)、首检水位 off-by-one(订阅后首检必报「没有新文章」)。发布说明 `docs/releases/v0.10.0.md`,复盘 devlog §46–§47。

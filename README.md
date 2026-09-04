@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.10.1-released-success.svg)
+![Status](https://img.shields.io/badge/v0.10.2-released-success.svg)
 
 ## 这是什么
 
@@ -17,17 +17,17 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.10.1）**
+> **当前能力边界（v0.10.2）**
 >
-> v0.10.1 在 v0.10.0 的**微信读书（WeRead）后端**订阅能力上，补充了可靠的本地发表日期日报和独立 CLI 进程 Cookie 会话续用：
+> v0.10.2 让**自动下载从黑箱变成看得见**：每次检查/自动下载的逐篇结果（刚下载/文库已有/失败/不可访问）持久留痕，订阅页行内摘要、检查记录弹窗与 CLI `subscription list` 的 `recentLog` 同源可查；订阅页每个公众号新增「文库」直达入口，按号筛选已下载文章：
 >
-> - 识别公众号改用「粘贴该号**任意一篇文章链接**」——微信读书无按名字搜索接口；
+> - 识别公众号用「粘贴该号**任意一篇文章链接**」——微信读书无按名字搜索接口；
 > - **降级项**：微信读书列表接口被服务端按账号限制，每次仅返回该号**最新一篇**文章；「按公众号批量下载」入口已移除（CLI `crawl` 稳定拒绝），自动订阅与日报无法找回两次刷新间被覆盖的文章；
-> - 按文章 URL 下载不依赖登录态，仍是主功能，未受影响。
+> - 按文章 URL 下载不依赖登录态，仍是主功能，未受影响；阅读器内点外链统一用系统浏览器打开。
 
 ## 当前界面
 
-以下截图来自 v0.10.1 正式界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
+以下截图来自 v0.10.2 正式界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
@@ -80,11 +80,11 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.1：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.2：
 
-- Apple Silicon：`wx-kit-0.10.1-arm64.dmg`
-- Intel Mac：`wx-kit-0.10.1.dmg`
-- Windows：`wx-kit.Setup.0.10.1.exe`
+- Apple Silicon：`wx-kit-0.10.2-arm64.dmg`
+- Intel Mac：`wx-kit-0.10.2.dmg`
+- Windows：`wx-kit.Setup.0.10.2.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -113,6 +113,7 @@ wx-kit --version
 | 扫码登录微信读书 | `wx-kit login`（终端打印二维码） |
 | 从文章链接识别公众号 | `wx-kit search --url <该号任意一篇文章链接>` |
 | 检查订阅更新 | `wx-kit subscription check-now [--accounts a,b]` |
+| 查自动下载了什么（M56） | `wx-kit subscription list`（输出 `recentLog` 含逐篇明细） |
 | 按发表日期查本地订阅文章（M55） | `wx-kit subscription digest --date <日期>` |
 | 刷新下载后查今天（M55） | `wx-kit subscription digest --date today --download` |
 | 登录态迁移 | `wx-kit session export/import` |
@@ -120,7 +121,7 @@ wx-kit --version
 
 CLI 契约：stdout 只输出 JSON，stderr 输出进度；退出码 `0` 表示成功，`1` 表示业务失败，`2` 表示用法错误或需先登录。完整参数和示例见 [`agent/wx-kit-skill/`](agent/wx-kit-skill/)。
 
-v0.10.1 的 digest 以 `library.json.publishTime` 按北京时间筛选，默认（包括 today）纯本地、无需登录。
+digest 以 `library.json.publishTime` 按北京时间筛选，默认（包括 today）纯本地、无需登录。
 仅今天允许显式 `--download`，会刷新最新 cover、下载缺失文章并重读文库，不受自动检查时间或自动下载设置影响；
 非今天加该选项会在联网前返回 `DOWNLOAD_TODAY_ONLY`（退出码 2）。清单只代表本地保存内容，无法保证捕获
 两次刷新间被 cover 覆盖的文章。无法确定发表时间时保留正文并告警，日报不将其归入任意日期，
@@ -192,7 +193,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.10.1；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
+- 最新已发布版本：v0.10.2；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
