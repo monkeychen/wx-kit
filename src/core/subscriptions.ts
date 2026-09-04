@@ -8,6 +8,7 @@ import type { ArticleRef } from './mp-types'
 import { mergeNewRefs, removeRefs } from './subscription-refs'
 import { normalizeAccountId } from './weread/book-id'
 import type { HistoryEvent } from './download-history'
+import type { DownloadItemResult } from './types'
 
 export interface SubscribedAccount {
   fakeid: string
@@ -22,6 +23,14 @@ export interface SubscribedAccount {
 
 export interface CheckFailure { nickname: string; error: string }
 
+/** 逐篇下载结果（M56）。四状态：刚下载 / 文库已有 / 真故障 / 读者不可见。 */
+export interface DownloadItemLog {
+  title: string
+  status: 'downloaded' | 'exists' | 'failed' | 'unavailable'
+  error?: string              // 仅 failed：失败原因（error.message）
+}
+export interface AccountDownloadLog { fakeid: string; nickname: string; items: DownloadItemLog[] }
+
 export interface CheckLogEntry {
   time: number                       // unix ms
   trigger: 'auto' | 'manual'
@@ -30,14 +39,48 @@ export interface CheckLogEntry {
   failed: number                     // 失败的号数
   failures?: CheckFailure[]          // 逐号失败明细（v0.5.4 起;旧条目无此字段）
   note?: string                      // 特殊情形：'no-session' | 'auth-expired' | 'no-accounts'
+  /** M56：'check'=检查（可含自动下载交付）；'download'=纯交付（手动批量补下载）。缺省 'check'=旧数据兼容。 */
+  kind?: 'check' | 'download'
+  downloaded?: number                // 刚下载篇数（不含 exists——不把「文库已有」伪装成「刚下载」）
+  existed?: number                   // 文库已有篇数
+  downloadDetail?: AccountDownloadLog[] // 有下载动作才写；不进单行日志，明细走弹窗/CLI
 }
 
-/** 落盘日志的一行（人类可读）。纯函数。 */
+/** 落盘日志的一行（人类可读）。纯函数。旧条目（无 M56 字段）输出逐字节不变。 */
 export function formatCheckLogLine(e: CheckLogEntry): string {
-  let line = `[${new Date(e.time).toISOString()}] ${e.trigger === 'auto' ? 'AUTO' : 'MANUAL'} accounts=${e.accounts} new=${e.newFound} failed=${e.failed}`
+  const label = e.kind === 'download' ? 'DOWNLOAD' : e.trigger === 'auto' ? 'AUTO' : 'MANUAL'
+  let line = `[${new Date(e.time).toISOString()}] ${label} accounts=${e.accounts} new=${e.newFound} failed=${e.failed}`
   if (e.note) line += ` note=${e.note}`
   if (e.failures?.length) line += ` [${e.failures.map((f) => `${f.nickname}: ${f.error}`).join('; ')}]`
+  if (e.downloaded !== undefined) line += ` downloaded=${e.downloaded}`
+  if (e.existed !== undefined) line += ` existed=${e.existed}`
   return line
+}
+
+/**
+ * DownloadItemResult → 下载日志条目（M56）。纯函数。
+ * 判定：ok&&!skipped→downloaded；ok&&skipped→exists；!ok&&unavailable→unavailable；其余→failed。
+ * 标题 item.title 优先，缺省时按 url 从 refs 补（列表本来就给标题），两者都无则空串。
+ * cancelled 的条目未尝试下载、没有下载动作，不产出日志。
+ */
+export function toDownloadItemLogs(
+  items: DownloadItemResult[],
+  refs: { url: string; title: string }[],
+): AccountDownloadLog['items'] {
+  const titleByUrl = new Map(refs.map((r) => [r.url, r.title] as const))
+  const logs: DownloadItemLog[] = []
+  for (const item of items) {
+    if (item.cancelled) continue
+    let status: DownloadItemLog['status']
+    if (item.ok && !item.skipped) status = 'downloaded'
+    else if (item.ok && item.skipped) status = 'exists'
+    else if (!item.ok && item.unavailable) status = 'unavailable'
+    else status = 'failed'
+    const log: DownloadItemLog = { title: item.title ?? titleByUrl.get(item.url) ?? '', status }
+    if (status === 'failed' && item.error?.message != null) log.error = item.error.message
+    logs.push(log)
+  }
+  return logs
 }
 
 interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: SubscribedAccount[]; checkLog: CheckLogEntry[]; removedFakeids?: string[] }

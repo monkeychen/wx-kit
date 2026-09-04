@@ -4,8 +4,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Subscriptions, mergeAccounts, accountsFromHistory, normalizeAccountKey, initialWatermark, type SubscribedAccount } from '../../src/core/subscriptions'
+import { Subscriptions, mergeAccounts, accountsFromHistory, normalizeAccountKey, initialWatermark, formatCheckLogLine, toDownloadItemLogs, type SubscribedAccount, type CheckLogEntry } from '../../src/core/subscriptions'
 import type { HistoryEvent } from '../../src/core/download-history'
+import type { DownloadItemResult } from '../../src/core/types'
 
 let dir: string
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'wxkit-subs-')) })
@@ -93,5 +94,81 @@ describe('Subscriptions.removeAccount（删除标记持久化）', () => {
       [], ['MP_WXS_3198966508'],
     )
     expect(merged).toEqual([])
+  })
+})
+
+// ---- M56：订阅自动下载结果可感知（数据层） ----
+
+describe('toDownloadItemLogs（四状态映射）', () => {
+  const refs = [
+    { url: 'https://mp.weixin.qq.com/s/a', title: '文章A' },
+    { url: 'https://mp.weixin.qq.com/s/b', title: '文章B' },
+  ]
+  const item = (over: Partial<DownloadItemResult>): DownloadItemResult =>
+    ({ url: 'https://mp.weixin.qq.com/s/a', ok: true, ...over })
+  it("ok && !skipped → 'downloaded'", () => {
+    expect(toDownloadItemLogs([item({ title: '文章A' })], refs))
+      .toEqual([{ title: '文章A', status: 'downloaded' }])
+  })
+  it("ok && skipped → 'exists'（不把「文库已有」伪装成「刚下载」）", () => {
+    expect(toDownloadItemLogs([item({ skipped: true, title: '文章A' })], refs))
+      .toEqual([{ title: '文章A', status: 'exists' }])
+  })
+  it("!ok && unavailable → 'unavailable'", () => {
+    expect(toDownloadItemLogs([item({ ok: false, unavailable: true, title: '文章A' })], refs))
+      .toEqual([{ title: '文章A', status: 'unavailable' }])
+  })
+  it("其余 → 'failed' 且 error 透传 error.message", () => {
+    expect(toDownloadItemLogs([item({ ok: false, title: '文章A', error: { code: 'E_PARSE', message: 'parse failed' } })], refs))
+      .toEqual([{ title: '文章A', status: 'failed', error: 'parse failed' }])
+  })
+  it('失败项标题缺省时按 url 从 refs 补全（列表本来就给标题）', () => {
+    expect(toDownloadItemLogs([item({ ok: false })], refs))
+      .toEqual([{ title: '文章A', status: 'failed' }])
+  })
+  it('cancelled 不产出日志条目（未尝试下载，没有下载动作）', () => {
+    expect(toDownloadItemLogs([item({ ok: false, cancelled: true }), item({ url: 'https://mp.weixin.qq.com/s/b', title: '文章B' })], refs))
+      .toEqual([{ title: '文章B', status: 'downloaded' }])
+  })
+  it('item.title 优先于 refs；两者都无则空串', () => {
+    expect(toDownloadItemLogs([item({ title: '以条目为准' })], refs))
+      .toEqual([{ title: '以条目为准', status: 'downloaded' }])
+    expect(toDownloadItemLogs([item({ ok: false, url: 'https://mp.weixin.qq.com/s/unknown' })], refs))
+      .toEqual([{ title: '', status: 'failed' }])
+  })
+})
+
+describe('formatCheckLogLine（M56 扩展）', () => {
+  it('旧格式条目输出与改动前逐字节一致（锁住原样例）', () => {
+    const full: CheckLogEntry = {
+      time: 1786000000000, trigger: 'auto', accounts: 3, newFound: 5, failed: 1,
+      note: 'no-session', failures: [{ nickname: '猫笔刀', error: 'list blocked' }],
+    }
+    expect(formatCheckLogLine(full))
+      .toBe('[2026-08-06T07:06:40.000Z] AUTO accounts=3 new=5 failed=1 note=no-session [猫笔刀: list blocked]')
+    const bare: CheckLogEntry = { time: 1786000000000, trigger: 'manual', accounts: 1, newFound: 0, failed: 0 }
+    expect(formatCheckLogLine(bare)).toBe('[2026-08-06T07:06:40.000Z] MANUAL accounts=1 new=0 failed=0')
+  })
+  it('新条目追加 downloaded=N existed=N；downloadDetail 不进单行', () => {
+    const e: CheckLogEntry = {
+      time: 1786000000000, trigger: 'auto', accounts: 3, newFound: 5, failed: 0,
+      downloaded: 2, existed: 1,
+      downloadDetail: [{ fakeid: 'MP_WXS_3198966508', nickname: '猫笔刀', items: [{ title: '文章A', status: 'downloaded' }] }],
+    }
+    expect(formatCheckLogLine(e))
+      .toBe('[2026-08-06T07:06:40.000Z] AUTO accounts=3 new=5 failed=0 downloaded=2 existed=1')
+  })
+  it('downloaded/existed 仅在非 undefined 时各自追加', () => {
+    const e: CheckLogEntry = { time: 1786000000000, trigger: 'manual', accounts: 1, newFound: 0, failed: 0, downloaded: 3 }
+    expect(formatCheckLogLine(e)).toBe('[2026-08-06T07:06:40.000Z] MANUAL accounts=1 new=0 failed=0 downloaded=3')
+  })
+  it("kind:'download' → DOWNLOAD 标签；缺省或 'check' 保持 AUTO/MANUAL", () => {
+    const base = { time: 1786000000000, accounts: 1, newFound: 0, failed: 0 }
+    expect(formatCheckLogLine({ ...base, trigger: 'auto', kind: 'download', downloaded: 1 }))
+      .toBe('[2026-08-06T07:06:40.000Z] DOWNLOAD accounts=1 new=0 failed=0 downloaded=1')
+    expect(formatCheckLogLine({ ...base, trigger: 'auto', kind: 'check' }))
+      .toBe('[2026-08-06T07:06:40.000Z] AUTO accounts=1 new=0 failed=0')
+    expect(formatCheckLogLine({ ...base, trigger: 'manual' }))
+      .toBe('[2026-08-06T07:06:40.000Z] MANUAL accounts=1 new=0 failed=0')
   })
 })
