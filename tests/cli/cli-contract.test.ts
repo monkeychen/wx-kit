@@ -440,6 +440,53 @@ describe('CLI settings get unknown key', () => {
   })
 })
 
+describe('CLI subscription list recentLog (M56)', () => {
+  /** 造一份带 M56 交付字段的 subscriptions.json：checkLog 新条目在前（与 appendCheckLog 落盘顺序一致） */
+  const seedCheckLog = () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-sublog-'))
+    const entry = (time: number, extra: Record<string, unknown> = {}) =>
+      ({ time, trigger: 'auto' as const, accounts: 1, newFound: 0, failed: 0, ...extra })
+    const newest = entry(6000, {
+      kind: 'check', downloaded: 1, existed: 1,
+      downloadDetail: [{ fakeid: 'MP_WXS_1', nickname: '测试号', items: [
+        { title: '文章一', status: 'downloaded' },
+        { title: '文章二', status: 'exists' },
+        { title: '文章三', status: 'unavailable' },
+        { title: '文章四', status: 'failed', error: 'boom' },
+      ] }],
+    })
+    writeFileSync(join(root, 'subscriptions.json'), JSON.stringify({
+      version: 1, lastRunAt: 6000,
+      accounts: [{ fakeid: 'MP_WXS_1', nickname: '测试号', subscribed: true, watermark: 100, lastCheckedAt: null, newRefs: [] }],
+      checkLog: [newest, entry(5000), entry(4000), entry(3000), entry(2000), entry(1000)],
+    }))
+    return root
+  }
+
+  it('输出 recentLog（最多 5 条、新在前），全量含 M56 下载明细字段', async () => {
+    const code = await runCli(['subscription', 'list', '--out', seedCheckLog()])
+    expect(code).toBe(0)
+    const out = JSON.parse(stdout)
+    expect(out).toMatchObject({ ok: true, accounts: [{ fakeid: 'MP_WXS_1', nickname: '测试号' }] })
+    // 6 条落盘只回最近 5 条，最旧一条不返回；顺序保持新在前
+    expect(out.recentLog.map((e: { time: number }) => e.time)).toEqual([6000, 5000, 4000, 3000, 2000])
+    expect(out.recentLog[0]).toMatchObject({ trigger: 'auto', kind: 'check', downloaded: 1, existed: 1 })
+    expect(out.recentLog[0].downloadDetail[0].items).toEqual([
+      { title: '文章一', status: 'downloaded' },
+      { title: '文章二', status: 'exists' },
+      { title: '文章三', status: 'unavailable' },
+      { title: '文章四', status: 'failed', error: 'boom' },
+    ])
+  })
+
+  it('无检查记录时 recentLog 仍存在且为空数组', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wxk-cli-sublog2-'))
+    const code = await runCli(['subscription', 'list', '--out', root])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, recentLog: [] })
+  })
+})
+
 describe('CLI help & version', () => {
   it('--version prints bare version to stdout, exit 0', async () => {
     const code = await runCli(['--version'], { version: '9.9.9' })

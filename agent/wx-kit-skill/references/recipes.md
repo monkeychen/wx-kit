@@ -89,6 +89,12 @@ wx-kit subscription digest --date today --accounts "$FAKEID" > today.json
 # (f) 用户明确要求刷新下载时才执行：仅今天允许，不依赖全局自动下载策略
 wx-kit subscription digest --date today --download --accounts "$FAKEID" --formats md,meta --no-video > refreshed.json
 jq '{ok,count,unknownPublishTimeCount,coverageNote,failures,articles}' refreshed.json
+
+# (g) 查最近自动下载了什么（GUI 定时任务下载的也在这里；无须登录、零网络）
+wx-kit subscription list > subs.json
+jq '[.recentLog[] | select(.downloadDetail != null)
+     | {time, trigger, downloaded, existed,
+        items: [.downloadDetail[].items[] | {title, status}]}]' subs.json
 ```
 
 要点：
@@ -96,6 +102,7 @@ jq '{ok,count,unknownPublishTimeCount,coverageNote,failures,articles}' refreshed
 - 微信读书**无按名字搜索接口**——识别公众号必须用「该号任意一篇文章链接」，不是公众号名称；
 - 登录态存于本机 `weread-creds.json`，会自动续期；headless 环境用 `wx-kit session export`/`import` 搬运；
 - `crawl` 已停用（列表接口被服务端按账号封禁）；要某号最新一篇用 `subscription check-now`，增量订阅不变。
+- 查「最近自动下载了什么」用 `subscription list` 的 `recentLog[]`（最近 5 条，按 `time` 过滤日期，逐篇明细在 `downloadDetail[].items`）；`check-now` 只报告本次触发的一轮，不回看历史。
 - 不得把过去日期与 `--download` 组合来回补历史；已有文库日报无法列出从未保存的漏文。
 - `unknownPublishTimeCount` 不为零时应告知有文章无法归入日期；它不是指定日期的缺失篇数。
 

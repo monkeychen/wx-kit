@@ -382,7 +382,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   const subscription = program.command('subscription').description('公众号订阅(子命令:list / check-now / digest)')
   subscription
     .command('list')
-    .description('列出订阅账号、水位、上次/下次检查')
+    .description('列出订阅账号、水位、上次/下次检查与最近检查记录')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
     .action(async (opts) => {
       const s = await settingsFor().get()
@@ -394,7 +394,11 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const next = s.subscriptionAutoCheck
         ? nextCheckAt(Date.now(), lastRunAt, { mode: s.subscriptionScheduleMode, checkTime: s.subscriptionCheckTime, intervalHours: s.subscriptionIntervalHours })
         : null
-      outJson({ ok: true, accounts: merged, lastRunAt, nextCheckAt: next, authExpired: false })
+      // M56:最近 5 条检查记录(与 GUI 检查记录弹窗同源,全量含下载交付字段)。定时自动下载
+      // 发生在 GUI 进程内,这里是 agent 查「最近自动下载了什么」的唯一 CLI 路径——check-now
+      // 只报告本次触发的一轮,不回看历史。
+      const recentLog = (await subs.getCheckLog()).slice(0, 5)
+      outJson({ ok: true, accounts: merged, lastRunAt, nextCheckAt: next, authExpired: false, recentLog })
       exitCode = 0
     })
   subscription

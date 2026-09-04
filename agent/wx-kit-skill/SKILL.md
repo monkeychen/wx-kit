@@ -34,7 +34,8 @@ Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/Ma
 | 识别公众号 | `wx-kit search --url <公众号的任意一篇文章链接>` (返回该公众号的标识 ID) |
 | 下载一篇或多篇文章 | `wx-kit download --url <URL> [--url <URL> ...] --formats md,meta` |
 | 从文件批量下载 URL | `wx-kit download --urls-file <文件> [--no-video]` |
-| 检查订阅更新 | `wx-kit subscription check-now` |
+| 检查订阅更新 | `wx-kit subscription check-now`（自动下载时 `results[].articles` 给出该号逐篇明细） |
+| 查订阅状态与最近检查记录 | `wx-kit subscription list`（`recentLog[]` 为最近 5 条检查记录，含自动下载明细；查自动下载历史用它，不用 check-now） |
 | 查询文库中某天发表的订阅文章 | `wx-kit subscription digest --date <日期>`（默认零网络，包括 today） |
 | 刷新下载后查询今天的文库日报 | `wx-kit subscription digest --date today --download`（仅今天允许） |
 | 跨机器同步凭据 | `wx-kit session export -o ./creds.json` / `wx-kit session import ./creds.json` |

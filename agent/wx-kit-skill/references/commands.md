@@ -55,8 +55,8 @@ wx-kit subscription digest --date <YYYY-MM-DD|today|yesterday> [--accounts a,b] 
 wx-kit subscription digest --date today --download [--accounts a,b] [--formats md,meta] [--no-video] [--out <目录>]
 ```
 
-- `list`：返回 `accounts[]`（含 `fakeid`/`nickname`/水位）、`lastRunAt`、`nextCheckAt`；
-- `check-now`：按稳定文章身份检查更新，按设置提示或自动下载；返回逐号明细 `results[]`、`newFound`、`failed`。
+- `list`：返回 `accounts[]`（含 `fakeid`/`nickname`/水位）、`lastRunAt`、`nextCheckAt`、`recentLog[]`（v0.10.2 起：最近 5 条检查记录，新在前，与 GUI「检查记录」同源）。定时自动下载发生在 GUI 进程内，查「最近自动下载了什么」用 `recentLog`，`check-now` 只报告本次触发的一轮；
+- `check-now`：按稳定文章身份检查更新，按设置提示或自动下载；返回逐号明细 `results[]`、`newFound`、`failed`。自动下载的号带 `results[].articles`（v0.10.2 起），为该号本次逐篇明细，与 `recentLog` 里 `downloadDetail[].items` 同构——`status` 四态 `downloaded`/`exists`/`failed`/`unavailable`（仅 `failed` 才有 `error`）；未走下载策略的号没有该字段。
 - `digest --date`：只读本地订阅与文库，按 `publishTime` 的北京时间自然日筛选，默认零网络（today 也一样）。
 - `--accounts` 从 `subscription list` 取 fakeid，兼容旧标识，默认全部已订阅账号。查询优先匹配文库 `accountId`，其次长链 `__biz`，历史数据两者皆无时才按本地订阅昵称精确匹配。新下载会保存已知账号身份，避免改名后漏查；缺少身份的旧短链条目仍可能受昵称变更影响。
 - `--download` 只允许北京时间今天或等于今天的具体日期；非今天返回 `DOWNLOAD_TODAY_ONLY`、退出码 2，在联网前拒绝。
@@ -67,6 +67,22 @@ wx-kit subscription digest --date today --download [--accounts a,b] [--formats m
   该计数覆盖所选账号范围，不是查询当天的漏文数；不能用 `downloadTime` 代填。
 - 日报正常（含空清单）退出码 0；刷新/下载有失败则保留本地清单，`ok:false`、退出码 1，错误放 `failures[]`。
 
+结果示意（`list`，v0.10.2 起含 `recentLog`；无下载动作的记录不含 `kind`/`downloaded`/`existed`/`downloadDetail`）：
+
+```json
+{ "ok": true,
+  "accounts": [ { "fakeid": "MP_WXS_3634850725", "nickname": "雷一言", "subscribed": true } ],
+  "lastRunAt": 1760000000000, "nextCheckAt": null, "authExpired": false,
+  "recentLog": [
+    { "time": 1760000000000, "trigger": "auto", "accounts": 1, "newFound": 2, "failed": 0,
+      "kind": "check", "downloaded": 1, "existed": 1,
+      "downloadDetail": [ { "fakeid": "MP_WXS_3634850725", "nickname": "雷一言",
+        "items": [ { "title": "早报", "status": "downloaded" },
+                   { "title": "旧文", "status": "exists" },
+                   { "title": "被删文", "status": "unavailable" },
+                   { "title": "失败文", "status": "failed", "error": "timeout" } ] } ] } ] }
+```
+
 结果示意（`digest`，字段示例）：
 
 ```json
@@ -76,11 +92,13 @@ wx-kit subscription digest --date today --download [--accounts a,b] [--formats m
 `articles` 仅来自文库；`contentPath` 只在 Markdown 文件确实存在时返回；未下载或未知日期不混入文章清单。
 `failures` 含账号昵称、错误，适用时附 `fakeid/url/code/unavailable`。不要用“有本地文章”判断刷新成功。
 
-结果示意（`check-now`）：
+结果示意（`check-now`，自动下载的号带 `articles` 逐篇明细）：
 
 ```json
 { "ok": true, "accounts": 3, "newFound": 2, "failed": 0,
-  "results": [ { "fakeid": "...", "nickname": "...", "newFound": 1, "downloaded": 1 } ],
+  "results": [ { "fakeid": "...", "nickname": "...", "newFound": 1, "downloaded": 1,
+                 "articles": [ { "title": "早报", "status": "downloaded" },
+                               { "title": "失败文", "status": "failed", "error": "timeout" } ] } ],
   "note": "微信读书接口每次仅返回最新一篇，历史文章无法增量回补" }
 ```
 

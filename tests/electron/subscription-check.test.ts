@@ -104,8 +104,11 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
     ])
     // 「真故障/未尝试留在待处理」语义不变：u1/u2/u3 处理完清掉，u4(故障)/u5(取消)留下
     expect(setPendingRefs).toHaveBeenCalledWith(account.fakeid, [refs[3], refs[4]])
-    // PerAccountResult 本任务不改：downloaded 仍取 summary.succeeded
+    // PerAccountResult 的 downloaded 仍取 summary.succeeded
     expect(result.results[0]).toMatchObject({ newFound: 5, downloaded: 1 })
+    // M56 T5:行结果挂逐篇明细 articles,与落盘的 downloadDetail 同源（一份收集、两处消费），
+    // CLI check-now 经 outJson 透传后即 results[].articles
+    expect(result.results[0].articles).toEqual(entry.downloadDetail![0].items)
   })
 
   it('仅提示策略：entry 不写 kind/downloaded/existed/downloadDetail（缺省而非 0）', async () => {
@@ -115,7 +118,7 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
       list: async () => [account], updateWatermark: async () => {}, addNewRefs: async () => {},
       setLastRunAt: async () => {},
     } as unknown as Subscriptions
-    await runSubscriptionCheck('auto', {
+    const result = await runSubscriptionCheck('auto', {
       subs,
       settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
       list: async () => [],
@@ -130,6 +133,9 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
     expect('existed' in entry).toBe(false)
     expect('downloadDetail' in entry).toBe(false)
     expect(downloadRefs).not.toHaveBeenCalled()
+    // M56 T5:无下载动作的行结果不写 articles 字段（缺省而非空数组）
+    expect(result.results[0]).toMatchObject({ newFound: 2, downloaded: 0 })
+    expect('articles' in result.results[0]).toBe(false)
   })
 
   it('manual + fakeids 子集 + download 策略：同样落明细，明细收集对 trigger 无感', async () => {

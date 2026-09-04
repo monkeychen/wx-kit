@@ -2,7 +2,7 @@
 // 订阅检查编排(从 ipc.ts 抽出,GUI 与 CLI 共用)。依赖全注入,无 electron 运行时,可单测。
 import { checkSubscriptions } from '../../src/core/check-subscriptions'
 import { MpAuthExpired } from '../../src/core/mp-errors'
-import type { Subscriptions, CheckLogEntry, CheckFailure, AccountDownloadLog } from '../../src/core/subscriptions'
+import type { Subscriptions, CheckLogEntry, CheckFailure, AccountDownloadLog, DownloadItemLog } from '../../src/core/subscriptions'
 import { toAccountDownloadLog, countDownloadOutcomes } from '../../src/core/subscription-batch'
 import type { ArticleRef } from '../../src/core/mp-types'
 import type { DownloadFormat, DownloadSummary, ProgressEvent } from '../../src/core/types'
@@ -36,6 +36,8 @@ export interface PerAccountResult {
   newFound: number
   /** 其中自动下载了几篇(仅 download 策略下 >0) */
   downloaded: number
+  /** M56:该号本次下载的逐篇四状态明细(仅 download 策略;与落盘的 downloadDetail 同源,无下载动作不写) */
+  articles?: DownloadItemLog[]
   error?: string
 }
 export interface RunCheckResult {
@@ -106,6 +108,7 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
     newFound += newRefs.length
     const total = newRefs.length
     let downloaded = 0
+    let articles: DownloadItemLog[] | undefined
     if (settings.subscriptionNewArticleAction === 'download') {
       // 自动下载的进度此前完全不可见(手动下载有进度条,自动下载连一条事件都不发)
       deps.onDownloadProgress?.({ fakeid: r.fakeid, total, done: 0, phase: 'start' })
@@ -120,12 +123,15 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
       const kept = newRefs.filter((x) => !doneUrls.has(x.url))
       if (kept.length) await subs.setPendingRefs(r.fakeid, kept)
       else await subs.clearNewRefs(r.fakeid)
-      downloadLogs.push(toAccountDownloadLog({ fakeid: r.fakeid, nickname, refs: newRefs }, summary))
+      // M56:明细一次收集两处消费——downloadDetail 落盘(检查记录),articles 挂行结果(GUI/CLI 透传)
+      const detail = toAccountDownloadLog({ fakeid: r.fakeid, nickname, refs: newRefs }, summary)
+      downloadLogs.push(detail)
       downloaded = summary.succeeded
+      articles = detail.items
     } else {
       await subs.addNewRefs(r.fakeid, newRefs)
     }
-    perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: total, downloaded })
+    perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: total, downloaded, ...(articles !== undefined ? { articles } : {}) })
   }
   await subs.setLastRunAt(now())
   // M56:有下载动作(downloadLogs 非空)才写交付字段;提示策略保持缺省而非 0 ——「没下载」和「下载了 0 篇」是两回事。
