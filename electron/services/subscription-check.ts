@@ -2,7 +2,8 @@
 // 订阅检查编排(从 ipc.ts 抽出,GUI 与 CLI 共用)。依赖全注入,无 electron 运行时,可单测。
 import { checkSubscriptions } from '../../src/core/check-subscriptions'
 import { MpAuthExpired } from '../../src/core/mp-errors'
-import type { Subscriptions, CheckLogEntry, CheckFailure } from '../../src/core/subscriptions'
+import type { Subscriptions, CheckLogEntry, CheckFailure, AccountDownloadLog } from '../../src/core/subscriptions'
+import { toAccountDownloadLog, countDownloadOutcomes } from '../../src/core/subscription-batch'
 import type { ArticleRef } from '../../src/core/mp-types'
 import type { DownloadFormat, DownloadSummary, ProgressEvent } from '../../src/core/types'
 import type { HistorySource } from '../../src/core/download-history'
@@ -73,6 +74,9 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
   let newFound = 0, failed = 0
   const failures: CheckFailure[] = []
   const perAccount: PerAccountResult[] = []
+  // M56:下载交付明细与「刚下载/文库已有」合计 —— 明细收集对 trigger 无感(auto/manual/行内子集同一代码路径)。
+  // 计数与明细同源(四状态),汇总数永远与逐号明细对得上;仅 download 策略会填充。
+  const downloadLogs: AccountDownloadLog[] = []
   for (const r of results) {
     const nickname = accounts.find((a) => a.fakeid === r.fakeid)?.nickname ?? r.fakeid
     if (!r.ok) {
@@ -116,6 +120,7 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
       const kept = newRefs.filter((x) => !doneUrls.has(x.url))
       if (kept.length) await subs.setPendingRefs(r.fakeid, kept)
       else await subs.clearNewRefs(r.fakeid)
+      downloadLogs.push(toAccountDownloadLog({ fakeid: r.fakeid, nickname, refs: newRefs }, summary))
       downloaded = summary.succeeded
     } else {
       await subs.addNewRefs(r.fakeid, newRefs)
@@ -123,6 +128,14 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
     perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: total, downloaded })
   }
   await subs.setLastRunAt(now())
-  await deps.log({ time: now(), trigger, accounts: accounts.length, newFound, failed, ...(failures.length ? { failures } : {}) })
+  // M56:有下载动作(downloadLogs 非空)才写交付字段;提示策略保持缺省而非 0 ——「没下载」和「下载了 0 篇」是两回事。
+  const { downloaded: downloadedTotal, existed: existedTotal } = countDownloadOutcomes(downloadLogs)
+  await deps.log({
+    time: now(), trigger, accounts: accounts.length, newFound, failed,
+    ...(failures.length ? { failures } : {}),
+    ...(downloadLogs.length
+      ? { kind: 'check' as const, downloaded: downloadedTotal, existed: existedTotal, downloadDetail: downloadLogs }
+      : {}),
+  })
   emit(); return { accounts: accounts.length, newFound, failed, ...(failures.length ? { failures } : {}), authExpired: false, results: perAccount }
 }

@@ -21,10 +21,10 @@ import { resolveUpdateCheck } from '../src/core/update-gate'
 import { detectChannel, upgradeCommand, pickAsset } from '../src/core/install-channel'
 import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } from '../src/core/material-export'
 import { syncToSite } from '../src/core/site-sync'
-import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type CheckLogEntry } from '../src/core/subscriptions'
+import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type AccountDownloadLog, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { refId, sourceUrlKey } from '../src/core/subscription-refs'
-import { collectPendingDownloads } from '../src/core/subscription-batch'
+import { collectPendingDownloads, toAccountDownloadLog, countDownloadOutcomes } from '../src/core/subscription-batch'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { UpdateScheduler } from './services/update-scheduler'
 import { SettingsService } from './services/settings'
@@ -433,6 +433,9 @@ export function registerIpc(settings: SettingsService): void {
     const groups = collectPendingDownloads(await subs.list())
     const total = groups.reduce((sum, group) => sum + group.refs.length, 0)
     let downloaded = 0, skipped = 0, failed = 0, kept = 0, doneBefore = 0
+    // M56:手动批量此前完全不落 checkLog —— 批量下载完在「检查记录」里查无此事。逐组收集交付明细,
+    // 循环后落一条 kind='download' 纯交付日志;计数与明细同源(四状态),与自动下载共用同一套映射。
+    const downloadDetail: AccountDownloadLog[] = []
     for (const group of groups) {
       const summary = await downloadRefs(group.refs, (await settings.get()).defaultFormats,
         { kind: 'account', nickname: group.nickname, fakeid: group.fakeid, range: { count: group.refs.length } },
@@ -444,11 +447,20 @@ export function registerIpc(settings: SettingsService): void {
         })
       const completed = new Set(summary.items.filter((item) => item.ok || item.unavailable).map((item) => item.url))
       await subs.removeNewRefs(group.fakeid, group.refs.filter((ref) => completed.has(ref.url)).map(refId))
+      downloadDetail.push(toAccountDownloadLog(group, summary))
       downloaded += summary.succeeded
       skipped += summary.skipped
       failed += summary.failed
       kept += group.refs.length - completed.size
       doneBefore += summary.items.length
+    }
+    // 无可下载(groups 为空)时不落 —— 空交付日志只有噪音。落盘失败由 logCheck 内部吞掉,不阻断返回。
+    if (groups.length) {
+      const outcomes = countDownloadOutcomes(downloadDetail)
+      await logCheck(subs, {
+        time: Date.now(), trigger: 'manual', kind: 'download', accounts: groups.length,
+        newFound: 0, failed: 0, downloaded: outcomes.downloaded, existed: outcomes.existed, downloadDetail,
+      })
     }
     emitSubsUpdated()
     return { accounts: groups.length, total, downloaded, skipped, failed, kept }

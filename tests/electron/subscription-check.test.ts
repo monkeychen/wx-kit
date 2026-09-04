@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { runSubscriptionCheck } from '../../electron/services/subscription-check'
-import type { SubscribedAccount, Subscriptions } from '../../src/core/subscriptions'
+import { formatCheckLogLine, type CheckLogEntry, type SubscribedAccount, type Subscriptions } from '../../src/core/subscriptions'
+import type { DownloadSummary } from '../../src/core/types'
 
 const account: SubscribedAccount = {
   fakeid: 'MP_WXS_1', nickname: '测试号', subscribed: true, watermark: 100,
   lastCheckedAt: null, newRefs: [],
 }
+
+/** M56 下载交付落盘测试共用的待处理文章（url 与 summary.items 的 url 对得上） */
+const mkRefs = (n: number) => Array.from({ length: n }, (_, i) => ({
+  url: `https://mp.weixin.qq.com/s/u${i + 1}`, title: `待处理${i + 1}`, createTime: 200 + i, sourceId: `r${i + 1}`,
+}))
 
 describe('runSubscriptionCheck 旧订阅迁移', () => {
   it('没有 identity 游标但当前 cover 已在文库时建立游标且不重复报新', async () => {
@@ -49,5 +55,146 @@ describe('runSubscriptionCheck 旧订阅迁移', () => {
     })
 
     expect(removeNewRefs).toHaveBeenCalledWith(existing.fakeid, ['https://mp.weixin.qq.com/s/token_x'])
+  })
+})
+
+describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
+  it('download 策略：落 kind=check 的逐号逐篇明细，downloaded/existed 与四状态一致，待处理保留语义不变', async () => {
+    const refs = mkRefs(5)
+    const summary: DownloadSummary = {
+      ok: false, total: 5, succeeded: 1, failed: 3, skipped: 1, unavailable: 1,
+      items: [
+        { url: refs[0].url, ok: true, title: '文章一' },                                            // downloaded
+        { url: refs[1].url, ok: true, skipped: true, title: '文章二' },                              // exists
+        { url: refs[2].url, ok: false, unavailable: true },                                        // unavailable（标题从 refs 补）
+        { url: refs[3].url, ok: false, error: { code: 'DOWNLOAD_FAILED', message: 'boom' } },        // failed
+        { url: refs[4].url, ok: false, cancelled: true },                                           // 未尝试 → 不产出日志
+      ],
+    }
+    const setPendingRefs = vi.fn(async () => {})
+    const logged: CheckLogEntry[] = []
+    const subs = {
+      list: async () => [account], updateWatermark: async () => {}, addNewRefs: async () => {},
+      setPendingRefs, clearNewRefs: async () => {}, setLastRunAt: async () => {},
+    } as unknown as Subscriptions
+    const result = await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
+      list: async () => [],
+      check: async () => [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: refs }],
+      downloadRefs: vi.fn(async () => summary),
+      log: async (e) => { logged.push(e) },
+    })
+
+    const entry = logged.at(-1)!
+    expect(entry).toMatchObject({
+      trigger: 'manual', accounts: 1, newFound: 5, failed: 0,
+      kind: 'check', downloaded: 1, existed: 1,
+    })
+    expect(entry.downloadDetail).toEqual([
+      {
+        fakeid: account.fakeid, nickname: account.nickname,
+        items: [
+          { title: '文章一', status: 'downloaded' },
+          { title: '文章二', status: 'exists' },
+          { title: '待处理3', status: 'unavailable' },
+          { title: '待处理4', status: 'failed', error: 'boom' },
+        ],
+      },
+    ])
+    // 「真故障/未尝试留在待处理」语义不变：u1/u2/u3 处理完清掉，u4(故障)/u5(取消)留下
+    expect(setPendingRefs).toHaveBeenCalledWith(account.fakeid, [refs[3], refs[4]])
+    // PerAccountResult 本任务不改：downloaded 仍取 summary.succeeded
+    expect(result.results[0]).toMatchObject({ newFound: 5, downloaded: 1 })
+  })
+
+  it('仅提示策略：entry 不写 kind/downloaded/existed/downloadDetail（缺省而非 0）', async () => {
+    const downloadRefs = vi.fn(async () => { throw new Error('notify 策略不应下载') })
+    const logged: CheckLogEntry[] = []
+    const subs = {
+      list: async () => [account], updateWatermark: async () => {}, addNewRefs: async () => {},
+      setLastRunAt: async () => {},
+    } as unknown as Subscriptions
+    await runSubscriptionCheck('auto', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      list: async () => [],
+      check: async () => [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: mkRefs(2) }],
+      downloadRefs, log: async (e) => { logged.push(e) },
+    })
+
+    const entry = logged.at(-1)!
+    expect(entry.newFound).toBe(2)
+    expect('kind' in entry).toBe(false)
+    expect('downloaded' in entry).toBe(false)
+    expect('existed' in entry).toBe(false)
+    expect('downloadDetail' in entry).toBe(false)
+    expect(downloadRefs).not.toHaveBeenCalled()
+  })
+
+  it('manual + fakeids 子集 + download 策略：同样落明细，明细收集对 trigger 无感', async () => {
+    const other: SubscribedAccount = { ...account, fakeid: 'MP_WXS_2', nickname: '二号' }
+    const refs = mkRefs(2)
+    const summary: DownloadSummary = {
+      ok: true, total: 2, succeeded: 2, failed: 0, skipped: 0,
+      items: refs.map((r) => ({ url: r.url, ok: true, title: r.title })),
+    }
+    const seenAccounts: string[] = []
+    const logged: CheckLogEntry[] = []
+    const subs = {
+      list: async () => [account, other], updateWatermark: async () => {},
+      setPendingRefs: async () => {}, clearNewRefs: async () => {}, setLastRunAt: async () => {},
+    } as unknown as Subscriptions
+    await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
+      list: async () => [],
+      fakeids: [account.fakeid],
+      check: async (accs) => {
+        seenAccounts.push(...accs.map((a) => a.fakeid))
+        return [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: refs }]
+      },
+      downloadRefs: vi.fn(async () => summary),
+      log: async (e) => { logged.push(e) },
+    })
+
+    expect(seenAccounts).toEqual([account.fakeid]) // 子集只查这一个号，不查 other
+    const entry = logged.at(-1)!
+    expect(entry).toMatchObject({ trigger: 'manual', accounts: 1, kind: 'check', downloaded: 2, existed: 0 })
+    expect(entry.downloadDetail).toEqual([
+      {
+        fakeid: account.fakeid, nickname: account.nickname,
+        items: [
+          { title: '待处理1', status: 'downloaded' },
+          { title: '待处理2', status: 'downloaded' },
+        ],
+      },
+    ])
+  })
+
+  it('落盘的新 entry 经 formatCheckLogLine 单行含 downloaded=N existed=N（检查记录日志可读）', async () => {
+    const refs = mkRefs(2)
+    const summary: DownloadSummary = {
+      ok: true, total: 2, succeeded: 1, failed: 0, skipped: 1,
+      items: [
+        { url: refs[0].url, ok: true, title: '文章一' },
+        { url: refs[1].url, ok: true, skipped: true, title: '文章二' },
+      ],
+    }
+    const logged: CheckLogEntry[] = []
+    const subs = {
+      list: async () => [account], updateWatermark: async () => {},
+      setPendingRefs: async () => {}, clearNewRefs: async () => {}, setLastRunAt: async () => {},
+    } as unknown as Subscriptions
+    await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
+      list: async () => [],
+      check: async () => [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: refs }],
+      downloadRefs: async () => summary,
+      log: async (e) => { logged.push(e) },
+    })
+
+    expect(formatCheckLogLine(logged.at(-1)!)).toMatch(/MANUAL accounts=1 new=2 failed=0 downloaded=1 existed=1$/)
   })
 })
