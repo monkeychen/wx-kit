@@ -206,11 +206,23 @@ export default function Library() {
         {loading ? (
           <div style={{ padding: 80, textAlign: 'center' }}><Spin /></div>
         ) : visibleIds.length === 0 ? (
-          <div className="empty-state">
-            <div className="es-mark">藏</div>
-            <div className="es-title">{kw || account ? '没有匹配的文章' : '文库还是空的'}</div>
-            <div>{kw || account ? '换个条件试试' : '到「下载」页粘贴文章链接，保存的文章会陈列在这里'}</div>
-          </div>
+          // 订阅页「文库」直达(或手动选了公众号)但该号一篇都没有——这是「该号还没有」,
+          // 不是「文库是空的」也不是「搜不到」,话术与退路都要专属(M56 R2)。
+          // 搜索词也在场时不套这套话术:0 条可能只是搜索没中,别赖到公众号头上。
+          account && !kw.trim() ? (
+            <div className="empty-state" data-testid="library-account-empty">
+              <div className="es-mark">藏</div>
+              <div className="es-title">该公众号还没有已下载的文章</div>
+              <div>订阅检查发现新文章并下载后，会出现在这里。</div>
+              <a data-testid="library-clear-account" onClick={() => setAccount(null)}>清除筛选，查看全部文章</a>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="es-mark">藏</div>
+              <div className="es-title">{kw || account ? '没有匹配的文章' : '文库还是空的'}</div>
+              <div>{kw || account ? '换个条件试试' : '到「下载」页粘贴文章链接，保存的文章会陈列在这里'}</div>
+            </div>
+          )
         ) : view === 'list' ? (
           /* ---- 列表视图：列头只一次，分组时各组只留分隔头（且去掉冗余的公众号列）---- */
           <div className={`list${grouped ? ' grouped' : ''}`} style={{ ['--lcols' as string]: buildListColumns(widths, grouped) }}>

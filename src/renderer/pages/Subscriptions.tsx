@@ -231,7 +231,7 @@ export default function Subscriptions() {
    * 当次内存态(rowRes)只保留两类职责:检查失败的即时反馈(失败不淡出、值钱,不能被一条
    * 旧落盘摘要掩盖)、以及该号还没有任何落盘摘要时的当次成功反馈(仅提示策略的号)。
    */
-  const rowResultEl = (fakeid: string, nickname: string) => {
+  const rowResultEl = (fakeid: string) => {
     const r = rowRes[fakeid]
     if (r && !r.ok) {
       return (
@@ -250,16 +250,14 @@ export default function Subscriptions() {
     }
     if (!r) return null
     // ↓ 以下为无落盘摘要时的当次态(旧渲染路径,原样保留)
+    // 「去看看」入口已移到行 actions 的常驻「文库」(M56 R2):同参数的两处入口只留一处,
+    // 且常驻入口不依赖当次内存态、传 fakeid 身份而非 nickname。
     const [text, color] = r.downloaded > 0 ? [`✓ 已自动下载 ${r.downloaded} 篇`, 'var(--celadon, #3f8f6f)']
       : r.newFound > 0 ? [`发现 ${r.newFound} 篇待处理`, 'var(--cinnabar)']
         : ['暂无新文章', undefined]
     return (
       <span data-testid="subs-row-result" style={{ marginLeft: 8, color }}>
         · {text}
-        {r.downloaded > 0 && (
-          <a style={{ marginLeft: 6 }} data-testid="subs-goto-library"
-            onClick={() => navigate(`/library?account=${encodeURIComponent(nickname)}`)}>去看看</a>
-        )}
       </span>
     )
   }
@@ -379,6 +377,13 @@ export default function Subscriptions() {
                   <a data-testid="subs-remove" aria-label={`删除 ${a.nickname}`}><DeleteOutlined /></a>
                 </Popconfirm>
               )
+              // R2:常驻「文库」入口——每个号随时可看它的存量文章,不再只在下载后出现。
+              // 传 fakeid(身份)而非 nickname:公众号改名/昵称不一致时按 accountId 仍能对上
+              // (见 library-view.ts 的 filterByAccount 身份优先匹配)。
+              const libraryEl = (
+                <a key="lib" data-testid="subs-goto-library"
+                  onClick={() => navigate(`/library?account=${encodeURIComponent(a.fakeid)}`)}>文库</a>
+              )
               // 行内动作作用于「当前选择」：收起时选择即全部，展开后随勾选变化。
               // 一次只有一个含义，不并列摆「下载全部」与「下载所选」两套按钮。
               const open = !!expanded[a.fakeid]
@@ -387,7 +392,7 @@ export default function Subscriptions() {
               const igLabel = open ? `忽略所选 ${picked} 篇` : '忽略'
               const idle = !busy && picked > 0
               const actions = downloadingThis
-                ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>, checkEl, removeEl]
+                ? [<span key="dl" data-testid="subs-downloading" style={{ color: 'var(--cinnabar)' }}><LoadingOutlined /> 下载中 {dl.done}/{dl.total}</span>, checkEl, libraryEl, removeEl]
                 : a.newRefs.length > 0
                   ? [
                       idle
@@ -397,12 +402,13 @@ export default function Subscriptions() {
                         ? <a key="ig" data-testid="subs-dismiss-new" onClick={() => dismiss(a)}>{igLabel}</a>
                         : <span key="ig" className="faint" data-testid="subs-dismiss-new">{igLabel}</span>,
                       checkEl,
+                      libraryEl,
                     ]
                   // 刚检查完这一行时,行内结果态已经把话说清了;再挂个「无新文章」会和
                   // 「已自动下载 N 篇」并列显示,读起来自相矛盾
                   : rowRes[a.fakeid]?.ok
-                    ? [checkEl, removeEl]
-                    : [<span key="none" className="faint">无新文章</span>, checkEl, removeEl]
+                    ? [checkEl, libraryEl, removeEl]
+                    : [<span key="none" className="faint">无新文章</span>, checkEl, libraryEl, removeEl]
               return (
               <List.Item data-testid="subs-row" actions={actions}>
                 <List.Item.Meta
@@ -421,7 +427,7 @@ export default function Subscriptions() {
                     <>
                       <span>
                         {a.lastCheckedAt ? `上次检查 ${new Date(a.lastCheckedAt).toLocaleString()}` : '尚未检查'}
-                        {rowResultEl(a.fakeid, a.nickname)}
+                        {rowResultEl(a.fakeid)}
                       </span>
                       {pendingPanel(a)}
                     </>

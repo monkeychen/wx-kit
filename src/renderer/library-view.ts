@@ -1,7 +1,8 @@
 // src/renderer/library-view.ts
 // 文库视图的纯变换：排序 / 按公众号筛选+分组。作用于已全量载入 renderer 的 ArticleMeta[]，
-// 不 import 任何 core 运行时（只用类型），属展示层逻辑。
+// 从 core 引入的只有纯函数与类型（排序、账号标识归一），不引入任何 IO / Electron 运行时。
 import type { ArticleMeta } from '../core/types'
+import { normalizeAccountKey } from '../core/subscriptions'
 
 // 排序逻辑(M25 起共享给 CLI)抽到了 core,这里 re-export 保持渲染层 import 兼容。
 export { sortArticles, type SortKey, type SortDir } from '../core/library-sort'
@@ -24,10 +25,18 @@ export function accountsOf(list: ArticleMeta[]): string[] {
   return out
 }
 
-/** account 为 null = 全部；否则只留该公众号。 */
+/**
+ * account 为 null = 全部；否则按「身份优先、名称兜底」只留该公众号。
+ * 入参语义（M56）：既可能是**身份**（订阅页「文库」跳转传 fakeid，MP_WXS_/纯数字/base64
+ * 三种历史形态），也可能是**名称**（本页筛选下拉传公众号名）。先归一比 `accountId`
+ * （公众号改名后名称对不上、身份仍对得上），不中再按名称字面兜底——旧条目缺
+ * `accountId` 时由兜底覆盖。任一命中即保留。
+ */
 export function filterByAccount(list: ArticleMeta[], account: string | null): ArticleMeta[] {
   if (!account) return list
-  return list.filter((m) => accountName(m) === account)
+  const key = normalizeAccountKey(account)
+  return list.filter((m) =>
+    (m.accountId != null && normalizeAccountKey(m.accountId) === key) || accountName(m) === account)
 }
 
 /** 按公众号分组，保持传入（通常已排序）顺序的组首见序与组内序。 */
