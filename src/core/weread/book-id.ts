@@ -39,6 +39,22 @@ export function normalizeAccountId(raw: string): string {
   return `MP_WXS_${digitsFromBiz(s)}`
 }
 
+/**
+ * 账号标识归一（容错包装）：v0.8.x 下载历史里是 base64 fakeid（如 MzE5ODk2NjUwOA==），
+ * v0.10.0 起是 `MP_WXS_<数字>`。同一公众号两种形态会在订阅列表里呈现为「同名重复行」
+ * （用户实测踩到），故所有入口统一归一到 MP_WXS_ 形态；无法归一的非法形态原样保留，
+ * 不让脏数据炸掉列表。
+ * 本函数放在这个零依赖的纯函数模块里，供渲染层直接 import——**别把它挪去任何带
+ * node 内建 import 的模块**（如 subscriptions.ts）：渲染层一旦经由那种模块引用它，
+ * node:fs 等会被 vite-plugin-electron-renderer 的 CJS shim 摇进渲染 bundle，沙箱页面
+ * 无 require 直接 ReferenceError（M56 T4 实录）。base64 分支里的 `Buffer` 在沙箱
+ * 渲染层不存在时抛 ReferenceError，会被下面的 catch 接住、按「非法形态」降级原样返回，
+ * 不影响模块加载。
+ */
+export function normalizeAccountKey(fakeid: string): string {
+  try { return normalizeAccountId(fakeid) } catch { return fakeid }
+}
+
 /** bookId → 数字段（如需给展示层用）。 */
 export function digitsOfBookId(bookId: string): string {
   return normalizeAccountId(bookId).slice('MP_WXS_'.length)

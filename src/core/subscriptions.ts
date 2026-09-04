@@ -6,7 +6,12 @@ import { atomicWriteFile } from './atomic-write'
 import { withPathLock } from './path-lock'
 import type { ArticleRef } from './mp-types'
 import { mergeNewRefs, removeRefs } from './subscription-refs'
-import { normalizeAccountId } from './weread/book-id'
+// normalizeAccountKey 已挪到 ./weread/book-id（零 node 依赖的纯函数模块）——渲染层会直接
+// import 它，不能经由本模块（本模块依赖 node:fs，vite-plugin-electron-renderer 会把 node
+// 内建摇进渲染 bundle，沙箱页面无 require 即崩）。此处 import 供本模块内部使用，向下
+// re-export 维持 electron/CLI/测试侧既有 import 路径不变（M56 T4 fix）。
+import { normalizeAccountKey } from './weread/book-id'
+export { normalizeAccountKey }
 import type { HistoryEvent } from './download-history'
 import type { DownloadItemResult } from './types'
 
@@ -93,15 +98,6 @@ interface SubscriptionsFile { version: 1; lastRunAt: number | null; accounts: Su
  */
 export function initialWatermark(latestCreateTime: number | null | undefined, nowSec: number): number {
   return latestCreateTime != null ? latestCreateTime - 1 : nowSec
-}
-
-/**
- * 账号标识归一：v0.8.x 下载历史里是 base64 fakeid（如 MzE5ODk2NjUwOA==），v0.10.0 起是
- * `MP_WXS_<数字>`。同一公众号两种形态会在订阅列表里呈现为「同名重复行」（用户实测踩到），
- * 故所有入口统一归一到 MP_WXS_ 形态；无法归一的非法形态原样保留，不让脏数据炸掉列表。
- */
-export function normalizeAccountKey(fakeid: string): string {
-  try { return normalizeAccountId(fakeid) } catch { return fakeid }
 }
 
 /** 从下载历史抽出去重的「按公众号抓取」账号（fakeid → nickname，后出现的昵称覆盖）。纯函数。 */

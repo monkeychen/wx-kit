@@ -2,7 +2,9 @@
 // 文库视图的纯变换：排序 / 按公众号筛选+分组。作用于已全量载入 renderer 的 ArticleMeta[]，
 // 从 core 引入的只有纯函数与类型（排序、账号标识归一），不引入任何 IO / Electron 运行时。
 import type { ArticleMeta } from '../core/types'
-import { normalizeAccountKey } from '../core/subscriptions'
+// 从零 node 依赖的纯函数模块 import（M56 T4 fix）：若经由 core/subscriptions（依赖 node:fs），
+// vite-plugin-electron-renderer 的 CJS shim 会把 node 内建摇进渲染 bundle，沙箱页面直接崩。
+import { normalizeAccountKey } from '../core/weread/book-id'
 
 // 排序逻辑(M25 起共享给 CLI)抽到了 core,这里 re-export 保持渲染层 import 兼容。
 export { sortArticles, type SortKey, type SortDir } from '../core/library-sort'
