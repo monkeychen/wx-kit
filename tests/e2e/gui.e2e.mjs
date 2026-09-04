@@ -14,7 +14,7 @@
 // Run: npx vite build && node tests/e2e/gui.e2e.mjs   (or: npm run test:e2e)
 import { _electron as electron } from 'playwright'
 import http from 'node:http'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -321,6 +321,49 @@ async function main() {
     await win.locator('[data-testid="subs-check-one"]').first().click()
     await win.waitForSelector('[data-testid="subs-row-result"]', { timeout: 30000 })
     assert(true, '行内「检查」只影响本行并落结果')
+
+    // ============ M56 · 落盘下载明细：行内摘要 + 明细弹窗 + 常驻文库入口 ============
+    // seed 一条含 downloadDetail 的检查记录（模拟定时自动下载已发生），再进订阅页断言可感知
+    {
+      const subPath = join(libraryRoot, 'subscriptions.json')
+      const sub = JSON.parse(readFileSync(subPath, 'utf8'))
+      const acc = sub.accounts.find((a) => a.subscribed)
+      assert(!!acc, 'seed 前订阅文件里存在已订阅账号')
+      sub.checkLog = [{
+        time: Date.now(), trigger: 'auto', kind: 'check', accounts: 1,
+        newFound: 1, failed: 0, downloaded: 1, existed: 0,
+        downloadDetail: [{ fakeid: acc.fakeid, nickname: acc.nickname,
+          items: [{ title: '订阅号最新文', status: 'downloaded' }] }],
+      }, ...(sub.checkLog ?? [])]
+      writeFileSync(subPath, JSON.stringify(sub))
+    }
+    await win.click('[data-testid="nav-设置"]')
+    await win.click('[data-testid="nav-订阅"]')
+    await win.waitForSelector('[data-testid="subs-row-summary"]', { timeout: 8000 })
+    const summary = await win.locator('[data-testid="subs-row-summary"]').first().innerText()
+    assert(summary.includes('已下载 1 篇') && summary.includes('自动'),
+      `M56: 行内摘要来自落盘明细且标注触发方式 (saw: ${summary.slice(0, 40)})`)
+    // 明细弹窗：点开检查记录，断言逐篇明细（标题 + 状态）
+    await win.locator('[data-testid="subs-log-entry"]').first().click()
+    await win.waitForSelector('.ant-modal-confirm', { timeout: 5000 })
+    const dlg = await win.locator('.ant-modal-confirm').innerText()
+    assert(dlg.includes('下载明细') && dlg.includes('订阅号最新文') && dlg.includes('已下载'),
+      `M56: 明细弹窗分节展示逐篇状态 (saw: ${dlg.slice(0, 60).replace(/\n/g, ' ')})`)
+    await win.click('.ant-modal-confirm .ant-btn:has-text("知道了")')
+    await win.waitForSelector('.ant-modal-confirm', { state: 'detached', timeout: 5000 })
+    // 常驻文库入口：点击 → 文库按该号筛选；该号无文章 → 专属空态（一石二鸟验入口与空态）
+    await win.locator('[data-testid="subs-goto-library"]').first().click()
+    await win.waitForSelector('[data-testid="library-account-empty"]', { timeout: 8000 })
+    const emptyText = await win.locator('[data-testid="library-account-empty"]').innerText()
+    assert(emptyText.includes('还没有已下载的文章'),
+      `M56: 文库入口按身份筛选且空态有专属提示 (saw: ${emptyText.slice(0, 40)})`)
+    await win.click('[data-testid="library-clear-account"]')
+    await win.waitForSelector('[data-testid="library-account-empty"]', { state: 'detached', timeout: 5000 })
+    assert(true, 'M56: 清除筛选后该号专属空态消失')
+    // 此时文库已被 M9 段清空：清除筛选回落到的是「文库还是空的」全局空态——两种空态话术正确区分
+    const globalEmpty = await win.locator('.empty-state').last().innerText()
+    assert(globalEmpty.includes('文库还是空的'),
+      `M56: 清除筛选后回落全局空态（与该号空态话术区分）(saw: ${globalEmpty.slice(0, 30).replace(/\n/g, ' ')})`)
 
     // ============ M49 · 现存设置继续可用（site-sync tooltip）============
     await win.click('[data-testid="nav-设置"]')
