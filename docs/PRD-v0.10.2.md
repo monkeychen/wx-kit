@@ -99,27 +99,27 @@ v0.10.1 的订阅链路（cover 最新一篇增量 + 批量下载 + 本地日报
 
 **R1 · 自动下载结果可感知**
 
-- [ ] 定时自动检查 + 自动下载成功后，检查记录含下载汇总与逐号逐篇明细；重启应用（新进程读取 `subscriptions.json`）后仍可查。
-- [ ] 行内单号「检查」在自动下载策略下同样落含明细的记录（`trigger:'manual'`）——三条触发路径（行内/检查全部/定时）共用同一编排，可观测性一致；行内检查过程中下载阶段进度照常可见。
-- [ ] 手动「下载全部待处理」落一条 `kind:'download'` 记录，明细与自动检查触发的下载可区分。
-- [ ] 「文库已有」单列计数，不并入「刚下载」；四种状态（downloaded/exists/failed/unavailable）在明细中可区分。
-- [ ] 下载失败的文章保留在待处理可重试；`unavailable` 不再进入待处理（沿用 M54 语义），明细中标注。
-- [ ] 订阅页每号行内显示最近一次结果摘要，能区分「发现」与「交付」及触发方式（自动/手动）。
-- [ ] 检查记录弹窗每条记录可展开逐号逐篇明细；旧记录（无新字段）不报错、不显示明细区。
-- [ ] `subscription check-now` 的逐号 `results[]` 含逐篇下载明细；`subscription list` 输出 `recentLog`（新进程读取，与 GUI 检查记录同源）；`agent/wx-kit-skill`（SKILL.md + references）同批刷新。
-- [ ] 旧 `subscriptions.json`（无新字段）升级后功能正常，零迁移。
+- [x] 定时自动检查 + 自动下载成功后，检查记录含下载汇总与逐号逐篇明细；重启应用（新进程读取 `subscriptions.json`）后仍可查。（2026-09-04 真实验收：`check-now` 后新进程 `list` 读到 `downloaded:1` + `downloadDetail` 逐篇明细）
+- [x] 行内单号「检查」在自动下载策略下同样落含明细的记录（`trigger:'manual'`）——三条触发路径（行内/检查全部/定时）共用同一编排，可观测性一致；行内检查过程中下载阶段进度照常可见。（单测钉住 manual+子集路径；真实 `check-now` 即 manual 路径验过）
+- [x] 手动「下载全部待处理」落一条 `kind:'download'` 记录，明细与自动检查触发的下载可区分。（单测 + e2e；`formatCheckLogLine` 输出 `DOWNLOAD` 标签）
+- [x] 「文库已有」单列计数，不并入「刚下载」；四种状态（downloaded/exists/failed/unavailable）在明细中可区分。（单测逐状态断言；真实验收确认 `downloaded` 状态）
+- [x] 下载失败的文章保留在待处理可重试；`unavailable` 不再进入待处理（沿用 M54 语义），明细中标注。（单测显式断言 `setPendingRefs` 收到真故障）
+- [x] 订阅页每号行内显示最近一次结果摘要，能区分「发现」与「交付」及触发方式（自动/手动）。（e2e：`· 自动 · 发现 1 篇，已下载 1 篇`）
+- [x] 检查记录弹窗每条记录可展开逐号逐篇明细；旧记录（无新字段）不报错、不显示明细区。（e2e 弹窗断言 + 单测旧条目渲染不变）
+- [x] `subscription check-now` 的逐号 `results[]` 含逐篇下载明细；`subscription list` 输出 `recentLog`（新进程读取，与 GUI 检查记录同源）；`agent/wx-kit-skill`（SKILL.md + references）同批刷新。（真实验收两项字段均读到）
+- [x] 旧 `subscriptions.json`（无新字段）升级后功能正常，零迁移。（单测：旧条目读入与格式输出不变；真实库全程未迁移）
 
 **R2 · 订阅页文库入口**
 
-- [ ] 每号行内「查看文库」点击后切换到文库页，且只显示该号文章（筛选态）。
-- [ ] 归一身份匹配：base64 fakeid 与 `MP_WXS_` 两种形态订阅行都能筛出对应文库文章。
-- [ ] 旧库条目缺 `accountId` 时按公众号名称兜底筛出。
-- [ ] 文库页可一键清除筛选回全部文章。
-- [ ] 该号文库为空时显示空态与提示，不报错。
+- [x] 每号行内「查看文库」点击后切换到文库页，且只显示该号文章（筛选态）。（e2e：跳转后进入该号筛选态）
+- [x] 归一身份匹配：base64 fakeid 与 `MP_WXS_` 两种形态订阅行都能筛出对应文库文章。（单测：`MzYzNDg1MDcyNQ==` ⇄ `MP_WXS_3634850725` 归一等价）
+- [x] 旧库条目缺 `accountId` 时按公众号名称兜底筛出。（单测）
+- [x] 文库页可一键清除筛选回全部文章。（e2e：清除后该号空态消失、回落全局视图）
+- [x] 该号文库为空时显示空态与提示，不报错。（e2e：「该公众号还没有已下载的文章」+ 无 console 错误）
 
 **R3 · 验收遗留与全链路**
 
-- [ ] 真实文章 URL 下载验收通过（多格式 + 阅读器可读）。
-- [ ] 真实 `cover` 增量检查验收通过（首检一次 + 增量不重复）。
-- [ ] `docs/PRD-v0.10.1.md` §6 三条未勾项逐条补勾。
-- [ ] `npm test`、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`、`npm run build`、当前有效 GUI e2e 全绿。
+- [x] 真实文章 URL 下载验收通过（多格式 + 阅读器可读）。（2026-09-04：打包 CLI 真实微信文章 URL，md/html/pdf/meta 成功）
+- [x] 真实 `cover` 增量检查验收通过（首检一次 + 增量不重复）。（2026-09-04：16 号检查成功；游标重置投递一次、复检 `newFound:0`）
+- [x] `docs/PRD-v0.10.1.md` §6 三条未勾项逐条补勾。
+- [x] `npm test`（560）、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`、`npm run build`、当前有效 GUI e2e 全绿（含 M56 五条新断言，`no console/page errors`）。

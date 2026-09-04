@@ -936,3 +936,35 @@ M55 的真实验收首次独立 CLI 能刷新 cover，第二个新进程却 401�
 有效扫码后又以两个不共享 Chromium 会话目录的隔离 CLI 进程连续验证成功。当前服务器没有下发新 Cookie，
 所以文件哈希未变化；测试证明跨进程使用持久化凭据正常，单测证明发生轮换时会写回。这个规则已写入 AGENTS，
 后续不要把 Cookie 当作一次登录后永不变化的静态配置。
+
+## §52 v0.10.2 M56：可观测性的本质是「系统知道的，必须留痕」（2026-09-04）
+
+**需求的来源是使用者本人**。安哥的痛点原话：「开启自动下载后，每天自动下载了什么，用户完全不知道」。
+代码核实：`CheckLogEntry` 只记 `newFound`，`DownloadSummary.items` 用完即弃，手动批量下载连 checkLog
+都不落——自动下载的交付结果在整个系统里没有落点。这不是 UI 缺一个展示位，是数据层缺一个事实。
+
+**几个站得住的决定**：
+- 明细收在共享编排层（`runSubscriptionCheck`），行内检查/检查全部/定时检查三个入口自动获得同等可观测性；
+  安哥追问「行内检查开了自动下载能看到吗」时，答案已在结构里。
+- 行内**单号下载**不落记录：一次性操作结果就地可见；只有「无人盯着」的链路（自动/全局批量）才需要留痕。
+  可观测性不是越多越好，是「事后查不到的才要记」。
+- 「文库已有」不并入「刚下载」——延续 v0.10.1「不把已有伪装成新发现」的话术原则。
+- 复用 checkLog（keep 50）不新增日志文件；新字段全部可选，零迁移。
+
+**踩坑（三条都值一条红线）**：
+1. **渲染层 import 分层红线**：T4 从 `core/subscriptions` import 运行时值 `normalizeAccountKey`，把该模块
+   顶部的 `node:fs/promises`/`node:path` 拖进渲染 bundle——`vite-plugin-electron-renderer` 把它们转成
+   `const m7=require,Dt=m7("fs/promises")` 的 CJS shim，页面沙箱无 require，app 直接白屏。修法：把纯函数
+   挪到零依赖的 `weread/book-id.ts`，渲染层只许 import「零 node 内建」的纯 core 模块（`import type` 除外）。
+2. **BSD grep 假阴性害人**：`\brequire\b` 在 macOS grep 上不工作、`required` 是子串、require 还会被重命名
+   成 `m7` 再调用——三重假阴性让「bundle 干净」的验证结论错了两次。验证 bundle 内容必须用 node/python 正则
+   `(?<![A-Za-z0-9_$])require(?![A-Za-z0-9_$])`。
+3. **e2e 假绿**：脚本 collect errors 后主流程被 catch、exit code 仍是 0——「exit 0」不等于通过，必须看输出。
+
+**验收时的两个方法论修正**：真实链路验收第一次跑在 `/Applications` 的**旧版包**上（装着 v0.10.1），字段
+当然不存在——验收必须显式指向 `release/` 的新产物；「制造真实下载动作」用「游标重置 + 文章暂移出库」的
+可回滚实验（终态与现态完全一致），比等一篇不可控的新文章可靠。
+
+**子代理流水线的价值**：五个任务五个实现者 + 每任务独立评审 + 修复轮 scoped re-review——T2 抓住了
+brief 里「succeeded 含 skipped」的事实错误（以四状态统计为唯一计数源并锁死恒等），评审在 e2e 之前
+就发现了 bundle 问题（虽然验证方法有假阴性）。控制器不写代码、不修 finding，只裁决和记录。
