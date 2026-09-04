@@ -121,6 +121,8 @@ recipes.md 若有订阅范例）、README 若涉及订阅能力描述、ROADMAP 
 
 - [ ] 先写测试：download 策略下 entry 含 `kind:'check'`、`downloaded`/`existed` 计数与逐号明细；
       仅提示策略 entry 无这些字段；下载失败项标 `failed` 且留在待处理的语义不变。
+- [ ] 先写测试：`trigger:'manual'` + `fakeids` 子集（行内单号检查）在 download 策略下同样落明细——
+      三条触发路径（行内/检查全部/定时）共用本编排函数，明细收集不得假设 trigger。
 - [ ] 先写测试：`kind:'download'` 记录（手动批量）的形状——`newFound:0`、明细可区分 trigger。
 - [ ] 实现 `runSubscriptionCheck` 明细收集与 entry 扩展；实现 `downloadAllNew` 落盘（落盘失败
       try/catch 不阻断返回）。
