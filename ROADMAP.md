@@ -6,7 +6,7 @@
 ## 当前状态
 
 - **最新发布:v0.10.1(2026-08-30,订阅日报与会话续用)** —— tag `v0.10.1` + GitHub Release(三平台包,标 Latest)+ brew tap。M55 将 digest 改为按 `library.json.publishTime` 的北京时间本地查询，只有今天显式 `--download` 才刷新并下载；补真实发表时间解析、未知时间告警、账号稳定身份、Cookie 快照持久化与独立进程验证。M54 的订阅可靠性、全量待处理下载和阶段反馈一并包含。微信读书列表仍按账号封禁，每号只返回最新一篇，latest-only 漏检边界保留。需求/验收 `docs/PRD-v0.10.1.md`，发布说明 `docs/releases/v0.10.1.md`。
-- **当前开发:暂无** —— 下一版候选见文末「下一步 / 候选」。
+- **当前开发:v0.10.2(M56 订阅自动下载可感知与文库直达)** —— 需求/验收 `docs/PRD-v0.10.2.md`,计划 `plans/2026-09-04-m56-subscription-visibility.md`。范围:下载明细持久落盘+行内摘要/弹窗、订阅页每号文库入口、补 v0.10.1 验收遗留。非目标:Windows CLI stdout 与公式保真均推迟(2026-09-04 安哥定)。
 - **v0.8.6、v0.8.7 均未发布且不再发布** —— M44–M47、M49 的有效成果由 v0.9.0 吸收；两份 PRD 仅保留历史设计与需求去向，不是当前验收契约。
 - 测试规模不写死数字——跑 `npm test`(单测)、`npm run test:e2e`(当前有效 GUI 端到端)看当前真实结果；另以隔离文库执行真实文章 URL 下载验收。私有后台命令只验收“稳定拒绝且零请求”，不再做 live 联调。
 
@@ -72,8 +72,9 @@
 | **M53** ✅ | v0.10.0 | GUI 复活：二维码登录组件、Subscriptions/Settings 恢复接线；**2026-08-28 按公众号下载入口随列表封禁一并移除（订阅页补删除与行内检查隔离）** | 同上 |
 | **M54** ✅ | v0.10.1 | 订阅可靠性与批量交付：`cover` 稳定身份游标、首次投递/重复检查修复、下载全部待处理新文章、移除无效列表探测、下载阶段可见（2026-08-29 完成） | `plans/2026-08-29-m54-subscription-reliability.md` |
 | **M55** ✅ | v0.10.1 | 本地发表日期日报、仅今天显式刷新下载、未知时间告警、账号改名身份匹配、Cookie 快照持久化与跨进程复验（2026-08-30 完成） | `plans/2026-08-30-m55-publication-digest.md` |
+| **M56** | v0.10.2 | 订阅自动下载可感知（下载明细持久落盘 + 行内摘要 + 记录弹窗 + CLI `list` recentLog / `check-now` 明细）+ 订阅页每号文库入口（身份匹配筛选）+ 补 v0.10.1 验收遗留（进行中） | `plans/2026-09-04-m56-subscription-visibility.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`（当前验收契约）。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`、v0.10.2 `docs/PRD-v0.10.2.md`（当前验收契约）。
 
 ## 版本发布史(最新在前)
 
