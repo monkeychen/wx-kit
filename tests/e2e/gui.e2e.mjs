@@ -365,6 +365,31 @@ async function main() {
     assert(globalEmpty.includes('文库还是空的'),
       `M56: 清除筛选后回落全局空态（与该号空态话术区分）(saw: ${globalEmpty.slice(0, 30).replace(/\n/g, ' ')})`)
 
+    // ============ M56 · 手动「下载全部待处理」→ kind:'download' 落盘（ipc subscriptions:downloadAllNew 全链路）============
+    // 此前行内「检查」在仅提示策略（settings 默认）下已投递 1 篇 pending（cover mock 给的短链，
+    // mp.weixin.qq.com/s/SUBTOKEN 已被 webRequest 重定向回 fixture，可真实下载成功）。
+    // 这里点真实按钮走完主进程 downloadAllNew，再直接读 subscriptions.json 核对补下载记录。
+    await win.click('[data-testid="nav-订阅"]')
+    await win.waitForSelector('[data-testid="subs-download-all"]', { timeout: 8000 })
+    await win.click('[data-testid="subs-download-all"]')
+    // 下载完成 + emitSubsUpdated → load() 重取后 pending 清空，按钮（pendingTotal>0 才渲染）随之卸载
+    await win.waitForSelector('[data-testid="subs-download-all"]', { state: 'detached', timeout: 30000 })
+    {
+      const sub2 = JSON.parse(readFileSync(join(libraryRoot, 'subscriptions.json'), 'utf8'))
+      const last = sub2.checkLog?.[0]
+      assert(last?.kind === 'download' && last?.trigger === 'manual' && last?.newFound === 0,
+        `M56: 下载全部待处理落 kind=download / trigger=manual / newFound=0 记录` +
+        ` (kind=${last?.kind}, trigger=${last?.trigger}, newFound=${last?.newFound})`)
+      const detail = (last?.downloadDetail ?? []).find((d) => d.nickname === '测试订阅号')
+      // 状态不锁死（downloaded/exists 均算落盘成立），但逐篇明细必须非空
+      assert(!!detail && detail.items.length > 0,
+        `M56: 补下载记录 downloadDetail 含「测试订阅号」且逐篇明细非空 (items=${detail?.items?.length ?? 0})`)
+    }
+    // 行内摘要随最新补下载记录更新：纯交付话术、不出现「发现」（补下载 newFound=0，说了就与检查记录的「新 0」打架）
+    const sumAfterDl = await win.locator('[data-testid="subs-row-summary"]').first().innerText()
+    assert(sumAfterDl.includes('补下载') && !sumAfterDl.includes('发现'),
+      `M56: 补下载后行内摘要为纯交付话术，无「发现」(saw: ${sumAfterDl.slice(0, 40)})`)
+
     // ============ M49 · 现存设置继续可用（site-sync tooltip）============
     await win.click('[data-testid="nav-设置"]')
     await win.locator('[data-testid="site-sync-help"]').hover()

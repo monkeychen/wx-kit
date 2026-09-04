@@ -101,10 +101,10 @@ v0.10.1 的订阅链路（cover 最新一篇增量 + 批量下载 + 本地日报
 
 - [x] 定时自动检查 + 自动下载成功后，检查记录含下载汇总与逐号逐篇明细；重启应用（新进程读取 `subscriptions.json`）后仍可查。（2026-09-04 真实验收：`check-now` 后新进程 `list` 读到 `downloaded:1` + `downloadDetail` 逐篇明细）
 - [x] 行内单号「检查」在自动下载策略下同样落含明细的记录（`trigger:'manual'`）——三条触发路径（行内/检查全部/定时）共用同一编排，可观测性一致；行内检查过程中下载阶段进度照常可见。（单测钉住 manual+子集路径；真实 `check-now` 即 manual 路径验过）
-- [x] 手动「下载全部待处理」落一条 `kind:'download'` 记录，明细与自动检查触发的下载可区分。（单测 + e2e；`formatCheckLogLine` 输出 `DOWNLOAD` 标签）
+- [x] 手动「下载全部待处理」落一条 `kind:'download'` 记录，明细与自动检查触发的下载可区分。（e2e：GUI 点「下载全部待处理」走完 `subscriptions:downloadAllNew` 全链路后读 `subscriptions.json`，断言最新记录 `kind:'download'`/`trigger:'manual'`/`newFound:0` 且 `downloadDetail` 含该号逐篇非空明细；`formatCheckLogLine` 输出 `DOWNLOAD` 标签由单测钉住）
 - [x] 「文库已有」单列计数，不并入「刚下载」；四种状态（downloaded/exists/failed/unavailable）在明细中可区分。（单测逐状态断言；真实验收确认 `downloaded` 状态）
 - [x] 下载失败的文章保留在待处理可重试；`unavailable` 不再进入待处理（沿用 M54 语义），明细中标注。（单测显式断言 `setPendingRefs` 收到真故障）
-- [x] 订阅页每号行内显示最近一次结果摘要，能区分「发现」与「交付」及触发方式（自动/手动）。（e2e：`· 自动 · 发现 1 篇，已下载 1 篇`）
+- [x] 订阅页每号行内显示最近一次结果摘要，能区分「发现」与「交付」及触发方式（自动/手动）。（e2e：`· 自动 · 发现 1 篇，已下载 1 篇`；补下载记录的行内摘要为纯交付话术、无「发现」字样，单测逐 kind 断言）
 - [x] 检查记录弹窗每条记录可展开逐号逐篇明细；旧记录（无新字段）不报错、不显示明细区。（e2e 弹窗断言 + 单测旧条目渲染不变）
 - [x] `subscription check-now` 的逐号 `results[]` 含逐篇下载明细；`subscription list` 输出 `recentLog`（新进程读取，与 GUI 检查记录同源）；`agent/wx-kit-skill`（SKILL.md + references）同批刷新。（真实验收两项字段均读到）
 - [x] 旧 `subscriptions.json`（无新字段）升级后功能正常，零迁移。（单测：旧条目读入与格式输出不变；真实库全程未迁移）

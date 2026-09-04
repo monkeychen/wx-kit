@@ -244,7 +244,7 @@ export default function Subscriptions() {
     if (hit) {
       return (
         <span data-testid="subs-row-summary" className="faint" style={{ marginLeft: 8 }}>
-          · {formatShortTime(hit.entry.time)} {triggerLabel(hit.entry)} · {summaryPhrase(hit.detail.items)}
+          · {formatShortTime(hit.entry.time)} {triggerLabel(hit.entry)} · {summaryPhrase(hit.detail.items, hit.entry.kind)}
         </span>
       )
     }

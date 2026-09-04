@@ -23,15 +23,24 @@ export function latestResultByAccount(checkLog: CheckLogEntry[]): Map<string, La
 
 /**
  * 交付话术：四状态收敛为三句（M56）。N = 该号本次进入下载流程的篇数（items.length）。
- * - downloaded>0 → 「发现 N 篇，已下载 M 篇」（brief 定死：并存 exists 时也不展开第三句）
- * - existed>0 且 downloaded=0 → 「发现 N 篇，M 篇文库已有」
- * - 其余（全 failed/unavailable）→ 只说「发现 N 篇」，失败细节走弹窗，摘要不展开
+ * - kind='check'（或缺省，发现+交付并存）：downloaded>0 → 「发现 N 篇，已下载 M 篇」
+ *   （brief 定死：并存 exists 时也不展开第三句）；existed>0 且 downloaded=0 → 「发现 N 篇，M 篇文库已有」；
+ *   其余（全 failed/unavailable）→ 只说「发现 N 篇」，失败细节走弹窗，摘要不展开
+ * - kind='download'（补下载，纯交付）：newFound 恒为 0，**不说「发现」**——说了会和同屏检查
+ *   记录行的「新 0」自相矛盾，也违反 PRD §4「行内摘要必须能区分发现与交付」。
+ *   downloaded>0 → 「已下载 M 篇」；existed>0 且 downloaded=0 → 「M 篇文库已有」；
+ *   其余 → 「N 篇未成功」（细节走弹窗）。刚下载/文库已有仍分开。
  */
-export function summaryPhrase(items: DownloadItemLog[]): string {
+export function summaryPhrase(items: DownloadItemLog[], kind: CheckLogEntry['kind'] = 'check'): string {
   let downloaded = 0, existed = 0
   for (const item of items) {
     if (item.status === 'downloaded') downloaded++
     else if (item.status === 'exists') existed++
+  }
+  if (kind === 'download') {
+    if (downloaded > 0) return `已下载 ${downloaded} 篇`
+    if (existed > 0) return `${existed} 篇文库已有`
+    return `${items.length} 篇未成功`
   }
   if (downloaded > 0) return `发现 ${items.length} 篇，已下载 ${downloaded} 篇`
   if (existed > 0) return `发现 ${items.length} 篇，${existed} 篇文库已有`

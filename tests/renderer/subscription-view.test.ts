@@ -60,6 +60,20 @@ describe('summaryPhrase', () => {
     expect(summaryPhrase(items('failed', 'unavailable'))).toBe('发现 2 篇')
     expect(summaryPhrase([])).toBe('发现 0 篇')
   })
+  // kind='download'（补下载）：纯交付动作，newFound 恒 0——话术不得出现「发现」（PRD §4 发现与交付可区分）
+  it("kind='download' downloaded>0 → 纯交付话术「已下载 M 篇」，无「发现」", () => {
+    expect(summaryPhrase(items('downloaded', 'downloaded', 'exists'), 'download')).toBe('已下载 2 篇')
+  })
+  it("kind='download' 全 exists → 只说文库已有，无「发现」", () => {
+    expect(summaryPhrase(items('exists', 'failed'), 'download')).toBe('1 篇文库已有')
+  })
+  it("kind='download' 无一交付 → 「N 篇未成功」（细节走弹窗）", () => {
+    expect(summaryPhrase(items('failed', 'unavailable'), 'download')).toBe('2 篇未成功')
+  })
+  it("kind='check' 显式传参与缺省逐字一致（缺省即检查语义）", () => {
+    expect(summaryPhrase(items('downloaded', 'exists'), 'check'))
+      .toBe(summaryPhrase(items('downloaded', 'exists')))
+  })
 })
 
 describe('triggerLabel', () => {
