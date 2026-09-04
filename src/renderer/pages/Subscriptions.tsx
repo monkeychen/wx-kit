@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Switch, Button, Spin, Alert, message, List, Tag, Modal, Checkbox, Popconfirm } from 'antd'
 import { LoadingOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons'
@@ -9,6 +9,9 @@ import type { MpAccount } from '../../core/mp-types'
 import { refId } from '../../core/subscription-refs'
 import { kindTag } from '../../core/message-kind'
 import { updatePerAccountProgress, type PerAccountDownloadState } from '../subscription-progress'
+import {
+  latestResultByAccount, summaryPhrase, triggerLabel, formatShortTime, itemStatusTag, detailModalTitle,
+} from '../subscription-view'
 
 /** 下载进度按 fakeid 存:手动下载与检查里的自动下载共用同一套 UI（M34） */
 /** 行内结果态展示多久后淡出；失败态不自动清（失败信息值钱，留到下次检查） */
@@ -54,6 +57,10 @@ export default function Subscriptions() {
     finally { setLoading(false) }
   }
   useEffect(() => { load(); return api.onSubscriptionsUpdated(load) }, [])
+
+  // M56:行内摘要改为 checkLog 落盘派生（单一数据源）——T2 落盘后 emitSubsUpdated →
+  // subscriptions:list 重取 → 这里跟着重算,行内自动刷新,不再依赖易失的当次内存态。
+  const latestByAccount = useMemo(() => latestResultByAccount(checkLog), [checkLog])
 
   /** 检查结果落到各行；成功态几秒后淡出，失败态留着 */
   const applyResults = (r: RunCheckResult) => {
@@ -219,14 +226,33 @@ export default function Subscriptions() {
     )
   }
 
-  /** 行内结果:检查完这一行到底发生了什么。此前自动下载全程零反馈，点完像什么都没发生。 */
+  /**
+   * 行内结果:这一行最近发生了什么。M56 起优先显示 checkLog 派生的落盘摘要(单一数据源),
+   * 当次内存态(rowRes)只保留两类职责:检查失败的即时反馈(失败不淡出、值钱,不能被一条
+   * 旧落盘摘要掩盖)、以及该号还没有任何落盘摘要时的当次成功反馈(仅提示策略的号)。
+   */
   const rowResultEl = (fakeid: string, nickname: string) => {
     const r = rowRes[fakeid]
+    if (r && !r.ok) {
+      return (
+        <span data-testid="subs-row-result" style={{ marginLeft: 8, color: 'var(--cinnabar)' }}>
+          · ✗ {r.error ?? '检查失败'}
+        </span>
+      )
+    }
+    const hit = latestByAccount.get(fakeid)
+    if (hit) {
+      return (
+        <span data-testid="subs-row-summary" className="faint" style={{ marginLeft: 8 }}>
+          · {formatShortTime(hit.entry.time)} {triggerLabel(hit.entry)} · {summaryPhrase(hit.detail.items)}
+        </span>
+      )
+    }
     if (!r) return null
-    const [text, color] = !r.ok ? [`✗ ${r.error ?? '检查失败'}`, 'var(--cinnabar)']
-      : r.downloaded > 0 ? [`✓ 已自动下载 ${r.downloaded} 篇`, 'var(--celadon, #3f8f6f)']
-        : r.newFound > 0 ? [`发现 ${r.newFound} 篇待处理`, 'var(--cinnabar)']
-          : ['暂无新文章', undefined]
+    // ↓ 以下为无落盘摘要时的当次态(旧渲染路径,原样保留)
+    const [text, color] = r.downloaded > 0 ? [`✓ 已自动下载 ${r.downloaded} 篇`, 'var(--celadon, #3f8f6f)']
+      : r.newFound > 0 ? [`发现 ${r.newFound} 篇待处理`, 'var(--cinnabar)']
+        : ['暂无新文章', undefined]
     return (
       <span data-testid="subs-row-result" style={{ marginLeft: 8, color }}>
         · {text}
@@ -238,19 +264,50 @@ export default function Subscriptions() {
     )
   }
 
-  // 检查记录里「失败 x」的明细弹窗(v0.5.4 起的记录才有 failures;旧记录保持纯文本)
-  const showFailures = (e: CheckLogEntry) => {
+  // M56:检查记录明细弹窗——「检查失败」与「下载明细」分节;空节不渲染,旧记录(两字段皆无)退化为纯文本
+  const showCheckDetail = (e: CheckLogEntry) => {
+    const sections: ReactNode[] = []
+    if (e.failures?.length) {
+      sections.push(
+        <div key="failures" data-testid="subs-detail-failures" style={{ marginBottom: 16 }}>
+          <h4 style={{ fontSize: 13, margin: '0 0 8px' }}>检查失败</h4>
+          <List size="small" dataSource={e.failures} renderItem={(f) => (
+            <List.Item>
+              <List.Item.Meta title={f.nickname} description={f.error} />
+            </List.Item>
+          )} />
+        </div>,
+      )
+    }
+    if (e.downloadDetail?.length) {
+      sections.push(
+        <div key="downloads" data-testid="subs-detail-downloads">
+          <h4 style={{ fontSize: 13, margin: '0 0 8px' }}>下载明细</h4>
+          {e.downloadDetail.map((acc) => (
+            <div key={acc.fakeid} style={{ marginBottom: 12 }} data-testid="subs-detail-account">
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{acc.nickname}</div>
+              {acc.items.map((item, i) => {
+                // failed 的 Tag 用 title 带 error(悬停可见原因);unavailable 是「读者本就打不开」,不是工具故障
+                const tag = itemStatusTag(item.status)
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 0' }} data-testid="subs-detail-item">
+                    <span style={{ flex: 1, fontSize: 13 }}>{item.title || '(无标题)'}</span>
+                    <Tag color={tag.color} title={item.error}>{tag.label}</Tag>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>,
+      )
+    }
     Modal.info({
-      title: `检查失败明细（${new Date(e.time).toLocaleString()}）`,
-      content: (
-        <List size="small" dataSource={e.failures} renderItem={(f) => (
-          <List.Item>
-            <List.Item.Meta title={f.nickname} description={f.error} />
-          </List.Item>
-        )} />
+      title: detailModalTitle(e),
+      content: sections.length ? <>{sections}</> : (
+        <span className="faint" style={{ fontSize: 13 }}>该记录没有留下更多明细（旧版本记录）。</span>
       ),
       okText: '知道了',
-      width: 480,
+      width: 520,
     })
   }
 
@@ -379,11 +436,12 @@ export default function Subscriptions() {
           <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>检查记录</h3>
           {checkLog.length === 0 ? <div className="faint" style={{ fontSize: 13 }}>还没有检查记录。开启自动检查或点「检查更新」后，这里会留痕。</div>
             : <List size="small" dataSource={checkLog.slice(0, 10)} renderItem={(e: CheckLogEntry) => (
-                <List.Item>
+                // M56:每条记录都可点开明细弹窗(不再只有失败才可展开);点击行文本里的链接时拦掉冒泡,避免开两层
+                <List.Item data-testid="subs-log-entry" style={{ cursor: 'pointer', padding: '6px 0' }} onClick={() => showCheckDetail(e)}>
                   <span style={{ fontSize: 12.5 }}>
-                    {new Date(e.time).toLocaleString()} · {e.trigger === 'auto' ? '自动' : '手动'} · 查 {e.accounts} 号 · 新 {e.newFound} ·{' '}
+                    {new Date(e.time).toLocaleString()} · {triggerLabel(e)} · 查 {e.accounts} 号 · 新 {e.newFound} ·{' '}
                     {e.failures?.length
-                      ? <a onClick={() => showFailures(e)} data-testid="subs-log-failures">失败 {e.failed}</a>
+                      ? <a onClick={(ev) => { ev.stopPropagation(); showCheckDetail(e) }} data-testid="subs-log-failures">失败 {e.failed}</a>
                       : <>失败 {e.failed}</>}{e.note ? ` · ${e.note}` : ''}
                   </span>
                 </List.Item>
