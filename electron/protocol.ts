@@ -45,6 +45,23 @@ export function resolveWxfilePath(url: string, root: string): string | null {
   return target
 }
 
+
+/**
+ * 给 html 注入 <base target="_blank">：HTML 视图 iframe（sandbox 无 allow-scripts，安全上不可
+ * 注入脚本）里点「原文」等外链默认在 iframe 内导航，会被微信的嵌入限制响应头阻断
+ * （ERR_BLOCKED_BY_RESPONSE）。base 让无 target 的链接改为新开窗口，配合主窗口的
+ * setWindowOpenHandler 转交系统浏览器。库内已带 <base> 的页面不重复注入。
+ */
+export function withBaseTarget(html: string): string {
+  if (/<base\s/i.test(html)) return html
+  const head = html.match(/<head[^>]*>/i)
+  if (head?.index != null) {
+    const at = head.index + head[0].length
+    return html.slice(0, at) + '<base target="_blank">' + html.slice(at)
+  }
+  return '<base target="_blank">' + html
+}
+
 /** 必须在 app ready 前调用：声明协议为可加载本地资源的特权协议。 */
 export function registerWxfileScheme(): void {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -62,9 +79,14 @@ export function handleWxfileProtocol(getRoot: () => string | Promise<string>): v
     const root = await getRoot()
     const target = resolveWxfilePath(req.url, root)
     if (!target) return new Response('forbidden', { status: 403 })
-    return net.fetch(pathToFileURL(target).toString()).catch((e) => {
+    const res = await net.fetch(pathToFileURL(target).toString()).catch((e) => {
       console.error('[wxfile] fetch error:', e)
-      return new Response('error', { status: 500 })
+      return null
     })
+    if (!res) return new Response('error', { status: 500 })
+    const type = res.headers.get('content-type') ?? ''
+    if (!/text\/html/i.test(type)) return res
+    const html = withBaseTarget(await res.text())
+    return new Response(html, { status: res.status, headers: { 'content-type': type } })
   })
 }

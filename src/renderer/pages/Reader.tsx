@@ -59,7 +59,7 @@ export default function Reader() {
       </div>
 
       {kind === 'html' ? (
-        <iframe title="article" className="reader-frame" sandbox="allow-same-origin"
+        <iframe title="article" className="reader-frame" sandbox="allow-same-origin allow-popups"
           src={wxfileJoin(base, 'index.html')} />
       ) : (
         <div className="reader-scroll">

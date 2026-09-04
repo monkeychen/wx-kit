@@ -1,5 +1,5 @@
 // electron/main.ts
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import path, { join } from 'node:path'
 import { runCli } from '../src/cli'
 import { isCliInvocation, normalizeUserArgs } from './cli-dispatch'
@@ -54,6 +54,13 @@ async function main() {
       // 注意 index.html 的 <title> 也必须为空,否则页面加载后会把它顶回来。
       width: 1200, height: 800, title: '',
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+    })
+    // 应用内不开新窗口:window.open/_blank 一律转交系统浏览器(仅 http/https;其余来源直接拒绝)。
+    // 与 wxfile 协议注入的 <base target="_blank">、iframe allow-popups 配套,让 HTML 视图里的
+    // 「原文」等外链能用系统浏览器打开——iframe 内导航会被微信的嵌入限制响应头阻断。
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//.test(url)) void shell.openExternal(url)
+      return { action: 'deny' }
     })
     const devUrl = process.env.VITE_DEV_SERVER_URL
     if (devUrl) win.loadURL(devUrl)

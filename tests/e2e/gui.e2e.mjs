@@ -275,6 +275,14 @@ async function main() {
     const iframeSrc = await win.getAttribute('iframe', 'src')
     assert(!!iframeSrc && iframeSrc.startsWith('wxfile://') && iframeSrc.endsWith('/index.html'),
       'reader html view: iframe src is wxfile .../index.html')
+    // 外链修复（阅读器原文链接 ERR_BLOCKED_BY_RESPONSE）：协议层注入 base + iframe 允许弹窗,
+    // 让「原文」走新窗口 → 主窗口 setWindowOpenHandler → 系统浏览器（真开浏览器不入 e2e,行为人工验）
+    const iframeSandbox = await win.getAttribute('iframe', 'sandbox')
+    assert(iframeSandbox.includes('allow-popups'), 'reader iframe sandbox allows popups (external links)')
+    // 主进程 net.fetch 走 wxfile 协议栈（主窗口的 renderer fetch 会被 CORS 拦）
+    const servedHtml = await app.evaluate(async ({ net }, u) => await (await net.fetch(u)).text(), iframeSrc)
+    assert(servedHtml.includes('<base target="_blank">'),
+      'wxfile-served html injects <base target="_blank"> (external links open via system browser)')
 
     // ============ M9 · 批量删除 + 单篇删除(a1/a2/a3) → 文库清空 ============
     await win.click('[data-testid="nav-文库"]')
