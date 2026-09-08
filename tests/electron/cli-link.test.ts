@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { linkStatus, createLink, wrapperScript, pathContains, ensureInProfile, profilePathFor } from '../../electron/services/cli-link'
+import { linkStatus, createLink, wrapperScript, pathContains, ensureInProfile, profilePathFor, isTransientExecPath } from '../../electron/services/cli-link'
 
 let dir: string
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'wxk-link-')) })
@@ -93,5 +93,20 @@ describe('profilePathFor', () => {
     expect(profilePathFor('/bin/zsh', '/h')).toBe(join('/h', '.zshrc'))
     expect(profilePathFor('/bin/bash', '/h')).toBe(join('/h', '.bashrc'))
     expect(profilePathFor(undefined, '/h')).toBe(join('/h', '.profile'))
+  })
+})
+
+describe('isTransientExecPath', () => {
+  it('dev（未打包）一律视为临时位置', () => {
+    expect(isTransientExecPath('/any/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron', false)).toBe(true)
+    expect(isTransientExecPath('C:\\node\\electron.exe', false)).toBe(true)
+  })
+  it('正式安装路径不是临时位置', () => {
+    expect(isTransientExecPath('/Applications/wx-kit.app/Contents/MacOS/wx-kit', true)).toBe(false)
+    expect(isTransientExecPath('C:\\Users\\a\\AppData\\Local\\Programs\\wx-kit\\wx-kit.exe', true)).toBe(false)
+  })
+  it('构建输出目录（mac/win 形态）是临时位置', () => {
+    expect(isTransientExecPath('/Users/a/proj/release/mac-arm64/wx-kit.app/Contents/MacOS/wx-kit', true)).toBe(true)
+    expect(isTransientExecPath('C:\\proj\\release\\win-unpacked\\wx-kit.exe', true)).toBe(true)
   })
 })

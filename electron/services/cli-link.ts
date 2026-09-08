@@ -61,3 +61,14 @@ export function profilePathFor(shell: string | undefined, home: string): string 
   if (shell?.includes('bash')) return join(home, '.bashrc')
   return join(home, '.profile')
 }
+
+/**
+ * execPath 是否处于「临时位置」：dev（未打包）或构建输出目录（路径含 release 段，mac/win 同判）。
+ * 临时位置的产物会被下次打包/清理删掉，wrapper 指向它必然悬空（2026-09-04 实录：从 release/
+ * 启动建链后 win 打包清目录，CLI 报 No such file or directory）。
+ * 正式安装（/Applications、brew、%LOCALAPPDATA%\Programs）不含 release 段，不受影响。
+ */
+export function isTransientExecPath(execPath: string, isPackaged: boolean): boolean {
+  if (!isPackaged) return true
+  return /[/\\]release[/\\]/.test(execPath)
+}
