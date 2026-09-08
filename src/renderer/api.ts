@@ -31,7 +31,7 @@ export interface SubscriptionDownloadProgress {
 
 
 export type CliLinkStatus = 'linked' | 'unlinked' | 'conflict'
-export interface CliLinkInfo { supported: boolean; status: CliLinkStatus; inPath: boolean; dir: string }
+export interface CliLinkInfo { supported: boolean; status: CliLinkStatus; inPath: boolean; dir: string; transient?: boolean }
 
 export interface WxApi {
   download(urls: string[], formats: DownloadFormat[]): Promise<DownloadSummary>
@@ -103,7 +103,7 @@ export interface WxApi {
   onUpdateProgress(cb: (p: UpdateProgress) => void): () => void
 
   cliLinkStatus(): Promise<CliLinkInfo>
-  cliLinkCreate(force: boolean): Promise<{ status: CliLinkStatus }>
+  cliLinkCreate(force: boolean): Promise<{ status: CliLinkStatus; transient?: boolean }>
   cliLinkAddToPath(): Promise<{ profilePath: string; result: 'added' | 'present' }>
 }
 

@@ -4,7 +4,7 @@ import { readdir } from 'node:fs/promises'
 import { appendFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { linkStatus, createLink, pathContains, ensureInProfile, profilePathFor } from './services/cli-link'
+import { linkStatus, createLink, pathContains, ensureInProfile, profilePathFor, isTransientExecPath } from './services/cli-link'
 import type { DownloadFormat } from '../src/core/types'
 import { fetchBinary as fetchGenericBinary } from '../src/core/fetch-html'
 import { Library } from '../src/core/library'
@@ -125,13 +125,16 @@ export function registerIpc(settings: SettingsService): void {
   const CLI_LINK_SUPPORTED = process.platform === 'darwin' || process.platform === 'linux'
   const cliLinkDir = () => join(homedir(), 'bin')
   const cliLinkPath = () => join(cliLinkDir(), 'wx-kit')
+  // wrapper 指向临时位置的产物会在打包/清理后悬空——临时位置一律不写（PRD-v0.10.3 R1）
+  const transientLink = () => isTransientExecPath(process.execPath, app.isPackaged)
 
   ipcMain.handle('cliLink:status', async () => {
     if (!CLI_LINK_SUPPORTED) return { supported: false, status: 'unlinked', inPath: false, dir: cliLinkDir() }
     let status = await linkStatus(cliLinkPath(), process.execPath)
-    if (status === 'legacy') {
+    if (status === 'legacy' && !transientLink()) {
       // ≤v0.5.1 建的是 symlink,mac 上经软链调用找不到 Helper app(download 必崩)——静默升级为 wrapper 脚本。
       // GUI 每次启动 CliLinkPrompt 都会查一次 status,老用户开一次 GUI 即自愈。
+      // 临时位置不写（保持现状，等从正式安装启动再自愈）。
       await createLink(cliLinkDir(), cliLinkPath(), process.execPath, true)
       status = await linkStatus(cliLinkPath(), process.execPath)
     }
@@ -140,10 +143,15 @@ export function registerIpc(settings: SettingsService): void {
       status,
       inPath: pathContains(cliLinkDir(), process.env.PATH),
       dir: cliLinkDir(),
+      transient: transientLink(),
     }
   })
   ipcMain.handle('cliLink:create', async (_e, force: boolean) => {
     if (!CLI_LINK_SUPPORTED) return { status: 'unlinked' as const }
+    if (transientLink()) {
+      // 拒绝创建但回报现状，渲染层据 transient 标记给引导话术
+      return { status: await linkStatus(cliLinkPath(), process.execPath), transient: true as const }
+    }
     await createLink(cliLinkDir(), cliLinkPath(), process.execPath, force)
     return { status: await linkStatus(cliLinkPath(), process.execPath) }
   })

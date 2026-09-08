@@ -80,7 +80,11 @@ export default function Settings() {
   }
   const createCliLink = async () => {
     try {
-      await api.cliLinkCreate(cliLink?.status === 'conflict')
+      const r = await api.cliLinkCreate(cliLink?.status === 'conflict')
+      if (r.transient) {
+        message.warning('当前从开发/构建目录运行，命令行入口暂不创建——请从正式安装的 wx-kit 启动后再试')
+        return
+      }
       if (cliLink && !cliLink.inPath) {
         const r = await api.cliLinkAddToPath()
         message.success(`已创建，并将 ~/bin 写入 ${r.profilePath}，重开终端生效`)
@@ -386,6 +390,11 @@ export default function Settings() {
                 当前状态：{cliLink.status === 'linked' ? '已创建' : cliLink.status === 'conflict' ? '该位置被占用（创建将覆盖）' : '未创建'}
                 {!cliLink.inPath && '；~/bin 不在 PATH，创建时会引导写入 shell 配置'}。
               </div>
+              {cliLink.transient && (
+                <div className="setting-hint" style={{ color: 'var(--warning, #d46b08)' }}>
+                  当前从开发/构建目录运行，命令行入口暂不可创建；从正式安装的 wx-kit 启动后可用。
+                </div>
+              )}
               <Button style={{ marginTop: 8 }} onClick={createCliLink} data-testid="set-cli-link">
                 {cliLink.status === 'linked' ? '重新创建' : '创建命令行快捷方式'}
               </Button>

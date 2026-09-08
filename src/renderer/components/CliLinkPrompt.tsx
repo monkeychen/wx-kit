@@ -13,6 +13,7 @@ export default function CliLinkPrompt() {
     (async () => {
       const i = await api.cliLinkStatus()
       if (!i.supported || i.status === 'linked') return
+      if (i.transient) return // dev/构建目录下引导无意义（创建会被拒），不弹
       if ((await api.getSettings()).cliLinkPrompted) return
       setInfo(i); setOpen(true)
     })().catch(() => { /* 引导失败不阻塞应用 */ })
@@ -22,7 +23,12 @@ export default function CliLinkPrompt() {
 
   const create = async () => {
     try {
-      await api.cliLinkCreate(info?.status === 'conflict')
+      const r = await api.cliLinkCreate(info?.status === 'conflict')
+      if (r.transient) {
+        message.warning('当前从开发/构建目录运行，请从正式安装的 wx-kit 启动后再创建命令行入口')
+        await dismiss()
+        return
+      }
       if (info && !info.inPath) {
         const r = await api.cliLinkAddToPath()
         message.success(`已创建快捷方式，并将 ~/bin 写入 ${r.profilePath}，重开终端后生效`)
