@@ -56,9 +56,10 @@ wx-kit subscription digest --date today --download [--accounts a,b] [--formats m
 ```
 
 - `list`：返回 `accounts[]`（含 `fakeid`/`nickname`/水位）、`lastRunAt`、`nextCheckAt`、`recentLog[]`（v0.10.2 起：最近 5 条检查记录，新在前，与 GUI「检查记录」同源）。定时自动下载发生在 GUI 进程内，查「最近自动下载了什么」用 `recentLog`，`check-now` 只报告本次触发的一轮；
+- **登录态失效（v0.10.5 起）**：`authExpired: true`、`recentLog` 落 `note: 'auth-expired'`、`check-now` 同样返回该 note——此时**不代表没有新文章**，应引导用户到设置页重新扫码登录，不要基于失效会话的结果下结论；
 - `check-now`：按稳定文章身份检查更新，按设置提示或自动下载；返回逐号明细 `results[]`、`newFound`、`failed`。自动下载的号带 `results[].articles`（v0.10.2 起），为该号本次逐篇明细，与 `recentLog` 里 `downloadDetail[].items` 同构——`status` 四态 `downloaded`/`exists`/`failed`/`unavailable`（仅 `failed` 才有 `error`）；未走下载策略的号没有该字段。
 - `digest --date`：只读本地订阅与文库，按 `publishTime` 的北京时间自然日筛选，默认零网络（today 也一样）。
-- `--accounts` 从 `subscription list` 取 fakeid，兼容旧标识，默认全部已订阅账号。查询优先匹配文库 `accountId`，其次长链 `__biz`，历史数据两者皆无时才按本地订阅昵称精确匹配。新下载会保存已知账号身份，避免改名后漏查；缺少身份的旧短链条目仍可能受昵称变更影响。
+- `--accounts` 从 `subscription list` 取 fakeid 即可（v0.10.5 起按身份归一匹配，`MP_WXS_` 与历史 base64 形态均可命中），默认全部已订阅账号。查询优先匹配文库 `accountId`，其次长链 `__biz`，历史数据两者皆无时才按本地订阅昵称精确匹配。新下载会保存已知账号身份，避免改名后漏查；缺少身份的旧短链条目仍可能受昵称变更影响。
 - `--download` 只允许北京时间今天或等于今天的具体日期；非今天返回 `DOWNLOAD_TODAY_ONLY`、退出码 2，在联网前拒绝。
 - 显式下载先读取所选账号的最新 cover，下载文库缺失文章，再重新读库筛选今天；最新 cover 若是旧文仍可能保存，但不会算作今天发表。
 - 显式下载不受全局自动下载策略影响，不修改订阅游标、`newRefs`、调度和设置；请求仍受串行、间隔与全局熔断保护。

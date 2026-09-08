@@ -96,6 +96,10 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 ## 关键约束与已知陷阱（容易重踩，务必注意）
 - **按 URL 下载仍是生产能力**：多 URL 下载保持串行；已删除文章会返回 HTTP 200 错误页 → 用“解析后标题为空即视为无效文章”判定失败（见 `src/core/download-article.ts`）。不要把私有列表接口失效扩大成“所有微信文章都不能下载”。
 - **文章库**：默认在用户文档目录下（`~/Documents/wx-kit`），可在设置改。文件系统存储 + `library.json` 索引，不用数据库。
+- **失败必须保留失败类型，不得降级为「成功但空」**（v0.10.5 实录，勿回退）:鉴权失效必须抛
+  `MpAuthExpired`——weread 传输层 401/403 抛它、cover 回退（`fallbackToCover`）不吞它,
+  `checkSubscriptions` 的 auth-expired 分支靠它触发。此前 401 被吞成空列表,登录过期后检查一直
+  报「没有新文章」。写「失败回退为空」的 catch 前先问:空和失败在调用方眼里是一回事吗。
 - **微信读书 Cookie 是可轮换会话，不是静态配置**：业务请求会优先使用 `weread-creds.json` 里的完整 `cookie` 快照。成功响应后的 Chromium `persist:weread` jar 必须同步写回该文件（变化才写、0600、原子替换），否则下一个独立 CLI 进程会继续发送旧 `wr_skey` 并可能 401。401/403 绝不覆盖凭据；快照落盘失败不改判已成功业务请求。
 - **构建：undici 必须 external**（`vite.config.ts`）。cheerio 依赖 undici，其 sqlite-cache-store 静态 `require('node:sqlite')`，Electron 当前内置的 Node 没有该模块（Electron 42 仍如此），打进 bundle 会导致主进程加载即崩溃。我们只用 `cheerio.load`，故 external 让它惰性、永不加载。
 - **CLI 模式必须注册 no-op `window-all-closed`**（`electron/main.ts`）：否则 PDF 用的离屏 BrowserWindow 关闭会触发 Electron 默认自动退出，截断流程。
