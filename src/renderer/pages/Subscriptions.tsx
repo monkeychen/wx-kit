@@ -50,7 +50,11 @@ export default function Subscriptions() {
     setLoading(true)
     try {
       const s = await api.subscriptionsList()
-      setAccounts(s.accounts); setAuthExpired(s.authExpired); setCheckLog(s.checkLog); setNextCheckAt(s.nextCheckAt)
+      // authExpired 是「上次检查时」的结论。重登后回到本页应按当前登录态修正——行动完成，
+      // 提示即消失；若凭据仍无效（重登前还挂着旧凭据），下次检查报 auth-expired 会把它置回。
+      const live = await api.mpSessionInfo().catch(() => null)
+      setAuthExpired(s.authExpired && live?.loggedIn !== true)
+      setAccounts(s.accounts); setCheckLog(s.checkLog); setNextCheckAt(s.nextCheckAt)
       // 策略常驻可见：设置是几天前设的，点检查时早忘了——让状态可见，而不是让人回忆
       setPolicy((await api.getSettings()).subscriptionNewArticleAction)
     }
