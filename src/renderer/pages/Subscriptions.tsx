@@ -85,11 +85,22 @@ export default function Subscriptions() {
   const toggle = async (a: SubscribedAccount, next: boolean) => {
     await api.subscriptionsSetSubscribed(a.fakeid, a.nickname, next); await load()
   }
+  const [searching, setSearching] = useState(false)
   const search = async () => {
-    const name = kw.trim(); if (!name) return
-    const r = await api.mpSearch(name)
-    if (!r.ok) { message.error(r.error?.message ?? '识别失败'); setAuthExpired(r.error?.code === 'AUTH_REQUIRED'); return }
-    setCandidates(r.list ?? [])
+    const name = kw.trim()
+    if (!name) { message.warning('先粘贴该公众号任意一篇文章的链接'); return }
+    setSearching(true)
+    try {
+      const r = await api.mpSearch(name)
+      if (!r.ok) { message.error(r.error?.message ?? '识别失败'); setAuthExpired(r.error?.code === 'AUTH_REQUIRED'); return }
+      const hits = r.list ?? []
+      setCandidates(hits)
+      // 成功但零候选（链接非公众号文章/已删）也是一条「点了没反应」的静默路径，必须给话术。
+      // e2e mock 对任何 cover 请求都返回同一候选，造不出零候选——此分支由实现评审覆盖，不进 e2e。
+      if (!hits.length) message.warning('未识别出公众号，请确认链接是公众号文章')
+    } finally {
+      setSearching(false)
+    }
   }
   const add = async (c: MpAccount) => {
     await api.subscriptionsAddAccount(c.fakeid, c.nickname); setCandidates([]); setKw(''); await load(); message.success(`已订阅「${c.nickname}」`)
@@ -322,8 +333,8 @@ export default function Subscriptions() {
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <Input placeholder="粘贴该公众号任意一篇文章的链接以订阅" value={kw} onChange={(e) => setKw(e.target.value)}
-            onPressEnter={search} style={{ width: 280 }} data-testid="subs-search-input" allowClear />
-          <Button type="primary" onClick={search} data-testid="subs-search-btn">识别</Button>
+            onPressEnter={search} style={{ width: 280 }} data-testid="subs-search-input" allowClear disabled={searching} />
+          <Button type="primary" onClick={search} loading={searching} data-testid="subs-search-btn">识别</Button>
           <div style={{ flex: 1 }} />
           {pendingTotal > 0 && <Button loading={bulkDl != null} disabled={busy && bulkDl == null} onClick={downloadAll} data-testid="subs-download-all">
             {bulkDl ? `${phaseText(bulkDl.phase)} ${bulkDl.done}/${bulkDl.total}${bulkDl.nickname ? ` · ${bulkDl.nickname}` : ''}` : `下载全部待处理新文章（${pendingTotal} 篇，${pendingGroups.length} 个公众号）`}
