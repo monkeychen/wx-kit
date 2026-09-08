@@ -34,8 +34,10 @@ const PNG = Buffer.from(
 const ARTICLES = {
   a1: { title: '阿尔法·甲', account: '甲号', pub: '2026-03-01 08:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486019', idx: '1' },
   a2: { title: '贝塔·甲', account: '甲号', pub: '2026-03-05 09:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486020', idx: '1' },
-  a3: { title: '伽马·乙', account: '乙号', pub: '2026-02-10 10:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486021', idx: '1' },
-  suba1: { title: '百宝箱订阅验收文', account: '测试订阅号', pub: '2026-08-27 10:00', biz: 'MzYzNDg1MDcyNQ==', mid: '2247486999', idx: '1' },
+  // 每个公众号必须有独立 biz（= 下载后 meta 的 accountId 身份）：M57 R2 起下拉按身份归并，
+  // 共用 biz 的两个名称会被并成同一选项（等价于「同号改名」）——fixture 必须反映真实形态。
+  a3: { title: '伽马·乙', account: '乙号', pub: '2026-02-10 10:00', biz: 'OTk5ODg4Nzc3', mid: '2247486021', idx: '1' },
+  suba1: { title: '百宝箱订阅验收文', account: '测试订阅号', pub: '2026-08-27 10:00', biz: 'ODg4Nzc3NjY2', mid: '2247486999', idx: '1' },
   bad: { title: '', account: '', pub: '' },   // 无标题 → 解析失败 → 失败项
 }
 const WEREAD_BOOK_ID = 'MP_WXS_3634850725'   // = normalizeAccountId(biz MzYzNDg1MDpyNQ==)
@@ -305,6 +307,10 @@ async function main() {
     // ============ v0.10.0 · 订阅：粘贴文章链接识别公众号 → 添加 ============
     await win.click('[data-testid="nav-订阅"]')
     await win.waitForSelector('[data-testid="subs-search-input"]', { timeout: 5000 })
+    // R3: 空输入点「识别」→ 引导话术，不发请求（mock 不变即可断言）
+    await win.click('[data-testid="subs-search-btn"]')
+    await win.waitForSelector('.ant-message-notice:has-text("先粘贴")', { timeout: 3000 })
+    assert(true, 'M57: 空输入识别给出引导话术')
     await win.fill('[data-testid="subs-search-input"]', MP_ARTICLE_URL)
     await win.click('[data-testid="subs-search-btn"]')
     await win.waitForSelector('.ant-list-item:has-text("测试订阅号")', { timeout: 10000 })
@@ -365,6 +371,11 @@ async function main() {
     const emptyText = await win.locator('[data-testid="library-account-empty"]').innerText()
     assert(emptyText.includes('还没有已下载的文章'),
       `M56: 文库入口按身份筛选且空态有专属提示 (saw: ${emptyText.slice(0, 40)})`)
+    // R2: 跳转文库后筛选框显示公众号名称而非裸 ID（该号 0 篇的空态场景，名称来自跳转参数）。
+    // Antd v6 单选的选中 label 是 .ant-select-content 里的裸文本节点（-content-value 仅在
+    // option 自带样式时出现），断言取容器文本。
+    const selText = (await win.locator('[data-testid="account-select"] .ant-select-content').innerText()).trim()
+    assert(selText === '测试订阅号', `M57: 跳转文库后筛选框显示名称(实际:${selText})`)
     await win.click('[data-testid="library-clear-account"]')
     await win.waitForSelector('[data-testid="library-account-empty"]', { state: 'detached', timeout: 5000 })
     assert(true, 'M56: 清除筛选后该号专属空态消失')
