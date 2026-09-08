@@ -88,7 +88,7 @@
 
 - [x] dev（未打包）启动：`cliLink:status` 不自动写 wrapper；设置页「重建」不执行并显示引导话术。（单测三态 + 打包验证脚本：未打包即 transient，两处写入点均拒绝）
 - [x] 从 `release/` 构建产物启动：同上两条拒绝路径，且已存在的健康 wrapper 不被改动。（2026-09-08 Playwright 驱动 release 产物实机验证：点创建出 warning、`~/bin/wx-kit` 内容前后一致、首启不弹引导 Modal）
-- [x] 正式安装形态（打包后 .app 或 e2e 等价模拟）启动：自动建链、手动重建行为与现状一致。（`isTransientExecPath` 单测锁死正式路径（/Applications、%LOCALAPPDATA%）返回 false；非 transient 时 create 走原逻辑未动；真机安装验证随发版流程执行）
+- [x] 正式安装形态（打包后 .app 或 e2e 等价模拟）启动：自动建链、手动重建行为与现状一致。（发版时 0.10.3 实装 /Applications 驱动验证：CLI 区无临时说明、状态「已创建」、首启不弹 Modal；临时态与正式态双态实机验证闭环）
 - [x] 纯函数 `isTransientExecPath` 单测覆盖：dev、release/ 目录（mac/win 形态）、正式路径三类。（`tests/electron/cli-link.test.ts`）
 - [x] 从订阅页「文库」跳转进文库：筛选框输入框显示公众号名称，不再出现裸 ID。（e2e：`跳转文库后筛选框显示名称(实际:测试订阅号)`——该场景正是 0 篇空态，名称来自跳转参数）
 - [x] 下拉手动选择任一公众号：列表正确按该号筛选（身份匹配），清除筛选回全部。（e2e 回归：`filter by account narrows to that account (got 2, gamma=false)` + 既有清除断言）
