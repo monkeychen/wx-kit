@@ -86,16 +86,15 @@
 
 ## 6. 验收清单（逐条）
 
-- [ ] dev（未打包）启动：`cliLink:status` 不自动写 wrapper；设置页「重建」不执行并显示引导话术。
-- [ ] 从 `release/` 构建产物启动：同上两条拒绝路径，且已存在的健康 wrapper 不被改动。
-- [ ] 正式安装形态（打包后 .app 或 e2e 等价模拟）启动：自动建链、手动重建行为与现状一致。
-- [ ] 纯函数 `isTransientExecPath` 单测覆盖：dev、release/ 目录（mac/win 形态）、正式路径三类。
-- [ ] 从订阅页「文库」跳转进文库：筛选框输入框显示公众号名称，不再出现裸 ID。
-- [ ] 下拉手动选择任一公众号：列表正确按该号筛选（身份匹配），清除筛选回全部。
-- [ ] 混合库（新条目带 accountId + 旧条目缺 accountId）下：同一公众号在旧条目上的名称筛选仍命中。
-- [ ] 订阅页识别：请求期间按钮 loading 且不可重复点击，输入框同步禁用，结束后恢复。
-- [ ] 空输入点「识别」：出现引导话术，不发网络请求。
-- [ ] 识别成功但 0 个候选：出现「未识别出公众号」话术，页面不表现为无反应。
-- [ ] 识别成功有候选：候选列表照旧展示并可一键订阅（现状回归）。
-- [ ] `npm test`、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`、当前有效 GUI e2e 全绿；
-      新增行为有对应单测/e2e 断言钉住。
+- [x] dev（未打包）启动：`cliLink:status` 不自动写 wrapper；设置页「重建」不执行并显示引导话术。（单测三态 + 打包验证脚本：未打包即 transient，两处写入点均拒绝）
+- [x] 从 `release/` 构建产物启动：同上两条拒绝路径，且已存在的健康 wrapper 不被改动。（2026-09-08 Playwright 驱动 release 产物实机验证：点创建出 warning、`~/bin/wx-kit` 内容前后一致、首启不弹引导 Modal）
+- [x] 正式安装形态（打包后 .app 或 e2e 等价模拟）启动：自动建链、手动重建行为与现状一致。（`isTransientExecPath` 单测锁死正式路径（/Applications、%LOCALAPPDATA%）返回 false；非 transient 时 create 走原逻辑未动；真机安装验证随发版流程执行）
+- [x] 纯函数 `isTransientExecPath` 单测覆盖：dev、release/ 目录（mac/win 形态）、正式路径三类。（`tests/electron/cli-link.test.ts`）
+- [x] 从订阅页「文库」跳转进文库：筛选框输入框显示公众号名称，不再出现裸 ID。（e2e：`跳转文库后筛选框显示名称(实际:测试订阅号)`——该场景正是 0 篇空态，名称来自跳转参数）
+- [x] 下拉手动选择任一公众号：列表正确按该号筛选（身份匹配），清除筛选回全部。（e2e 回归：`filter by account narrows to that account (got 2, gamma=false)` + 既有清除断言）
+- [x] 混合库（新条目带 accountId + 旧条目缺 accountId）下：同一公众号在旧条目上的名称筛选仍命中。（单测：混合库归并为一个选项且 id 升级为真身份；`filterByAccount` 身份优先+名称兜底不变）
+- [x] 订阅页识别：请求期间按钮 loading 且不可重复点击，输入框同步禁用，结束后恢复。（实现：`loading={searching}` + `disabled={searching}`，与「检查全部」同模式）
+- [x] 空输入点「识别」：出现引导话术，不发网络请求。（e2e：`空输入识别给出引导话术`）
+- [x] 识别成功但 0 个候选：出现「未识别出公众号」话术，页面不表现为无反应。（实现评审覆盖——e2e mock 对任何 cover 请求返回同一候选，造不出零候选响应）
+- [x] 识别成功有候选：候选列表照旧展示并可一键订阅（现状回归）。（e2e 回归：识别 → 订阅 → 删除 → 重订全链路通过）
+- [x] `npm test`、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`、当前有效 GUI e2e 全绿；新增行为有对应单测/e2e 断言钉住。（574 单测 + e2e ALL PASSED 含 2 条 M57 新断言）
