@@ -6,7 +6,7 @@ import { api } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import ArticleRow from '../components/ArticleRow'
 import {
-  accountsOf, filterByAccount, sortArticles, groupByAccount,
+  accountOptions, filterByAccount, sortArticles, groupByAccount,
   type SortKey, type SortDir,
 } from '../library-view'
 import { buildListColumns, clampColWidth, nextSort, DEFAULT_LIST_WIDTHS } from '../list-columns'
@@ -28,6 +28,9 @@ export default function Library() {
   // 从订阅页「去看看」带过来的公众号筛选(M34):一次性消费,读完清掉 query
   const [sp, setSp] = useSearchParams()
   const [account, setAccount] = useState<string | null>(sp.get('account'))
+  // 订阅页「文库」跳转带的显示名（useEffect 会清掉 URL 参数，这里先取入 state）——
+  // 该号 0 篇时下拉 options 里没有它，靠这个把名称显示出来而非裸 ID（M57 R2）
+  const [accountLabel] = useState<string | null>(sp.get('name'))
   // 消费掉即清:否则用户手动切了筛选后一刷新又被 URL 参数拽回去
   useEffect(() => { if (sp.get('account')) setSp({}, { replace: true }) }, [sp, setSp])
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -62,7 +65,7 @@ export default function Library() {
   }
   useEffect(() => { load() }, [])
 
-  const accounts = useMemo(() => accountsOf(all), [all])
+  const accounts = useMemo(() => accountOptions(all), [all])
   // 搜索（标题，即时）→ 公众号筛选 → 排序 → 分组
   const groups = useMemo(() => {
     const k = kw.trim()
@@ -182,7 +185,8 @@ export default function Library() {
               onClick={() => changeSort(sortKey, sortDir === 'desc' ? 'asc' : 'desc')}>{sortDir === 'desc' ? '↓' : '↑'}</button>
           </>}
           <span data-testid="account-select"><Select size="middle" value={account ?? '__all'} onChange={(v) => setAccount(v === '__all' ? null : v)}
-            style={{ width: 150 }} options={[{ value: '__all', label: '全部公众号' }, ...accounts.map((a) => ({ value: a, label: a }))]} /></span>
+            style={{ width: 150 }} options={[{ value: '__all', label: '全部公众号' }, ...accounts.map((a) => ({ value: a.id, label: a.name })),
+              ...(account && accountLabel && !accounts.some((x) => x.id === account) ? [{ value: account, label: accountLabel }] : [])]} /></span>
           <button className={`tb-toggle${grouped ? ' on' : ''}`} data-testid="group-toggle" onClick={() => setGrouped((g) => !g)}>⊟ 分组</button>
           {grouped && <button className="tb-toggle" data-testid="expand-all" onClick={toggleAllGroups}>{allExpanded ? '⊖ 全部收起' : '⊕ 全部展开'}</button>}
           <Segmented value={view} onChange={(v) => setView(v as 'card' | 'list')}

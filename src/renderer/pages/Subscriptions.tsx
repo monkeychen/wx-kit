@@ -382,7 +382,7 @@ export default function Subscriptions() {
               // (见 library-view.ts 的 filterByAccount 身份优先匹配)。
               const libraryEl = (
                 <a key="lib" data-testid="subs-goto-library"
-                  onClick={() => navigate(`/library?account=${encodeURIComponent(a.fakeid)}`)}>文库</a>
+                  onClick={() => navigate(`/library?account=${encodeURIComponent(a.fakeid)}&name=${encodeURIComponent(a.nickname)}`)}>文库</a>
               )
               // 行内动作作用于「当前选择」：收起时选择即全部，展开后随勾选变化。
               // 一次只有一个含义，不并列摆「下载全部」与「下载所选」两套按钮。

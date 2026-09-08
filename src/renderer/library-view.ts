@@ -16,13 +16,31 @@ export function accountName(m: ArticleMeta): string {
   return m.account || '未知公众号'
 }
 
-/** 去重的公众号列表，按首次出现序——喂筛选下拉。 */
-export function accountsOf(list: ArticleMeta[]): string[] {
-  const seen = new Set<string>()
-  const out: string[] = []
+export interface AccountOption { id: string; name: string }
+
+/**
+ * 喂筛选下拉的公众号选项：value 用身份（accountId；旧条目缺失时以名称兼任，与旧下拉行为等价），
+ * label 用名称。同一公众号按「身份 key + 名称 key」双轨归并——M56 跳转传身份、历史下拉传名称，
+ * 混合库下同一号会以两种形态出现；保持首见序。
+ */
+export function accountOptions(list: ArticleMeta[]): AccountOption[] {
+  const byKey = new Map<string, AccountOption>()
+  const out: AccountOption[] = []
   for (const m of list) {
-    const a = accountName(m)
-    if (!seen.has(a)) { seen.add(a); out.push(a) }
+    const name = accountName(m)
+    const keys = [normalizeAccountKey(name)]
+    if (m.accountId) keys.push(normalizeAccountKey(m.accountId))
+    const hit = keys.map((k) => byKey.get(k)).find(Boolean)
+    if (!hit) {
+      const opt: AccountOption = { id: m.accountId ?? name, name }
+      for (const k of keys) byKey.set(k, opt)
+      out.push(opt)
+      continue
+    }
+    // 已有同号：id 从名称形态升级为真身份；名称从「未知公众号」升级为真名
+    if (m.accountId && hit.id === hit.name) hit.id = m.accountId
+    if (hit.name === '未知公众号' && name !== '未知公众号') hit.name = name
+    for (const k of keys) byKey.set(k, hit)
   }
   return out
 }
