@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.10.2-released-success.svg)
+![Status](https://img.shields.io/badge/v0.10.3-released-success.svg)
 
 ## 这是什么
 
@@ -17,9 +17,9 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.10.2）**
+> **当前能力边界（v0.10.3）**
 >
-> v0.10.2 让**自动下载从黑箱变成看得见**：每次检查/自动下载的逐篇结果（刚下载/文库已有/失败/不可访问）持久留痕，订阅页行内摘要、检查记录弹窗与 CLI `subscription list` 的 `recentLog` 同源可查；订阅页每个公众号新增「文库」直达入口，按号筛选已下载文章：
+> v0.10.3 集中打磨交互可信度：**CLI 快捷入口不再指向开发/构建目录的临时产物**（打包清理后不悬空）；**文库筛选框在任何入口下都显示公众号名称**而非一串 ID；订阅页「识别」**全程有反馈**（识别中转圈、空输入与识别不出有明确话术）：
 >
 > - 识别公众号用「粘贴该号**任意一篇文章链接**」——微信读书无按名字搜索接口；
 > - **降级项**：微信读书列表接口被服务端按账号限制，每次仅返回该号**最新一篇**文章；「按公众号批量下载」入口已移除（CLI `crawl` 稳定拒绝），自动订阅与日报无法找回两次刷新间被覆盖的文章；
@@ -27,7 +27,7 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 ## 当前界面
 
-以下截图来自 v0.10.2 正式界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
+以下截图来自 v0.10.3 正式界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
@@ -80,11 +80,11 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.2：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.3：
 
-- Apple Silicon：`wx-kit-0.10.2-arm64.dmg`
-- Intel Mac：`wx-kit-0.10.2.dmg`
-- Windows：`wx-kit.Setup.0.10.2.exe`
+- Apple Silicon：`wx-kit-0.10.3-arm64.dmg`
+- Intel Mac：`wx-kit-0.10.3.dmg`
+- Windows：`wx-kit.Setup.0.10.3.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -193,7 +193,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.10.2；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
+- 最新已发布版本：v0.10.3；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
