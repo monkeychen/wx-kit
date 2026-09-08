@@ -199,7 +199,12 @@ async function listAllArticles(client: WereadClient, bookId: string): Promise<Ar
 
 /** 列表失败（-2041 等）时回退 cover 单篇——增量订阅的保底路径 */
 async function fallbackToCover(client: WereadClient, fakeid: string): Promise<ArticleRef[]> {
-  const cover = await client.getLatestArticle(fakeid).catch(() => null)
+  const cover = await client.getLatestArticle(fakeid).catch((e) => {
+    // 鉴权失效绝不能吞成「空列表」——上层会把空解读为「没有新文章」（v0.10.4 实录：
+    // wr_skey 过期后检查一直报无新文章）。MpAuthExpired 上抛交 checkSubscriptions 整体中止。
+    if (e instanceof MpAuthExpired) throw e
+    return null
+  })
   if (!cover) return []
   const token = cover.reviewId.split('_').pop() || ''
   return [{

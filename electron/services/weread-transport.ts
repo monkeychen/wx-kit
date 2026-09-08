@@ -4,6 +4,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { MpJson } from '../../src/core/mp-types'
+import { MpAuthExpired } from '../../src/core/mp-errors'
 import type { MpRequestTransport } from './mp-request-gateway'
 import type { WereadCredentials } from '../../src/core/weread/types'
 
@@ -72,7 +73,9 @@ export class WereadNodeTransport {
     const sig = signal ? AbortSignal.any([signal, timeout]) : timeout
     const res = await this.doFetch(url, { headers: await this.headers(url), signal: sig })
     if (res.status === 401 || res.status === 403) {
-      throw Object.assign(new Error(`微信读书 HTTP ${res.status}（登录态可能失效）`), { status: res.status })
+      // 抛 MpAuthExpired 而非通用错误：check 链路（checkSubscriptions）对它有专门的上抛分支，
+      // 引导重新登录——若吞成普通错误，登录态失效会被伪装成「没有新文章」（v0.10.4 实录）。
+      throw new MpAuthExpired(`微信读书登录态已失效（HTTP ${res.status}），请重新扫码登录`)
     }
     if (!res.ok) throw Object.assign(new Error(`微信读书请求 HTTP ${res.status}: ${url}`), { status: res.status })
     const payload = await res.json() as MpJson

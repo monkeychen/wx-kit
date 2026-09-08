@@ -138,6 +138,31 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
     expect('articles' in result.results[0]).toBe(false)
   })
 
+  it('fakeids 入参按身份归一匹配（CLI list 输出 MP_WXS_ 形态 vs 磁盘 base64 形态）', async () => {
+    // v0.10.4 实录：subscription list 输出归一后的 MP_WXS_ fakeid，check-now --accounts
+    // 按它传入却在字面比对磁盘里的 base64 形态 → 永远 accounts:0
+    const legacy: SubscribedAccount = { ...account, fakeid: 'MzI2NDU4OTExOQ==' } // base64 ⇄ MP_WXS_3264589119
+    const subs = {
+      list: async () => [legacy],
+      updateWatermark: async () => {}, setPendingRefs: async () => {},
+      clearNewRefs: async () => {}, setLastRunAt: async () => {},
+    } as unknown as Subscriptions
+    const seenAccounts: string[] = []
+    await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      list: async () => [],
+      fakeids: ['MP_WXS_3264589119'],
+      check: async (accs) => {
+        seenAccounts.push(...accs.map((a) => a.fakeid))
+        return [{ fakeid: legacy.fakeid, ok: true, latest: 300, newRefs: [] }]
+      },
+      downloadRefs: vi.fn(async () => ({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0, items: [] })),
+      log: async () => {},
+    })
+    expect(seenAccounts).toEqual(['MzI2NDU4OTExOQ=='])
+  })
+
   it('manual + fakeids 子集 + download 策略：同样落明细，明细收集对 trigger 无感', async () => {
     const other: SubscribedAccount = { ...account, fakeid: 'MP_WXS_2', nickname: '二号' }
     const refs = mkRefs(2)

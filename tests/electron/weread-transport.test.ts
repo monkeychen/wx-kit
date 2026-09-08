@@ -82,12 +82,13 @@ describe('WereadNodeTransport.json', () => {
       expect(headers!.accessToken).toBeUndefined()
     } finally { globalThis.fetch = origFetch }
   })
-  it('HTTP 401/403 → 带 status 的错误（登录态失效语义）', async () => {
+  it('HTTP 401/403 → MpAuthExpired（登录态失效语义；v0.10.4 起抛鉴权专用错误）', async () => {
     const origFetch = globalThis.fetch
     const stub = (async () => new Response('', { status: 401 })) as typeof fetch
     const t = new WereadNodeTransport(join(dir, 'none.json'), stub)
     try {
-      await expect(t.json('https://i.weread.qq.com/mp/chapters', 5000)).rejects.toMatchObject({ status: 401 })
+      const { MpAuthExpired } = await import('../../src/core/mp-errors')
+      await expect(t.json('https://i.weread.qq.com/mp/chapters', 5000)).rejects.toBeInstanceOf(MpAuthExpired)
     } finally { globalThis.fetch = origFetch }
   })
   it('仅成功响应后同步 Chromium Cookie 快照，401 不覆盖凭据', async () => {
@@ -98,7 +99,8 @@ describe('WereadNodeTransport.json', () => {
     await ok.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)
     expect(sync).toHaveBeenCalledTimes(1)
     const denied = new WereadNodeTransport(p, (async () => new Response('', { status: 401 })) as typeof fetch, sync)
-    await expect(denied.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)).rejects.toMatchObject({ status: 401 })
+    const { MpAuthExpired } = await import('../../src/core/mp-errors')
+    await expect(denied.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)).rejects.toBeInstanceOf(MpAuthExpired)
     expect(sync).toHaveBeenCalledTimes(1)
   })
   it('Cookie 快照落盘失败不把已经成功的业务请求改判失败', async () => {
@@ -127,5 +129,14 @@ describe('RoutingTransport', () => {
     const json = await t.json('https://mp.weixin.qq.com/cgi-bin/home?t=home', 5000)
     expect(json).toMatchObject({ via: 'chromium' })
     expect(await t.text('https://mp.weixin.qq.com/s/abc', 5000)).toContain('chromium-text')
+  })
+})
+
+describe('WereadNodeTransport · 401/403 → MpAuthExpired', () => {
+  it('登录态失效抛 MpAuthExpired（check 链路的 auth-expired 分支靠它触发）', async () => {
+    const { MpAuthExpired } = await import('../../src/core/mp-errors')
+    const tp = new WereadNodeTransport(join(dir, 'no-creds.json'), (async () =>
+      new Response(JSON.stringify({ errcode: -2013, errmsg: '鉴权失败' }), { status: 401 })) as typeof fetch)
+    await expect(tp.json('https://weread.qq.com/api/mp/cover?bookId=x', 5000)).rejects.toBeInstanceOf(MpAuthExpired)
   })
 })

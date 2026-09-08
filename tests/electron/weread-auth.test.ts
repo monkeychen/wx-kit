@@ -129,3 +129,27 @@ describe('wereadListFn（订阅 latest-only）', () => {
     expect(refs?.[0]).toMatchObject({ sourceId: 'MP_WXS_7_token-1' })
   })
 })
+
+describe('wereadListFn · 鉴权失败不得伪装成「无新文章」(v0.10.4 实录)', () => {
+  it('cover 返回 401（MpAuthExpired）时上抛，交上层引导重新登录', async () => {
+    await writeFile(join(dir, 'weread-creds.json'), JSON.stringify({
+      vid: '7', refreshToken: 'web@RT', accessToken: 'AT', name: '', updatedAt: 0,
+    }))
+    const { MpAuthExpired } = await import('../../src/core/mp-errors')
+    const list = await wereadListFn(dir, async () => {
+      // 真实链路里 transport 对 401 抛 MpAuthExpired（weread-transport.ts），此处同构
+      throw new MpAuthExpired('微信读书登录态已失效（HTTP 401），请重新扫码登录')
+    })
+    await expect(list?.('MP_WXS_7', 0)).rejects.toBeInstanceOf(MpAuthExpired)
+  })
+
+  it('非鉴权错误（网络/风控）仍按既有语义回退为空，不炸检查', async () => {
+    await writeFile(join(dir, 'weread-creds.json'), JSON.stringify({
+      vid: '7', refreshToken: 'web@RT', accessToken: 'AT', name: '', updatedAt: 0,
+    }))
+    const list = await wereadListFn(dir, async () => {
+      throw new Error('网络中断')
+    })
+    await expect(list?.('MP_WXS_7', 0)).resolves.toEqual([])
+  })
+})

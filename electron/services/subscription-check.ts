@@ -2,6 +2,7 @@
 // 订阅检查编排(从 ipc.ts 抽出,GUI 与 CLI 共用)。依赖全注入,无 electron 运行时,可单测。
 import { checkSubscriptions } from '../../src/core/check-subscriptions'
 import { MpAuthExpired } from '../../src/core/mp-errors'
+import { normalizeAccountKey } from '../../src/core/weread/book-id'
 import type { Subscriptions, CheckLogEntry, CheckFailure, AccountDownloadLog, DownloadItemLog } from '../../src/core/subscriptions'
 import { toAccountDownloadLog, countDownloadOutcomes } from '../../src/core/subscription-batch'
 import type { ArticleRef } from '../../src/core/mp-types'
@@ -58,7 +59,11 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
     emit(); return { accounts: 0, newFound: 0, failed: 0, note: 'no-session', authExpired: true, results: [] }
   }
   const accounts = (await subs.list()).filter((a) => a.subscribed)
-    .filter((a) => (deps.fakeids ? deps.fakeids.includes(a.fakeid) : true))
+    // fakeids 按身份归一比对：CLI `subscription list` 输出 MP_WXS_ 形态，磁盘里可能是
+    // base64 等历史形态——字面比对永远不中（--accounts 报 accounts:0）。
+    .filter((a) => (deps.fakeids
+      ? deps.fakeids.some((f) => normalizeAccountKey(f) === normalizeAccountKey(a.fakeid))
+      : true))
   if (!accounts.length) {
     await subs.setLastRunAt(now())
     await deps.log({ time: now(), trigger, accounts: 0, newFound: 0, failed: 0, note: 'no-accounts' })
