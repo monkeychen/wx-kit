@@ -6,7 +6,7 @@ import { api } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import ArticleRow from '../components/ArticleRow'
 import {
-  accountOptions, filterByAccount, sortArticles, groupByAccount,
+  accountOptions, fallbackAccountOption, filterByAccount, sortArticles, groupByAccount,
   type SortKey, type SortDir,
 } from '../library-view'
 import { buildListColumns, clampColWidth, nextSort, DEFAULT_LIST_WIDTHS } from '../list-columns'
@@ -66,13 +66,17 @@ export default function Library() {
   useEffect(() => { load() }, [])
 
   const accounts = useMemo(() => accountOptions(all), [all])
-  // 搜索（标题，即时）→ 公众号筛选 → 排序 → 分组
+  // 搜索（标题，即时）→ 公众号筛选 → 排序 → 分组。
+  // 筛选按选项的等价类 keys 匹配：库里没有的号（跳转 0 篇）用 URL 参数构造降级选项。
+  const activeOpt = useMemo(
+    () => (account ? accounts.find((a) => a.id === account) ?? fallbackAccountOption(account, accountLabel) : null),
+    [accounts, account, accountLabel])
   const groups = useMemo(() => {
     const k = kw.trim()
     const searched = k ? all.filter((m) => m.title.includes(k)) : all
-    const sorted = sortArticles(filterByAccount(searched, account), sortKey, sortDir)
+    const sorted = sortArticles(filterByAccount(searched, activeOpt), sortKey, sortDir)
     return grouped ? groupByAccount(sorted) : [{ account: '', items: sorted }]
-  }, [all, kw, account, sortKey, sortDir, grouped])
+  }, [all, kw, activeOpt, sortKey, sortDir, grouped])
 
   const visibleIds = useMemo(() => groups.flatMap((g) => g.items.map((m) => m.id)), [groups])
 
