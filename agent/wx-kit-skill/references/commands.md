@@ -56,6 +56,7 @@ wx-kit subscription digest --date today --download [--accounts a,b] [--formats m
 ```
 
 - `list`：返回 `accounts[]`（含 `fakeid`/`nickname`/水位）、`lastRunAt`、`nextCheckAt`、`recentLog[]`（v0.10.2 起：最近 5 条检查记录，新在前，与 GUI「检查记录」同源）。定时自动下载发生在 GUI 进程内，查「最近自动下载了什么」用 `recentLog`，`check-now` 只报告本次触发的一轮；
+- `recentLog[].downloadDetail`（v0.10.6 起）：本轮检查的**每个号**都有条目——有新文章的号 `items` 为逐篇明细（`status` 五态：`downloaded`/`exists`/`failed`/`unavailable`/**`pending`**），无新文章的号 `items: []`（查过、无新）。判「某号下载了什么」按 `items` 非空过滤；
 - **登录态失效（v0.10.5 起）**：`authExpired: true`、`recentLog` 落 `note: 'auth-expired'`、`check-now` 同样返回该 note——此时**不代表没有新文章**，应引导用户到设置页重新扫码登录，不要基于失效会话的结果下结论；
 - `check-now`：按稳定文章身份检查更新，按设置提示或自动下载；返回逐号明细 `results[]`、`newFound`、`failed`。自动下载的号带 `results[].articles`（v0.10.2 起），为该号本次逐篇明细，与 `recentLog` 里 `downloadDetail[].items` 同构——`status` 四态 `downloaded`/`exists`/`failed`/`unavailable`（仅 `failed` 才有 `error`）；未走下载策略的号没有该字段。
 - `digest --date`：只读本地订阅与文库，按 `publishTime` 的北京时间自然日筛选，默认零网络（today 也一样）。

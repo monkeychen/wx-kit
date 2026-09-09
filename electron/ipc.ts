@@ -436,8 +436,14 @@ export function registerIpc(settings: SettingsService): void {
     const done = new Set(summary.items.filter((i) => i.ok || i.unavailable).map((i) => i.url))
     await subs.removeNewRefs(fakeid, picked.filter((r) => done.has(r.url)).map(refId))
     // M58:把本次结果回填进「本轮检查明细」——行内列表的 pending 状态就地变为结果态。
+    // articleId 从文库反查（下载成功后按 sourceUrl 匹配），行内点标题才能直开阅读器。
     // 只影响最近一条含该号的检查记录;若下载前又跑了新一轮检查,该文章不在其中则不回填(下次检查刷新)。
-    const items = toDownloadItemLogs(summary.items, picked)
+    const articleIdByUrl = new Map((await new Library((await settings.get()).libraryRoot).list())
+      .map((article) => [sourceUrlKey(article.sourceUrl), article.id] as const))
+    const items = toDownloadItemLogs(summary.items, picked).map((item) => {
+      const id = item.url != null ? articleIdByUrl.get(sourceUrlKey(item.url)) : undefined
+      return id ? { ...item, articleId: id } : item
+    })
     await subs.mutateLatestCheckDetail(fakeid, (cur) => mergeCheckDetailItems(cur, items))
     emitProgress(total, 'done')
     emitSubsUpdated()

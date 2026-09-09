@@ -333,8 +333,11 @@ async function main() {
     await win.waitForSelector('[data-testid="subs-row"]', { timeout: 10000 })
     assert(true, '删除后重新订阅成功（删除标记被撤销）')
     await win.locator('[data-testid="subs-check-one"]').first().click()
-    await win.waitForSelector('[data-testid="subs-row-result"]', { timeout: 30000 })
-    assert(true, '行内「检查」只影响本行并落结果')
+    // M58 起行内检查的结果由落盘明细派生（提示策略也有明细）——显示摘要「待下载」而非瞬时结果态
+    await win.waitForSelector('[data-testid="subs-row-summary"]', { timeout: 30000 })
+    const inlineSum = await win.locator('[data-testid="subs-row-summary"]').first().innerText()
+    assert(inlineSum.includes('待下载') && inlineSum.includes('发现'),
+      `行内「检查」只影响本行并落结果，摘要显示待下载 (saw: ${inlineSum.slice(0, 40)})`)
 
     // ============ M56 · 落盘下载明细：行内摘要 + 明细弹窗 + 常驻文库入口 ============
     // seed 一条含 downloadDetail 的检查记录（模拟定时自动下载已发生），再进订阅页断言可感知
@@ -408,6 +411,42 @@ async function main() {
     const sumAfterDl = await win.locator('[data-testid="subs-row-summary"]').first().innerText()
     assert(sumAfterDl.includes('补下载') && !sumAfterDl.includes('发现'),
       `M56: 补下载后行内摘要为纯交付话术，无「发现」(saw: ${sumAfterDl.slice(0, 40)})`)
+
+    // ============ M58 · 行内「本轮检查文章列表」：pending 明细 + 单篇下载 + 直开阅读器 ============
+    // seed 一条含 pending 明细的检查记录 + 同一篇文章的 newRefs（url 指向 fixture，可真实下载）。
+    // refId 退化为 sourceUrlKey(url)（ArticleRef 无 mid/idx 时），与 UI 的 downloadable 判定同源。
+    {
+      const artUrl = urlOf('a1')
+      const sub3 = JSON.parse(readFileSync(join(libraryRoot, 'subscriptions.json'), 'utf8'))
+      const acc = sub3.accounts.find((x) => x.nickname === '测试订阅号')
+      acc.newRefs = [{ url: artUrl, title: '阿尔法·甲', createTime: Math.floor(Date.now() / 1000), sourceId: 'm58-seed' }]
+      sub3.checkLog = [{
+        time: Date.now(), trigger: 'manual', accounts: 1, newFound: 1, failed: 0,
+        downloadDetail: [{ fakeid: acc.fakeid, nickname: acc.nickname,
+          items: [{ title: '阿尔法·甲', status: 'pending', url: artUrl, refId: artUrl }] }],
+      }, ...(sub3.checkLog ?? [])]
+      writeFileSync(join(libraryRoot, 'subscriptions.json'), JSON.stringify(sub3))
+    }
+    await win.click('[data-testid="nav-设置"]')
+    await win.click('[data-testid="nav-订阅"]')
+    await win.waitForSelector('[data-testid="subs-row"]', { timeout: 8000 })
+    await win.locator('[data-testid="subs-expand"]').first().click()
+    await win.waitForSelector('[data-testid="subs-pending-item"]', { timeout: 8000 })
+    const st0 = await win.locator('[data-testid="subs-item-status"]').first().innerText()
+    assert(st0 === '未下载', `M58: 检查明细显示 pending 状态 (saw: ${st0})`)
+    // 单篇下载 → 走真实下载链路（fixture a1）→ 检查明细回填 → 状态就地变为结果态
+    await win.locator('[data-testid="subs-item-download"]').first().click()
+    await win.waitForFunction(() => {
+      const el = document.querySelector('[data-testid="subs-item-status"]')
+      return el && el.textContent !== '未下载'
+    }, { timeout: 30000 })
+    const st1 = await win.locator('[data-testid="subs-item-status"]').first().innerText()
+    assert(st1 === '已下载' || st1 === '文库已有', `M58: 单篇下载后状态就地更新 (saw: ${st1})`)
+    // articleId 回填后点标题直开阅读器
+    await win.locator('[data-testid="subs-pending-title"]').first().click()
+    await win.waitForURL(/reader/, { timeout: 8000 })
+    assert(win.url().includes('/reader/'), `M58: 点已下载文章标题直开阅读器 (${win.url()})`)
+    await win.click('[data-testid="nav-订阅"]')
 
     // ============ M49 · 现存设置继续可用（site-sync tooltip）============
     await win.click('[data-testid="nav-设置"]')

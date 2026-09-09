@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.10.5-released-success.svg)
+![Status](https://img.shields.io/badge/v0.10.6-released-success.svg)
 
 ## 这是什么
 
@@ -17,9 +17,9 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.10.5）**
+> **当前能力边界（v0.10.6）**
 >
-> v0.10.5 修复登录态失效的诚实性：微信读书登录过期后，订阅检查**如实报「需重新登录」**（此前伪装成「没有新文章」）；重登成功后提示即消失。v0.10.3–v0.10.4 的改进全部保留——文库按公众号筛选覆盖全部文章（等价类匹配，新旧条目不掉队）；CLI 快捷入口不指向临时产物；文库筛选框显示公众号名称；订阅页「识别」全程有反馈：
+> v0.10.6 让每一轮订阅检查「看得见、能落地」：行内展开即见**本轮检查的文章清单与状态**（未下载/已下载/失败等），未下载的可**单篇下载**并就地看结果，已下载的**点标题直开阅读器**。v0.10.3–v0.10.5 的改进全部保留——登录态失效如实报「需重新登录」且重登后提示即消；文库按公众号筛选覆盖全部文章；CLI 快捷入口不指向临时产物；订阅页「识别」全程有反馈：
 >
 > - 识别公众号用「粘贴该号**任意一篇文章链接**」——微信读书无按名字搜索接口；
 > - **降级项**：微信读书列表接口被服务端按账号限制，每次仅返回该号**最新一篇**文章；「按公众号批量下载」入口已移除（CLI `crawl` 稳定拒绝），自动订阅与日报无法找回两次刷新间被覆盖的文章；
@@ -27,7 +27,7 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 ## 当前界面
 
-以下截图来自 v0.10.5 正式界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
+以下截图来自 v0.10.6 正式界面，并由同一篇真实公众号文章完成下载、入库和阅读后生成。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
@@ -80,11 +80,11 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.5：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.10.6：
 
-- Apple Silicon：`wx-kit-0.10.5-arm64.dmg`
-- Intel Mac：`wx-kit-0.10.5.dmg`
-- Windows：`wx-kit.Setup.0.10.5.exe`
+- Apple Silicon：`wx-kit-0.10.6-arm64.dmg`
+- Intel Mac：`wx-kit-0.10.6.dmg`
+- Windows：`wx-kit.Setup.0.10.6.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -193,7 +193,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.10.5；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
+- 最新已发布版本：v0.10.6；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
