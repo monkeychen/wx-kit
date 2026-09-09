@@ -27,7 +27,13 @@ td.addRule('wechatCodeSnippet', {
 const flattenCell = (el: Element): string =>
   td.turndown(el.innerHTML)
     .replace(/\s+/g, ' ')      // 块级元素留下的换行/缩进一律压成单空格（GFM 表格不允许裸换行）
-    .replace(/\|/g, '\\|')     // 管道符会被当列分隔符
+    // 管道符会被当列分隔符。转义必须按反斜杠奇偶判态，不能盲目补杠：
+    // turndown 对文本节点已把 \ 转义成 \\（其后的 | 是裸管道，需补成 \|）；
+    // 但 code span/属性内容不转义反斜杠，其内的 \| 已是转义态——再补会变成 \\|，
+    // \\ 被表格解析成字面反斜杠、| 恢复列分隔符，单元格内容击穿表格结构
+    // （CodeQL js/incomplete-sanitization 指认的正是这种不完整转义）。
+    // 规则：管道前连续反斜杠为奇数（已转义）不动，偶数才补一个。
+    .replace(/\\*\|/g, (run) => ((run.length - 1) % 2 === 1 ? run : `\\${run}`))
     .trim()
 
 const cellsOf = (row: Element): Element[] =>

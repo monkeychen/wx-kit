@@ -94,4 +94,25 @@ describe('buildMarkdown 的 GFM 表格', () => {
     expect(out).toBe('| a | b | c |\n| --- | --- | --- |\n| 1 |  |  |')
     expect(body('<table></table>')).toBe('')
   })
+
+  it('keeps already-escaped pipe inside inline code intact (no delimiter breakout)', () => {
+    // turndown 对 code span 不转义反斜杠：内容 a\|b 出来就是 a\|b（1 个反斜杠，管道已是转义态）。
+    // 盲目补杠会把它变成 a\\|b —— \\ 被表格认成字面反斜杠、| 恢复列分隔符，击穿表格结构
+    // （CodeQL js/incomplete-sanitization 指认的正是这种不完整转义）。
+    const out = body(
+      '<table><tbody><tr><td>列</td><td>v</td></tr>' +
+      '<tr><td><code>a\\|b</code></td><td>ok</td></tr></tbody></table>',
+    )
+    expect(out).toContain('| `a\\|b` | ok |')
+  })
+
+  it('escapes raw pipe after backslash pair in text nodes (composes with turndown escaping)', () => {
+    // 文本节点：turndown 已把原文的 \ 转义成 \\，管道仍裸露 → 再补一层成 \\\|
+    // （\\ 渲染字面反斜杠、\| 渲染字面管道，与原文 a\|b 一致）
+    const out = body(
+      '<table><tbody><tr><td>列</td><td>v</td></tr>' +
+      '<tr><td>a\\|b</td><td>ok</td></tr></tbody></table>',
+    )
+    expect(out).toContain('| a\\\\\\|b | ok |')
+  })
 })
