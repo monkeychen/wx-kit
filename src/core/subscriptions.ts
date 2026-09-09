@@ -28,11 +28,14 @@ export interface SubscribedAccount {
 
 export interface CheckFailure { nickname: string; error: string }
 
-/** 逐篇下载结果（M56）。四状态：刚下载 / 文库已有 / 真故障 / 读者不可见。 */
+/** 逐篇下载结果（M56）。状态：刚下载 / 文库已有 / 真故障 / 读者不可见；M58 增加 pending（提示策略检查后的未下载态）。 */
 export interface DownloadItemLog {
   title: string
-  status: 'downloaded' | 'exists' | 'failed' | 'unavailable'
+  status: 'downloaded' | 'exists' | 'failed' | 'unavailable' | 'pending'
   error?: string              // 仅 failed：失败原因（error.message）
+  articleId?: string          // M58：文库条目 id（downloaded/exists 时回填）——行内点标题直开阅读器
+  url?: string                // M58：原文链接（检查时从 ArticleRef 带出）——未下载时点标题开浏览器
+  refId?: string              // M58：待处理主键（与 newRefs 的 refId 同值）——单篇/勾选下载的入参
 }
 export interface AccountDownloadLog { fakeid: string; nickname: string; items: DownloadItemLog[] }
 
@@ -70,9 +73,9 @@ export function formatCheckLogLine(e: CheckLogEntry): string {
  */
 export function toDownloadItemLogs(
   items: DownloadItemResult[],
-  refs: { url: string; title: string }[],
+  refs: { url: string; title: string; refId?: string; articleId?: string }[],
 ): AccountDownloadLog['items'] {
-  const titleByUrl = new Map(refs.map((r) => [r.url, r.title] as const))
+  const byUrl = new Map(refs.map((r) => [r.url, r] as const))
   const logs: DownloadItemLog[] = []
   for (const item of items) {
     if (item.cancelled) continue
@@ -81,7 +84,8 @@ export function toDownloadItemLogs(
     else if (item.ok && item.skipped) status = 'exists'
     else if (!item.ok && item.unavailable) status = 'unavailable'
     else status = 'failed'
-    const log: DownloadItemLog = { title: item.title ?? titleByUrl.get(item.url) ?? '', status }
+    const ref = byUrl.get(item.url)
+    const log: DownloadItemLog = { title: item.title ?? ref?.title ?? '', status, url: item.url, ...(ref?.refId ? { refId: ref.refId } : {}), ...(ref?.articleId ? { articleId: ref.articleId } : {}) }
     if (status === 'failed' && item.error?.message != null) log.error = item.error.message
     logs.push(log)
   }
@@ -246,5 +250,27 @@ export class Subscriptions {
   async getCheckLog(): Promise<CheckLogEntry[]> { return (await this.read()).checkLog ?? [] }
   async appendCheckLog(entry: CheckLogEntry, keep = 50): Promise<void> {
     await this.mutate((d) => { d.checkLog = [entry, ...(d.checkLog ?? [])].slice(0, keep) })
+  }
+
+  /**
+   * 原子更新「最新一条含该号条目」的检查明细（M58）：下载动作完成后把对应文章的
+   * pending 状态改写为结果态。只动最新命中的一条（它是「本轮状态面板」），历史条目不动。
+   * 返回是否命中该号。
+   */
+  async mutateLatestCheckDetail(
+    fakeid: string,
+    fn: (items: AccountDownloadLog['items']) => AccountDownloadLog['items'],
+  ): Promise<boolean> {
+    let hit = false
+    await this.mutate((d) => {
+      for (const entry of d.checkLog ?? []) {
+        const target = entry.downloadDetail?.find((x) => x.fakeid === fakeid)
+        if (!target) continue
+        target.items = fn(target.items)
+        hit = true
+        break
+      }
+    })
+    return hit
   }
 }

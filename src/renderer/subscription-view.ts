@@ -42,6 +42,8 @@ export function summaryPhrase(items: DownloadItemLog[], kind: CheckLogEntry['kin
     if (existed > 0) return `${existed} 篇文库已有`
     return `${items.length} 篇未成功`
   }
+  // M58：提示策略的检查明细全为 pending——「待下载」比「已下载 0 篇」更贴合用户要做的动作
+  if (items.length > 0 && items.every((i) => i.status === 'pending')) return `发现 ${items.length} 篇，待下载`
   if (downloaded > 0) return `发现 ${items.length} 篇，已下载 ${downloaded} 篇`
   if (existed > 0) return `发现 ${items.length} 篇，${existed} 篇文库已有`
   return `发现 ${items.length} 篇`
@@ -60,13 +62,14 @@ export function formatShortTime(ms: number): string {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** 下载明细弹窗里的状态 Tag：四状态四色；failed 的 title（tooltip）带 error 由调用方透传。 */
+/** 下载明细弹窗里的状态 Tag：五状态五色；failed 的 title（tooltip）带 error 由调用方透传。 */
 export function itemStatusTag(status: DownloadItemLog['status']): { label: string; color: string } {
   switch (status) {
     case 'downloaded': return { label: '已下载', color: 'green' }
     case 'exists': return { label: '文库已有', color: 'default' }
     case 'failed': return { label: '失败', color: 'red' }
     case 'unavailable': return { label: '不可访问', color: 'orange' }
+    case 'pending': return { label: '未下载', color: 'default' }
   }
 }
 

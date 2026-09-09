@@ -30,7 +30,8 @@ describe('toAccountDownloadLog（M56 手动批量明细）', () => {
       ],
     }
 
-    expect(toAccountDownloadLog(group, summary)).toEqual({
+    // M58 起明细带 url/refId——断言改 toMatchObject 聚焦状态语义
+    expect(toAccountDownloadLog(group, summary)).toMatchObject({
       fakeid: 'a', nickname: 'a',
       items: [
         { title: '0', status: 'downloaded' },
@@ -46,7 +47,7 @@ describe('toAccountDownloadLog（M56 手动批量明细）', () => {
       items: [{ url: group.refs[0].url, ok: false, error: { code: 'DOWNLOAD_FAILED', message: 'boom' } }],
     }
 
-    expect(toAccountDownloadLog(group, summary).items[0]).toEqual({ title: '0', status: 'failed', error: 'boom' })
+    expect(toAccountDownloadLog(group, summary).items[0]).toMatchObject({ title: '0', status: 'failed', error: 'boom' })
   })
 })
 

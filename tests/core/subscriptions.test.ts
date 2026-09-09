@@ -108,33 +108,33 @@ describe('toDownloadItemLogs（四状态映射）', () => {
     ({ url: 'https://mp.weixin.qq.com/s/a', ok: true, ...over })
   it("ok && !skipped → 'downloaded'", () => {
     expect(toDownloadItemLogs([item({ title: '文章A' })], refs))
-      .toEqual([{ title: '文章A', status: 'downloaded' }])
+      .toEqual([{ title: '文章A', status: 'downloaded', url: 'https://mp.weixin.qq.com/s/a' }])
   })
   it("ok && skipped → 'exists'（不把「文库已有」伪装成「刚下载」）", () => {
     expect(toDownloadItemLogs([item({ skipped: true, title: '文章A' })], refs))
-      .toEqual([{ title: '文章A', status: 'exists' }])
+      .toEqual([{ title: '文章A', status: 'exists', url: 'https://mp.weixin.qq.com/s/a' }])
   })
   it("!ok && unavailable → 'unavailable'", () => {
     expect(toDownloadItemLogs([item({ ok: false, unavailable: true, title: '文章A' })], refs))
-      .toEqual([{ title: '文章A', status: 'unavailable' }])
+      .toEqual([{ title: '文章A', status: 'unavailable', url: 'https://mp.weixin.qq.com/s/a' }])
   })
   it("其余 → 'failed' 且 error 透传 error.message", () => {
     expect(toDownloadItemLogs([item({ ok: false, title: '文章A', error: { code: 'E_PARSE', message: 'parse failed' } })], refs))
-      .toEqual([{ title: '文章A', status: 'failed', error: 'parse failed' }])
+      .toEqual([{ title: '文章A', status: 'failed', url: 'https://mp.weixin.qq.com/s/a', error: 'parse failed' }])
   })
   it('失败项标题缺省时按 url 从 refs 补全（列表本来就给标题）', () => {
     expect(toDownloadItemLogs([item({ ok: false })], refs))
-      .toEqual([{ title: '文章A', status: 'failed' }])
+      .toEqual([{ title: '文章A', status: 'failed', url: 'https://mp.weixin.qq.com/s/a' }])
   })
   it('cancelled 不产出日志条目（未尝试下载，没有下载动作）', () => {
     expect(toDownloadItemLogs([item({ ok: false, cancelled: true }), item({ url: 'https://mp.weixin.qq.com/s/b', title: '文章B' })], refs))
-      .toEqual([{ title: '文章B', status: 'downloaded' }])
+      .toEqual([{ title: '文章B', status: 'downloaded', url: 'https://mp.weixin.qq.com/s/b' }])
   })
   it('item.title 优先于 refs；两者都无则空串', () => {
     expect(toDownloadItemLogs([item({ title: '以条目为准' })], refs))
-      .toEqual([{ title: '以条目为准', status: 'downloaded' }])
+      .toEqual([{ title: '以条目为准', status: 'downloaded', url: 'https://mp.weixin.qq.com/s/a' }])
     expect(toDownloadItemLogs([item({ ok: false, url: 'https://mp.weixin.qq.com/s/unknown' })], refs))
-      .toEqual([{ title: '', status: 'failed' }])
+      .toEqual([{ title: '', status: 'failed', url: 'https://mp.weixin.qq.com/s/unknown' }])
   })
 })
 
@@ -170,5 +170,47 @@ describe('formatCheckLogLine（M56 扩展）', () => {
       .toBe('[2026-08-06T07:06:40.000Z] AUTO accounts=1 new=0 failed=0')
     expect(formatCheckLogLine({ ...base, trigger: 'manual' }))
       .toBe('[2026-08-06T07:06:40.000Z] MANUAL accounts=1 new=0 failed=0')
+  })
+})
+
+describe('DownloadItemLog · pending 态与回填字段 (M58)', () => {
+  const item = (over: Partial<DownloadItemResult>): DownloadItemResult => ({
+    url: 'https://mp.weixin.qq.com/s/a', ok: true, ...over,
+  } as DownloadItemResult)
+
+  it('toDownloadItemLogs 透传 refs 的 url/refId/articleId', () => {
+    const logs = toDownloadItemLogs(
+      [item({})],
+      [{ url: 'https://mp.weixin.qq.com/s/a', title: '新文', refId: '2247486019_1', articleId: 'art-1' }],
+    )
+    expect(logs[0]).toMatchObject({ title: '新文', status: 'downloaded', url: 'https://mp.weixin.qq.com/s/a', refId: '2247486019_1', articleId: 'art-1' })
+  })
+
+  it('pending 是合法状态（构造不抛错即可，供提示策略落盘）', () => {
+    const entry: CheckLogEntry = {
+      time: 0, trigger: 'manual', accounts: 1, newFound: 1, failed: 0,
+      downloadDetail: [{ fakeid: 'f', nickname: 'n', items: [{ title: 't', status: 'pending', url: 'u', refId: 'r' }] }],
+    }
+    expect(entry.downloadDetail?.[0].items[0].status).toBe('pending')
+  })
+})
+
+describe('mutateLatestCheckDetail (M58)', () => {
+  it('更新最新含该号条目的 items；不含该号时返回 false；历史条目不动', async () => {
+    const root = dir
+    const subs = new Subscriptions(root)
+    await subs.appendCheckLog({ time: 2, trigger: 'manual', accounts: 1, newFound: 1, failed: 0,
+      downloadDetail: [{ fakeid: 'A', nickname: '甲', items: [{ title: '新文', status: 'pending', url: 'u-a', refId: 'ra' }] }] })
+    await subs.appendCheckLog({ time: 1, trigger: 'manual', accounts: 1, newFound: 1, failed: 0,
+      downloadDetail: [{ fakeid: 'B', nickname: '乙', items: [{ title: '旧文', status: 'pending', url: 'u-b', refId: 'rb' }] }] })
+
+    const hit = await subs.mutateLatestCheckDetail('A', (items) =>
+      items.map((i) => (i.url === 'u-a' ? { ...i, status: 'downloaded' as const, articleId: 'art-a' } : i)))
+    expect(hit).toBe(true)
+    const log = await subs.getCheckLog()
+    expect(log[1].downloadDetail?.[0].items[0]).toMatchObject({ status: 'downloaded', articleId: 'art-a' }) // A 被更新（log[1]）
+    expect(log[0].downloadDetail?.[0].items[0]).toMatchObject({ status: 'pending' }) // B 未动（log[0]）
+
+    expect(await subs.mutateLatestCheckDetail('X', (i) => i)).toBe(false) // 没有该号条目
   })
 })

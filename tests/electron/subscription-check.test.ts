@@ -91,7 +91,8 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
       trigger: 'manual', accounts: 1, newFound: 5, failed: 0,
       kind: 'check', downloaded: 1, existed: 1,
     })
-    expect(entry.downloadDetail).toEqual([
+    // M58 起明细带 url/refId——断言改 toMatchObject 聚焦状态语义
+    expect(entry.downloadDetail).toMatchObject([
       {
         fakeid: account.fakeid, nickname: account.nickname,
         items: [
@@ -192,7 +193,7 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
     expect(seenAccounts).toEqual([account.fakeid]) // 子集只查这一个号，不查 other
     const entry = logged.at(-1)!
     expect(entry).toMatchObject({ trigger: 'manual', accounts: 1, kind: 'check', downloaded: 2, existed: 0 })
-    expect(entry.downloadDetail).toEqual([
+    expect(entry.downloadDetail).toMatchObject([
       {
         fakeid: account.fakeid, nickname: account.nickname,
         items: [
