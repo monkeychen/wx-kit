@@ -31,6 +31,22 @@ export function toAccountDownloadLog(
  * 从逐号明细统计「刚下载 / 文库已有」（M56）。与明细**同源**（四状态），而非另走 summary 计数——
  * 汇总数永远与用户在明细里逐篇数出来的对得上。纯函数。
  */
+/**
+ * 下载动作完成后，把本次结果合并进「本轮检查明细」（M58）：按 url 匹配覆盖状态（pending →
+ * 结果态）并继承 fresh 的 articleId。fresh 里 existing 没有的文章不追加——明细只反映本轮
+ * 检查涉及的文章。返回新数组，不改入参。
+ */
+export function mergeCheckDetailItems(
+  existing: AccountDownloadLog['items'],
+  fresh: AccountDownloadLog['items'],
+): AccountDownloadLog['items'] {
+  const byUrl = new Map(fresh.map((i) => [i.url, i] as const))
+  return existing.map((item) => {
+    const hit = item.url != null ? byUrl.get(item.url) : undefined
+    return hit ? { ...item, ...hit, url: item.url, refId: item.refId ?? hit.refId } : item
+  })
+}
+
 export function countDownloadOutcomes(details: AccountDownloadLog[]): { downloaded: number; existed: number } {
   let downloaded = 0, existed = 0
   for (const log of details) {

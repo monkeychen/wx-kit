@@ -21,10 +21,10 @@ import { resolveUpdateCheck } from '../src/core/update-gate'
 import { detectChannel, upgradeCommand, pickAsset } from '../src/core/install-channel'
 import { selectArticles, buildManifest, writeMaterialExport, buildAgentPrompt } from '../src/core/material-export'
 import { syncToSite } from '../src/core/site-sync'
-import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, type AccountDownloadLog, type CheckLogEntry } from '../src/core/subscriptions'
+import { Subscriptions, accountsFromHistory, mergeAccounts, formatCheckLogLine, toDownloadItemLogs, type AccountDownloadLog, type CheckLogEntry } from '../src/core/subscriptions'
 import { nextCheckAt } from '../src/core/subscription-schedule'
 import { refId, sourceUrlKey } from '../src/core/subscription-refs'
-import { collectPendingDownloads, toAccountDownloadLog, countDownloadOutcomes } from '../src/core/subscription-batch'
+import { collectPendingDownloads, toAccountDownloadLog, countDownloadOutcomes, mergeCheckDetailItems } from '../src/core/subscription-batch'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { UpdateScheduler } from './services/update-scheduler'
 import { SettingsService } from './services/settings'
@@ -435,6 +435,10 @@ export function registerIpc(settings: SettingsService): void {
     // 用户点了下载、失败了、列表里也没了,连重试的入口都没有。
     const done = new Set(summary.items.filter((i) => i.ok || i.unavailable).map((i) => i.url))
     await subs.removeNewRefs(fakeid, picked.filter((r) => done.has(r.url)).map(refId))
+    // M58:把本次结果回填进「本轮检查明细」——行内列表的 pending 状态就地变为结果态。
+    // 只影响最近一条含该号的检查记录;若下载前又跑了新一轮检查,该文章不在其中则不回填(下次检查刷新)。
+    const items = toDownloadItemLogs(summary.items, picked)
+    await subs.mutateLatestCheckDetail(fakeid, (cur) => mergeCheckDetailItems(cur, items))
     emitProgress(total, 'done')
     emitSubsUpdated()
     return { downloaded: summary.succeeded, skipped: summary.skipped, failed: summary.failed, kept: total - done.size }

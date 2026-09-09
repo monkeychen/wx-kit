@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectPendingDownloads, toAccountDownloadLog, countDownloadOutcomes } from '../../src/core/subscription-batch'
+import { collectPendingDownloads, toAccountDownloadLog, countDownloadOutcomes, mergeCheckDetailItems } from '../../src/core/subscription-batch'
 import type { AccountDownloadLog, SubscribedAccount } from '../../src/core/subscriptions'
 import type { DownloadSummary } from '../../src/core/types'
 
@@ -81,5 +81,25 @@ describe('countDownloadOutcomes（M56 与明细同源的计数）', () => {
 
     expect(countDownloadOutcomes([toAccountDownloadLog(group, summary)]))
       .toEqual({ downloaded: summary.succeeded, existed: summary.skipped })
+  })
+})
+
+describe('mergeCheckDetailItems（M58 下载后回填本轮检查明细）', () => {
+  const existing = [
+    { title: '文A', status: 'pending' as const, url: 'u-a', refId: 'ra' },
+    { title: '文B', status: 'pending' as const, url: 'u-b', refId: 'rb' },
+  ]
+  it('按 url 匹配覆盖为新状态并回填 articleId；未涉及的保留', () => {
+    const fresh = [
+      { title: '文A', status: 'downloaded' as const, url: 'u-a', refId: 'ra', articleId: 'art-a' },
+    ]
+    expect(mergeCheckDetailItems(existing, fresh)).toEqual([
+      { title: '文A', status: 'downloaded', url: 'u-a', refId: 'ra', articleId: 'art-a' },
+      { title: '文B', status: 'pending', url: 'u-b', refId: 'rb' },
+    ])
+  })
+  it('fresh 中 existing 没有的文章（本轮检查后才入库）不追加', () => {
+    const fresh = [{ title: '文C', status: 'downloaded' as const, url: 'u-c', refId: 'rc' }]
+    expect(mergeCheckDetailItems(existing, fresh)).toHaveLength(2)
   })
 })
