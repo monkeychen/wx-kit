@@ -2,7 +2,7 @@
 // M56 T3：行内摘要的 checkLog 派生与话术纯函数。
 import { describe, it, expect } from 'vitest'
 import {
-  latestResultByAccount, summaryPhrase, triggerLabel, formatShortTime,
+  latestResultByAccount, latestItemsForAccount, summaryPhrase, triggerLabel, formatShortTime,
   itemStatusTag, detailModalTitle,
 } from '../../src/renderer/subscription-view'
 import type { CheckLogEntry, DownloadItemLog } from '../../src/core/subscriptions'
@@ -106,5 +106,33 @@ describe('detailModalTitle', () => {
     expect(detailModalTitle(entry({ time: t, kind: 'download', trigger: 'manual' })))
       .toBe('补下载明细（09-04 09:05 · 手动）')
     expect(detailModalTitle(entry({ time: t, trigger: 'auto' }))).toBe('检查明细（09-04 09:05 · 自动）')
+  })
+})
+
+describe('latestItemsForAccount（M58 行内本轮检查文章列表）', () => {
+  const entry = (time: number, fakeid: string, statuses: DownloadItemLog['status'][]) => ({
+    time, trigger: 'manual' as const, accounts: 1, newFound: statuses.length, failed: 0,
+    downloadDetail: [{ fakeid, nickname: '号', items: statuses.map((s, i) => ({ title: `文${i}`, status: s, url: `u-${fakeid}-${i}`, refId: `r${i}` })) }],
+  })
+  it('取最近一条含该号的条目；该号不在最新记录时回落更旧的', () => {
+    const log = [
+      entry(3, 'B', ['pending']),
+      entry(2, 'A', ['downloaded', 'pending']),
+      entry(1, 'A', ['downloaded']),
+    ]
+    const a = latestItemsForAccount(log as never, 'A')
+    expect(a?.items).toHaveLength(2)          // A 不在最新(3)记录,回落 time=2 那条
+    const b = latestItemsForAccount(log as never, 'B')
+    expect(b?.items).toHaveLength(1)          // B 取最新
+    expect(latestItemsForAccount(log as never, 'C')).toBeNull()
+  })
+  it('空 items 也是有效条目（查过、无新 → 行内清空）', () => {
+    const log = [{ time: 5, trigger: 'manual' as const, accounts: 1, newFound: 0, failed: 0,
+      downloadDetail: [{ fakeid: 'A', nickname: '号', items: [] }] }]
+    expect(latestItemsForAccount(log as never, 'A')?.items).toEqual([])
+  })
+  it('summaryPhrase：全 pending 显示「待下载」', () => {
+    const items = [{ title: 'a', status: 'pending' as const }, { title: 'b', status: 'pending' as const }]
+    expect(summaryPhrase(items as never)).toBe('发现 2 篇，待下载')
   })
 })

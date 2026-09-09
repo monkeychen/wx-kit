@@ -7,10 +7,9 @@ import type { SubscribedAccount, CheckLogEntry, PerAccountResult, RunCheckResult
 import type { NewArticleAction } from '../../../electron/services/settings'
 import type { MpAccount } from '../../core/mp-types'
 import { refId } from '../../core/subscription-refs'
-import { kindTag } from '../../core/message-kind'
 import { updatePerAccountProgress, type PerAccountDownloadState } from '../subscription-progress'
 import {
-  latestResultByAccount, summaryPhrase, triggerLabel, formatShortTime, itemStatusTag, detailModalTitle,
+  latestResultByAccount, latestItemsForAccount, summaryPhrase, triggerLabel, formatShortTime, itemStatusTag, detailModalTitle,
 } from '../subscription-view'
 
 /** 下载进度按 fakeid 存:手动下载与检查里的自动下载共用同一套 UI（M34） */
@@ -215,25 +214,51 @@ export default function Subscriptions() {
     })
   }
 
-  /** 待处理文章明细（M40）：标题/时间/类型——这些数据早就存在本地，此前只显示了一个数字 */
+  /** 单篇下载（M58）：复用批量通道（传单 id），完成后 load() 从回填的检查明细刷新状态。 */
+  const downloadOne = async (a: SubscribedAccount, refIdStr: string) => {
+    setDls((prev) => ({ ...prev, [a.fakeid]: { total: 1, done: 0, phase: 'start' } }))
+    try {
+      const r = await api.subscriptionsDownloadNew(a.fakeid, [refIdStr])
+      if (r && r.failed > 0) message.warning(`「${r.failed}」篇下载失败，可重试`)
+      await load()
+    } catch (e) {
+      message.error('下载失败：' + (e as Error).message)
+    } finally {
+      setDls((prev) => { const next = { ...prev }; delete next[a.fakeid]; return next })
+    }
+  }
+
+  /**
+   * 本轮检查文章列表（M58）：数据源 = 检查记录里该号最近一次的明细条目（跨重启持久、
+   * 每号跟随自己的轮次）。仍存在的 newRefs（待处理）才有勾选与「下载」；已入库的文章
+   * 点标题直开阅读器，未入库的点标题开浏览器原文。
+   */
   const pendingPanel = (a: SubscribedAccount) => {
-    if (!expanded[a.fakeid] || !a.newRefs.length) return null
+    const detail = latestItemsForAccount(checkLog, a.fakeid)
+    const items = detail?.items ?? []
+    if (!expanded[a.fakeid] || (!items.length && !a.newRefs.length)) return null
     const all = a.newRefs.map(refId)
     const sel = selected[a.fakeid] ?? all
+    const pendingIds = new Set(all)
     return (
       <div className="subs-pending" data-testid="subs-pending">
-        {a.newRefs.map((r) => {
-          const id = refId(r)
-          const tag = kindTag(r.itemShowType)
+        {items.map((item) => {
+          const downloadable = item.refId != null && pendingIds.has(item.refId)
+          const status = itemStatusTag(item.status)
           return (
-            <div key={id} className="subs-pending-item" data-testid="subs-pending-item">
-              <Checkbox checked={sel.includes(id)} disabled={busy}
-                onChange={() => toggleOne(a.fakeid, id, all)} data-testid="subs-pending-check" />
-              {/* 光看标题常判断不了值不值得下——点开原文再决定，这是「有选择」能成立的前提 */}
-              <a className="subs-pending-title" onClick={() => api.openExternal(r.url)}
-                title="在浏览器打开原文" data-testid="subs-pending-title">{r.title || '(无标题)'}</a>
-              {tag && <span className={`kind-tag${tag.warn ? ' warn' : ''}`} data-testid="subs-pending-kind">{tag.text}</span>}
-              <span className="faint subs-pending-time">{new Date(r.createTime * 1000).toLocaleString()}</span>
+            <div key={item.url ?? item.title} className="subs-pending-item" data-testid="subs-pending-item">
+              {downloadable && <Checkbox checked={sel.includes(item.refId!)} disabled={busy}
+                onChange={() => toggleOne(a.fakeid, item.refId!, all)} data-testid="subs-pending-check" />}
+              <a className="subs-pending-title"
+                onClick={() => item.articleId
+                  ? navigate(`/reader/${encodeURIComponent(item.articleId)}`)
+                  : item.url && api.openExternal(item.url)}
+                title={item.articleId ? '打开阅读器' : '在浏览器打开原文'}
+                data-testid="subs-pending-title">{item.title || '(无标题)'}</a>
+              <Tag color={status.color} data-testid="subs-item-status" title={item.status === 'failed' ? item.error : undefined}>{status.label}</Tag>
+              {item.status === 'pending' && downloadable &&
+                <a data-testid="subs-item-download" onClick={() => downloadOne(a, item.refId!)}
+                  style={{ opacity: busy ? 0.5 : 1 }}>下载</a>}
             </div>
           )
         })}

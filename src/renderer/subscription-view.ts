@@ -22,6 +22,19 @@ export function latestResultByAccount(checkLog: CheckLogEntry[]): Map<string, La
 }
 
 /**
+ * 行内「本轮检查文章列表」的数据源（M58）：该号在检查日志中**最近一次出现**的明细条目。
+ * 行内单查号 A 产生的记录只含 A——号 B 回落它自己上一次的条目，互不冲掉；
+ * 空 `items` 也是有效条目（查过、无新 → 行内列表清空）。从未出现过 → null。
+ */
+export function latestItemsForAccount(checkLog: CheckLogEntry[], fakeid: string): AccountDownloadLog | null {
+  for (const entry of checkLog) {
+    const hit = entry.downloadDetail?.find((d) => d.fakeid === fakeid)
+    if (hit) return hit
+  }
+  return null
+}
+
+/**
  * 交付话术：四状态收敛为三句（M56）。N = 该号本次进入下载流程的篇数（items.length）。
  * - kind='check'（或缺省，发现+交付并存）：downloaded>0 → 「发现 N 篇，已下载 M 篇」
  *   （brief 定死：并存 exists 时也不展开第三句）；existed>0 且 downloaded=0 → 「发现 N 篇，M 篇文库已有」；
