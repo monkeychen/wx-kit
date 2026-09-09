@@ -63,7 +63,7 @@
     "vite": "^6.4.3",
     "vite-plugin-electron": "^0.28.0",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.11"
   },
   "build": {
     "appId": "com.wxkit.app",
