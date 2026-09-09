@@ -455,12 +455,22 @@ export default function Subscriptions() {
                   title={
                     <span>
                       {a.nickname}
-                      {/* 数字点得开:标题早就存在本地,此前只让人看见一个计数(M40) */}
-                      {a.newRefs.length > 0 && (
-                        <a onClick={() => toggleExpand(a)} data-testid="subs-expand" title="查看具体是哪几篇">
-                          <Tag color="red" style={{ cursor: 'pointer' }}>{open ? '▾' : '▸'} {a.newRefs.length} 新</Tag>
-                        </a>
-                      )}
+                      {/* 数字点得开:标题早就存在本地,此前只让人看见一个计数(M40)。
+                          M58:列表数据源是检查明细——自动下载后 newRefs 清零,但本轮明细仍在,
+                          展开入口不能随之消失(否则「下载了什么」根本没法看)。 */}
+                      {(() => {
+                        const detail = latestItemsForAccount(checkLog, a.fakeid)
+                        const hasNew = a.newRefs.length > 0
+                        const hasDetail = (detail?.items.length ?? 0) > 0
+                        if (!hasNew && !hasDetail) return null
+                        return (
+                          <a onClick={() => toggleExpand(a)} data-testid="subs-expand" title="查看具体是哪几篇">
+                            {hasNew
+                              ? <Tag color="red" style={{ cursor: 'pointer' }}>{open ? '▾' : '▸'} {a.newRefs.length} 新</Tag>
+                              : <Tag color="green" style={{ cursor: 'pointer' }}>{open ? '▾' : '▸'} {detail!.items.length} 篇</Tag>}
+                          </a>
+                        )
+                      })()}
                     </span>
                   }
                   description={

@@ -447,6 +447,14 @@ async function main() {
     await win.waitForURL(/reader/, { timeout: 8000 })
     assert(win.url().includes('/reader/'), `M58: 点已下载文章标题直开阅读器 (${win.url()})`)
     await win.click('[data-testid="nav-订阅"]')
+    await win.waitForSelector('[data-testid="subs-row"]', { timeout: 8000 })
+    // 下载成功后 newRefs 清零——展开入口不得随之消失（v0.10.6 实录：自动下载后列表无法展开）
+    await win.waitForSelector('[data-testid="subs-expand"]', { timeout: 8000 })
+    const arrowText = await win.locator('[data-testid="subs-expand"]').first().innerText()
+    assert(arrowText.includes('篇'), `M58: newRefs 清零后展开入口仍在 (saw: ${arrowText})`)
+    await win.locator('[data-testid="subs-expand"]').first().click()
+    await win.waitForSelector('[data-testid="subs-pending-item"]', { timeout: 8000 })
+    assert(true, 'M58: 下载完成后重新展开仍见本轮明细')
 
     // ============ M49 · 现存设置继续可用（site-sync tooltip）============
     await win.click('[data-testid="nav-设置"]')
