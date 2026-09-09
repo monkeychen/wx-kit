@@ -32,7 +32,10 @@ export function urlFromReviewId(reviewId: string, bookId: string): string {
   const prefix = `${bookId}_`
   if (prefix && rid.startsWith(prefix)) token = rid.slice(prefix.length)
   else if (token.includes('_')) token = token.split('_').pop() ?? token
-  return `${MP_BASE}/s/${encodeURIComponent(token)}`
+  // 微信读书给 token 里的 `~` 与微信短链里的 `_` 是同一字符的两种形态（AGENTS.md）;
+  // 真实可打开的短链用 `_`,且 token 本身 URL 安全——encodeURIComponent 会把 `~` 变 `%7E`
+  // 导致开原文 404(v0.10.6 实录:花叔文章链接打不开)。
+  return `${MP_BASE}/s/${token.replace(/~/g, '_')}`
 }
 
 export interface WereadCover {

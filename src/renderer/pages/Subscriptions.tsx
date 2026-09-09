@@ -250,10 +250,13 @@ export default function Subscriptions() {
               {downloadable && <Checkbox checked={sel.includes(item.refId!)} disabled={busy}
                 onChange={() => toggleOne(a.fakeid, item.refId!, all)} data-testid="subs-pending-check" />}
               <a className="subs-pending-title"
-                onClick={() => item.articleId
-                  ? navigate(`/reader/${encodeURIComponent(item.articleId)}`)
-                  : item.url && api.openExternal(item.url)}
-                title={item.articleId ? '打开阅读器' : '在浏览器打开原文'}
+                onClick={() => {
+                  if (item.articleId) { navigate(`/reader/${encodeURIComponent(item.articleId)}`); return }
+                  if (item.url) { api.openExternal(item.url); return }
+                  // M58 之前的检查记录没有 url/articleId——重新检查一次即可获得
+                  message.info('该条记录来自旧版本检查，重新「检查」一次即可补全文章链接')
+                }}
+                title={item.articleId ? '打开阅读器' : item.url ? '在浏览器打开原文' : undefined}
                 data-testid="subs-pending-title">{item.title || '(无标题)'}</a>
               <Tag color={status.color} data-testid="subs-item-status" title={item.status === 'failed' ? item.error : undefined}>{status.label}</Tag>
               {item.status === 'pending' && downloadable &&

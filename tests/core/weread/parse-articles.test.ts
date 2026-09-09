@@ -47,7 +47,10 @@ describe('错误码翻译', () => {
 
 describe('urlFromReviewId · reviewId 末段兜底', () => {
   it('剥掉 bookId 前缀取 token', () => {
-    expect(urlFromReviewId(`${BOOK}_4OcS7~rrtk2Lwe4P0YPiGg`, BOOK)).toBe('https://mp.weixin.qq.com/s/4OcS7~rrtk2Lwe4P0YPiGg')
+    expect(urlFromReviewId(`${BOOK}_4OcS7_rrtk2Lwe4P0YPiGg`, BOOK)).toBe('https://mp.weixin.qq.com/s/4OcS7_rrtk2Lwe4P0YPiGg')
+  })
+  it('token 里的 `~` 归一为 `_`（微信读书形态 → 微信原生短链形态，v0.10.6 实录：`~` 形态打不开）', () => {
+    expect(urlFromReviewId(`${BOOK}_H7-G~vszhDe8tLaNuC4jZA`, BOOK)).toBe('https://mp.weixin.qq.com/s/H7-G_vszhDe8tLaNuC4jZA')
   })
   it('无前缀时取最后一段', () => {
     expect(urlFromReviewId('SOMEOTHER_123_tok', BOOK)).toBe('https://mp.weixin.qq.com/s/tok')
