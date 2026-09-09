@@ -277,7 +277,7 @@ describe('runSubscriptionCheck · 全号落明细 (M58)', () => {
     expect(logged[0].downloadDetail).toEqual([{ fakeid: account.fakeid, nickname: account.nickname, items: [] }])
   })
 
-  it('findArticleId 提供时 downloaded/exists 条目回填 articleId', async () => {
+  it('articleId 直接取下载结果自带的 id（跨 URL 形态不可靠，按 id 不按 url 反查）', async () => {
     const { logged, subs } = mkSubs()
     const refs = mkRefs(2)
     await runSubscriptionCheck('manual', {
@@ -286,19 +286,17 @@ describe('runSubscriptionCheck · 全号落明细 (M58)', () => {
       list: async () => [],
       check: async () => [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: refs }],
       isRefDownloaded: async () => false,
-      findArticleId: async (ref) => (ref.url === refs[0].url ? 'art-1' : null),
       downloadRefs: async () => ({
         ok: true, total: 2, succeeded: 1, failed: 0, skipped: 1,
         items: [
-          { url: refs[0].url, ok: true, title: '待处理1' },
-          { url: refs[1].url, ok: true, skipped: true, title: '待处理2' },
+          { url: refs[0].url, ok: true, title: '待处理1', id: 'art-1' },
+          { url: refs[1].url, ok: true, skipped: true, title: '待处理2', id: 'art-2' },
         ],
       }),
       log: async (e) => { logged.unshift(e) },
     })
     const items = logged[0].downloadDetail?.[0].items ?? []
     expect(items[0]).toMatchObject({ status: 'downloaded', articleId: 'art-1' })
-    expect(items[1]).toMatchObject({ status: 'exists' })
-    expect(items[1].articleId).toBeUndefined()
+    expect(items[1]).toMatchObject({ status: 'exists', articleId: 'art-2' })
   })
 })

@@ -368,13 +368,6 @@ export function registerIpc(settings: SettingsService): void {
       const result = await svcRunSubscriptionCheck(trigger, {
         subs, settings: s, list,
         isRefDownloaded: async (ref) => downloadedUrls.has(sourceUrlKey(ref.url)),
-        // M58:检查明细回填 articleId。**必须调用时实时查库**——自动下载发生在检查中途,
-        // 用检查前的快照查不到刚入库的文章(v0.10.6 实录:自动下载的文章 articleId 恒空)。
-        findArticleId: async (ref) => {
-          const hit = (await new Library(s.libraryRoot).list())
-            .find((article) => sourceUrlKey(article.sourceUrl) === sourceUrlKey(ref.url))
-          return hit?.id ?? null
-        },
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
         onDownloadProgress: broadcastDlProgress,
         ...(fakeids ? { fakeids } : {}),
@@ -440,12 +433,11 @@ export function registerIpc(settings: SettingsService): void {
     const done = new Set(summary.items.filter((i) => i.ok || i.unavailable).map((i) => i.url))
     await subs.removeNewRefs(fakeid, picked.filter((r) => done.has(r.url)).map(refId))
     // M58:把本次结果回填进「本轮检查明细」——行内列表的 pending 状态就地变为结果态。
-    // articleId 从文库反查（下载成功后按 sourceUrl 匹配），行内点标题才能直开阅读器。
-    // 只影响最近一条含该号的检查记录;若下载前又跑了新一轮检查,该文章不在其中则不回填(下次检查刷新)。
-    const articleIdByUrl = new Map((await new Library((await settings.get()).libraryRoot).list())
-      .map((article) => [sourceUrlKey(article.sourceUrl), article.id] as const))
+    // articleId 直接取下载结果自带的 id（下载器解析后的 canonical 主键），不按 url 反查文库
+    // （检查给短链、库存长链，跨形态匹配不可靠）。只影响最近一条含该号的检查记录。
+    const idByUrl = new Map(summary.items.filter((i) => i.id).map((i) => [i.url, i.id!] as const))
     const items = toDownloadItemLogs(summary.items, picked).map((item) => {
-      const id = item.url != null ? articleIdByUrl.get(sourceUrlKey(item.url)) : undefined
+      const id = item.url != null ? idByUrl.get(item.url) : undefined
       return id ? { ...item, articleId: id } : item
     })
     await subs.mutateLatestCheckDetail(fakeid, (cur) => mergeCheckDetailItems(cur, items))

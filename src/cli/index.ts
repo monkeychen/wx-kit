@@ -410,10 +410,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const s = await settingsFor().get()
       const root = await resolveRoot(opts.out)
       const subs = new Subscriptions(root)
-      const libraryArticles = await new Library(root).list()
-      const downloadedUrls = new Set(libraryArticles.map((article) => sourceUrlKey(article.sourceUrl)))
-      // M58:检查明细回填 articleId 用（行内点标题直开阅读器）
-      const articleIdByUrl = new Map(libraryArticles.map((article) => [sourceUrlKey(article.sourceUrl), article.id] as const))
+      const downloadedUrls = new Set((await new Library(root).list()).map((article) => sourceUrlKey(article.sourceUrl)))
       const logFilePath = join(userDataDir, 'subscriptions-check.log')
       const fakeids = opts.accounts ? String(opts.accounts).split(',').map((x: string) => x.trim()).filter(Boolean) : undefined
       const downloadRefs = async (refs: import('../core/mp-types').ArticleRef[], formats: DownloadFormat[], source: HistorySource) => {
@@ -429,8 +426,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const list = await wereadListFn(userDataDir, (url) => mpGateway().requestWereadJson('weread-list', url))
       const result = await runSubscriptionCheck('manual', {
         ...(fakeids ? { fakeids } : {}),
-        subs, settings: s, list, isRefDownloaded: async (ref) => downloadedUrls.has(sourceUrlKey(ref.url)),
-        findArticleId: async (ref) => articleIdByUrl.get(sourceUrlKey(ref.url)) ?? null, downloadRefs,
+        subs, settings: s, list, isRefDownloaded: async (ref) => downloadedUrls.has(sourceUrlKey(ref.url)), downloadRefs,
         log: async (e) => {
           try { await subs.appendCheckLog(e); appendFileSync(logFilePath, formatCheckLogLine(e) + '\n') } catch { /* 留痕失败不阻断 */ }
           process.stderr.write(formatCheckLogLine(e) + '\n')

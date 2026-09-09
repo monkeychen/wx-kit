@@ -27,8 +27,6 @@ export interface RunCheckDeps {
   onDownloadProgress?: (e: { fakeid: string; total: number; done: number; phase: string }) => void
   /** v0.10.0 旧订阅没有 cover 游标时，用本地文库建立基线，避免升级后把已下载文章再报一次。 */
   isRefDownloaded?: (ref: ArticleRef) => Promise<boolean>
-  /** M58：文库条目反查（按原文 url）——downloaded/exists 明细回填 articleId 供行内直开阅读器。 */
-  findArticleId?: (ref: ArticleRef) => Promise<string | null>
 }
 /** M34:逐号明细。汇总数说不出「这一行新增了几篇」,而反馈要落在被操作的对象上。 */
 export interface PerAccountResult {
@@ -134,18 +132,21 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
       else await subs.clearNewRefs(r.fakeid)
       // M56:明细一次收集两处消费——downloadDetail 落盘(检查记录),articles 挂行结果(GUI/CLI 透传)
       const detail = toAccountDownloadLog({ fakeid: r.fakeid, nickname, refs: newRefs }, summary)
-      // M58:回填 url/refId/articleId——行内单篇下载(refId)与直开阅读器(articleId)依赖
+      // M58:回填 url/refId/articleId——行内单篇下载(refId)与直开阅读器(articleId)依赖。
+      // articleId 直接取**下载结果自带的 id**(下载器解析后的 canonical 文章主键)——
+      // 不按 url 反查文库:检查给的是短链、库存的是长链,跨形态匹配正是 AGENTS.md 警告的坑
+      // (v0.10.6 实录:按 url 反查导致自动下载的文章 articleId 恒空)。
+      const idByUrl = new Map(summary.items.filter((i) => i.id).map((i) => [i.url, i.id!] as const))
       const refByUrl = new Map(newRefs.map((x) => [x.url, x] as const))
-      detail.items = await Promise.all(detail.items.map(async (item) => {
+      detail.items = detail.items.map((item) => {
         const ref = item.url != null ? refByUrl.get(item.url) : undefined
-        if (!ref) return item
-        const enriched: DownloadItemLog = { ...item, refId: refId(ref) }
-        if ((item.status === 'downloaded' || item.status === 'exists') && deps.findArticleId) {
-          const id = await deps.findArticleId(ref)
-          if (id) enriched.articleId = id
+        const articleId = item.url != null ? idByUrl.get(item.url) : undefined
+        return {
+          ...item,
+          ...(ref ? { refId: refId(ref) } : {}),
+          ...(articleId ? { articleId } : {}),
         }
-        return enriched
-      }))
+      })
       downloadLogs.push(detail)
       downloaded = summary.succeeded
       articles = detail.items
