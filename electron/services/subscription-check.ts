@@ -27,6 +27,8 @@ export interface RunCheckDeps {
   onDownloadProgress?: (e: { fakeid: string; total: number; done: number; phase: string }) => void
   /** v0.10.0 旧订阅没有 cover 游标时，用本地文库建立基线，避免升级后把已下载文章再报一次。 */
   isRefDownloaded?: (ref: ArticleRef) => Promise<boolean>
+  /** M58：文库条目反查（按原文 url）——downloaded/exists 明细回填 articleId 供行内直开阅读器。 */
+  findArticleId?: (ref: ArticleRef) => Promise<string | null>
 }
 /** M34:逐号明细。汇总数说不出「这一行新增了几篇」,而反馈要落在被操作的对象上。 */
 export interface PerAccountResult {
@@ -107,6 +109,8 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
     const newRefs = migratedDuplicate ? [] : r.newRefs
     await subs.updateWatermark(r.fakeid, r.latest, r.latestArticleId)
     if (newRefs.length === 0) {
+      // M58:全号落条目——空 items 显式表达「查过、无新」,行内列表据此把该号清空
+      downloadLogs.push({ fakeid: r.fakeid, nickname, items: [] })
       perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: 0, downloaded: 0 })
       continue
     }
@@ -130,23 +134,42 @@ export async function runSubscriptionCheck(trigger: 'auto' | 'manual', deps: Run
       else await subs.clearNewRefs(r.fakeid)
       // M56:明细一次收集两处消费——downloadDetail 落盘(检查记录),articles 挂行结果(GUI/CLI 透传)
       const detail = toAccountDownloadLog({ fakeid: r.fakeid, nickname, refs: newRefs }, summary)
+      // M58:回填 url/refId/articleId——行内单篇下载(refId)与直开阅读器(articleId)依赖
+      const refByUrl = new Map(newRefs.map((x) => [x.url, x] as const))
+      detail.items = await Promise.all(detail.items.map(async (item) => {
+        const ref = item.url != null ? refByUrl.get(item.url) : undefined
+        if (!ref) return item
+        const enriched: DownloadItemLog = { ...item, refId: refId(ref) }
+        if ((item.status === 'downloaded' || item.status === 'exists') && deps.findArticleId) {
+          const id = await deps.findArticleId(ref)
+          if (id) enriched.articleId = id
+        }
+        return enriched
+      }))
       downloadLogs.push(detail)
       downloaded = summary.succeeded
       articles = detail.items
     } else {
       await subs.addNewRefs(r.fakeid, newRefs)
+      // M58:提示策略也落逐篇明细(pending)——行内「本轮检查文章列表」两种策略同源
+      downloadLogs.push({
+        fakeid: r.fakeid, nickname,
+        items: newRefs.map((x) => ({ title: x.title || '(无标题)', status: 'pending' as const, url: x.url, refId: refId(x) })),
+      })
     }
     perAccount.push({ fakeid: r.fakeid, nickname, ok: true, newFound: total, downloaded, ...(articles !== undefined ? { articles } : {}) })
   }
   await subs.setLastRunAt(now())
-  // M56:有下载动作(downloadLogs 非空)才写交付字段;提示策略保持缺省而非 0 ——「没下载」和「下载了 0 篇」是两回事。
+  // M56:交付字段(kind/downloaded/existed)只在**有下载动作**时写;提示策略保持缺省而非 0 ——
+  // 「没下载」和「下载了 0 篇」是两回事。M58:downloadDetail 与之解耦,**全号落条目**(提示策略
+  // 落 pending、无新文章落空 items),供行内「本轮检查文章列表」消费。
   const { downloaded: downloadedTotal, existed: existedTotal } = countDownloadOutcomes(downloadLogs)
+  const didDownload = downloadLogs.some((d) => d.items.some((i) => i.status !== 'pending'))
   await deps.log({
     time: now(), trigger, accounts: accounts.length, newFound, failed,
     ...(failures.length ? { failures } : {}),
-    ...(downloadLogs.length
-      ? { kind: 'check' as const, downloaded: downloadedTotal, existed: existedTotal, downloadDetail: downloadLogs }
-      : {}),
+    ...(downloadLogs.length ? { downloadDetail: downloadLogs } : {}),
+    ...(didDownload ? { kind: 'check' as const, downloaded: downloadedTotal, existed: existedTotal } : {}),
   })
   emit(); return { accounts: accounts.length, newFound, failed, ...(failures.length ? { failures } : {}), authExpired: false, results: perAccount }
 }

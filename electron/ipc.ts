@@ -364,10 +364,13 @@ export function registerIpc(settings: SettingsService): void {
       const s = await settings.get()
       const library = new Library(s.libraryRoot)
       const downloadedUrls = new Set((await library.list()).map((article) => sourceUrlKey(article.sourceUrl)))
+      // M58:按原文 url 反查文库条目 id,检查明细回填 articleId(行内点标题直开阅读器)
+      const articleIdByUrl = new Map((await library.list()).map((article) => [sourceUrlKey(article.sourceUrl), article.id] as const))
       const list = await wereadListFn(app.getPath('userData'), (url) => mpGateway.requestWereadJson('weread-list', url))
       const result = await svcRunSubscriptionCheck(trigger, {
         subs, settings: s, list,
         isRefDownloaded: async (ref) => downloadedUrls.has(sourceUrlKey(ref.url)),
+        findArticleId: async (ref) => articleIdByUrl.get(sourceUrlKey(ref.url)) ?? null,
         downloadRefs, log: (entry) => logCheck(subs, entry), onEmit: emitSubsUpdated,
         onDownloadProgress: broadcastDlProgress,
         ...(fakeids ? { fakeids } : {}),

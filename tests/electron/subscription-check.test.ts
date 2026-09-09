@@ -112,7 +112,7 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
     expect(result.results[0].articles).toEqual(entry.downloadDetail![0].items)
   })
 
-  it('仅提示策略：entry 不写 kind/downloaded/existed/downloadDetail（缺省而非 0）', async () => {
+  it('仅提示策略：entry 不写 kind/downloaded/existed（缺省而非 0）；M58 起 downloadDetail 落 pending 明细', async () => {
     const downloadRefs = vi.fn(async () => { throw new Error('notify 策略不应下载') })
     const logged: CheckLogEntry[] = []
     const subs = {
@@ -132,7 +132,9 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
     expect('kind' in entry).toBe(false)
     expect('downloaded' in entry).toBe(false)
     expect('existed' in entry).toBe(false)
-    expect('downloadDetail' in entry).toBe(false)
+    // M58:downloadDetail 全号落条目(提示策略 = pending 明细),单行字段纪律不变
+    expect(entry.downloadDetail?.[0]).toMatchObject({ fakeid: account.fakeid })
+    expect(entry.downloadDetail?.[0].items.every((i) => i.status === 'pending')).toBe(true)
     expect(downloadRefs).not.toHaveBeenCalled()
     // M56 T5:无下载动作的行结果不写 articles 字段（缺省而非空数组）
     expect(result.results[0]).toMatchObject({ newFound: 2, downloaded: 0 })
@@ -228,5 +230,75 @@ describe('runSubscriptionCheck 下载交付落盘（M56）', () => {
     })
 
     expect(formatCheckLogLine(logged.at(-1)!)).toMatch(/MANUAL accounts=1 new=2 failed=0 downloaded=1 existed=1$/)
+  })
+})
+
+describe('runSubscriptionCheck · 全号落明细 (M58)', () => {
+  const mkSubs = () => {
+    const logged: CheckLogEntry[] = []
+    const subs = {
+      list: async () => [account], updateWatermark: async () => {},
+      addNewRefs: async () => {}, setPendingRefs: async () => {}, clearNewRefs: async () => {},
+      setLastRunAt: async () => {},
+      appendCheckLog: async (e: CheckLogEntry) => { logged.unshift(e) },
+    } as unknown as Subscriptions
+    return { logged, subs }
+  }
+
+  it('提示策略：downloadDetail 落 pending 明细（带 url/refId），不再只认 download 策略', async () => {
+    const { logged, subs } = mkSubs()
+    const refs = mkRefs(2)
+    await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'notify' },
+      list: async () => [],
+      check: async () => [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: refs }],
+      downloadRefs: async () => ({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0, items: [] }),
+      log: async (e) => { logged.unshift(e) },
+    })
+    const detail = logged[0].downloadDetail?.find((d) => d.fakeid === account.fakeid)
+    expect(detail?.items).toEqual([
+      { title: '待处理1', status: 'pending', url: refs[0].url, refId: expect.stringMatching(/.+/) },
+      { title: '待处理2', status: 'pending', url: refs[1].url, refId: expect.stringMatching(/.+/) },
+    ])
+  })
+
+  it('无新文章的号落空 items 条目（显式「查过、无新」）', async () => {
+    const { logged, subs } = mkSubs()
+    await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
+      list: async () => [],
+      check: async () => [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: [] }],
+      isRefDownloaded: async () => false,
+      downloadRefs: async () => ({ ok: true, total: 0, succeeded: 0, failed: 0, skipped: 0, items: [] }),
+      log: async (e) => { logged.unshift(e) },
+    })
+    expect(logged[0].downloadDetail).toEqual([{ fakeid: account.fakeid, nickname: account.nickname, items: [] }])
+  })
+
+  it('findArticleId 提供时 downloaded/exists 条目回填 articleId', async () => {
+    const { logged, subs } = mkSubs()
+    const refs = mkRefs(2)
+    await runSubscriptionCheck('manual', {
+      subs,
+      settings: { defaultFormats: ['md'], subscriptionNewArticleAction: 'download' },
+      list: async () => [],
+      check: async () => [{ fakeid: account.fakeid, ok: true, latest: 300, latestArticleId: 'review-9', newRefs: refs }],
+      isRefDownloaded: async () => false,
+      findArticleId: async (ref) => (ref.url === refs[0].url ? 'art-1' : null),
+      downloadRefs: async () => ({
+        ok: true, total: 2, succeeded: 1, failed: 0, skipped: 1,
+        items: [
+          { url: refs[0].url, ok: true, title: '待处理1' },
+          { url: refs[1].url, ok: true, skipped: true, title: '待处理2' },
+        ],
+      }),
+      log: async (e) => { logged.unshift(e) },
+    })
+    const items = logged[0].downloadDetail?.[0].items ?? []
+    expect(items[0]).toMatchObject({ status: 'downloaded', articleId: 'art-1' })
+    expect(items[1]).toMatchObject({ status: 'exists' })
+    expect(items[1].articleId).toBeUndefined()
   })
 })
