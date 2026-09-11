@@ -187,6 +187,8 @@
 
 ### R2 · 墨问笔记接入
 
+> 验收分段：R2d CLI 五命令（M60 已完成，见下文「R2d」段）；R2a/R2b/R2c 随 M61。
+
 **R2a 墨问 tab（按用户批量）**：
 
 - [ ] tab 内按关键词搜用户：调 `mocli user search`，候选列表显示昵称/简介/UID（单测：mock spawn 输出；e2e）。
@@ -223,14 +225,23 @@
 - [ ] `wx-kit mowen detect`：检测 mocli 安装状态并输出。
 - [ ] `wx-kit mowen list-user --uid <uid>` / `search-user --keyword K` / `list-mine` / `search --keyword K`：透传输出 JSON。
 
-### R3 · 启动检测 mocli
+### R3 · 启动检测 mocli（M60 已完成 2026-09-11）
 
-- [ ] 主进程 `app.whenReady` 后每次启动检测一次 `mocli` 是否存在（单测：mock `which`）。
-- [ ] 检测结果写 settings：`mowen.mocliPath` / `mowen.mocliVersion` / `mowen.detectedAt`。
-- [ ] 设置页「墨问集成」区块显示当前状态（已安装：路径 + 版本 + 重新检测；未安装：安装指引）。
-- [ ] 「重新检测」按钮立即触发一次检测并刷新 UI（单测 + e2e）。
-- [ ] 未安装时墨问入口禁用/引导（GUI tab + URL 输入框 + CLI 命令均给出指引）。
-- [ ] 检测失败/超时不影响 wx-kit 其他功能启动（隔离保护）。
+- [x] 主进程 `app.whenReady` 后每次启动检测一次 `mocli` 是否存在（单测：mock which/where）。
+- [x] 检测结果写 settings：`mowenMocliPath` / `mowenMocliVersion` / `mowenDetectedAt`（扁平键，M60 实现时定名）。
+- [x] 设置页「墨问集成」区块显示当前状态（已安装：路径 + 版本 + 重新检测；未安装：安装指引）。
+- [x] 「重新检测」按钮立即触发一次检测并刷新 UI（IPC `mowen:detect`；单测 + e2e）。
+- [x] 未安装时墨问入口禁用/引导（CLI `mowen *` 五命令统一前置检测并出指引，exit 1；GUI tab 属 M61）。
+- [x] 检测失败/超时不影响 wx-kit 其他功能启动（隔离保护：fire-and-forget + 全量 try/catch）。
+
+### R2d · CLI（detect / list-user / search-user / list-mine / search，M60 已完成；import 随 M61）
+
+- [x] `wx-kit mowen detect`：检测 mocli 安装状态 + 认证身份（moUid）并输出（真机验收）。
+- [x] `wx-kit mowen list-user --uid <uid>`（--filter/--recent/--count 透传，真机验收）。
+- [x] `wx-kit mowen search-user --keyword K`（真机验收；空 keyword → `MOCLI_FAILED/VALIDATE` 如实透传）。
+- [x] `wx-kit mowen list-mine`（真机验收，返回自己的含私密笔记）。
+- [x] `wx-kit mowen search --keyword K`（真机验收）。
+- [ ] `wx-kit mowen import <note-id>`：单篇拉取并入库（M61，随正文通道）。
 
 ### 集成 & 收尾
 

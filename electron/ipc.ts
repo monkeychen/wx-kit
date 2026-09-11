@@ -27,6 +27,7 @@ import { refId, sourceUrlKey } from '../src/core/subscription-refs'
 import { collectPendingDownloads, toAccountDownloadLog, countDownloadOutcomes, mergeCheckDetailItems } from '../src/core/subscription-batch'
 import { SubscriptionScheduler } from './services/subscription-scheduler'
 import { UpdateScheduler } from './services/update-scheduler'
+import { registerMowenIpc } from './services/mowen-detect'
 import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 import type { RunCheckResult } from './services/subscription-check'
@@ -44,6 +45,7 @@ import { PRIVATE_API_FEATURE_ENABLED, RETIRED_PRIVATE_API_COMMANDS, retiredPriva
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
 export function registerIpc(settings: SettingsService): void {
+  registerMowenIpc(settings)
   const mpGateway = createMpRuntime(app.getPath('userData'))
   const { fetchHtml, fetchBinary } = articleFetchers(mpGateway)
   const libraryFor = async () => new Library((await settings.get()).libraryRoot)

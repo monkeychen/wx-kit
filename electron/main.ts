@@ -2,6 +2,7 @@
 import { app, BrowserWindow, shell } from 'electron'
 import path, { join } from 'node:path'
 import { runCli } from '../src/cli'
+import { runStartupMowenDetect } from './services/mowen-detect'
 import { isCliInvocation, normalizeUserArgs } from './cli-dispatch'
 import { registerWxfileScheme, handleWxfileProtocol } from './protocol'
 import { registerIpc } from './ipc'
@@ -47,6 +48,8 @@ async function main() {
   const settings = new SettingsService(app.getPath('userData'), join(app.getPath('documents'), 'wx-kit'))
   handleWxfileProtocol(async () => (await settings.get()).libraryRoot)
   registerIpc(settings)
+  // M60 R3:启动期检测 mocli,fire-and-forget——装没装、多慢都不阻塞窗口创建
+  void runStartupMowenDetect(settings)
 
   const createWindow = () => {
     const win = new BrowserWindow({

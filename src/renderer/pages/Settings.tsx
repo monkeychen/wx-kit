@@ -27,7 +27,19 @@ export default function Settings() {
   const [mpSession, setMpSession] = useState<MpSessionInfo | null>(null)
   const [mpAuthBusy, setMpAuthBusy] = useState<'login' | 'relogin' | 'logout' | null>(null)
   const [mpCleanupError, setMpCleanupError] = useState('')
+  // M60 R3:墨问集成。读 settings 缓存渲染,「重新检测」走即时 IPC
+  const [mowenChecking, setMowenChecking] = useState(false)
   const wereadQr = useWereadLoginQr()
+
+  const redetectMowen = async () => {
+    setMowenChecking(true)
+    try {
+      await api.mowenDetect()
+      setS(await api.getSettings())
+      message.success('已重新检测')
+    } catch (e) { message.error('检测失败：' + (e as Error).message) }
+    finally { setMowenChecking(false) }
+  }
 
   useEffect(() => { api.getSettings().then(setS) }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
@@ -400,6 +412,27 @@ export default function Settings() {
               </Button>
             </div>
           )}
+          <div className="setting-block" data-testid="mowen-section">
+            <div className="setting-label">墨问集成</div>
+            <div className="setting-hint">
+              接入墨问笔记下载依赖墨问官方命令行 <code>mocli</code>。检测到后，下载页即可使用墨问相关功能。
+            </div>
+            {s?.mowenMocliPath ? (
+              <div className="setting-hint" data-testid="mowen-status-installed">
+                已检测到 mocli：<code data-testid="mowen-path">{s.mowenMocliPath}</code>
+                {s.mowenMocliVersion && <>（版本 <span data-testid="mowen-version">{s.mowenMocliVersion}</span>）</>}
+              </div>
+            ) : (
+              <div className="setting-hint" data-testid="mowen-status-missing">
+                未检测到 mocli。请先安装并完成认证：
+                <pre style={{ margin: '6px 0 0' }}><code>npm install -g @mowenxd/cli{'\n'}mocli auth init --apik &lt;你的墨问 API Key&gt;</code></pre>
+                <span className="faint">API Key 在墨问小程序「我的 → 开发者 → 我的 API Key」获取。</span>
+              </div>
+            )}
+            <Button style={{ marginTop: 8 }} size="small" loading={mowenChecking}
+              onClick={redetectMowen} data-testid="mowen-redetect">重新检测</Button>
+          </div>
+
           <div className="setting-block">
             <div className="setting-label">关于</div>
             <div className="setting-hint">

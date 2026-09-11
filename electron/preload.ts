@@ -24,6 +24,7 @@ const api: WxApi = {
   reveal: (path) => ipcRenderer.invoke('shell:reveal', path),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   appVersion: () => ipcRenderer.invoke('app:version'),
+  mowenDetect: () => ipcRenderer.invoke('mowen:detect'),
   copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
   mpAuthStatus: () => ipcRenderer.invoke('mp:authStatus'),
   mpLogin: () => ipcRenderer.invoke('mp:login'),

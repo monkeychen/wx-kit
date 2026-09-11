@@ -23,6 +23,11 @@ import { detectChannel, upgradeCommand } from '../core/install-channel'
 import { selectArticles, buildManifest } from '../core/material-export'
 import { sortArticles } from '../core/library-sort'
 import { syncToSite } from '../core/site-sync'
+import { detectMocli } from '../core/mowen/detect'
+import { createMocliRunner, createWhichRunner } from '../core/mowen/runner'
+import { searchUsers, listUserNotes, listMyNotes, authInfo } from '../core/mowen/metadata'
+import { MocliFailed } from '../core/mowen/errors'
+import { searchNotes } from '../core/mowen/search'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
 import { History, eventFromSummary, type HistorySource } from '../core/download-history'
@@ -596,6 +601,79 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
       const summary = await syncToSite(picked.map((m) => ({ meta: m, slug: slugMap.get(m.id)! })), postsRoot)
       outJson({ ok: summary.failed === 0, ...summary })
       exitCode = summary.failed === 0 ? 0 : 1
+    })
+
+  // —— M60:墨问发现链路(只读;import 随 M61 正文通道) ——
+  const mowen = program.command('mowen').description('墨问笔记(子命令:detect / search-user / list-user / list-mine / search)')
+  // 全部命令共用的前置:装了才继续;未装如实报错出指引(PRD R3:不静默失败)
+  const mowenRunnerOf = async () => {
+    const det = await detectMocli(createMocliRunner(), createWhichRunner())
+    if (!det.installed) {
+      outJson({ ok: false, error: { code: 'MOCLI_NOT_FOUND', message: '未检测到 mocli。请先安装:npm install -g @mowenxd/cli,并运行 mocli auth init 完成认证(API Key 在墨问小程序「我的 → 开发者」获取)' } })
+      exitCode = 1
+      return null
+    }
+    return createMocliRunner()
+  }
+
+  mowen.command('detect').description('检测 mocli 安装状态与认证身份')
+    .action(async () => {
+      const run = await mowenRunnerOf()
+      if (!run) return
+      const det = await detectMocli(run, createWhichRunner())
+      let moUid: string | null = null
+      try { moUid = (await authInfo(run)).moUid || null } catch { /* 未认证不影响「已安装」结论 */ }
+      outJson({ ok: true, installed: det.installed, path: det.path, version: det.version, moUid })
+    })
+  mowen.command('search-user').description('按关键词模糊搜索墨问用户（昵称+简介）')
+    .requiredOption('--keyword <kw>', '搜索关键词')
+    .action(async (opts) => {
+      const run = await mowenRunnerOf()
+      if (!run) return
+      try { outJson({ ok: true, users: await searchUsers(run, String(opts.keyword)) }) }
+      catch (e) {
+        if (e instanceof MocliFailed) { outJson({ ok: false, error: { code: 'MOCLI_FAILED', reason: e.reason, message: e.message } }); exitCode = 1; return }
+        throw e
+      }
+    })
+  mowen.command('list-user').description('列出某用户的公开笔记清单（不下载）')
+    .requiredOption('--uid <uid>', '墨问用户 UID')
+    .option('--filter <f>', 'all / album / fee / popular', 'all')
+    .option('--recent <r>', '时间窗：1h / 24h / 3d / 7d / 15d')
+    .option('--count <n>', '数量上限（1-100，默认 20）', '20')
+    .action(async (opts) => {
+      const run = await mowenRunnerOf()
+      if (!run) return
+      try {
+        outJson({ ok: true, notes: await listUserNotes(run, String(opts.uid), { filter: opts.filter, recent: opts.recent, count: Number(opts.count) }) })
+      } catch (e) {
+        if (e instanceof MocliFailed) { outJson({ ok: false, error: { code: 'MOCLI_FAILED', reason: e.reason, message: e.message } }); exitCode = 1; return }
+        throw e
+      }
+    })
+  mowen.command('list-mine').description('列出我自己的笔记（含私密，需 mocli 已认证）')
+    .option('--filter <f>', 'priv / fee / pub / cond-pub')
+    .option('--count <n>', '数量上限', '20')
+    .action(async (opts) => {
+      const run = await mowenRunnerOf()
+      if (!run) return
+      try { outJson({ ok: true, notes: await listMyNotes(run, { mineFilter: opts.filter, count: Number(opts.count) }) }) }
+      catch (e) {
+        if (e instanceof MocliFailed) { outJson({ ok: false, error: { code: 'MOCLI_FAILED', reason: e.reason, message: e.message } }); exitCode = 1; return }
+        throw e
+      }
+    })
+  mowen.command('search').description('全站关键词搜索笔记')
+    .requiredOption('--keyword <kw>', '搜索关键词')
+    .option('--count <n>', '数量上限', '20')
+    .action(async (opts) => {
+      const run = await mowenRunnerOf()
+      if (!run) return
+      try { outJson({ ok: true, notes: await searchNotes(run, String(opts.keyword), Number(opts.count)) }) }
+      catch (e) {
+        if (e instanceof MocliFailed) { outJson({ ok: false, error: { code: 'MOCLI_FAILED', reason: e.reason, message: e.message } }); exitCode = 1; return }
+        throw e
+      }
     })
 
   const settings = program.command('settings').description('读写应用设置(子命令:get / set)')

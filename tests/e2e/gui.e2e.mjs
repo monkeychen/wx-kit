@@ -203,6 +203,16 @@ async function main() {
     assert((await win.locator('[data-testid="set-update-check"]').count()) === 1, 'settings keeps the startup-check toggle')
     assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings keeps site-sync help')
 
+    // ============ M60 · 设置页墨问集成区块（读缓存渲染，两种状态取其一）============
+    await win.waitForSelector('[data-testid="mowen-section"]', { timeout: 8000 })
+    // 启动检测是 fire-and-forget，等它的 settings 写入落地后再断言（检测到/未检测到都算通过，形态必须二选一）
+    await win.waitForTimeout(1500)
+    const installed = (await win.locator('[data-testid="mowen-status-installed"]').count()) === 1
+    const missing = (await win.locator('[data-testid="mowen-status-missing"]').count()) === 1
+    assert(installed !== missing && (installed || missing),
+      `M60: mowen section shows exactly one state (installed=${installed}, missing=${missing})`)
+    assert((await win.locator('[data-testid="mowen-redetect"]').count()) === 1, 'M60: re-detect button is present')
+
     // ============ M9/M23 · 文库组织(a1/a2/a3) ============
     await win.click('[data-testid="nav-文库"]')
     await win.waitForSelector('.ghead', { timeout: 15000 })

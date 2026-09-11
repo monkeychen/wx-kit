@@ -52,6 +52,8 @@ export interface WxApi {
   reveal(path: string): Promise<void>
   openExternal(url: string): Promise<void>
   appVersion(): Promise<string>
+  /** M60 R3:立即检测一次 mocli 并刷新 settings 缓存。 */
+  mowenDetect(): Promise<{ installed: boolean; path: string | null; version: string | null }>
   copyText(text: string): Promise<void>
   // —— M3.5 批量爬取 ——
   mpAuthStatus(): Promise<{ status: 'missing' | 'present'; valid: false | null; checkedAt?: number }>

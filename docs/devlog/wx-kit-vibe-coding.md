@@ -1179,3 +1179,31 @@ M58 的 toast 时序同源：**UI 测试里「等状态」永远比「等时间�
 
 **验证**：589 单测 + tsc + lint 全绿（2 个 warning 为既有）；e2e 全绿含 M59 七条新断言（列表按钮
 剪贴板真值 / toast / 菜单四项 / 逐篇绑定 / 多选不劫持 / hover 并存）。
+
+### M60 实录：R3 检测 + mocli 发现链路 + CLI（2026-09-11，真机验收五命令）
+
+**plan 前真机钉契约的价值在这版兑现了两次**。mocli v0.5.4 的响应结构是写 plan 时实跑钉死的
+（单行 JSON 信封 / VALIDATE=2 / NOT_FOUND=7），单测 fixture 全部来自真机裁剪——结果实现期又
+撞出两个 plan 时**没人想到要去测**的暗坑：
+
+1. **which 不能走 MocliRunner**。第一版把 `which mocli` 和 `mocli --version` 塞进同一个注入
+   runner，真机 `mowen detect` 永远报「未检测到」。逐层二分（electron 里裸 execFile which
+   正常 → 带选项也正常 → 完整复现 xr/wr 才炸）才发现：MocliRunner 的语义是 `execFile('mocli',
+   args)`，传 `['which','mocli']` 真实执行的是 **`mocli which mocli`**——mocli 把 which 当
+   子命令，INTERNAL 255。which/where 是系统命令不是 mocli 子命令，拆出独立的 WhichRunner。
+   教训：**注入接口的语义边界要跟「被注入的东西是什么程序」对齐，不是「都是子进程」就算同一抽象**。
+2. **mocli 失败 JSON 走 stderr**。真机空 keyword 测出 `BAD_OUTPUT`——单测里 mock 的失败响应
+   放在 stdout 全绿，真机上 mocli 失败时错误 JSON 写 stderr、stdout 为空。parseMocliJson 补上
+   stderr 回退 + 对应单测。教训：**mock 永远只会复现你已知的形态；「错误输出在哪个流」这种
+   传输层事实，mock 之前先在真机上分离 stdout/stderr 看一眼**。
+
+**真机验收五命令全过**：detect（path/version/moUid=安哥 UID）、search-user（池建强命中本尊）、
+list-user（--filter fee 正确返回付费清单）、list-mine（自己的含私密）、search。错误路径：空
+keyword → `MOCLI_FAILED/VALIDATE` 透传；CLI 前置检测未装 → `MOCLI_NOT_FOUND` + 指引 exit 1。
+
+**settings 测试的三处期望值是全量对齐**（toEqual 整个 defaults 对象）：加键必须同步测试 fixture，
+这次用脚本一次替换三处——「测试里写死整个对象」是双刃剑：新键漏改必红（好事，逼你同步），
+但改起来要一次改全（脚本化）。
+
+**验证**：605 单测 + tsc + lint 全绿；e2e 全绿（M60 设置页两态断言——隔离环境无用户 PATH，
+missing 态正确；真机打包态 installed 态已单独验证）。CLI 分发白名单单测随 cli-dispatch 既有用例。
