@@ -5,6 +5,7 @@
 
 ## 当前状态
 
+- **当前在做:v0.11.0(R1 复制路径 + 墨问接入 + 启动检测)** —— 2026-09-11 安哥拍板。原 v0.10.7 取消,R1 与墨问接入合并到 v0.11.0。墨问接入经同日 5 个 spike 修订实现路径:**mocli 拿元数据 + wx-kit 自身 offscreen BrowserWindow 渲染 SPA 拿正文**(零新增依赖,复用 `src/core/exporter/export-pdf.ts` 的 BrowserWindow 模式)。覆盖范围:① 公开/会员可看的墨问笔记;② 安哥自己写的墨问笔记(`mocli --show-atom` 拿完整 AST);❌ 他人私密笔记不在范围(mowen 按作者授权)。**需求/验收契约 `docs/PRD-v0.11.0.md`**;**spike 全过程 `docs/superpowers/spikes/2026-09-11-mowen-integration-feasibility.md`**(5 个 spike 综合报告);**spike 脚本 `scripts/spike-mowen-api.mjs` + `scripts/spike-mowen-render.mjs` 留库**。里程碑拆分 M59(R1)/M60(检测+元数据层)/M61(渲染层+GUI)/M62(验收+文档),待 plan 阶段写 `docs/plans/`。
 - **最新发布:v0.10.6(2026-09-09,订阅行内本轮检查文章列表)** —— M58:检查后行内显示逐篇文章+五态状态(新增 pending),未下载的单篇下载,已下载点标题直开阅读器,列表持久到该号下次检查;安哥实测揪出四个缺陷同批修复(展开入口随 newRefs 清空消失、自动下载 articleId 恒空、`~` 形态原文链接打不开、旧记录点击无反应)。584 单测 + e2e 全绿,PRD §6 八条全勾。需求/验收 `docs/PRD-v0.10.6.md`。
 - **最新发布:v0.10.5(2026-09-09,登录态失效诚实化)** —— 微信读书登录过期后订阅检查如实报「需重新登录」(此前 401 被 cover 回退吞成空结果,伪装成「没有新文章」——安哥实测两号当天有新文章却报无,直连 cover 证实 401 从未查过);重登后提示即消;`check-now --accounts` 按身份归一匹配。发布说明 `docs/releases/v0.10.5.md`。
 - **v0.8.6、v0.8.7 均未发布且不再发布** —— M44–M47、M49 的有效成果由 v0.9.0 吸收；两份 PRD 仅保留历史设计与需求去向，不是当前验收契约。
@@ -74,7 +75,7 @@
 | **M55** ✅ | v0.10.1 | 本地发表日期日报、仅今天显式刷新下载、未知时间告警、账号改名身份匹配、Cookie 快照持久化与跨进程复验（2026-08-30 完成） | `plans/2026-08-30-m55-publication-digest.md` |
 | **M56** ✅ | v0.10.2 | 订阅自动下载可感知（下载明细持久落盘 + 行内摘要 + 记录弹窗 + CLI `list` recentLog / `check-now` 明细）+ 订阅页每号文库入口（身份匹配筛选）+ 补 v0.10.1 验收遗留（2026-09-04 完成，真实链路验收含游标重置投递/复检不重复/跨进程明细） | `plans/2026-09-04-m56-subscription-visibility.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`、v0.10.2 `docs/PRD-v0.10.2.md`、v0.10.4 `docs/PRD-v0.10.4.md`（发版后补档）、v0.10.5 `docs/PRD-v0.10.5.md`、v0.10.6 `docs/PRD-v0.10.6.md`（当前验收契约）。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`、v0.10.2 `docs/PRD-v0.10.2.md`、v0.10.4 `docs/PRD-v0.10.4.md`（发版后补档）、v0.10.5 `docs/PRD-v0.10.5.md`、v0.10.6 `docs/PRD-v0.10.6.md`（最新发布验收契约）、v0.11.0 `docs/PRD-v0.11.0.md`（当前在做，PRD 已写，待 M59+）。
 
 ## 版本发布史(最新在前)
 
@@ -109,6 +110,10 @@
 - **v0.1.0 · 2026-06-07 · 第一阶段首发** —— M1 核心+CLI 五格式 + M2 GUI + M3 登录/爬取(CLI)+ M3.5 批量 GUI + M4 打包。发布说明 `docs/releases/v0.1.0.md`,复盘 devlog §1–§9。
 
 ## 下一步 / 候选
+
+**当前在做**:
+
+- **v0.11.0** —— R1 复制保存路径 + R2 墨问接入 + R3 启动检测。`docs/PRD-v0.11.0.md` 已写。里程碑拆分:M59(R1)→M60(检测+元数据层)→M61(渲染层+GUI)→M62(验收+文档)。spike 报告 `docs/superpowers/spikes/2026-09-11-mowen-integration-feasibility.md`。
 
 候选(需要时单议):
 

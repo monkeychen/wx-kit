@@ -1045,3 +1045,64 @@ accountId 相同，按身份归并的下拉把两个名称合成一个选项（�
 
 **修复的边界也要如实说**:修复只对之后落盘的记录生效,之前那条脏记录(花叔)无法事后补全——按 url
 反查不可靠、按标题匹配被 AGENTS.md 明令禁止。该号重新检查后按本轮真相覆盖,已入库的文章不丢。
+
+## §56 v0.11.0 立项：被「不局限于接口」救回的墨问接入（2026-09-11）
+
+**故事**：v0.10.6 收尾当天，安哥问「评估下墨问接入的可行性」。PRD 第一版按 spike #1（API
+直连 503）和 spike #2（`--show-atom` 仅自己笔记生效）写成「走方案 B：wx-kit spawn mocli 拉
+NoteAtom」—— 但 `--show-atom` 既然只对作者开放，他人笔记就只剩 brief/word_count，等于没有
+正文。我做完这个结论就准备写 PRD 收尾。
+
+**安哥一句话打回**：「你都能获取到 URL，为何不能下载全文？不要局限于人家的接口啊。」
+
+这句话把困住我的那层玻璃罩击碎了：我下意识把「mocli 没有接口」等同于「拿不到内容」，
+**忽略了 wx-kit 当年 v0.1.0 M1 就是「按 URL 下载网页」起家的**。mowen 详情页是公开 URL（之前
+spike 已经验过 `note.mowen.cn = 200 OK`），URL 公开 = 浏览器能打开 = wx-kit 能下。重新走 spike
+链：
+
+- spike #3：mowen 详情页是纯 Vue SPA（`<div id="app"></div>` 空壳，无 SSR、无公开 fetch API）——
+  必须 JS 渲染
+- spike #4：**关键验证**——用 wx-kit 自己的 offscreen BrowserWindow（参考 `export-pdf.ts`
+  的 `show: false` 模式）加载 `note.mowen.cn/detail/<id>`，等 Vue 异步渲染完成
+  （稳定 3 轮 + 长度 >100），executeJavaScript 拿 `#app` innerText —— **无 cookie**
+  拿到 chill2 笔记完整正文（1052 字符，关键词「京东健康」「A380」「驾驶舱」全部命中）
+- spike #5：他问我「你确定私密文章带 cookie 就拿得到？」我承认是推论、未实测；
+  重新走 mowen 访问控制模型，结论是「mocli 列表里没有的 = wx-kit 也拿不到」，R2 范围自然
+  收窄为「mocli 能列出的所有笔记 = 公开/会员可看/自己写的」
+
+最后还有一个意外发现：`mocli notes mine --count 1` 返回的 `uid` 字段就是当前认证用户身份。
+安哥本人 = `4L8RrxEaExmHJOf9xrGLo` = 尼古拉-猴哥——之前 v0.10.6 动态里看到的「猴哥」其实就是
+他本人。这一锚定直接打开了第二条 meta 路径：**自己写的任何笔记都可走 `--show-atom` 拿
+完整 AST**（无需 BrowserWindow 渲染兜底）。
+
+最终 R2 路径：`mocli note info` 拿元数据 + offscreen BrowserWindow 渲染拿正文（公开兜底），
+或 `mocli --show-atom` 拿 AST（自己笔记优先）。**零新增依赖**，完全复用 wx-kit 已有的
+Electron Chromium + PDF 导出的 BrowserWindow 模式。
+
+**方法论沉淀**：
+
+1. **「接口拿不到」≠「内容拿不到」**。被「API 没有这个能力」困住时，先问「内容从哪流出
+   去了」——用户能看见的内容，必然有途径出来。Web 时代的「那个途径」多半就是浏览器
+   自己。再退一步：wx-kit 当年就是干这个的，别把能力忘了。
+2. **「未实测」和「推论」要在 PRD 上分开标**。spike #5 我写了「私密/付费笔记带 cookie 就能
+   下」——这是推论不是实测。安哥当场质疑，我才走通访问控制模型并修正。规矩：spike 跑过
+   的写进 PRD 作为依据，推论要么去掉要么打 `⚠️ 未实测，待 spike`。
+3. **用户的身份锚定经常改变范围**。「能否下某人笔记」的答案不只在 API 能力，还在「当前
+   用户是不是作者本人」。先 `mocli notes mine` 拿到 UID 再讨论范围，比凭空假设省一次绕路。
+4. **复用现成能力比造新轮子优先级高**。offscreen BrowserWindow wx-kit 已经在用（PDF
+   导出），R2 一开始没往这边想，差点去引 headless Chrome——多 50MB 依赖、且违反
+   CLAUDE.md「无独立 chromium」。先列 wx-kit 已有的能力清单再设计，是这条省下来的。
+5. **「推荐方案」只给一个**。前面 spike 阶段我列了 A/B/C/D 四个方案各带利弊——安哥的
+   默认期望是「你给我一个推荐，我判断要不要」，不是「我自己挑」。给多选项是友好，给推荐
+   才是有用。已在 agent 工作流里记下：见 `wx-kit-stay-on-task` 这条 memory。
+
+**PRD 修订一并进**：R2 核心流程从「spawn mocli 拉 NoteAtom → 适配器」改为「mocli 拿元数据 +
+BrowserWindow 渲染拿正文」；错误分类简化（`NoteUnavailable` → `RenderTimeout` / `EmptyContent`）；
+非目标新增三条（❌ 不做 cookie 复用、❌ 不支持他人私密、❌ 不引 headless 浏览器）；验收清单
+加 spike #4 回归测试项。spike 报告合并到 `docs/superpowers/spikes/2026-09-11-mowen-integration-feasibility.md`
+（260 行，5 个 spike 综合），保留 spike 脚本 `scripts/spike-mowen-render.mjs` 供未来回归。
+旧 `2026-09-10-mowen-api-feasibility.md` 保留为历史。
+
+**PRD/ROADMAP/devlog 三方同步**：ROADMAP 「当前状态」加 v0.11.0 为「当前在做」，PRD 索引行
+加 v0.11.0.md，「下一步」段写范围；agent/wx-kit-skill 与 README 等 CLI 变更或发版时再刷
+（CLAUDE.md 钉死）。
