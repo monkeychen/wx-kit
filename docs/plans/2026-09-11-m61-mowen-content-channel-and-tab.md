@@ -25,7 +25,11 @@
 5. **`note/show` 不走 mp gateway**：gateway 是微信请求保护闸（pause/resume 语义只对 mp.weixin.qq.com），
    墨问是另一个平台，被「暂停微信请求」误伤没有道理。走独立 `fetchJsonPost`（Node 内建 fetch + 超时）。
 6. **stderr 教训延续**（M60 实录）：对 note/show 的失败分类测试要覆盖「HTTP 400 + JSON 体」（不是 mocli 通道，无 stderr 问题，但传输层错误形态要按真机钉）。
-7. **export-markdown 的转换器是手写最小规则**（M29）——对 `<audio>`/`<pre>` 的行为未验证，
+7. **合集 = 引用链，非特殊类型**（2026-09-12 安哥追问后真机钉死）：`--filter album` 返回的是**普通笔记**，
+   引用挂载在 `detail.noteRef: [子uuid...]`（数组，可多条）；子笔记是**独立完整笔记**（note/show 可单独取全文，
+   实测两层链 `05-oJ...` → `6ipCT...` → `uhMLo...` → 叶子，无回环）；付费分区在 `noteEmbed.ref.{charge,free}`。
+   处理方案（安哥拍板）：**引用块如实呈现 + 递归显式开关（默认关）**——不做隐式展开（勾 3 篇下 17 篇是意外）。
+8. **export-markdown 的转换器是手写最小规则**（M29）——对 `<audio>`/`<pre>` 的行为未验证，
    T1 里先补验证测试再决定是否加规则；**改 exporter 共用路径必须带微信文章回归**。
 
 ## 设计决定
@@ -59,6 +63,7 @@ export interface NoteShowResult {
   authorUid: string; authorName: string
   images: Map<string, string>                                        // img uuid → w_1200 URL
   audios: string[]                                                   // 远程音频 URL
+  refNoteIds: string[]                                               // noteRef 引用的子笔记 uuid（合集/引用块）
   warnings: string[]                                                 // uuid 映射缺失等
 }
 export class MowenNoteUnavailable extends Error {}                   // 400 ASSET_NOT_FOUND
@@ -68,11 +73,12 @@ export async function fetchNoteShow(uuid: string, deps: {
 ```
 
 - URL `https://note.mowen.cn/api/note/wxa/v1/note/show`，body `{"uuid"}`，`Content-Type: application/json`，超时 15s。
-- status 200 → 解析映射；`noteFile:null` → 空 Map；`<img uuid>` 的 uuid 不在 images → warning「图片映射缺失」。
+- status 200 → 解析映射；`noteFile:null` → 空 Map；`<img uuid>` 的 uuid 不在 images → warning「图片映射缺失」；
+  `noteRef` → `refNoteIds`（顺序保留）。
 - status 400 且 body 含 `ASSET_NOT_FOUND` → 抛 `MowenNoteUnavailable`；其他非 200 → 抛 `MowenShowFailed`（含 status + 截断 body）。
 
-**`tests/core/mowen/note-show.test.ts`**：fixture 用真机响应裁剪（上面关键事实 #1）——成功映射（含 w_1200 选择）、
-无图 null noteFile、400 付费、500、非 JSON、uuid 缺失 warning。
+**`tests/core/mowen/note-show.test.ts`**：fixture 用真机响应裁剪（上面关键事实 #1 与 #7）——成功映射（含 w_1200 选择）、
+无图 null noteFile、400 付费、500、非 JSON、uuid 缺失 warning、noteRef 顺序解析。
 
 ## T2 · mowen-to-article 适配器 + 单测
 
@@ -126,13 +132,33 @@ mowen URL 路由进 mowen 分支（fetchNoteShow mock）、skipped 判重、unav
 
 **单测**：mock BrowserWindowCtor + webContents（executeJavaScript 脚本化返回），钉轮询收敛与超时两条路径。
 
+## T4b · 合集引用块 + 递归开关（2026-09-12 追加，安哥拍板）
+
+**引用块渲染（无条件，防信息丢失）**：`mowen-to-article.ts` 的适配阶段——`refNoteIds` 非空时在
+contentHtml 尾部追加「引用笔记」块（`<section class="mowen-refs">`，每条：标题占位 + 作者 + `note.mowen.cn/detail/<uuid>`
+链接）。子笔记的标题**不在父级响应里**（noteRef 只有 uuid 数组），首版链接文案用「引用笔记 · detail/<uuid 前 8 位>」；
+不为拿标题对每条引用加 note/show 往返（递归开启时子笔记下载后自然有标题，父级记录不再回写——如实即可）。
+md 走同一 HTML 的转换；清单条目 `with_ref` 标「含引用」（GUI T6 / CLI 输出加 `hasRefs` 字段）。
+
+**递归下载（显式开关，默认关）**：
+
+- `downloadMowenNote(url, formats, deps, opts?: { expandRefs?: boolean })`——`expandRefs` 开启且
+  `refNoteIds` 非空时，对每个子 uuid 构造 detail URL **递归调用 downloadMowenNote**（天然复用：判重跳过、
+  限速、unavailable 分类、library.add 全部同一条路径）；深度上限 **3 层**（真机实测两层，留一层数字余量，
+  超深 warning「引用层级过深，已停止展开」防失控）。子笔记付费墙 → unavailable 如实进父级 result 的
+  `refResults` 摘要（不阻塞父级成功）。
+- CLI：`mowen import --expand-refs`；GUI：清单条目勾选框旁「含引用」标记 + 展开子勾选（T6）。
+- 单测：链式两层展开（mock fetchNoteShow 按深度返回不同 noteRef）、付费子篇 unavailable 不阻塞父级、
+  默认不展开（只有引用块）、深度 3 截断、判重跳过（父子重复引用同一篇只下一次）。
+
 ## T5 · CLI `mowen import` + 单测
 
 `src/cli/index.ts` mowen 组追加：
 
 - `mowen import <note-id...>`：逐个 `extractMowenNoteId` → 归一 URL → DownloadQueue（formats 跟设置
   `defaultFormats`，与 digest --download 一致）→ 输出与其他下载命令同构的 DownloadSummary JSON。
-- `mowen import --uid <uid> [--recent 7d] [--count 20] [--filter all]`：先 listUserNotes → URL 列表 → 同上。
+- `mowen import --uid <uid> [--recent 7d] [--count 20] [--filter all] [--expand-refs]`：先 listUserNotes →
+  URL 列表 → 同上；`--expand-refs` 开启递归（每条 URL 的 opts 透传）。
 - **`tests/cli/mowen-import.test.ts`**（或沿用既有 CLI 测试模式）：mock downloadMowenNote/metadata，钉参数拼装与 summary 形态。
 
 ## T6 · GUI 墨问 tab
@@ -143,8 +169,10 @@ mowen URL 路由进 mowen 分支（fetchNoteShow mock）、skipped 判重、unav
 1. 搜索行：`Input.Search`（`data-testid="mowen-search-input"`）→ IPC `mowen:searchUsers`；
    候选列表（昵称 / 简介 / UID 尾 6 位），行点击选中（`data-testid="mowen-user-item"`）。
 2. 条件行：`--filter`（全部/合集/付费/热门）、`--recent`（24h/3d/7d/15d）、`--count`（默认 20）→
-   IPC `mowen:listUserNotes` → 清单表（标题/发表时间/字数/「付费」标记/「文库已有」标记）。
+   IPC `mowen:listUserNotes` → 清单表（标题/发表时间/字数/「付费」标记/「含引用」标记/「文库已有」标记）。
    勾选：默认全选，文库已有与付费默认不选（标注原因，见设计决定）。
+   含引用条目的操作区带「展开引用子笔记」子勾选（`data-testid="mowen-expand-refs"`，默认关）——
+   勾选该行的下载 opts 带 expandRefs（T4b）。
 3. 下载行：「下载选中（N）」→ 组装 mowen URL 数组 → **复用 `api.download(urls, formatsFromSettings)`**
    （现有通道：进度、历史、结果区全复用）；完成 toast + onDone() 刷历史。
 
@@ -177,6 +205,8 @@ mowen URL 路由进 mowen 分支（fetchNoteShow mock）、skipped 判重、unav
 | BrowserWindow 兜底（note/show 网络失败才触发） | T4 |
 | 图片 w_1200 落地、URL 不入库 | T2/T3（exporter 复用） |
 | 音频嵌入、代码块保留 | T2/T2b |
+| 合集引用块（含引用标记） | T4b |
+| 递归下载显式开关（默认关，深度 3，付费子篇如实） | T4b/T5/T6 |
 | 付费 ASSET_NOT_FOUND → unavailable 不伪装 | T1/T3 |
 | 限速 0.5s/篇 0.3s/图 | T1/T3（注入 sleep 单测） |
 | 同源入 library.json，sourceUrl 区分 | T3 |
