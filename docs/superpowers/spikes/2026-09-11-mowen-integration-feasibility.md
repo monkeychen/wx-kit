@@ -1,6 +1,8 @@
 # Spike · 墨问 (note.mowen.cn) 接入 wx-kit 可行性
 
-> **结论先行**:墨问接入 v0.11.0 **完全可行**。最优路径 = `mocli` 拿元数据 + `wx-kit offscreen BrowserWindow` 渲染 SPA 拿正文,**零新增依赖**(复用 wx-kit 已有的 Electron Chromium)。
+> **结论先行(2026-09-11 晚修订)**:墨问接入 v0.11.0 **完全可行**。最优路径 = `mocli` 做发现(搜用户/拉清单/元数据) + **`note/show` 匿名接口拿正文(主通道)** + `wx-kit offscreen BrowserWindow` 渲染兜底,**零新增依赖**。
+>
+> **修订说明**:初版结论(正文走 BrowserWindow 渲染)被安哥同日的接口逆向探索超越——`POST note.mowen.cn/api/note/wxa/v1/note/show` 无任何凭证即返回结构化正文 HTML + 图片映射 + 统计,比渲染 SPA 更快更稳。完整逆向过程见 `dreamble/site/content/posts/2026-09-11-mowen-cli-exploration/`;本报告 §5.5 收录该通道并附当日复验记录。
 >
 > **覆盖范围**:
 > - ✅ **公开笔记**(任何人可访问)— `mocli notes homepage/search/tagged` 拿 list + BrowserWindow 无 cookie 渲染拿正文
@@ -192,33 +194,69 @@ for (let i = 0; i < 30; i++) {
 - 他人私密笔记**不在 v0.11.0 范围**(mocli 也无能为力)
 - **不需要 cookie 复用机制**(公开/会员可看无需,自己的有 mocli 自然访问)
 
-## 6. v0.11.0 R2 实现路径(基于 spike 综合)
+## 5.5 Spike #6 · `note/show` 匿名正文接口(2026-09-11,安哥逆向 + 当日晚复验)— **正文主通道**
+
+**来源**:安哥独立探索(完整记录 `dreamble/site/content/posts/2026-09-11-mowen-cli-exploration/index.md`),路径为「headless 浏览器 network 面板定位 SPA 的 XHR → 裸 curl 直调验证」。
+
+**接口**:
 
 ```
-note.mowen.cn/detail/<id>  URL/CLI 命令
-       ↓
-① mocli notes homepage / mine / search / tagged  → noteId list
-       ↓
-② mocli note info --note-id <id>  → 元数据(title/uid/brief/word_count/stat)
-       ↓
-③ offscreen BrowserWindow.loadURL + executeJavaScript 拿 #app innerText
-       (稳定 3 轮 + length > 100)
-       ↓
-④ DOM 解析 → ParsedArticle(title/author/publishTime/contentHtml/imageUrls/...)
-       ↓
-⑤ 同次流程下载资源(图片直链 OSS 签名有时效,URL 不入库)
-       ↓
-⑥ 复用 wx-kit exporter: md/html/pdf/cover/meta
-       ↓
-⑦ 入 library.json(同源,按 sourceUrl 区分 mowen vs weixin)
+POST https://note.mowen.cn/api/note/wxa/v1/note/show
+Content-Type: application/json
+{"uuid": "<笔记ID>"}
 ```
 
-**两条 meta 路径**:
+**匿名性已双重验证**(安哥原文 + wx-kit 侧 2026-09-11 晚复验):最裸请求(仅 Content-Type,UA 为 curl,无 Origin/Referer/Cookie/Authorization)返回完整正文。复验样本 `sR7--cPyh93LY0inGk2yX`(chill2):
 
-| 路径 | 触发 | 数据 |
-|------|------|------|
-| **mocli `--show-atom`** | 仅自己写的笔记 | 完整 NoteAtom AST(结构化最稳)|
-| **BrowserWindow 渲染** | 公开/会员可看/自己写的(兜底) | DOM innerText + 解析 |
+| 字段 | 复验结果 |
+|------|---------|
+| `noteBase.title` / `content` | ✅ 命中,content 810 字符 HTML |
+| `noteFlag` | ✅ 完整(isPublic/hasFee/hasImage/auditStatus 等 24 字段) |
+| `noteStat` | ✅ `{duv:'126', comment:'5', favor:'14', ...}` |
+| `user.base.name` | ✅ `chill2` |
+| `noteFile` | ⚠️ **无图笔记为 `null`**(非缺省空对象)——解析器边界,已写进 PRD 验收 |
+
+**响应关键结构**:`detail.noteBase.{uuid,title,digest,content,createdAt,publicAt,uid}`、`detail.noteFile.images[<uuid>].{url,scale.w_1200}`(OSS 签名 URL,约 7 天过期)、`detail.noteStat`、`detail.noteFlag`、`user.base`。
+
+**行为边界**(安哥实测):
+
+| 笔记类型 | 接口行为 |
+|---|---|
+| 公开笔记 | ✅ 完整正文,不管是否关注作者 |
+| 付费笔记 | ❌ `400 ASSET_NOT_FOUND`(附 skuId,付费墙在服务端) |
+| 私有笔记 | 不会出现在任何发现渠道,无从触达 |
+
+**图片机制**:正文 HTML 中 `<img uuid="xxx">` 无 src,按 `noteFile.images` 映射取 URL;`scale.w_1200` 是合适下载规格;签名 URL 7 天过期→必须同次流程落盘、URL 不入库。
+
+**与 spike #4(BrowserWindow)的分工**:`note/show` 更快(无 30s 渲染窗)、更结构化(HTML+图片映射+统计),升为**主通道**;BrowserWindow 降为**兜底**(接口失效/风控时),spike #4 验证结论与脚本继续有效。
+
+**风险(如实记录,进 PRD)**:民间逆向接口无官方 SLA,随时可能加登录/频控(等级:高)。应对:限速 0.5s/篇 + 0.3s/图;`EmptyContent`/连续失败作为接口变更信号自动降级 BrowserWindow;个人工具形态(单用户、限速、仅自己关注的内容)是最安全的合规边界。
+
+## 6. v0.11.0 R2 实现路径(2026-09-11 晚修订)
+
+```
+发现层(mocli,官方 OpenAPI,已认证)          获取层(匿名/渲染)
+─────────────────────────────          ─────────────────────────
+user search --keyword   → 候选用户      ① note/show POST {uuid}      ← 主通道(公开笔记)
+notes homepage --uid    → noteId 清单      ↓ 结构化 JSON(HTML+图片映射+统计)
+  (--filter/--recent/--count)         ② --show-atom AST            ← 自己笔记优先
+note info --note-id     → 元数据        ③ BrowserWindow 渲染         ← 兜底(接口失效时)
+                                             ↓
+                                      mowen-to-article → ParsedArticle
+                                      图片按 noteFile.images 落盘(scale.w_1200,URL 不入库)
+                                             ↓
+                                      复用 exporter: md/html/pdf/cover/meta → library.json
+```
+
+**三条正文路径(自动化选优)**:
+
+| 优先级 | 路径 | 触发 | 数据形态 |
+|------|------|------|---------|
+| 1 | `mocli --show-atom` | 自己写的笔记(uid 匹配认证身份) | 完整 NoteAtom AST(结构化最稳) |
+| 2 | `note/show` 匿名接口 | 公开/会员可看笔记(主通道) | 结构化 JSON(HTML + 图片映射 + 统计) |
+| 3 | BrowserWindow 渲染 | 兜底(note/show 连续失败时) | DOM innerText + 解析 |
+
+**限速**:笔记 0.5s/篇、图片 0.3s/张,写死在 core 层。
 
 ## 7. 关键设计决策
 
@@ -226,8 +264,8 @@ note.mowen.cn/detail/<id>  URL/CLI 命令
 |---|------|------|
 | 1 | **不走 `open.mowen.cn` API** | spike #1 证实在本机 ALB 503,即使网络通了也是重复造客户端(API 仅给 brief 不给 AST)|
 | 2 | **mocli 拿元数据,不用 `--show-atom`**(除自己笔记外) | spike #2 证 `--show-atom` 仅自己生效 |
-| 3 | **BrowserWindow 渲染拿正文** | spike #3+4 证 SPA 必须 JS 渲染,wx-kit 自身有 Chromium |
-| 4 | **不做 cookie 复用** | spike #5 推论:公开/会员可看无需 cookie;私密不在范围 |
+| 3 | **正文主通道 = `note/show` 匿名接口,BrowserWindow 兜底** | spike #6(安哥逆向+复验):结构化 JSON 直接拿 HTML/图片映射/统计,无 30s 渲染窗;渲染路径保留为接口失效时的降级 |
+| 4 | **不做 cookie 复用** | spike #5 推论 + spike #6 复验:公开/会员可看无需 cookie;私密不在范围 |
 | 5 | **不引入 headless 浏览器** | 复用 wx-kit 已有 Electron,零新增依赖(CLAUDE.md:无独立 chromium)|
 | 6 | **资源本地化,URL 不入库** | 与微信视频 mpvideo 同坑(CLAUDE.md 钉死):OSS 签名有时效 |
 | 7 | **同源入 library.json** | 零迁移成本,`sourceUrl` 区分来源 |
@@ -237,18 +275,22 @@ note.mowen.cn/detail/<id>  URL/CLI 命令
 ```
 src/core/mowen/
 ├── detect.ts            # ~50 行  which mocli 检测
-├── metadata.ts          # ~80 行  spawn mocli 拿元数据
-├── browser-render.ts    # ~150 行 offscreen BrowserWindow 渲染 + DOM 解析
+├── metadata.ts          # ~150 行 spawn mocli:user search / homepage 清单 / note info / --show-atom
+├── note-show.ts         # ~120 行 note/show 匿名接口(gateway 域名路由 + 限速)——主通道
+├── browser-render.ts    # ~150 行 offscreen BrowserWindow 兜底渲染
 │                                  复用 src/core/exporter/export-pdf.ts 模式
 │                                  复用 spike-mowen-render.mjs 稳定轮询逻辑
-├── atom-to-meta.ts      # ~200 行 mowen DOM → ParsedArticle
-└── errors.ts            # ~40 行  MocliNotFound / RenderTimeout / EmptyContent
+├── mowen-to-article.ts  # ~250 行 note/show JSON / NoteAtom / DOM → ParsedArticle(图片本地化)
+└── errors.ts            # ~50 行  MocliNotFound / MocliFailed / MowenNoteUnavailable / RenderTimeout / EmptyContent
 
 src/core/download-article.ts
 └── URL 路由识别 note.mowen.cn/detail/<id> → mowen 分支(~30 行)
 
 src/cli/
-└── mowen { import | detect | list-mine | search }  (~300 行)
+└── mowen { import | detect | list-user | search-user | list-mine | search }  (~350 行)
+
+src/renderer/
+└── 下载页「墨问笔记」tab:搜用户 → 条件 → 清单(默认全选) → 批量下载  (~400 行,复用批量页骨架)
 ```
 
 **总预估**:~700-850 行,1 个主里程碑(M60) + 1 个验收里程碑(M61)

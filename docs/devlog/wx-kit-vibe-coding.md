@@ -1106,3 +1106,52 @@ BrowserWindow 渲染拿正文」；错误分类简化（`NoteUnavailable` → `R
 **PRD/ROADMAP/devlog 三方同步**：ROADMAP 「当前状态」加 v0.11.0 为「当前在做」，PRD 索引行
 加 v0.11.0.md，「下一步」段写范围；agent/wx-kit-skill 与 README 等 CLI 变更或发版时再刷
 （CLAUDE.md 钉死）。
+
+## §57 R2 第二版：需求自己长出来了，正文通道又被逆向后浪拍了一次（2026-09-11 晚）
+
+**故事**：v0.11.0 立项文档（§56）当天傍晚刚提交，安哥晚上重新思考后把 R2 整个改大：
+从「单 URL 拉取」扩为「下载页新增墨问笔记 tab——按用户名模糊搜用户 → 条件拉清单（默认全选）
+→ 批量下载，格式跟设置页」。一句话：**逻辑与按公众号下载微信文章同构，只是内容源换成墨问**。
+同时他甩出当天下午独立完成的接口逆向探索（`dreamble/site/content/posts/2026-09-11-mowen-cli-exploration/`）：
+headless 浏览器 network 面板定位到 SPA 的正文 XHR——`POST note.mowen.cn/api/note/wxa/v1/note/show`，
+**无任何凭证**返回结构化 JSON（`noteBase.content` HTML + `noteFile.images` 图片映射 + `noteStat` 统计）。
+
+**这次修订改了三层**：
+
+1. **需求层**：R2 从「URL 单篇」扩为「tab 化按用户批量 + URL 单篇」双入口。发现层全部走 mocli
+   官方 OpenAPI（`user search` 模糊搜用户、`notes homepage --uid` 按 filter/recent/count 拉清单）——
+   这是**官方通道**，与微信私有列表接口被封（M49 教训）性质不同，不构成对「不接私有批量接口」
+   原则的违背。PRD 里把这条理由写明了，避免后人看到「按作者批量」就条件反射地砍。
+2. **正文通道**：`note/show` 升为主通道——比 BrowserWindow 渲染快（无 30s 稳定轮询窗）、结构化
+   （HTML + 图片 uuid 映射 + 统计字段全给）；spike #4 的 BrowserWindow 降为兜底（接口失效时降级）。
+   自己私密笔记仍走 `mocli --show-atom` AST。三条路径自动化选优。
+3. **风险层**：`note/show` 是民间逆向接口无 SLA（等级：高），PRD 如实记录并配三件套——限速
+   0.5s/篇 + 0.3s/图写死 core 层、连续失败/`EmptyContent` 作为接口变更信号自动降级、付费笔记
+   `ASSET_NOT_FOUND` 抛 `MowenNoteUnavailable` 如实标注（宪法：失败保留失败类型，不伪装成功）。
+
+**当晚复验**（先验证再动 PRD）：裸 curl `note/show` 打 chill2 样本笔记，title/content/noteFlag
+（24 字段）/noteStat/作者全部命中；发现一个 spike 原文没有的边界——**无图笔记 `noteFile` 为
+`null` 而非空对象**，已写进 PRD 验收清单钉死。
+
+**方法论沉淀**：
+
+1. **用户的「重新思考」不是返工，是需求在合适的时间长到了合适的大小**。早上立项时「单 URL
+   拉取」是当时信息下的合理最小集；晚上安哥把墨问 CLI 能力摸清后，「按用户批量」才是他真正
+   要的形态（与微信批量同构 = 用户心智零迁移）。文档侧代价很小：PRD 还没进 plan 阶段，改的
+   全是纸面。这印证了「先 PRD 后 plan 后代码」的分层价值——需求变更越早，越便宜。
+2. **同一波探索，两个视角互相补位**。我（spike #1-#5）从「wx-kit 能做什么」出发走到
+   BrowserWindow 渲染；安哥从「墨问的网页自己怎么拿数据」出发走到 note/show。两条路都通，
+   但他的更优——逆向 SPA 的 XHR 永远先于妥协于「渲染整个页面」。方法论对齐他原文那句：
+   **浏览器 network 面板是逆向 SPA 的正道**。
+3. **复验是改 PRD 的前置动作，不是可选项**。安哥的探索文章已经实测过 note/show，我改 PRD
+   前仍裸 curl 复验一遍——结果真发现了原文没记的 `noteFile: null` 边界。别人的实测（哪怕是
+   安哥自己的）只能证明「当时可用」，写进验收契约的东西必须当下可复现。
+4. **「教训」要写明适用条件，否则会误伤新需求**。M49「按作者批量下载无解」是**微信私有接口**
+   的教训；墨问 `notes homepage` 是官方 OpenAPI，note/show 是公开分享页自用接口——若不分青红
+   皂白地把「按作者批量」列为禁区，这个 tab 需求会被自己的历史教训误杀。教训要钉，但钉的时候
+   必须带上「为什么」和「边界在哪」。
+
+**同步范围**：PRD-v0.11.0 R2 整节重写（R2a tab / R2b URL 识别 / R2c 三通道正文 / R2d CLI 七命令）、
+非目标调整（删「不做按墨问作者批量」，加「不做付费绕过」「合集/PDF 附件后续单议」）、验收清单
+R2 重写（含 noteFile null 边界、限速断言、付费失败类型）；spike 报告增补 §5.5（note/show 通道 +
+复验记录）并修订 §6-§8 实现路径与模块清单；ROADMAP 「当前在做」更新为 R2 第二版描述。
