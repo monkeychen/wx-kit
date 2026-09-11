@@ -60,6 +60,16 @@ td.addRule('gfmTable', {
   },
 })
 
+// 墨问音频（M61）：turndown 不认识 <audio>，默认整块丢弃——音频 URL 就没了。
+// 不落地是 PRD 决定（内容不是格式），但链接至少要留在 md 里：转成 [音频](url) 一行。
+td.addRule('mowenAudio', {
+  filter: (node) => node.nodeName === 'AUDIO',
+  replacement: (_content, node) => {
+    const src = (node as unknown as Element).getAttribute('src') ?? ''
+    return src ? `\n\n[音频](${src})\n\n` : '\n\n'
+  },
+})
+
 function frontmatter(m: ArticleMeta): string {
   const esc = (s: string) =>
     s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n')

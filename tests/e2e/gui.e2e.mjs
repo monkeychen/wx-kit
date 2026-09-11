@@ -164,6 +164,17 @@ async function main() {
     // ============ M6 · URL 批量下载 → 历史就地确认 ============
     await win.click('[data-testid="nav-下载"]')
     await win.waitForSelector('[data-testid="start-download"]', { timeout: 5000 })
+    // M61:下载页双模式（链接 / 墨问笔记）——默认链接模式原样；墨问 tab 切过去渲染搜索骨架
+    assert((await win.locator('[data-testid="download-mode-segmented"]').count()) === 1, 'M61: download mode segmented present')
+    await win.locator('.ant-segmented-item:has-text("墨问笔记")').click()
+    await win.waitForSelector('[data-testid="mowen-mode"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="mowen-search-input"]').count()) === 1, 'M61: mowen tab shows user search input')
+    // e2e 隔离环境 PATH 里 mocli 可达与否不定——指引条或正常搜索框二选一,不允许空白页
+    const tabMissing = (await win.locator('[data-testid="mowen-tab-missing"]').count()) === 1
+    assert(tabMissing || (await win.locator('[data-testid="mowen-tab-error"]').count()) === 0,
+      'M61: mowen tab renders either the mocli-missing guide or a clean search state')
+    await win.locator('.ant-segmented-item:has-text("按链接下载")').click()
+    await win.waitForSelector('[data-testid="start-download"]', { timeout: 5000 })
     await win.fill('[data-testid="url-input"]', [urlOf('a1'), urlOf('a2'), urlOf('a3')].join('\n'))
     await win.click('[data-testid="start-download"]')
     await win.waitForSelector('[data-testid="history-event"]', { timeout: 30000 })

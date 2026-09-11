@@ -15,3 +15,17 @@ export class MocliFailed extends Error {
     this.name = 'MocliFailed'
   }
 }
+
+/** note/show 判定的不可见笔记（付费墙 ASSET_NOT_FOUND / 私密 / 风控空标题）。
+ *  失败保留失败类型（宪法红线）：调用方归 unavailable，不进 failed、不产出空文件。 */
+export class MowenNoteUnavailable extends Error {
+  constructor(message = '该笔记不可匿名获取（付费/私密），无法下载') { super(message); this.name = 'MowenNoteUnavailable' }
+}
+
+/** note/show 网络层失败（非 200 非 400 付费 / 非 JSON）。BrowserWindow 兜底只在这类失败时触发。 */
+export class MowenShowFailed extends Error {
+  constructor(public readonly status: number, bodySnippet: string) {
+    super(`墨问正文接口请求失败（HTTP ${status}）：${bodySnippet.slice(0, 120)}`)
+    this.name = 'MowenShowFailed'
+  }
+}

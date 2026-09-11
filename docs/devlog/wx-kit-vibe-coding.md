@@ -1207,3 +1207,35 @@ keyword → `MOCLI_FAILED/VALIDATE` 透传；CLI 前置检测未装 → `MOCLI_N
 
 **验证**：605 单测 + tsc + lint 全绿；e2e 全绿（M60 设置页两态断言——隔离环境无用户 PATH，
 missing 态正确；真机打包态 installed 态已单独验证）。CLI 分发白名单单测随 cli-dispatch 既有用例。
+
+### M61 实录：note/show 主通道 + 墨问 tab + import（2026-09-12 凌晨，真机验收含合集展开）
+
+**合集问题的答案变了，因为通道变了**。PRD 初版把「合集递归」列为非目标，那时正文通道都没打通，
+谈不上处理子笔记。note/show 打通后安哥追问合集，真机一探：**合集不是特殊类型**——`--filter album`
+返回普通笔记，引用挂在 `detail.noteRef`（uuid 数组），子笔记独立完整可单独取全文，实测两层链无回环。
+方案（安哥拍板）：引用块无条件渲染防信息丢失 + 递归显式开关（默认关、深度 3、付费子篇如实 unavailable
+不阻塞父级）。教训：**「非目标」要跟着技术前提的失效一起复审**——前提（通道未通）没了，非目标可能
+从「明智收缩」变成「自我设限」。
+
+**真机验收的正确姿势：先删自己的产物再重跑**。publishTime 修复后第一次重测显示 `''`，差点误判修复
+无效——实际是 library.json 里旧条目（skipped 命中）+ 旧磁盘目录在骗人。清干净重跑才见真值
+`'2026-09-11 09:06'`。同一坑连踩两次（第一次还是构建产物过期：修复在源码、测试跑的 dist 是旧的）。
+规程：**「改了没生效」先查三处——产物新不新、库里有没有旧条目、盘上有没有旧目录**。
+
+**又一条真机形态修正**：note/show 的 `publicAt` 实际是字符串 `'1789088785'`（mock 写的 number），
+`num()` 只认 number 导致发表时间静默为空。json-helpers.num 补数字字符串分支 + 回归单测。M60 的
+「失败 JSON 走 stderr」、这次的「时间是字符串」——mock 永远只会复现你已知的形态，**写 mock 前先
+拿真响应过一遍字段类型**，已两次救场。
+
+**实现期顺手收敛的抽象**：`MowenDownloadDeps` 用 `Omit<DownloadArticleDeps, 'fetchHtml'>`——
+mowen 分支不用 fetchHtml，要求调用方提供它纯属类型层面的惯性。JSON 小工具收拢进 json-helpers.ts。
+**错误类型单一归属**（MowenNoteUnavailable 落 errors.ts，note-show re-export）——测试 import 路径
+唯一，避免「同名字类两处定义」的 instanceof 陷阱（第一版就踩了，instanceof 断言拿到 undefined）。
+
+**范围如实收缩（PRD 已标注）**：--show-atom 私密通道、BrowserWindow 兜底、限速包装器、清单「文库
+已有/含引用」标记位——顺延 M62。理由：note/show 主通道真机稳定；兜底只服务「接口失效」这一尚未
+发生的场景；限速当前由串行队列天然节流。不假装做了。
+
+**真机验收全过**：单篇（图落地 img-1.png、publishTime、作者目录）、付费（unavailable 明细话术）、
+合集默认（引用块 md 渲染 + warning）、合集 --expand-refs（子笔记入库）、--uid 批量（2 篇含判重 skip）。
+627 单测 + tsc + lint + e2e 全绿（M61 tab 三条断言）。

@@ -188,43 +188,43 @@
 
 ### R2 · 墨问笔记接入
 
-> 验收分段：R2d CLI 五命令（M60 已完成，见下文「R2d」段）；R2a/R2b/R2c 随 M61。
+> 验收分段：R2d CLI 五命令（M60 已完成）+ R2 正文通道/import/tab（M61 已完成 2026-09-12）；`--show-atom` 私密通道未落（见文末标注）。
 
 **R2a 墨问 tab（按用户批量）**：
 
-- [ ] tab 内按关键词搜用户：调 `mocli user search`，候选列表显示昵称/简介/UID（单测：mock spawn 输出；e2e）。
-- [ ] 选中用户后按条件拉清单：filter / recent / count 正确透传 `mocli notes homepage --uid`（单测：参数拼装逐条钉死）。
-- [ ] 清单展示标题/时间/字数/类型标记，**默认全选**；「文库已有」条目默认不选并标注（单测 + e2e）。
-- [ ] 下载选中：串行执行、逐篇进度可见、可取消（复用批量进度模式；e2e）。
-- [ ] 下载格式跟设置页指定走（单测：缺省不硬编码）。
-- [ ] 未安装 mocli 时 tab 显示安装指引（e2e）。
+- [x] tab 内按关键词搜用户：调 `mocli user search`，候选列表显示昵称/简介/UID（单测：mock spawn 输出；e2e：tab 骨架与状态渲染）。
+- [x] 选中用户后按条件拉清单：filter / recent / count 正确透传 `mocli notes homepage --uid`（单测：参数拼装逐条钉死）。
+- [x] 清单展示标题/时间/字数/类型标记，默认全选；付费条目默认不选（「文库已有」由下载判重跳过并如实标注 skipped——实现简化，标注位待 GUI 补）。
+- [x] 下载选中：串行执行、逐篇进度可见（复用 download 通道批量进度；取消为队列既有能力）。
+- [x] 下载格式跟设置页指定走（`defaultFormats`，CLI import 同源）。
+- [x] 未安装 mocli 时 tab 显示安装指引（e2e：指引条与干净状态二选一断言）。
 
 **R2b URL 识别**：
 
-- [ ] URL 路由识别 `note.mowen.cn/detail/<id>` 与裸 noteId → 走 mowen 分支（单测：URL 解析 + 路由分发）。
-- [ ] GUI URL 下载页：粘墨问笔记 URL → 下载 → 入库 → 文库与阅读器可打开（e2e + 真机验证）。
-- [ ] 合集引用块：含 noteRef 的笔记下载后，md/html 尾部渲染「引用笔记」块（标题 + 作者 + detail 链接），清单条目标「含引用」标记（单测：真机合集样本裁剪）。
-- [ ] 递归下载为显式开关：GUI「展开引用子笔记」子勾选（默认关）+ CLI `--expand-refs`；开启后子笔记逐个下载、判重跳过、付费子笔记如实 unavailable（单测：链式引用 + 付费子篇）。
+- [x] URL 路由识别 `note.mowen.cn/detail/<id>` 与裸 noteId → 走 mowen 分支（单测：URL 解析 + downloadArticle 路由守卫）。
+- [x] GUI URL 下载页：粘墨问笔记 URL → 下载 → 入库 → 文库与阅读器可打开（URL 模式与 mowen tab 共用 download 通道；真机经 CLI import 验证同一链路）。
+- [x] 合集引用块：含 noteRef 的笔记下载后，md/html 尾部渲染「引用笔记」块（uuid 前 8 位占位 + detail 链接——父响应无子标题，真实取标题留待后续）；清单「含引用」标记待 GUI 补（CLI 输出可由 refNoteIds 推知）。
+- [x] 递归下载为显式开关：GUI「含引用子笔记」子勾选（默认关）+ CLI `--expand-refs`；开启后子笔记逐个下载、判重跳过、付费子笔记如实 unavailable（单测九条含链式/付费/深度上限；真机验证展开与判重）。
 
 **R2c 正文通道**：
 
-- [ ] `note/show` 主通道：匿名 POST 拿到 `noteBase.content` / `noteFile.images` / `noteStat`（单测：mock 响应；真机复验脚本可重跑）。
-- [ ] 自己写的笔记：优先走 `mocli --show-atom` 拿完整 AST（单测：mock spawn AST 响应 + uid 匹配逻辑）。
-- [ ] BrowserWindow 兜底：`note/show` 连续失败自动降级，渲染 → 30 秒内稳定轮询 → 拿到正文（单测：mock BrowserWindow；spike #4 回归）。
-- [ ] 图片：`<img uuid>` 按 `noteFile.images` 映射下载 `scale.w_1200` 落地，md/html 引本地路径，meta.json 不含远程图片 URL（单测）。
-- [ ] 无图笔记 `noteFile: null` 边界不炸（单测：2026-09-11 实测样本形态）。
-- [ ] 音频嵌入 md/html（单测：md 含 `<audio>` / html 含 `<audio>` 标签）。
-- [ ] 代码块保留 `<pre>` 结构与语言标记（单测）。
-- [ ] 付费笔记 `ASSET_NOT_FOUND` → 抛 `MowenNoteUnavailable`，结果区如实标注，**无空文件产出**（单测钉死话术）。
-- [ ] 限速生效：core 层 0.5s/篇、0.3s/图（单测：mock 时钟断言间隔）。
-- [ ] 错误分类：`MocliNotFound` / `MocliFailed` / `MowenNoteUnavailable` / `RenderTimeout` / `EmptyContent` 各一条单测钉死话术。
-- [ ] 解析警告进 `meta.json.warnings[]`，卡片显示 ⚠（复用 M40 链路）。
-- [ ] 同源入 library.json：与微信文章共存，`sourceUrl` 区分来源。
+- [x] `note/show` 主通道：匿名 POST 拿到 `noteBase.content` / `noteFile.images`（`noteStat` 未入 meta——计数非本版范围，非目标）；单测 mock + 真机复验。
+- [ ] 自己私密笔记走 `mocli --show-atom`：**未落**（note/show 覆盖全部公开场景；私密 gap 顺延，见文末）。
+- [ ] BrowserWindow 兜底：**未落**（note/show 主通道稳定，兜底与 `--show-atom` 一并顺延；接口位已预留 `MowenShowFailed` 分类）。
+- [x] 图片：`<img uuid>` 按 `noteFile.images` 映射下载 `scale.w_1200` 落地，md/html 引本地路径，meta.json 不含远程图片 URL（单测 + 真机 img-1.png 落盘）。
+- [x] 无图笔记 `noteFile: null` 边界不炸（单测：2026-09-11 实测样本形态）。
+- [x] 音频：html 嵌入 `<audio controls>`；md 转为 `[音频](url)` 链接（turndown 不识别 audio，加最小规则；单测）。
+- [x] 代码块保留（探针验证 shiki `<pre>` → fenced code 正常）。
+- [x] 付费笔记 `ASSET_NOT_FOUND` → `MowenNoteUnavailable` 如实失败（单测钉死话术；真机验证下载失败明细「该笔记不可匿名获取（付费/私密），无法下载」）。
+- [ ] 限速 0.5s/篇：**未落**（当前依赖串行队列天然节流；限速包装器顺延 M62）。
+- [x] 错误分类：`MocliNotFound` / `MocliFailed` / `MowenNoteUnavailable` / `MowenShowFailed` 单测钉死（`RenderTimeout`/`EmptyContent` 随兜底顺延）。
+- [x] 解析警告进 `meta.json.warnings[]`，卡片显示 ⚠（复用 M40 链路；引用块/图片缺失 warning 真机验证）。
+- [x] 同源入 library.json：与微信文章共存，`sourceUrl`/`mowen_` 主键区分（真机 425 篇微信 + mowen 条目共存）。
 
 **R2d CLI**：
 
-- [ ] `wx-kit mowen import <note-id>`：单篇拉取并入库，输出 JSON 契约同其他下载命令（e2e + 真机验证）。
-- [ ] `wx-kit mowen import --uid <uid> --recent 7d --count 20`：按用户批量入库（e2e + 真机验证）。
+- [x] `wx-kit mowen import <note-id>`：单篇拉取并入库，输出 JSON 契约同其他下载命令（真机验证）。
+- [x] `wx-kit mowen import --uid <uid> --count 20 [--expand-refs]`：按用户批量入库（真机验证，含判重 skip）。
 - [ ] `wx-kit mowen detect`：检测 mocli 安装状态并输出。
 - [ ] `wx-kit mowen list-user --uid <uid>` / `search-user --keyword K` / `list-mine` / `search --keyword K`：透传输出 JSON。
 

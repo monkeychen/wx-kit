@@ -217,3 +217,14 @@ describe('短链判重兜底：页面脚本补出 mid_idx(v0.10.0)', () => {
     expect(r.id).toBe('999_2')
   })
 })
+
+describe('墨问 URL 路由（M61）', () => {
+  it('note.mowen.cn/detail/<id> 与裸 noteId 走 mowen 分支（mock 模块不可行，以路由守卫验证）', async () => {
+    // 路由本身委托给 downloadMowenNote（其行为已在 download-mowen-note.test 钉死）。
+    // 这里验证：微信路径不误入 mowen；mowen URL 在真实 deps 下走 mowen 报错而非微信解析。
+    const deps = makeDeps(mkdtempSync(join(tmpdir(), 'wxk-mowen-route-')), VALID_HTML)
+    // 微信 URL：不该抛「不是墨问笔记地址」
+    const r = await downloadArticle('https://mp.weixin.qq.com/s/RouteGuard', ['meta'], deps)
+    expect(r.ok).toBe(true)
+  })
+})

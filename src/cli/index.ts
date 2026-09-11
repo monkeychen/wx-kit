@@ -28,6 +28,8 @@ import { createMocliRunner, createWhichRunner } from '../core/mowen/runner'
 import { searchUsers, listUserNotes, listMyNotes, authInfo } from '../core/mowen/metadata'
 import { MocliFailed } from '../core/mowen/errors'
 import { searchNotes } from '../core/mowen/search'
+import { extractMowenNoteId, normalizeMowenUrl } from '../core/mowen/url'
+import { downloadMowenNote } from '../core/mowen/download-mowen-note'
 import { SettingsService } from '../../electron/services/settings'
 import { parseSettingAssignment } from '../../electron/services/settings-cli'
 import { History, eventFromSummary, type HistorySource } from '../core/download-history'
@@ -674,6 +676,55 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
         if (e instanceof MocliFailed) { outJson({ ok: false, error: { code: 'MOCLI_FAILED', reason: e.reason, message: e.message } }); exitCode = 1; return }
         throw e
       }
+    })
+
+  mowen.command('import').description('下载墨问笔记到文章库（单篇/多篇 note-id，或 --uid 按用户批量）')
+    .argument('[note-ids...]', '笔记 ID 或 note.mowen.cn/detail/<id> URL（可多个）')
+    .option('--uid <uid>', '按用户批量：先列该用户清单再逐篇下载')
+    .option('--filter <f>', '（--uid 时）all / album / fee / popular', 'all')
+    .option('--recent <r>', '（--uid 时）1h / 24h / 3d / 7d / 15d')
+    .option('--count <n>', '（--uid 时）数量上限（默认 20）', '20')
+    .option('--expand-refs', '递归下载引用子笔记（合集；默认只下本体+引用链接）', false)
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (noteIds: string[], opts) => {
+      const run = await mowenRunnerOf()
+      if (!run) return
+      // 目标 URL 集：显式 noteIds 优先；--uid 则先拉清单
+      const targets: string[] = [...noteIds]
+      if (opts.uid) {
+        try {
+          const items = await listUserNotes(run, String(opts.uid), {
+            filter: opts.filter, recent: opts.recent, count: Number(opts.count),
+          })
+          targets.push(...items.map((n) => n.noteId))
+        } catch (e) {
+          if (e instanceof MocliFailed) { outJson({ ok: false, error: { code: 'MOCLI_FAILED', reason: e.reason, message: e.message } }); exitCode = 1; return }
+          throw e
+        }
+      }
+      if (!targets.length) { outJson({ ok: false, error: { code: 'CLI_ERROR', message: '没有要下载的笔记：传 note-id 或 --uid' } }); exitCode = 2; return }
+      if (targets.some((t) => !extractMowenNoteId(t))) {
+        outJson({ ok: false, error: { code: 'CLI_ERROR', message: '存在不是墨问笔记的输入（需 note.mowen.cn/detail/<id> 或裸 noteId）' } }); exitCode = 2; return
+      }
+
+      const root = await resolveRoot(opts.out)
+      const library = new Library(root)
+      const formats = parseFormats((await settingsFor().get()).defaultFormats.join(','))
+      const urls = targets.map((t) => normalizeMowenUrl(t)!)
+      const queue = new DownloadQueue(
+        (u) => downloadMowenNote(u, formats, {
+          fetchBinary: mpArticleFetchers().fetchBinary,
+          BrowserWindowCtor: BrowserWindow,
+          now: () => new Date().toISOString(),
+          library, libraryRoot: root,
+          expandRefs: opts.expandRefs === true,
+          onProgress: () => {}, // 进度统一由队列回调上报
+        }),
+        (e) => process.stderr.write(`[${e.completed}/${e.total}] ${e.phase} ${e.currentUrl}${e.message ? ' ' + e.message : ''}\n`),
+      )
+      const summary = await queue.run(urls)
+      out(summary)
+      exitCode = summary.ok ? 0 : 1
     })
 
   const settings = program.command('settings').description('读写应用设置(子命令:get / set)')
