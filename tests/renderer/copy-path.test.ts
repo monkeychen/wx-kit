@@ -18,10 +18,10 @@ describe('copyPathText', () => {
 })
 
 describe('cardMenuItems', () => {
-  it('含 📋 复制路径，且四个动作齐全', () => {
+  it('含 复制路径，且四个动作齐全', () => {
     const items = cardMenuItems(true)
     expect(items.map((i) => i.key)).toEqual(['read', 'reveal', 'copy-path', 'delete'])
-    expect(items.find((i) => i.key === 'copy-path')?.label).toBe('📋 复制路径')
+    expect(items.find((i) => i.key === 'copy-path')?.label).toBe('复制路径')
   })
   it('不可读文章 read 项 disabled', () => {
     expect(cardMenuItems(false).find((i) => i.key === 'read')?.disabled).toBe(true)

@@ -4,11 +4,11 @@ import { buildListColumns, clampColWidth, nextSort, DEFAULT_LIST_WIDTHS, MIN_COL
 describe('buildListColumns', () => {
   it('non-grouped: thumb | title-1fr | account | publish | download | actions', () => {
     expect(buildListColumns({ account: 132, publish: 150, download: 110 }, false))
-      .toBe('44px minmax(0, 1fr) 132px 150px 110px 172px')
+      .toBe('44px minmax(0, 1fr) 132px 150px 110px 210px')
   })
   it('grouped: drops the account column', () => {
     expect(buildListColumns({ account: 132, publish: 150, download: 110 }, true))
-      .toBe('44px minmax(0, 1fr) 150px 110px 172px')
+      .toBe('44px minmax(0, 1fr) 150px 110px 210px')
   })
 })
 

@@ -276,14 +276,14 @@ async function main() {
     await win.locator('[data-testid="article-card"]').nth(0).click({ button: 'right' })
     await win.waitForSelector('.ant-dropdown-menu-item', { timeout: 5000 })
     const menuLabels = await win.locator('.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item').allInnerTexts()
-    assert(['阅读', '文件夹', '📋 复制路径', '删除'].every((t) => menuLabels.some((l) => l.includes(t))),
-      `M59: card context menu offers 阅读/文件夹/📋 复制路径/删除 (got ${menuLabels.join('/')})`)
-    await visibleMenuItem('📋 复制路径').click()
+    assert(['阅读', '文件夹', '复制路径', '删除'].every((t) => menuLabels.some((l) => l.includes(t))),
+      `M59: card context menu offers 阅读/文件夹/复制路径/删除 (got ${menuLabels.join('/')})`)
+    await visibleMenuItem('复制路径').click()
     await waitAllMenusClosed()
     const clipCard0 = await readClipboard()
     assert(clipCard0.startsWith(libraryRoot), 'M59: card context copy-path puts the abs dir on clipboard')
     await win.locator('[data-testid="article-card"]').nth(1).click({ button: 'right' })
-    await visibleMenuItem('📋 复制路径').click()
+    await visibleMenuItem('复制路径').click()
     await waitAllMenusClosed()
     const clipCard1 = await readClipboard()
     assert(clipCard1 !== clipCard0 && clipCard1.startsWith(libraryRoot),
@@ -292,7 +292,7 @@ async function main() {
     await win.locator('[data-testid="article-card"]').nth(0).click()
     await win.locator('[data-testid="article-card"]').nth(1).click()
     await win.locator('[data-testid="article-card"]').nth(0).click({ button: 'right' })
-    await visibleMenuItem('📋 复制路径').click()
+    await visibleMenuItem('复制路径').click()
     await waitAllMenusClosed()
     assert((await readClipboard()) === clipCard0,
       'M59: multi-select does not hijack copy-path (still the right-clicked card)')

@@ -12,12 +12,12 @@ export function clampColWidth(px: number): number {
 }
 
 /** 由列宽 + 是否分组生成 grid-template-columns。
- *  布局：缩略图 44px | 标题 1fr | [公众号]（仅非分组）| 发布 | 下载 | 操作 172px。 */
+ *  布局：缩略图 44px | 标题 1fr | [公众号]（仅非分组）| 发布 | 下载 | 操作 210px（四个文字按钮不换行）。 */
 export function buildListColumns(w: ListColumnWidths, grouped: boolean): string {
   const mid = grouped
     ? `${w.publish}px ${w.download}px`
     : `${w.account}px ${w.publish}px ${w.download}px`
-  return `44px minmax(0, 1fr) ${mid} 172px`
+  return `44px minmax(0, 1fr) ${mid} 210px`
 }
 
 export interface SortState { key: SortKey; dir: SortDir }

@@ -19,7 +19,7 @@ export function cardMenuItems(readable: boolean): CardMenuItem[] {
   return [
     { key: 'read', label: '阅读', disabled: !readable },
     { key: 'reveal', label: '文件夹' },
-    { key: 'copy-path', label: '📋 复制路径' },
+    { key: 'copy-path', label: '复制路径' },
     { key: 'delete', label: '删除', danger: true },
   ]
 }

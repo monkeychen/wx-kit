@@ -29,7 +29,7 @@ export default function ArticleRow({ meta, selected, showAccount, onToggleSelect
         <button disabled={!readable} style={!readable ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
           onClick={() => readable && onRead()}>阅读</button>
         <button onClick={onReveal}>文件夹</button>
-        <button data-testid="row-copy-path" onClick={onCopyPath}>📋 复制路径</button>
+        <button data-testid="row-copy-path" onClick={onCopyPath}>复制路径</button>
         <Popconfirm title="删除该文章？" description="磁盘文件将一并删除" okText="删除" cancelText="取消"
           okButtonProps={{ danger: true }} onConfirm={onDelete}>
           <button className="danger">删除</button>
