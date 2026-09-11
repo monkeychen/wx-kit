@@ -255,6 +255,57 @@ async function main() {
     await win.waitForTimeout(150)
     assert((await firstRowText()).includes('伽马'), 'clicking same header flips to asc (oldest 伽马 first)')
 
+    // ============ M59 · 复制路径（列表常驻按钮 + 卡片右键菜单）============
+    const readClipboard = () => app.evaluate(({ clipboard }) => clipboard.readText())
+    await win.locator('[data-testid="row-copy-path"]').first().click()
+    const clipList = await readClipboard()
+    assert(clipList.startsWith(libraryRoot), `M59: list row copy-path puts the abs dir on clipboard (got ${clipList})`)
+    await win.waitForSelector('.ant-message :text("已复制")', { timeout: 3000 })
+    assert(true, 'M59: copy-path shows 已复制 toast')
+
+    // 卡片视图右键菜单：四项齐全、作用于右键所在篇、不被选中集劫持
+    // antd 菜单关闭有离场动画,动画结束才加 .ant-dropdown-hidden;每次点完菜单项
+    // 必须等它彻底收起,否则下一次右键时新旧两个菜单同时可见,定位歧义
+    const visibleMenuItem = (text) => win.locator(`.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item:has-text("${text}")`)
+    const waitAllMenusClosed = () => win.waitForFunction(
+      () => [...document.querySelectorAll('.ant-dropdown')].every((d) => d.classList.contains('ant-dropdown-hidden')),
+      undefined, { timeout: 3000 },
+    )
+    await win.click('.ant-segmented label:has-text("卡片")')
+    await win.waitForSelector('[data-testid="article-card"]', { timeout: 8000 })
+    await win.locator('[data-testid="article-card"]').nth(0).click({ button: 'right' })
+    await win.waitForSelector('.ant-dropdown-menu-item', { timeout: 5000 })
+    const menuLabels = await win.locator('.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item').allInnerTexts()
+    assert(['阅读', '文件夹', '📋 复制路径', '删除'].every((t) => menuLabels.some((l) => l.includes(t))),
+      `M59: card context menu offers 阅读/文件夹/📋 复制路径/删除 (got ${menuLabels.join('/')})`)
+    await visibleMenuItem('📋 复制路径').click()
+    await waitAllMenusClosed()
+    const clipCard0 = await readClipboard()
+    assert(clipCard0.startsWith(libraryRoot), 'M59: card context copy-path puts the abs dir on clipboard')
+    await win.locator('[data-testid="article-card"]').nth(1).click({ button: 'right' })
+    await visibleMenuItem('📋 复制路径').click()
+    await waitAllMenusClosed()
+    const clipCard1 = await readClipboard()
+    assert(clipCard1 !== clipCard0 && clipCard1.startsWith(libraryRoot),
+      'M59: copy-path binds to the right-clicked card, not a fixed entry')
+    // 选中两篇后再右键第一篇复制 → 仍是第一篇路径（不与 sel 耦合）
+    await win.locator('[data-testid="article-card"]').nth(0).click()
+    await win.locator('[data-testid="article-card"]').nth(1).click()
+    await win.locator('[data-testid="article-card"]').nth(0).click({ button: 'right' })
+    await visibleMenuItem('📋 复制路径').click()
+    await waitAllMenusClosed()
+    assert((await readClipboard()) === clipCard0,
+      'M59: multi-select does not hijack copy-path (still the right-clicked card)')
+    await win.locator('[data-testid="article-card"]').nth(0).click()
+    await win.locator('[data-testid="article-card"]').nth(1).click()   // 撤掉选中,别影响后续批量删除断言
+    // 右键菜单是发现性补充：hover 入口仍在
+    await win.locator('[data-testid="article-card"]').first().hover()
+    assert((await win.locator('[data-testid="card-read"]').count()) > 0
+      && (await win.locator('[data-testid="card-delete"]').count()) > 0,
+      'M59: hover actions remain alongside the context menu')
+    await win.click('.ant-segmented label:has-text("列表")')
+    await win.waitForSelector('[data-testid="article-row"]', { timeout: 8000 })
+
     const colsBefore = await win.locator('.list').evaluate((el) => getComputedStyle(el).getPropertyValue('--lcols'))
     const rzBox = await win.locator('.lhead .lh-resz:has-text("发布时间") .rz').boundingBox()
     await win.mouse.move(rzBox.x + 3, rzBox.y + rzBox.height / 2)

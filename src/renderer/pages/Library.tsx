@@ -10,6 +10,7 @@ import {
   type SortKey, type SortDir,
 } from '../library-view'
 import { buildListColumns, clampColWidth, nextSort, DEFAULT_LIST_WIDTHS } from '../list-columns'
+import { copyPathText } from '../copy-path'
 import type { ListColumnWidths } from '../../../electron/services/settings'
 import type { ArticleMeta } from '../../core/types'
 
@@ -153,19 +154,25 @@ export default function Library() {
     } finally { setSyncing(false) }
   }
 
+  // M59 R1:复制该篇目录绝对路径。闭包绑定该篇 m、不读 sel——「多选只复制所在那篇」由结构保证。
+  const copyPath = async (m: ArticleMeta) => {
+    try { await api.copyText(copyPathText(m)); message.success('已复制') }
+    catch (e) { message.error('复制失败：' + (e as Error).message) }
+  }
+
   const renderCards = (items: ArticleMeta[]) => (
     <div className="shelf">
       {items.map((m, i) => (
         <ArticleCard key={m.id} meta={m} libraryRoot={root} index={i} selected={sel.has(m.id)}
           onToggleSelect={() => toggleSel(m.id)} onRead={() => read(m.id)}
-          onReveal={() => api.reveal(m.dir)} onDelete={() => delSingle(m.id)} />
+          onReveal={() => api.reveal(m.dir)} onCopyPath={() => copyPath(m)} onDelete={() => delSingle(m.id)} />
       ))}
     </div>
   )
   const renderRows = (items: ArticleMeta[], showAccount: boolean) => items.map((m) => (
     <ArticleRow key={m.id} meta={m} selected={sel.has(m.id)} showAccount={showAccount}
       onToggleSelect={() => toggleSel(m.id)} onRead={() => read(m.id)}
-      onReveal={() => api.reveal(m.dir)} onDelete={() => delSingle(m.id)} />
+      onReveal={() => api.reveal(m.dir)} onCopyPath={() => copyPath(m)} onDelete={() => delSingle(m.id)} />
   ))
 
   return (

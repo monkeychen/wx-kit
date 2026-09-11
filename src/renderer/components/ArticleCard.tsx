@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Popconfirm } from 'antd'
+import { Dropdown, Modal, Popconfirm } from 'antd'
 import type { ArticleMeta } from '../../core/types'
 import { api } from '../api'
 import { toWxfileBase, wxfileJoin } from '../wxfile'
 import { relativeTime } from '../time'
 import { kindTag } from '../../core/message-kind'
+import { cardMenuItems } from '../copy-path'
 
 interface Props {
   meta: ArticleMeta
@@ -14,6 +15,7 @@ interface Props {
   onToggleSelect: () => void   // 单击卡片：切换选中
   onRead: () => void           // 双击卡片 / hover「阅读」：进入阅读
   onReveal: () => void
+  onCopyPath: () => void       // M59 R1：复制该篇目录绝对路径
   onDelete: () => void
 }
 
@@ -21,7 +23,7 @@ interface Props {
 // 单击=选中（切换），双击=阅读；hover 浮出操作。内容人脑子里是「封面+标题」，不是表格行。
 // 类型文案在 core/message-kind（M40 上提）：订阅页的待处理列表也要用同一份，两处各写一份必然漂。
 
-export default function ArticleCard({ meta, libraryRoot, index, selected, onToggleSelect, onRead, onReveal, onDelete }: Props) {
+export default function ArticleCard({ meta, libraryRoot, index, selected, onToggleSelect, onRead, onReveal, onCopyPath, onDelete }: Props) {
   const [cover, setCover] = useState<string | null>(null)
   const readable = meta.formats.includes('md') || meta.formats.includes('html')
   const tag = kindTag(meta.itemShowType)
@@ -36,7 +38,29 @@ export default function ArticleCard({ meta, libraryRoot, index, selected, onTogg
     return () => { alive = false }
   }, [meta.dir, meta.formats, libraryRoot])
 
+  // M59 R1：右键菜单与 hover 按钮共用同一组 handler（发现性补充，不替换 hover 入口）。
+  // 菜单动作统一 stopPropagation，不触发卡片单击选中。
+  const menu = {
+    items: cardMenuItems(readable).map((i) => ({
+      key: i.key, label: i.label, danger: i.danger, disabled: i.disabled,
+    })),
+    onClick: ({ key, domEvent }: { key: string; domEvent: React.SyntheticEvent }) => {
+      domEvent.stopPropagation()
+      if (key === 'read') { if (readable) onRead() }
+      else if (key === 'reveal') onReveal()
+      else if (key === 'copy-path') onCopyPath()
+      else if (key === 'delete') {
+        Modal.confirm({
+          title: '删除该文章？', content: '磁盘文件将一并删除',
+          okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+          onOk: onDelete,
+        })
+      }
+    },
+  }
+
   return (
+    <Dropdown menu={menu} trigger={['contextMenu']}>
     <div className={`article-card${selected ? ' sel' : ''}`} data-testid="article-card"
       style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
       onClick={onToggleSelect} onDoubleClick={() => readable && onRead()}>
@@ -75,5 +99,6 @@ export default function ArticleCard({ meta, libraryRoot, index, selected, onTogg
         </Popconfirm>
       </div>
     </div>
+    </Dropdown>
   )
 }

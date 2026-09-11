@@ -1155,3 +1155,27 @@ headless 浏览器 network 面板定位到 SPA 的正文 XHR——`POST note.mow
 非目标调整（删「不做按墨问作者批量」，加「不做付费绕过」「合集/PDF 附件后续单议」）、验收清单
 R2 重写（含 noteFile null 边界、限速断言、付费失败类型）；spike 报告增补 §5.5（note/show 通道 +
 复验记录）并修订 §6-§8 实现路径与模块清单；ROADMAP 「当前在做」更新为 R2 第二版描述。
+
+### M59 实录：R1 复制路径（2026-09-11，v0.11.0 首个落地里程碑）
+
+**需求很轻，plan 期摸底改了实现形状**：PRD 写「复制 `<libraryRoot>/<meta.dir>`」，实现前查 types.ts
+发现 `meta.dir` 本身就是绝对路径——拼接反而是错的（Windows 分隔符坑）；`api.copyText` IPC 在 M30
+就存在。最终零核心层、零 IPC 改动：纯 renderer + 一个纯函数模块 `copy-path.ts`（type-only import，
+避开 M56 的 vite 白屏红线）。教训复读：**plan 阶段的「现状摸底」不是过场，这次直接砍掉了 PRD 里
+一句错误的实现假设**（PRD 措辞已随收尾修正，验收条款不变）。
+
+**右键菜单定为四项**（阅读/文件夹/📋 复制路径/删除，共用 hover 的 handler 组）：PRD 字面是「加
+一项」，但只放一项的右键菜单不符合平台惯例；四项不产生第二套逻辑，PRD 验收只钉复制路径项存在。
+
+**e2e 踩了 antd Dropdown 两个坑**：① 菜单关闭后仍留在 DOM，第二次右键时两个菜单并存导致
+Playwright strict mode 定位歧义；② 加 `:not(.ant-dropdown-hidden)` 限定后还是两个——关闭有离场
+动画，动画没结束 hidden 类还没挂上。终解：每次点完菜单项 `waitForFunction` 等所有
+`.ant-dropdown` 挂上 `ant-dropdown-hidden` 再下一步。这类「组件库动画时序 vs 测试节奏」的坑与
+M58 的 toast 时序同源：**UI 测试里「等状态」永远比「等时间」可靠**。
+
+**环境坑**：本会话 shell 预置 `ELECTRON_RUN_AS_NODE=1`（WorkBuddy 托管 node 所致），Electron 被
+当纯 node 跑，e2e 报「Process failed to launch」——`env -u ELECTRON_RUN_AS_NODE npm run test:e2e`
+即解。跑 e2e/打包类命令前值得先 `env | grep -i electron` 一眼。
+
+**验证**：589 单测 + tsc + lint 全绿（2 个 warning 为既有）；e2e 全绿含 M59 七条新断言（列表按钮
+剪贴板真值 / toast / 菜单四项 / 逐篇绑定 / 多选不劫持 / hover 并存）。
