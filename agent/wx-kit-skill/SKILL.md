@@ -7,7 +7,8 @@ description: |
   同步 Astro 站点——stdout 输出纯 JSON，面向 agent 自动化。
   当用户要「下载这篇微信文章」「批量下载这些文章链接」「下载这篇墨问笔记」「批量下载某位墨问作者的文章」
   「检查订阅号有没有新文章」「订阅这个墨问作者」「查今天自动下载了什么」「查某天发表了哪些订阅文章」
-  「搜索或导出已下载文章」时使用；发现 wx-kit 未安装时，本 skill 提供安装路径。
+  「搜索或导出已下载文章」「wx-kit 报错/出问题了帮我看看」时使用；发现 wx-kit 未安装时，本 skill 提供安装路径；
+  排障先读诊断日志（v0.11.3 起 `~/Library/Application Support/wx-kit/logs/main.log`）。
   不用于：按公众号批量下载全部历史文章（列表接口已被服务端封禁，该能力不存在）；
   下载他人私密墨问笔记（按作者授权，不可获取）；基于文库素材的写作编排（用 wx-kit-compose）。
 ---
@@ -17,7 +18,7 @@ description: |
 wx-kit 是 GUI + CLI 同一二进制的桌面应用：无参启动 GUI，命中 CLI 命令白名单时进入 CLI。
 CLI 契约：stdout 纯 JSON，stderr 输出进度；退出码 `0` 成功、`1` 业务失败、`2` 用法错误。
 
-本文描述 v0.10.2 / M56 的当前行为。
+本文描述 v0.11.3 / M66 的当前行为（v0.11.2 及之前：无诊断日志，排障按各命令 JSON `error` 字段）。
 
 ## 1. 确认安装
 
@@ -96,6 +97,20 @@ digest 使用 `count/articles` 而非下载命令的 `total/items`。检查 `ok`
 
 - macOS 安装包：直接调用 `/Applications/wx-kit.app/Contents/MacOS/wx-kit`，不要用 `open -a`；
 - Windows 安装包：Electron 是 GUI 子系统程序，stdout 不回贴当前控制台，必须重定向到文件。
+
+## 5. 排障：先读诊断日志（v0.11.3 起）
+
+用户报「wx-kit 出问题/某功能不可用」时，第一步读诊断日志再动手，别盲猜：
+
+```
+~/Library/Application Support/wx-kit/logs/main.log
+```
+
+- JSON 行格式 `{time, level, domain, event, ...}`，已脱敏（敏感值显示 `«redacted:N»`）；
+- 每次启动的 `startup/snapshot` 记录版本与 PATH/HOME/SHELL 环境（GUI 从 Dock 启动只有系统最小 PATH，是 mocli 类「装了却找不到」问题的根源，一眼可判）；
+- `mocli/spawn·exit` 记录每次子进程调用的 argv/退出码/耗时与 stdout/stderr 首行；`mp-request/request` 记录微信/微信读书请求；`download/done·fail` 记录每篇下载结果；
+- 5MB×3 滚动（`main.log` / `main.1.log` / `main.2.log`），无远程上报。
+- v0.11.3 之前的版本没有该日志，旧版问题仍按各命令自身的 JSON `error` 字段排查。
 
 ## 细节按需查
 

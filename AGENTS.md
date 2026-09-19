@@ -170,6 +170,23 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 
 ---
 
+## 诊断日志约定（M66 起，2026-09-19）
+
+统一诊断日志落 `userData/logs/main.log`（JSON 行、已脱敏、5MB×3 轮转、默认常开 info），
+实现于 `src/core/diag-log.ts`（**落盘层在 core**——埋点最深处在 core 边界，放 electron 层
+会被反向 import 违反分层；埋点经 `diag()?.info(domain, event, fields, msg)` 单例访问，未 init
+null 安全）。三条硬约定：
+
+1. **新增外部调用/子进程通道必须同步埋 diag 点**（类比「CLI 变更刷 skill」）——排障价值
+   全靠埋点在场，事后补埋等于没有。
+2. **短命进程（CLI）退出前必须 `await flushDiagLog()`**（`electron/main.ts` CLI 分支已接）：
+   写入是异步排队的，`app.exit` 会截断尾部日志行。
+3. **外部进程输出（stdout/stderr）入日志必须过 `redactFreeText`**：结构化 redact 管不到
+   字符串内部的敏感赋值——mocli `auth info` 的 stdout JSON 带 api_key 明文，产物验收曾实测
+   泄漏（devlog §62）。脱敏属安全属性，验收要跑真实链路 grep 真实敏感值，不能只跑自造用例。
+
+---
+
 ## 文档索引
 - `ROADMAP.md` — **里程碑状态与路线图（续接看这里）**。状态/进度只在这里维护；各里程碑的详细实现计划放在 `docs/plans/`，其逐里程碑索引也在 ROADMAP 维护。
 - `docs/PRD.md` — 第一阶段（v0.1.0）产品需求（全貌、F1–F5、架构、风控、验收）。**后续每版一份 `docs/PRD-vX.Y.Z.md`**（§4 逐条可勾验收是验收契约），逐版清单见 ROADMAP 的 PRD 索引行。
