@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.11.2-released-success.svg)
+![Status](https://img.shields.io/badge/v0.11.3-released-success.svg)
 
 ## 这是什么
 
@@ -17,15 +17,15 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.11.2）**
+> **当前能力边界（v0.11.3）**
 >
-> v0.11.0 把文库内容源从「只下微信文章」扩到「**微信 + 墨问**」；v0.11.2 补齐墨问阅读体验（引用卡片、图集补图）并新增按关键词搜笔记：
+> v0.11.0 把文库内容源从「只下微信文章」扩到「**微信 + 墨问**」；v0.11.3 聚焦可靠性——墨问功能在打包安装环境开箱即用 + 全程诊断日志：
 >
-> - **引用卡片**：下载的墨问笔记里引用其他笔记时，正文原位置渲染标题/摘要/作者卡片（此前只有 uuid + 链接）；付费子笔记如实标注；图集缺图自动补齐（墨问图片池不保证完整）；
-> - **按关键词搜笔记**：墨问 tab 新增「按用户 ｜ 按关键词」切换——关键词搜全站，结果带作者/摘要/阅读数，点作者名直接展开他的全部笔记；
+> - **统一诊断日志**：启动环境、mocli/微信读书/微信文章每次外部调用的关键事实自动落 `main.log`（敏感信息自动打码、5MB×3 自动滚动、无远程上报）；设置页「诊断」一键打开日志文件夹——报障不再靠口头描述；
+> - **墨问打包环境修复**：mocli 装在 nvm/homebrew 或自定义路径的用户，从 Dock/Finder 启动（不加载 `~/.zshrc`、PATH 只有系统四件套）也能正常检测与执行（v0.11.2 及之前部分安装形态恒报 BAD_OUTPUT）；失败消息带真实原因摘要；
 >
-> - **墨问笔记下载**：下载页新增「墨问笔记」tab——按用户名搜索作者（候选带简介）→ 条件拉清单 → 勾选批量下载；URL 输入框同时识别墨问笔记地址；合集引用默认渲染引用块，勾选「展开引用子笔记」递归下载；
-> - **墨问作者订阅**：订阅页新增「墨问作者」tab——搜索作者订阅，定时检查新笔记（与公众号订阅共用频率与自动下载设置），行内清单可见可挑，检查记录独立留痕；
+> - **墨问笔记下载**：下载页「墨问笔记」tab——按用户名搜索作者（候选带简介）→ 条件拉清单 → 勾选批量下载，或按关键词搜全站（点作者名展开全部笔记）；URL 输入框同时识别墨问笔记地址；合集引用默认渲染引用块，勾选「展开引用子笔记」递归下载；引用卡片在阅读器内联显示标题/摘要/作者；
+> - **墨问作者订阅**：订阅页「墨问作者」tab——搜索作者订阅，定时检查新笔记（与公众号订阅共用频率与自动下载设置），行内清单可见可挑，检查记录独立留痕；
 > - **CLI 对等**：`wx-kit mowen import / detect / search-user / list-user / list-mine / search / subscribe / unsubscribe / list / check-now`；
 > - 文库卡片右键可**复制文章保存路径**；贴图类微信文章自动走浏览器渲染兜底提取正文与图片；
 > - **依赖说明**：墨问发现与订阅检查走 mocli（`npm install -g @mowenxd/cli` 并 `mocli auth init`），未安装时墨问入口显示安装指引，不影响微信功能；
@@ -33,7 +33,7 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 ## 当前界面
 
-以下截图来自 v0.11.2 界面（下载页双 tab 与内容卡片为 v0.11.2 统一后的形态；订阅页平台切换、文库、阅读器与 v0.11.0 一致）。
+以下截图来自 v0.11.3 界面（下载页双 tab 与内容卡片为 v0.11.2 统一后的形态；订阅页平台切换、文库、阅读器与 v0.11.0 一致）。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
@@ -86,11 +86,11 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.11.2：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.11.3：
 
-- Apple Silicon：`wx-kit-0.11.2-arm64.dmg`
-- Intel Mac：`wx-kit-0.11.2.dmg`
-- Windows：`wx-kit.Setup.0.11.2.exe`
+- Apple Silicon：`wx-kit-0.11.3-arm64.dmg`
+- Intel Mac：`wx-kit-0.11.3.dmg`
+- Windows：`wx-kit.Setup.0.11.3.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -209,7 +209,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.11.2；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
+- 最新已发布版本：v0.11.3；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
@@ -217,7 +217,7 @@ npm run build
 ## 用户手册
 
 想看「下载一篇文章该按哪个按钮、订阅怎么配、文库怎么用」——直接看
-[`docs/USER_MANUAL.md`](docs/USER_MANUAL.md)（v0.11.2 起随版本同步更新，面向真人用户的
+[`docs/USER_MANUAL.md`](docs/USER_MANUAL.md)（随版本同步更新，面向真人用户的
 上手教程，含 GUI 截图与配套插画）。
 
 命令行（CLI）面向 AI agent 的速查表在 `agent/wx-kit-skill/references/commands.md`，不在用户手册范围。

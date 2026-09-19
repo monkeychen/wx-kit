@@ -1,10 +1,10 @@
-# wx-kit 用户手册（v0.11.2）
+# wx-kit 用户手册（v0.11.3）
 
 > 面向真实用户的上手指南。读完应该能完成：安装 → 下载 1 篇微信文章 → 在本地文库读它 → 订阅几个作者 → 偶尔下几篇墨问笔记。
 >
 > 这份手册只讲「怎么做」。命令行（CLI）面向 AI agent 的部分、代码与开发约定不在这里——见 [`AGENTS.md`](../AGENTS.md)、[`README.md`](../README.md) 和 [`docs/`](../docs/)。
 >
-> 截图分两类：*GUI 截图*来自 v0.11.2 真实应用（`docs/screenshots/`）；*插画*为辅助说明使用 AI 生成（`docs/screenshots/illustrations/`），风格与 GUI 截图配色保持一致。macOS 排版；Windows 控件位置一致。
+> 截图分两类：*GUI 截图*来自 v0.11.3 真实应用（`docs/screenshots/`）；*插画*为辅助说明使用 AI 生成（`docs/screenshots/illustrations/`），风格与 GUI 截图配色保持一致。macOS 排版；Windows 控件位置一致。
 
 ---
 
@@ -50,9 +50,9 @@ xattr -cr /Applications/wx-kit.app
 
 | 芯片 | 文件 |
 |---|---|
-| Apple Silicon (M1/M2/M3/M4) | `wx-kit-0.11.2-arm64.dmg` |
-| Intel Mac | `wx-kit-0.11.2.dmg` |
-| Windows | `wx-kit.Setup.0.11.2.exe` |
+| Apple Silicon (M1/M2/M3/M4) | `wx-kit-0.11.3-arm64.dmg` |
+| Intel Mac | `wx-kit-0.11.3.dmg` |
+| Windows | `wx-kit.Setup.0.11.3.exe` |
 
 下载后：
 
@@ -281,7 +281,11 @@ mocli auth init
 
 显示 mocli 是否检测到、是否认证。点「测试连接」立刻验证。
 
-### 7.6 站点同步（可选）
+### 7.6 诊断（v0.11.3 起）
+
+运行日志自动记录启动环境与对外请求（**敏感信息已自动打码**，显示为 `«redacted:N»`）。遇到问题需要反馈时：点「打开日志文件夹」，把 `main.log` 一并发给帮你排障的人——比口头描述「报错了」有用得多。日志超过 5MB 自动滚动，最多保留 3 份，无需手动清理。
+
+### 7.7 站点同步（可选）
 
 如果你想把自己下载的文章发到个人站点（Astro 站），这里打开开关、配好站点内容目录即可。开启后，文库选中文章时多出「同步到站点」按钮——按个人站点的发文规范（frontmatter / 文件结构）生成 markdown 文件。
 
@@ -309,7 +313,7 @@ mocli auth init
 
 ### 8.4 墨问页面报「未检测到 mocli」
 
-`mocli` 没装或没在 PATH 里。按 [§4.1](#41-装-mocli) 装一下。如果装了还报错，去设置页「墨问集成」点「测试连接」看具体报错。
+`mocli` 没装或没在 PATH 里。按 [§4.1](#41-装-mocli) 装一下。如果装了还报错，去设置页「墨问集成」点「测试连接」看具体报错；仍定位不了就到设置页「诊断」打开日志文件夹，把 `main.log` 发给帮你排障的人（v0.11.3 起）——里面记录了每次 mocli 调用的完整命令与输出摘要。
 
 ### 8.5 macOS 启动被 Gatekeeper 拦
 
