@@ -31,7 +31,7 @@ import { registerMowenIpc, mowenRunnerOrNull } from './services/mowen-detect'
 import { registerMowenSubscriptionIpc } from './services/mowen-ipc'
 import { downloadMowenNote } from '../src/core/mowen/download-mowen-note'
 import { MowenSubscriptions, migrateMowenCheckLog } from '../src/core/mowen/subscription'
-import { runMowenSubscriptionCheck } from './services/mowen-subscription-check'
+import { runMowenSubscriptionCheck, mowenSchedulerCanRun } from './services/mowen-subscription-check'
 import { SettingsService } from './services/settings'
 import { runSubscriptionCheck as svcRunSubscriptionCheck } from './services/subscription-check'
 import type { RunCheckResult } from './services/subscription-check'
@@ -417,23 +417,26 @@ export function registerIpc(settings: SettingsService): void {
     migrate.catch((e) => console.warn('[mowen-subscriptions] check-log migrate failed:', e instanceof Error ? e.message : e))
   }
   // 调度与微信共用设置键（PRD R4 拍板），但 scheduler 实例独立——canRun 各自闸门：
-  // 微信未登录(mpGateway 非 active)只跳过微信 tick，墨问只看 mocli 装没装，两平台互不阻塞。
+  // 微信未登录(mpGateway 非 active)只跳过微信 tick，墨问先看「有没有已订阅作者」（读本地
+  // JSON，零成本）再看 mocli 装没装——未装 mocli 的探测以 login shell 兜底（最多 3s），
+  // 没有 mowenSchedulerCanRun 这道前置的话纯微信用户每分钟 tick 都白 spawn 一个登录 shell。
+  const mowenSubsOf = async () => new MowenSubscriptions((await settings.get()).libraryRoot)
   new SubscriptionScheduler({
     settings,
-    subsFor: async () => new MowenSubscriptions((await settings.get()).libraryRoot),
+    subsFor: mowenSubsOf,
     runCheck: async () => {
       const runner = await mowenRunnerOrNull()
       if (!runner) return
       const s = await settings.get()
       return runMowenSubscriptionCheck('auto', {
-        subs: new MowenSubscriptions(s.libraryRoot),
+        subs: await mowenSubsOf(),
         runner,
         log: mowenLogCheck,
         settings: { subscriptionNewArticleAction: s.subscriptionNewArticleAction, defaultFormats: s.defaultFormats },
         downloadNote: (noteId) => mowenDownloadNote(noteId, s.defaultFormats),
       })
     },
-    canRun: async () => (await mowenRunnerOrNull()) !== null,
+    canRun: async () => mowenSchedulerCanRun(await mowenSubsOf(), async () => (await mowenRunnerOrNull()) !== null),
   }).start()
 
   // 共享 in-flight:自动检查与手动「检查更新」/行内单号检查重叠时并入同一次运行(防重入的第二道闸,第一道在 scheduler tick)

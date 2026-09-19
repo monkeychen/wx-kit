@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runMowenSubscriptionCheck, type MowenCheckDeps } from '../../electron/services/mowen-subscription-check'
+import { runMowenSubscriptionCheck, mowenSchedulerCanRun, type MowenCheckDeps } from '../../electron/services/mowen-subscription-check'
 import { MowenSubscriptions } from '../../src/core/mowen/subscription'
 import { MowenNoteUnavailable } from '../../src/core/mowen/errors'
 import type { MowenNoteListItem } from '../../src/core/mowen/types'
@@ -181,5 +181,24 @@ describe('runMowenSubscriptionCheck', () => {
     expect(r.authors).toBe(1)
     expect(calls).toEqual(['u2'])
     expect(h.logs[0].accounts).toBe(1)
+  })
+})
+
+describe('mowenSchedulerCanRun（调度闸门）', () => {
+  // 背景：mowen 调度器每分钟 tick 都会先过 canRun——原实现直接跑完整 mocli 探测链，
+  // 未装 mocli 的机器每次都以「spawn 一个 zsh 登录 shell（最多等 3s）」告终，且发生在
+  // 「有没有墨问订阅」判断之前。纯微信用户（零墨问订阅）开着 app 也每分钟白 spawn 一个 shell。
+  it('没有已订阅作者 → false 且不做 mocli 探测', async () => {
+    let probes = 0
+    const probe = async () => { probes++; return true }
+    const unsubscribed = { uid: 'u1', name: 'x', intro: '', subscribed: false, watermark: 0, lastCheckedAt: null, lastRunAt: null, newNotes: [] }
+    expect(await mowenSchedulerCanRun({ list: async () => [] }, probe)).toBe(false)
+    expect(await mowenSchedulerCanRun({ list: async () => [unsubscribed] }, probe)).toBe(false)
+    expect(probes).toBe(0)
+  })
+  it('有已订阅作者 → 探测结论透传（true/false 都如实）', async () => {
+    const subscribed = { uid: 'u1', name: 'x', intro: '', subscribed: true, watermark: 0, lastCheckedAt: null, lastRunAt: null, newNotes: [] }
+    expect(await mowenSchedulerCanRun({ list: async () => [subscribed] }, async () => true)).toBe(true)
+    expect(await mowenSchedulerCanRun({ list: async () => [subscribed] }, async () => false)).toBe(false)
   })
 })
