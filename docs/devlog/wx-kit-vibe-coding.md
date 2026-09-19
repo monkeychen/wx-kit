@@ -1624,3 +1624,39 @@ surface 白底卡片，订阅页两个面板是唯二裸渲染，而它与下载
 「检查记录」留卡片外（与 DownloadHistory 同为卡片外日志区块），Alert 留卡片外。
 两个面板结构对称，改动各一处 div。**视觉一致性的正确姿势是先盘点全库形态再动手，
 答案在数据里，不在审美直觉里**。
+
+## §62 M66 统一诊断日志:两次 mocli 事故换来的「日志必须在场」(2026-09-19)
+
+**动机是疼出来的。** v0.11.2 后连续两起 mocli 事故(v0.11.0 未检出、v0.11.2
+BAD_OUTPUT),真正的线索都随进程消失——`env: node: No such file or directory`
+在子进程 stderr 里,GUI 弹窗只剩一句误导性文案,排障靠猜。盘点发现项目根本没有
+日志模块:7 处零散 console 在打包 GUI(Finder 启动 stdout 进黑洞)上无人可见,
+仅有的两个专用文件(mp-request-audit/subscriptions-check)各管一摊。安哥问
+「日志模块有没有认真设计过」,答案是没有。
+
+**设计定案(安哥拍板)**:默认常开 info——「让用户先开日志再复现」在体验上是
+灾难,偶发问题恰恰是最难排查的;体积靠 5MB×3 滚动窗口控制。JSON 行格式(agent
+排障友好是第一消费场景)。自写 ~200 行,不引 electron-log。三个专用日志不吞并。
+
+**两个值得留的方法论沉淀**:
+
+1. **落盘层放 core 而非 electron/services**。埋点最深处在 core 边界(mocli
+   runner 的 spawn/exit),logger 若在 electron 层会被 core 反向 import 违反
+   分层。判据不是「日志是主进程的事」,而是「埋点最深的那层在哪」。配套决策:
+   模块级可选单例(`diag()?.info(...)`),违反「无全局」洁癖换埋点零侵入——
+   不给业务函数加 logger 参数污染签名。CLI 进程退出前必须 flushDiagLog(),
+   否则 app.exit 截断尾部日志行。
+
+2. **产物验收抓到了单测抓不到的泄漏**。mocli `auth info` 的 stdout JSON 里带
+   api_key 明文,「首行摘要入日志」把它原样带进 main.log——结构化 redact(按
+   key 打码)管不到字符串**内部**的敏感赋值。补了 redactFreeText:对「外部
+   进程输出」这类不可信文本做内嵌模式打码(JSON 字段与 query 两种形态)。
+   这条防线的测试在单测阶段是盲区——我写测试时根本不知道 mocli 会输出什么,
+   是真实产物跑一遍才现形。**脱敏这种安全属性,验收要跑真实链路,grep 真实
+   敏感值,不能只跑自己构造的用例**。
+
+事件域划分:startup(snapshot 含 PATH/HOME/SHELL——两起事故的直接线索)、
+mocli(spawn/exit 含 stderr 首行)、mp-request(kind+脱敏端点+耗时,收口在
+gateway 的 execute 单点)、download(篇级 done/fail)。设置页「诊断」区一个
+按钮打开日志文件夹,报障话术从「你看看设置页检测到没」升级为「把 main.log
+发我」。

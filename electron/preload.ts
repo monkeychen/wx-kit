@@ -100,6 +100,7 @@ const api: WxApi = {
   cliLinkStatus: () => ipcRenderer.invoke('cliLink:status'),
   cliLinkCreate: (force) => ipcRenderer.invoke('cliLink:create', force),
   cliLinkAddToPath: () => ipcRenderer.invoke('cliLink:addToPath'),
+  diagOpenLogsFolder: () => ipcRenderer.invoke('diag:openLogsFolder'),
 }
 
 contextBridge.exposeInMainWorld('api', api)

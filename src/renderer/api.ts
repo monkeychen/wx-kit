@@ -129,6 +129,9 @@ export interface WxApi {
   cliLinkStatus(): Promise<CliLinkInfo>
   cliLinkCreate(force: boolean): Promise<{ status: CliLinkStatus; transient?: boolean }>
   cliLinkAddToPath(): Promise<{ profilePath: string; result: 'added' | 'present' }>
+
+  /** M66 诊断:打开日志文件夹(Finder 选中 main.log);返回日志路径用于展示 */
+  diagOpenLogsFolder(): Promise<{ ok: boolean; path?: string; error?: string }>
 }
 
 declare global {
