@@ -15,6 +15,21 @@ import type { AppSettings } from './settings'
 
 const CHECK_COUNT = 20
 
+/**
+ * 调度闸门：没有已订阅作者时直接 false、不碰 mocli 探测。探测链未装 mocli 时以
+ * login shell（`$SHELL -ilc`，最多 3s）兜底——调度器每分钟 tick 都先过 canRun，
+ * 无此闸门的话纯微信用户（零墨问订阅、未装 mocli）开着 app 就每分钟白 spawn 一个
+ * 登录 shell。订阅与否读本地 JSON（廉价），探测只在真有订阅对象时发生。
+ */
+export async function mowenSchedulerCanRun(
+  subs: Pick<MowenSubscriptions, 'list'>,
+  probe: () => Promise<boolean>,
+): Promise<boolean> {
+  const authors = await subs.list()
+  if (!authors.some((a) => a.subscribed)) return false
+  return probe()
+}
+
 export interface MowenCheckDeps {
   subs: MowenSubscriptions
   /** null = mocli 不可用（未装/检测失败）→ mocli-missing 早退，不伪装「无新笔记」 */
