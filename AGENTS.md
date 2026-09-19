@@ -157,6 +157,10 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
   `$SHELL -ilc 'command -v mocli'` 兜底），且检出路径后必须 `injectPathDir` 把所在目录
   prepend 进 `process.env.PATH`——mocli 的 shebang 是 `#!/usr/bin/env node`，PATH 里还得有
   node（nvm/volta/homebrew 的 bin 里两者同住，注入一次全解决）。勿回退成「仅 which」判定。
+  **真实工厂必须透传 env（v0.11.2 后本机实录，已用测试钉住）**：`createLocateDeps()` 漏传
+  `env.HOME/SHELL` 会让第②步（HOME 相对候选 + nvm 扫描）在生产整体跳过、永远落到 login shell
+  兜底——若兜底拿到的是符号链接（如 `~/bin/mocli`），注入其所在目录后 `env node` 仍不可达，
+  空 stdout → BAD_OUTPUT。另 BAD_OUTPUT 消息已带 stderr 首行摘要，见 `env: node` 即为此坑。
 - OSS 图片签名 URL 有时效——解析同次流程下完，URL 不入库（与微信视频同坑）。
 
 ---

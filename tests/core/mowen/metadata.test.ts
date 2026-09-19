@@ -1,7 +1,7 @@
 // tests/core/mowen/metadata.test.ts
 // fixture 来自 2026-09-11 真机 mocli v0.5.4 实测（裁剪），字段形态不猜。
 import { describe, it, expect } from 'vitest'
-import { searchUsers, listUserNotes, authInfo, mapNoteList, mapReplyUsers } from '../../../src/core/mowen/metadata'
+import { searchUsers, listUserNotes, authInfo, mapNoteList, mapReplyUsers, parseMocliJson } from '../../../src/core/mowen/metadata'
 import type { MocliRunner } from '../../../src/core/mowen/types'
 
 const USER_SEARCH_RAW = JSON.stringify({
@@ -79,6 +79,19 @@ const VALIDATE_FAIL_RAW = JSON.stringify({ code: 2, status: 'FAIL', reason: 'VAL
 function runner(stdout: string, code = 0): MocliRunner {
   return async () => ({ code, stdout, stderr: '' })
 }
+
+describe('parseMocliJson 失败通道', () => {
+  it('stdout/stderr 都不是 JSON 且 stderr 有诊断信息 → BAD_OUTPUT 消息带 stderr 摘要（如 env: node 解析失败）', () => {
+    expect(() => parseMocliJson('', 'env: node: No such file or directory\n'))
+      .toThrow(/env: node: No such file or directory/)
+  })
+  it('stdout 非法但 stderr 是合法 JSON → 按 mocli 失败通道解析（透传 reason/msg）', () => {
+    expect(() => parseMocliJson('', VALIDATE_FAIL_RAW)).toThrow('query is required')
+  })
+  it('stdout/stderr 都空 → 保持通用提示，不追加空的 stderr 摘要', () => {
+    expect(() => parseMocliJson('', '')).toThrow('mocli 输出不是合法 JSON（可能是版本过旧或被外层工具污染）')
+  })
+})
 
 describe('searchUsers', () => {
   it('按 uids 顺序映射 users，snake→camel', async () => {

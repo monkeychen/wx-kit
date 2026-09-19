@@ -17,7 +17,10 @@ export function parseMocliJson(stdout: string, stderr = ''): Record<string, unkn
   try { json = JSON.parse(stdout) } catch {
     // stdout 不是 JSON → 尝试 stderr（mocli 失败通道）
     try { json = JSON.parse(stderr) } catch {
-      throw new MocliFailed('BAD_OUTPUT', 'mocli 输出不是合法 JSON（可能是版本过旧或被外层工具污染）')
+      // 两流都非 JSON：带上 stderr 摘要引导定位——GUI 环境常见的 `env: node` 解析失败
+      // （PATH 里没有 node）正是空 stdout + 该 stderr，只说「版本过旧」会把人带偏（v0.11.2 实录）
+      const hint = stderr.trim() ? `：${stderr.trim().split(/\r?\n/)[0].slice(0, 120)}` : ''
+      throw new MocliFailed('BAD_OUTPUT', `mocli 输出不是合法 JSON（可能是版本过旧或被外层工具污染）${hint}`)
     }
   }
   if (!isObj(json)) throw new MocliFailed('BAD_OUTPUT', 'mocli 输出结构异常')
