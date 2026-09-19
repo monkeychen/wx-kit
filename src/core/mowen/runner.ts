@@ -40,9 +40,14 @@ export function createWhichRunner(): (cmd: string, arg: string) => Promise<{ cod
     })
 }
 
-/** locateMocli 的真实 deps：fs 存在性 + login shell（`$SHELL -ilc`，带超时，dotfiles 报错即弃）。 */
+/** locateMocli 的真实 deps：fs 存在性 + login shell（`$SHELL -ilc`，带超时，dotfiles 报错即弃）。
+ *  env 必须透传 HOME/SHELL：漏了会让 locateMocli 的 HOME 相对候选与 nvm 扫描整块被跳过
+ *  （deps.env?.HOME === undefined），探测链在生产里永远落到 login shell 兜底——若它返回
+ *  的是符号链接（如 ~/bin/mocli），注入的目录里没有 node，mocli 的 `env node` shebang
+ *  解析失败 → 空 stdout → BAD_OUTPUT（v0.11.2 后本机实录）。 */
 export function createLocateDeps(): LocateDeps {
   return {
+    env: { HOME: process.env.HOME, SHELL: process.env.SHELL },
     exists: async (p) => {
       try { await access(p) ; return true } catch { return false }
     },
