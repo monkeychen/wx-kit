@@ -43,6 +43,25 @@ function parseNvmVersion(name: string): [number, number, number] | null {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null
 }
 
+/** nvm versions 目录里最新的合法 node 版本目录名；目录缺失/无合法版本 → null。 */
+async function nvmLatestVersionName(
+  nvmDir: string,
+  listDir: (dir: string) => Promise<string[] | null>,
+): Promise<string | null> {
+  const entries = await listDir(nvmDir)
+  if (!entries) return null
+  const versions = entries
+    .map((name) => ({ name, key: parseNvmVersion(name) }))
+    .filter((e): e is { name: string; key: [number, number, number] } => e.key !== null)
+    .sort((a, b) => {
+      for (let i = 0; i < 3; i++) {
+        if (a.key[i] !== b.key[i]) return a.key[i] - b.key[i]
+      }
+      return 0
+    })
+  return versions[versions.length - 1]?.name ?? null
+}
+
 /** login shell 输出里取最后一个「绝对路径形态」的行——.zshrc 可能打垃圾，只认 / 开头。 */
 function lastAbsolutePathLine(stdout: string): string | null {
   const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith('/'))
@@ -83,23 +102,10 @@ export async function locateMocli(which: WhichRunner, deps: LocateDeps = {}): Pr
       if (await exists(p)) return p
     }
     // nvm：取最新 node 版本目录下的 bin/mocli
-    const nvmDir = `${home}/${NVM_NODE_DIR}`
-    const entries = await listDir(nvmDir)
-    if (entries) {
-      const versions = entries
-        .map((name) => ({ name, key: parseNvmVersion(name) }))
-        .filter((e): e is { name: string; key: [number, number, number] } => e.key !== null)
-        .sort((a, b) => {
-          for (let i = 0; i < 3; i++) {
-            if (a.key[i] !== b.key[i]) return a.key[i] - b.key[i]
-          }
-          return 0
-        })
-      const latest = versions[versions.length - 1]
-      if (latest) {
-        const p = `${nvmDir}/${latest.name}/bin/mocli`
-        if (await exists(p)) return p
-      }
+    const latest = await nvmLatestVersionName(`${home}/${NVM_NODE_DIR}`, listDir)
+    if (latest) {
+      const p = `${home}/${NVM_NODE_DIR}/${latest}/bin/mocli`
+      if (await exists(p)) return p
     }
   }
 
@@ -116,4 +122,34 @@ export async function locateMocli(which: WhichRunner, deps: LocateDeps = {}): Pr
     } catch { /* 超时/dotfiles 报错 → 未安装不抛 */ }
   }
   return null
+}
+
+/**
+ * 常见工具链 bin 目录（纯 fs 探测：不找 mocli、不跑 login shell，微秒级）。
+ * 启动期 PATH 预置用：GUI 最小 PATH 下，`env node` 与各 CLI shebang 的可达性
+ * 不应依赖「精确探测到 mocli」——两起事故（v0.11.0 未检出、v0.11.2 BAD_OUTPUT）
+ * 的共同根因都是探测链某一环失灵后 node 不可达。这层预置保证即使探测链失灵，
+ * mocli 与其 node 也已可达；探测链仍保留（设置页展示路径/版本、覆盖奇葩安装位）。
+ * 返回存在的目录（HOME 相对在前、绝对在后）。win32 上全是 unix 路径、探测全落空 → 空数组，天然 no-op。
+ */
+export async function commonBinDirs(deps: LocateDeps = {}): Promise<string[]> {
+  const exists = deps.exists ?? (async () => false)
+  const listDir = deps.listDir ?? (async () => null)
+  const out: string[] = []
+  const home = deps.env?.HOME
+  if (home) {
+    for (const rel of ['.volta/bin', '.asdf/shims', '.npm-global/bin', 'bin']) {
+      const p = `${home}/${rel}`
+      if (await exists(p)) out.push(p)
+    }
+    const latest = await nvmLatestVersionName(`${home}/${NVM_NODE_DIR}`, listDir)
+    if (latest) {
+      const p = `${home}/${NVM_NODE_DIR}/${latest}/bin`
+      if (await exists(p)) out.push(p)
+    }
+  }
+  for (const p of ['/opt/homebrew/bin', '/usr/local/bin']) {
+    if (await exists(p)) out.push(p)
+  }
+  return out
 }

@@ -6,7 +6,7 @@
 // shebang `env node` 仍解析失败 → 空 stdout → BAD_OUTPUT。locate.test.ts 的用例都在
 // 测试辅助里显式传了 env，唯独「真实工厂」这条缝没人盖——形状测试钉死。
 import { describe, it, expect } from 'vitest'
-import { createLocateDeps } from '../../../src/core/mowen/runner'
+import { createLocateDeps, prependPathDir, injectCommonBinDirs } from '../../../src/core/mowen/runner'
 
 describe('createLocateDeps（真实工厂）', () => {
   it('必须把 process.env 的 HOME/SHELL 传给 locateMocli——漏传 env 会让第②步（HOME 相对候选 + nvm 扫描）在生产变成死代码', () => {
@@ -14,5 +14,27 @@ describe('createLocateDeps（真实工厂）', () => {
     expect(deps.env).toBeDefined()
     expect(deps.env?.HOME).toBe(process.env.HOME)
     expect(deps.env?.SHELL).toBe(process.env.SHELL)
+  })
+})
+
+describe('prependPathDir / injectCommonBinDirs（启动期 PATH 预置）', () => {
+  it('prependPathDir 幂等 prepend；injectCommonBinDirs 把存在的常见目录注入 PATH', async () => {
+    const saved = process.env.PATH
+    try {
+      process.env.PATH = '/usr/bin:/bin'
+      prependPathDir('/opt/homebrew/bin')
+      prependPathDir('/opt/homebrew/bin') // 幂等
+      expect(process.env.PATH).toBe('/opt/homebrew/bin:/usr/bin:/bin')
+      await injectCommonBinDirs({
+        env: { HOME: '/Users/tom', SHELL: '/bin/zsh' },
+        exists: async (p) => p === '/Users/tom/.nvm/versions/node/v24.12.0/bin' || p === '/Users/tom/.volta/bin',
+        listDir: async () => ['v24.12.0'],
+      })
+      const dirs = (process.env.PATH as string).split(':')
+      expect(dirs).toContain('/Users/tom/.nvm/versions/node/v24.12.0/bin')
+      expect(dirs).toContain('/Users/tom/.volta/bin')
+    } finally {
+      process.env.PATH = saved
+    }
   })
 })

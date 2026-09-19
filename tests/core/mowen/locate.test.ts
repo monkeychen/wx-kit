@@ -3,7 +3,7 @@
 // 背景：macOS GUI 启动的应用只拿系统最小 PATH，nvm/volta/homebrew 里的 mocli
 // 在终端找得到、在 GUI 里找不到（v0.11.0 另一台机器实录）。
 import { describe, it, expect } from 'vitest'
-import { locateMocli } from '../../../src/core/mowen/locate'
+import { locateMocli, commonBinDirs } from '../../../src/core/mowen/locate'
 import { injectPathDir } from '../../../src/core/mowen/runner'
 import type { LocateDeps } from '../../../src/core/mowen/locate'
 import type { WhichRunner } from '../../../src/core/mowen/detect'
@@ -136,5 +136,29 @@ describe('injectPathDir', () => {
     } finally {
       process.env.PATH = saved
     }
+  })
+})
+
+describe('commonBinDirs（启动期 PATH 预置候选）', () => {
+  it('返回存在的常见工具链目录；nvm 取最新版本 bin；不存在的跳过', async () => {
+    const { deps } = makeDeps({
+      dirs: { '/Users/tom/.nvm/versions/node': ['v20.11.0', 'v24.12.0'] },
+      existsFiles: ['/Users/tom/.volta/bin', '/Users/tom/.nvm/versions/node/v24.12.0/bin', '/opt/homebrew/bin'],
+    })
+    const dirs = await commonBinDirs(deps)
+    expect(dirs).toContain('/Users/tom/.volta/bin')
+    expect(dirs).toContain('/Users/tom/.nvm/versions/node/v24.12.0/bin')
+    expect(dirs).toContain('/opt/homebrew/bin')
+    expect(dirs).not.toContain('/Users/tom/.asdf/shims')
+    expect(dirs).not.toContain('/Users/tom/.nvm/versions/node/v20.11.0/bin')
+  })
+  it('纯 fs 探测：不跑 login shell、不要求 mocli 存在', async () => {
+    const { deps, calls } = makeDeps({})
+    await commonBinDirs(deps)
+    expect(calls.shell).toBe(0)
+  })
+  it('HOME 缺失 → 只返回存在的绝对目录', async () => {
+    const { deps } = makeDeps({ env: { HOME: undefined, SHELL: '/bin/zsh' }, existsFiles: ['/usr/local/bin'] })
+    expect(await commonBinDirs(deps)).toEqual(['/usr/local/bin'])
   })
 })
