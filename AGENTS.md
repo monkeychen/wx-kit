@@ -161,6 +161,11 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
   `env.HOME/SHELL` 会让第②步（HOME 相对候选 + nvm 扫描）在生产整体跳过、永远落到 login shell
   兜底——若兜底拿到的是符号链接（如 `~/bin/mocli`），注入其所在目录后 `env node` 仍不可达，
   空 stdout → BAD_OUTPUT。另 BAD_OUTPUT 消息已带 stderr 首行摘要，见 `env: node` 即为此坑。
+  **防线已前移（两次事故后定案）**：启动期 `injectCommonBinDirs()`（GUI 在 `runStartupMowenDetect`、
+  CLI 在 `mowenRunnerOf` 各调一次）把常见工具链 bin 目录（nvm 最新版/volta/asdf/npm-global/
+  `~/bin`/brew 两个前缀，存在才加，纯 fs 探测微秒级）prepend 进 PATH——`env node` 与常见 CLI
+  的可达性**不再依赖「精确探测到 mocli」**，探测链单环失灵不再致命。探测链保留（设置页要展示
+  路径/版本、login shell 兜底覆盖奇葩安装位），但定位从「唯一防线」降级为「精确展示 + 补充」。
 - OSS 图片签名 URL 有时效——解析同次流程下完，URL 不入库（与微信视频同坑）。
 
 ---

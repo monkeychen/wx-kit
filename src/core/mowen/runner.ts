@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process'
 import { access, readdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { MocliRunner } from './types'
+import { commonBinDirs } from './locate'
 import type { LocateDeps } from './locate'
 
 const DEFAULT_TIMEOUT_MS = 15_000
@@ -65,6 +66,13 @@ export function createLocateDeps(): LocateDeps {
   }
 }
 
+/** 把目录 prepend 进本进程 PATH（幂等）。 */
+export function prependPathDir(dir: string): void {
+  const cur = (process.env.PATH ?? '').split(':').filter(Boolean)
+  if (cur.includes(dir)) return
+  process.env.PATH = [dir, ...cur].join(':')
+}
+
 /**
  * 把二进制所在目录 prepend 进本进程 PATH（幂等）。GUI/受限环境里 execFile('mocli')
  * 与其 shebang `#!/usr/bin/env node` 都依赖 PATH 可达——nvm/volta/homebrew 的 bin 里
@@ -72,8 +80,15 @@ export function createLocateDeps(): LocateDeps {
  */
 export function injectPathDir(binPath: string | null): void {
   if (!binPath) return
-  const dir = dirname(binPath)
-  const cur = (process.env.PATH ?? '').split(':').filter(Boolean)
-  if (cur.includes(dir)) return
-  process.env.PATH = [dir, ...cur].join(':')
+  prependPathDir(dirname(binPath))
+}
+
+/**
+ * 启动期 PATH 预置：把常见工具链 bin 目录（存在才加）prepend 进 PATH，幂等。
+ * 防线前移——不依赖「精确探测到 mocli」，先保证 `env node` 与常见 CLI 可达；
+ * 探测链（locateMocli）仍负责精确路径展示与奇葩安装位。GUI 启动与 CLI mowen
+ * 命令入口各调一次。
+ */
+export async function injectCommonBinDirs(deps: LocateDeps = createLocateDeps()): Promise<void> {
+  for (const dir of await commonBinDirs(deps)) prependPathDir(dir)
 }

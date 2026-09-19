@@ -4,7 +4,7 @@
 // mocli 装没装不该影响 wx-kit 其他功能的启动。
 import { SettingsService } from './settings'
 import { detectMocli } from '../../src/core/mowen/detect'
-import { createMocliRunner, createWhichRunner, createLocateDeps } from '../../src/core/mowen/runner'
+import { createMocliRunner, createWhichRunner, createLocateDeps, injectCommonBinDirs } from '../../src/core/mowen/runner'
 import { searchUsers, listUserNotes } from '../../src/core/mowen/metadata'
 import { searchNotes } from '../../src/core/mowen/search'
 import { MocliFailed, MocliNotFound } from '../../src/core/mowen/errors'
@@ -16,6 +16,12 @@ import { ipcMain } from 'electron'
  */
 async function detectAndInject() {
   return detectMocli(createMocliRunner(), createWhichRunner(), createLocateDeps())
+}
+
+/** 启动期 PATH 预置：常见工具链 bin 目录先进 PATH（存在才加，微秒级），再谈精确探测——
+ *  即使探测链某环失灵，mocli 的 `env node` shebang 也已可达（两起事故的共同根因）。 */
+export async function presetCommonPath(): Promise<void> {
+  try { await injectCommonBinDirs() } catch { /* 预置失败不致命,探测链仍有兜底 */ }
 }
 
 /** GUI 发现链路的前置检测:未装返回 null(调用方给 MOCLI_NOT_FOUND 载荷)。M63 起订阅 IPC 共用。 */
@@ -34,6 +40,7 @@ function mowenErrorPayload(err: unknown) {
 
 export async function runStartupMowenDetect(settings: SettingsService): Promise<void> {
   try {
+    await presetCommonPath()
     const r = await detectAndInject()
     await settings.save({
       mowenMocliPath: r.path,

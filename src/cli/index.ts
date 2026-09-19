@@ -24,7 +24,7 @@ import { selectArticles, buildManifest } from '../core/material-export'
 import { sortArticles } from '../core/library-sort'
 import { syncToSite } from '../core/site-sync'
 import { detectMocli } from '../core/mowen/detect'
-import { createMocliRunner, createWhichRunner, createLocateDeps } from '../core/mowen/runner'
+import { createMocliRunner, createWhichRunner, createLocateDeps, injectCommonBinDirs } from '../core/mowen/runner'
 import { searchUsers, listUserNotes, listMyNotes, authInfo } from '../core/mowen/metadata'
 import { MocliFailed } from '../core/mowen/errors'
 import { searchNotes } from '../core/mowen/search'
@@ -612,6 +612,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   const mowen = program.command('mowen').description('墨问笔记(子命令:detect / search-user / list-user / list-mine / search)')
   // 全部命令共用的前置:装了才继续;未装如实报错出指引(PRD R3:不静默失败)
   const mowenRunnerOf = async () => {
+    await injectCommonBinDirs()   // 打包 CLI 同样只有最小 PATH:先预置常见工具链 bin 再精确探测
     const det = await detectMocli(createMocliRunner(), createWhichRunner(), createLocateDeps())
     if (!det.installed) {
       outJson({ ok: false, error: { code: 'MOCLI_NOT_FOUND', message: '未检测到 mocli。请先安装:npm install -g @mowenxd/cli,并运行 mocli auth init 完成认证(API Key 在墨问小程序「我的 → 开发者」获取)' } })
