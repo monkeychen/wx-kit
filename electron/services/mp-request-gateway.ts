@@ -1,4 +1,5 @@
 import { MpRateLimited, MpRequestProtectionError } from '../../src/core/mp-errors'
+import { diag } from '../../src/core/diag-log'
 import {
   pauseRequests,
   beginRequest,
@@ -137,7 +138,25 @@ export class MpRequestGateway {
     return this.execute('article-asset', url, timeoutMs + 10_000, signal, () => this.transport.binary(url, timeoutMs, signal))
   }
 
+  /** M66 诊断埋点收口:所有微信/微信读书网络请求(成功/失败)一条日志——kind+脱敏端点+耗时+错误。 */
   private async execute<T>(
+    kind: MpRequestKind, url: string, leaseMs: number, signal: AbortSignal | undefined, task: () => Promise<T>,
+  ): Promise<T> {
+    const t0 = Date.now()
+    try {
+      const r = await this.executeInner(kind, url, leaseMs, signal, task)
+      diag()?.info('mp-request', 'request', { kind, endpoint: safeEndpoint(url), ms: Date.now() - t0 })
+      return r
+    } catch (e) {
+      diag()?.warn('mp-request', 'request', {
+        kind, endpoint: safeEndpoint(url), ms: Date.now() - t0,
+        error: e instanceof Error ? e.message : String(e),
+      })
+      throw e
+    }
+  }
+
+  private async executeInner<T>(
     kind: MpRequestKind, url: string, leaseMs: number, signal: AbortSignal | undefined, task: () => Promise<T>,
   ): Promise<T> {
     const endpoint = safeEndpoint(url)

@@ -1,16 +1,33 @@
 // electron/main.ts
 import { app, BrowserWindow, shell } from 'electron'
 import path, { join } from 'node:path'
+import { access } from 'node:fs/promises'
 import { runCli } from '../src/cli'
 import { runStartupMowenDetect } from './services/mowen-detect'
 import { isCliInvocation, normalizeUserArgs } from './cli-dispatch'
 import { registerWxfileScheme, handleWxfileProtocol } from './protocol'
 import { registerIpc } from './ipc'
 import { SettingsService } from './services/settings'
+import { initDiagLog, diag, flushDiagLog } from '../src/core/diag-log'
 
 // Must be called before app 'ready'. Safe in CLI mode — the registered
 // scheme is never exercised without a BrowserWindow.
 registerWxfileScheme()
+
+/** M66 启动快照:环境信息一条入日志(PATH/HOME/SHELL 是两起 mocli 事故的直接线索);
+ *  weread 凭据只记存在与否,不记内容。 */
+async function writeStartupSnapshot(mode: 'gui' | 'cli', version: string, userData: string, argv: string[]): Promise<void> {
+  initDiagLog({ dir: join(userData, 'logs') })
+  const wereadCreds = await access(join(userData, 'weread-creds.json')).then(() => true, () => false)
+  diag()?.info('startup', 'snapshot', {
+    mode, appVersion: version,
+    electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome,
+    platform: process.platform, arch: process.arch,
+    userData, wereadCreds,
+    PATH: process.env.PATH, HOME: process.env.HOME, SHELL: process.env.SHELL,
+    ...(mode === 'cli' ? { argv: argv.slice(0, 20) } : {}),
+  }, 'startup snapshot')
+}
 
 // 打包后 argv: [exe, ...args]；开发时 argv: [electron, '.', ...args]
 function userArgs(): string[] {
@@ -33,19 +50,23 @@ async function main() {
     // before the summary/library write finish. We exit explicitly below.
     app.on('window-all-closed', () => {})
     await app.whenReady()
+    await writeStartupSnapshot('cli', app.getVersion(), app.getPath('userData'), args)
     const code = await runCli(args, { version: app.getVersion(), userDataDir: app.getPath('userData') })
+    await flushDiagLog()   // CLI 进程即将退出:不 flush 会截断尾部日志行
     app.exit(code)
     return
   }
 
   // GUI 模式
   await app.whenReady()
+  void writeStartupSnapshot('gui', app.getVersion(), app.getPath('userData'), args)
 
   // LSUIElement=true 让进程启动即无程序坞图标(为了 CLI,见上方 CLI 分支注释),
   // GUI 模式要把图标要回来;accessory 应用的窗口不会自动抢焦点,故一并 focus。
   if (app.dock) { app.dock.show(); app.focus({ steal: true }) }
 
   const settings = new SettingsService(app.getPath('userData'), join(app.getPath('documents'), 'wx-kit'))
+  void settings.get().then((s) => diag()?.info('startup', 'ready', { libraryRoot: s.libraryRoot }))
   handleWxfileProtocol(async () => (await settings.get()).libraryRoot)
   registerIpc(settings)
   // M60 R3:启动期检测 mocli,fire-and-forget——装没装、多慢都不阻塞窗口创建

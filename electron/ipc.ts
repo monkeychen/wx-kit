@@ -1,8 +1,8 @@
 // electron/ipc.ts
 import { ipcMain, dialog, shell, BrowserWindow, app, clipboard } from 'electron'
-import { readdir } from 'node:fs/promises'
+import { readdir, access } from 'node:fs/promises'
 import { appendFileSync, writeFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { linkStatus, createLink, pathContains, ensureInProfile, profilePathFor, isTransientExecPath } from './services/cli-link'
 import type { DownloadFormat } from '../src/core/types'
@@ -43,6 +43,7 @@ import { extractArticleKeys } from '../src/core/article-keys'
 import { normalizeAccountId } from '../src/core/weread/book-id'
 import { parseAccount } from '../src/core/parse-article'
 import { HTML_TIMEOUT_MS } from '../src/core/fetch-html'
+import { diag, diagLogPath } from '../src/core/diag-log'
 import * as cheerio from 'cheerio'
 import { PRIVATE_API_FEATURE_ENABLED, RETIRED_PRIVATE_API_COMMANDS, retiredPrivateApiError, retiredPrivateApiResponse } from '../src/core/retired-private-api'
 
@@ -64,6 +65,20 @@ export function registerIpc(settings: SettingsService): void {
 
   ipcMain.handle('settings:get', () => settings.get())
   ipcMain.handle('settings:save', (_e, patch) => settings.save(patch))
+
+  // M66 诊断区:报障话术「设置→打开日志文件夹,把 main.log 发我」。
+  // showItemInFolder 在 Finder 里选中文件;日志尚无一行时退回打开目录。
+  ipcMain.handle('diag:openLogsFolder', async () => {
+    const p = diagLogPath()
+    if (!p) return { ok: false as const, error: '日志尚未初始化' }
+    try {
+      await access(p)
+      shell.showItemInFolder(p)
+    } catch {
+      await shell.openPath(dirname(p))
+    }
+    return { ok: true as const, path: p }
+  })
 
   ipcMain.handle('library:list', async () => (await libraryFor()).list())
   ipcMain.handle('library:search', async (_e, kw: string) => (await libraryFor()).search(kw))
@@ -183,14 +198,29 @@ export function registerIpc(settings: SettingsService): void {
       if (!event.sender.isDestroyed()) event.sender.send('download:progress', ev)
     }
     const queue = new DownloadQueue(
-      (url) => downloadArticle(url, formats, {
-        ...deps,
-        // 视频可达上百 MB、单个要下一分多钟：不报进度的话界面一动不动，看着像卡死
-        onVideoProgress: (e) => sendProgress({
-          total: urls.length, completed: 0, currentUrl: url, phase: 'images',
-          message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB，${e.video.width}×${e.video.height}）`,
-        }),
-      }),
+      (url) => {
+        // M66 篇级诊断埋点:URL/耗时/结果(失败类型由 error message 承载,宪法:不降级)
+        const t0 = Date.now()
+        return downloadArticle(url, formats, {
+          ...deps,
+          // 视频可达上百 MB、单个要下一分多钟：不报进度的话界面一动不动，看着像卡死
+          onVideoProgress: (e) => sendProgress({
+            total: urls.length, completed: 0, currentUrl: url, phase: 'images',
+            message: `正在下载视频 ${e.index}/${e.total}（${(e.video.filesize / 1048576).toFixed(1)}MB，${e.video.width}×${e.video.height}）`,
+          }),
+        }).then(
+          (r) => {
+            diag()?.info('download', r.ok || r.skipped ? 'done' : 'fail', {
+              url, ok: r.ok, skipped: !!r.skipped, ms: Date.now() - t0, ...(r.id ? { articleId: r.id } : {}),
+            })
+            return r
+          },
+          (e: unknown) => {
+            diag()?.error('download', 'fail', { url, ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) })
+            throw e
+          },
+        )
+      },
       sendProgress,
     )
     const summary = await queue.run(urls)

@@ -4,6 +4,7 @@
 import { execFile } from 'node:child_process'
 import { access, readdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { diag, redactFreeText } from '../diag-log'
 import type { MocliRunner } from './types'
 import { commonBinDirs } from './locate'
 import type { LocateDeps } from './locate'
@@ -14,13 +15,25 @@ const SHELL_RESOLVE_TIMEOUT_MS = 3_000
 export function createMocliRunner(bin = 'mocli'): MocliRunner {
   return (args, timeoutMs = DEFAULT_TIMEOUT_MS) =>
     new Promise((resolve, reject) => {
+      const startedAt = Date.now()
+      // M66 诊断埋点:spawn/exit 全记录(stderr 首行是 BAD_OUTPUT 类事故的直接线索——
+      // v0.11.2 的 `env: node: No such file or directory` 就死在这里)
+      diag()?.info('mocli', 'spawn', { bin, args })
       execFile(bin, args, { timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
+        // 外部进程输出是不可信文本:结构化 redact 管不到字符串内部,首行摘要须过自由文本打码
+        // (mocli auth info 的 stdout JSON 带 api_key 明文,产物验收曾实测泄漏)
+        const firstLine = (s: unknown): string => redactFreeText(String(s ?? '').split(/\r?\n/)[0]?.slice(0, 120) ?? '')
         if (err) {
           const code: string | number | undefined = (err as NodeJS.ErrnoException).code
           // ENOENT = 可执行文件不存在；非零退出：mocli 失败也会输出 JSON，把退出码带给上层判
-          if (code === 'ENOENT') return reject(new Error(`mocli not found (${bin})`))
+          if (code === 'ENOENT') {
+            diag()?.warn('mocli', 'not-found', { bin, ms: Date.now() - startedAt })
+            return reject(new Error(`mocli not found (${bin})`))
+          }
+          diag()?.info('mocli', 'exit', { code: typeof code === 'number' ? code : 1, ms: Date.now() - startedAt, stdout1: firstLine(stdout), stderr1: firstLine(stderr) })
           return resolve({ code: typeof code === 'number' ? code : 1, stdout: String(stdout), stderr: String(stderr) })
         }
+        diag()?.info('mocli', 'exit', { code: 0, ms: Date.now() - startedAt, stdout1: firstLine(stdout), stderr1: firstLine(stderr) })
         resolve({ code: 0, stdout: String(stdout), stderr: String(stderr) })
       })
     })

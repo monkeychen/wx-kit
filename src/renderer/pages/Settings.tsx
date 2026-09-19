@@ -434,6 +434,20 @@ export default function Settings() {
           </div>
 
           <div className="setting-block">
+            <div className="setting-label">诊断</div>
+            <div className="setting-hint">
+              运行日志记录启动环境与外部请求(已自动脱敏),报障时请把 main.log 一并发给开发者。
+            </div>
+            <Button style={{ marginTop: 8 }} size="small" data-testid="diag-open-logs"
+              onClick={async () => {
+                try {
+                  const r = await api.diagOpenLogsFolder()
+                  if (!r.ok) message.warning(r.error ?? '打开失败')
+                } catch { message.error('打开日志文件夹失败') }
+              }}>打开日志文件夹</Button>
+          </div>
+
+          <div className="setting-block">
             <div className="setting-label">关于</div>
             <div className="setting-hint">
               wx-kit（微信百宝箱）当前版本 <strong data-testid="about-version">v{ver || '—'}</strong>

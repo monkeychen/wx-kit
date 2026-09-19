@@ -9,6 +9,7 @@ import { searchUsers, listUserNotes } from '../../src/core/mowen/metadata'
 import { searchNotes } from '../../src/core/mowen/search'
 import { MocliFailed, MocliNotFound } from '../../src/core/mowen/errors'
 import { ipcMain } from 'electron'
+import { diag } from '../../src/core/diag-log'
 
 /**
  * 统一检测入口：探测链定位 + PATH 注入 + 版本探测（注入收口在 detectMocli 内部、
@@ -42,12 +43,14 @@ export async function runStartupMowenDetect(settings: SettingsService): Promise<
   try {
     await presetCommonPath()
     const r = await detectAndInject()
+    diag()?.info('startup', 'mocli-located', { path: r.path, version: r.version }, r.installed ? 'mocli detected' : 'mocli not found')
     await settings.save({
       mowenMocliPath: r.path,
       mowenMocliVersion: r.version,
       mowenDetectedAt: new Date().toISOString(),
     })
   } catch (e) {
+    diag()?.error('startup', 'mocli-located', { error: (e as Error).message }, 'mocli detect threw (ignored)')
     process.stderr.write(`[mowen] mocli detect failed (ignored): ${(e as Error).message}\n`)
     try { await settings.save({ mowenMocliPath: null, mowenMocliVersion: null, mowenDetectedAt: new Date().toISOString() }) }
     catch { /* 连 settings 都写不进:静默,别拖垮启动 */ }
