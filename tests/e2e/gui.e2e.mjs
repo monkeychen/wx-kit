@@ -304,6 +304,16 @@ async function main() {
       `M60: mowen section shows exactly one state (installed=${installed}, missing=${missing})`)
     assert((await win.locator('[data-testid="mowen-redetect"]').count()) === 1, 'M60: re-detect button is present')
 
+    // ============ M66 · 设置页诊断区(按钮在,IPC 走通返回日志路径) ============
+    assert((await win.locator('[data-testid="diag-open-logs"]').count()) === 1, 'M66: diag open-logs button is present')
+    {
+      // 点击会真调 shell.showItemInFolder(Finder 打开目录)——e2e 沙箱 userData 下无副作用风险,
+      // 断言 IPC 契约:ok + main.log 绝对路径(GUI 进程 init 过 diag-log,必然非空)
+      const diagResp = await win.evaluate(() => window.api.diagOpenLogsFolder())
+      assert(diagResp?.ok === true && /main\.log$/.test(diagResp.path ?? ''),
+        `M66: diag IPC returns ok + log path (saw ${JSON.stringify(diagResp)})`)
+    }
+
     // ============ M9/M23 · 文库组织(a1/a2/a3) ============
     await win.click('[data-testid="nav-文库"]')
     await win.waitForSelector('.ghead', { timeout: 15000 })
