@@ -11,7 +11,7 @@ describe('normalizeUserArgs', () => {
 
 describe('isCliInvocation', () => {
   it('subcommands are CLI', () => {
-    for (const c of ['download', 'crawl', 'search', 'login', 'auth-status', 'library', 'subscription', 'settings', 'session', 'site', 'update', 'protection', 'help', 'version'])
+    for (const c of ['download', 'crawl', 'search', 'login', 'auth-status', 'library', 'subscription', 'settings', 'session', 'site', 'update', 'protection', 'mowen', 'topics', 'help', 'version'])
       expect(isCliInvocation([c])).toBe(true)
   })
   it('help/version flags are CLI even as first arg', () => {

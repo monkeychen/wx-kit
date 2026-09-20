@@ -4,7 +4,7 @@
 
 ## 内含
 
-- `wx-kit-skill/` —— **wx-kit 能力说明书 skill**：安装（brew/npm 自动检测）、按 URL 下载、公众号订阅（微信读书后端）、本地文库、素材导出、站点同步。agent 从零上手 wx-kit 看这个。
+- `wx-kit-skill/` —— **wx-kit 能力说明书 Skill**：安装（brew/npm 自动检测）、按 URL 下载、公众号订阅（微信读书后端）、本地文库、素材导出、站点同步，以及当前 main / M69 未发布的 BYOK 选题 CLI。agent 从零上手 wx-kit 看这个。
   **它是 CLI 契约的唯一真相**——参数、输出结构、错误码只在这里维护，随每次 CLI 变更同步。
 
 ## 安装

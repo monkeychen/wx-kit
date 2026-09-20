@@ -21,6 +21,7 @@ export interface AnalyzeTopicsDeps {
   readContent?: TopicSnapshotDeps['readContent']
   now?: () => Date
   makeRunId?: () => string
+  onStage?: (stage: TopicTraceEvent['stage']) => void
 }
 
 export interface AnalyzeTopicsInput {
@@ -50,6 +51,9 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
     taskVersion: `${TOPIC_EXTRACT_VERSION}+${TOPIC_PROPOSE_VERSION}`,
   }
   const duration = (): number => Math.max(0, clock().getTime() - startedMs)
+  const notify = (stage: TopicTraceEvent['stage']): void => {
+    try { deps.onStage?.(stage) } catch { /* UI/CLI 进度回调不能改变业务结果 */ }
+  }
   const trace = async (event: Omit<TopicTraceEvent, 'time'>): Promise<void> => {
     try { await deps.store.appendTrace(runId, { time: clock().toISOString(), ...event }) }
     catch (error) { diag()?.warn('topics', 'trace-failed', { runId, message: error instanceof Error ? error.message : String(error) }) }
@@ -61,18 +65,23 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
     now: () => startedAt,
   }, { runId, window: input.window, articles: input.articles })
   const manifestPath = await deps.store.writeManifest(runId, snapshot)
+  notify('snapshot')
   await trace({ stage: 'snapshot', status: 'done', counts: { articles: snapshot.articles.length, groups: snapshot.groups.length, excluded: snapshot.excluded.length }, durationMs: duration() })
   diag()?.info('topics', 'snapshot', { runId, articles: snapshot.articles.length, groups: snapshot.groups.length, excluded: snapshot.excluded.length })
 
-  const base = () => ({
-    schemaVersion: 1 as const,
-    runId,
-    window: input.window,
-    manifestPath,
-    createdAt: startedAt.toISOString(),
-    durationMs: duration(),
-    model,
-  })
+  const base = () => {
+    const usage = deps.model.usage?.()
+    return {
+      schemaVersion: 1 as const,
+      runId,
+      window: input.window,
+      manifestPath,
+      createdAt: startedAt.toISOString(),
+      durationMs: duration(),
+      model,
+      ...(usage ? { usage } : {}),
+    }
+  }
   const persist = async (result: TopicRunResult): Promise<TopicRunResult> => {
     try {
       await deps.store.writeResult(runId, result)
@@ -95,6 +104,7 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
   let stage: TopicTraceEvent['stage'] = 'extract'
   try {
     if (input.signal?.aborted) throw abortError()
+    notify('extract')
     await trace({ stage: 'extract', status: 'start' })
     const rawExtractions = await deps.model.extract(makeTopicExtractionInput(snapshot), input.signal)
     await trace({ stage: 'extract', status: 'done' })
@@ -111,6 +121,7 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
 
     if (input.signal?.aborted) throw abortError()
     stage = 'propose'
+    notify('propose')
     await trace({ stage, status: 'start' })
     const rawProposals = await deps.model.propose(makeTopicProposalInput(snapshot, extracted.items), input.signal)
     await trace({ stage, status: 'done' })
@@ -125,6 +136,7 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
         error: { code: 'NO_VALID_CARDS', message: `模型候选没有通过校验：${proposed.failures.map(item => item.code).join(', ')}` },
       })
     }
+    notify('result')
     if (failures.length > 0) return persist({ ...base(), status: 'partial', cards: proposed.cards, failures })
     return persist({ ...base(), status: 'completed', cards: proposed.cards })
   } catch (error) {

@@ -42,6 +42,7 @@ export interface TopicModel {
   descriptor: { providerId: string; modelName: string }
   extract(input: TopicExtractionInput, signal?: AbortSignal): Promise<unknown>
   propose(input: TopicProposalInput, signal?: AbortSignal): Promise<unknown>
+  usage?(): { inputTokens?: number; outputTokens?: number } | undefined
 }
 
 export const makeTopicExtractionInput = (snapshot: TopicMaterialSnapshot): TopicExtractionInput => ({

@@ -51,9 +51,11 @@ class FakeModel implements TopicModel {
   proposeCalls = 0
   extractionInput?: TopicExtractionInput
   proposalInput?: TopicProposalInput
+  usageValue?: { inputTokens?: number; outputTokens?: number }
   constructor(private extractionRaw: unknown = extraction, private proposalRaw: unknown = { cards: [goodCard] }) {}
   async extract(input: TopicExtractionInput): Promise<unknown> { this.extractCalls++; this.extractionInput = input; return this.extractionRaw }
   async propose(input: TopicProposalInput): Promise<unknown> { this.proposeCalls++; this.proposalInput = input; return this.proposalRaw }
+  usage(): { inputTokens?: number; outputTokens?: number } | undefined { return this.usageValue }
 }
 
 const window = resolveTopicWindow(undefined, AS_OF)
@@ -63,6 +65,7 @@ describe('可验证选题分析编排', () => {
   it('运行真实快照、校验、统计和落盘，读取结果不会重复调用模型', async () => {
     const root = await tempRoot()
     const model = new FakeModel()
+    model.usageValue = { inputTokens: 21, outputTokens: 8 }
     const store = new TopicRunStore(root)
     const result = await analyzeTopics({ libraryRoot: root, model, store, now: fixedNow, makeRunId: () => 'run-success' }, {
       window, articles: [await material(root)],
@@ -71,6 +74,7 @@ describe('可验证选题分析编排', () => {
     expect(result).toMatchObject({
       status: 'completed', runId: 'run-success', durationMs: 0,
       model: { providerId: 'fixture', modelName: 'fixture-v1', systemVersion: TOPIC_SYSTEM_VERSION, taskVersion: `${TOPIC_EXTRACT_VERSION}+${TOPIC_PROPOSE_VERSION}` },
+      usage: { inputTokens: 21, outputTokens: 8 },
       cards: [{ id: 'topic-1', statistics: { relatedArticleCount: 1, sourceAccountCount: 1, contentGroupCount: 1 } }],
     })
     expect(model.extractionInput).toMatchObject({ systemVersion: TOPIC_SYSTEM_VERSION, taskVersion: TOPIC_EXTRACT_VERSION })

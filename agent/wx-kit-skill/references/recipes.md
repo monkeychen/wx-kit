@@ -144,6 +144,30 @@ WX=${WX:-$(command -v wx-kit || echo /Applications/wx-kit.app/Contents/MacOS/wx-
 - 付费/私密笔记如实失败（`MowenNoteUnavailable`），不伪装成功；他人私密笔记不可获取；
 - `check-now` 的检查日志独立于公众号订阅（`mowen-subscriptions.json`），逐作者明细在 `results[]`。
 
+## 9. 从本地文库形成选题简报（当前 main / M69，未发布）
+
+先在自己的终端配置服务。下面只写变量名，不要把真实 Key 记入脚本、仓库、聊天或问题单。
+
+```sh
+export WXKIT_AI_BASE_URL='https://provider.example/v1'
+export WXKIT_AI_MODEL='model-name'
+export WXKIT_AI_API_KEY='在自己的终端中填写'
+
+# 默认最近 24 小时；正文会发送到上面配置的服务
+wx-kit topics analyze --range 24h > topics.json
+jq '{ok,status,runId,timeExcludedCount,cards:[.cards[]? | {id,question,angle,readerValues,statistics,distributionEvidence}]}' topics.json
+
+jq -e '.ok == true and (.status == "completed" or .status == "partial") and (.cards | length > 0)' topics.json >/dev/null \
+  || { echo '本次没有可生成简报的候选，请查看 status/error/排除信息'; exit 1; }
+
+RUN_ID=$(jq -r '.runId' topics.json)
+TOPIC_ID=$(jq -r '.cards[0].id' topics.json)
+wx-kit topics brief --run "$RUN_ID" --topic "$TOPIC_ID" > brief.json
+jq -r '.path' brief.json
+```
+
+`failed/cancelled` 没有可用卡片；`completed` 也可能合法返回空数组。上面的 `jq -e` 在取 `.cards[0]` 前完成门禁。`brief` 只整理已经验证的本地结果，不产生新的模型费用。
+
 ## 失败处理
 
 | 现象 | 含义 | 动作 |

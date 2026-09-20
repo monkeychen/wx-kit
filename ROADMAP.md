@@ -84,6 +84,7 @@
 | **M66** ✅ | v0.11.3 | 统一诊断日志 main.log：JSON 行 + 脱敏红线 + 5MB×3 轮转,默认常开 info;`src/core/diag-log.ts` 纯逻辑+落盘单例(零 electron 依赖),埋点 4 处边界(启动快照含 PATH/mocli 结论、mocli spawn-exit 含 stderr 首行、weread 请求码与耗时、download 篇级结果),设置页「诊断」区打开日志文件夹。同版压入 v0.11.2 后 mocli 修复三连(locate 透传 env、BAD_OUTPUT 带 stderr 摘要、启动 PATH 预置+调度闸门)。设计定案:不引 electron-log、不吞并 audit/check 专用日志、无远程上报。验收契约 `docs/PRD-v0.11.3.md`(2026-09-19 完成,728 单测+三平台产物真机全过) | `plans/2026-09-19-m66-diag-log.md` |
 | **M67** ✅ | 未发布 | 选题基础契约与 compose 退场：清理当前安装/路由入口，保留历史；新增按发表时间的 24h/3d/7d/自定义筛选、日期精度和结果类型；十二类合成评估材料（27 条）。54 个针对用例通过，全量 782 个测试与类型检查通过，独立审查无阻塞问题（2026-09-20 完成）。AI 调用、topics CLI、GUI 与真实语义评估不在本阶段 | `plans/2026-09-20-m67-topic-foundation.md` |
 | **M68** ✅ | 未发布 | 可验证选题分析核心：本地正文快照与完全重复内容组、30 篇/12 万字符护栏、两阶段注入式模型协议、unknown 输出运行时校验、精确摘录与统计重算、manifest/result/trace/brief 私有落盘、可区分的完成/材料不足/部分/取消/失败状态。104 个 topics 用例、全量 832 个测试与类型检查通过（2026-09-20 完成）。真实供应商、Key、CLI/GUI 与语义质量未实现 | `plans/2026-09-20-m68-verifiable-topic-analysis.md` |
+| **M69** ✅ | 未发布 | BYOK 模型适配与 topics CLI：明确支持 OpenAI Chat Completions 兼容协议，Key 仅从环境变量读取；严格 JSON、usage、90 秒超时、零重试和脱敏诊断；`topics analyze/brief` 共享 M68 核心，新增 CLI 白名单与 Skill 说明。本地 HTTP 验收通过，12 个目标文件/147 个目标用例、全量 869 个测试与类型检查通过（2026-09-20 完成）。真实外部供应商和语义质量未验 | `plans/2026-09-20-m69-byok-topics-cli.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`、v0.10.2 `docs/PRD-v0.10.2.md`、v0.10.4 `docs/PRD-v0.10.4.md`（发版后补档）、v0.10.5 `docs/PRD-v0.10.5.md`、v0.10.6 `docs/PRD-v0.10.6.md`、v0.11.0 `docs/PRD-v0.11.0.md`、v0.11.1 `docs/PRD-v0.11.1.md`、v0.11.2 `docs/PRD-v0.11.2.md`、v0.11.3 `docs/PRD-v0.11.3.md`（最新发布验收契约）。
 
@@ -125,7 +126,7 @@
 
 ## 下一步 / 候选
 
-**当前在做**：无在制里程碑；M68 可验证选题分析核心已完成（2026-09-20），计划见 [`docs/plans/2026-09-20-m68-verifiable-topic-analysis.md`](docs/plans/2026-09-20-m68-verifiable-topic-analysis.md)。下一步接入 BYOK 供应商与 topics CLI，随后再接已确认的 GUI；真实模型语义质量仍未验收，发布基线仍为 v0.11.3。
+**当前在做**：无在制里程碑；M69 BYOK 模型适配与 topics CLI 已完成（2026-09-20），计划见 [`docs/plans/2026-09-20-m69-byok-topics-cli.md`](docs/plans/2026-09-20-m69-byok-topics-cli.md)。下一步接入已确认的选题 GUI 与安全 Key 保存；真实外部供应商和语义质量仍未验收，发布基线仍为 v0.11.3。
 
 - **首版边界**：本地素材 → 最多三张可解释选题卡 → 同页详情 → 选题简报；初始默认最近 24 小时，用户可选择 3 天/7 天/自定义日期，按发表时间筛选，不自动扩窗。`wx-kit-compose` 与当前入口已于本阶段删除，旧 PRD/计划/发版说明保留；下一步落地模型分析与证据验证，再接入界面。完整写作、配图、排版、自动发布与收费体系不在本期范围。
 

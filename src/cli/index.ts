@@ -50,6 +50,14 @@ import {
   wereadCredsStore, wereadListFn, wereadListUrl
 } from '../../electron/services/weread-auth'
 import { buildWereadQrFlowHttp } from '../../electron/services/weread-net'
+import type { TopicModel } from '../core/topics/model'
+import { ChatCompletionsTopicModel, TopicProviderError } from '../core/topics/chat-completions'
+import { TopicCliInputError, resolveTopicCliModelConfig, resolveTopicWindowArgs, type TopicCliModelConfig } from '../core/topics/cli-input'
+import { selectTopicArticles } from '../core/topics/time-window'
+import { analyzeTopics } from '../core/topics/analyze'
+import { TopicRunStore } from '../core/topics/store'
+import { buildTopicBrief } from '../core/topics/brief'
+import { TopicInputLimitError } from '../core/topics/snapshot'
 
 function defaultLibraryRoot(): string {
   return join(homedir(), 'Documents', 'wx-kit')
@@ -68,8 +76,17 @@ function out(summary: DownloadSummary): void {
 
 function outJson(obj: unknown): void { process.stdout.write(JSON.stringify(obj) + '\n') }
 
+export interface RunCliOptions {
+  version?: string
+  userDataDir?: string
+  env?: NodeJS.ProcessEnv
+  now?: () => Date
+  makeTopicRunId?: () => string
+  topicModelFactory?: (config: TopicCliModelConfig) => TopicModel
+}
+
 /** 解析 CLI 参数并执行；返回退出码 */
-export async function runCli(argv: string[], opts: { version?: string; userDataDir?: string } = {}): Promise<number> {
+export async function runCli(argv: string[], opts: RunCliOptions = {}): Promise<number> {
   const program = new Command()
   program.name('wx-kit')
     .description('微信百宝箱 CLI — 与 GUI 同一二进制:无参启动图形界面,带子命令进入命令行模式。\n'
@@ -87,6 +104,7 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   wx-kit search --url "https://mp.weixin.qq.com/s/XXX"   # 从文章链接识别公众号
   wx-kit subscription check-now                     # 检查订阅更新
   wx-kit library list
+  wx-kit topics analyze --range 24h                # 需配置 WXKIT_AI_BASE_URL/MODEL/API_KEY
   wx-kit settings get libraryRoot
   wx-kit site sync --ids <id> --slug my-post        # 同步到个人站点(需先配 siteSyncPostsDir)
 
@@ -99,6 +117,9 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   // opts.userDataDir 由 main.ts 注入真实 app.getPath('userData')，与 GUI 同源；
   // '.wx-kit' 仅为 opts 缺省时的安全兜底，实际运行不会用到
   const userDataDir = opts.userDataDir ?? join(homedir(), '.wx-kit')
+  const cliEnv = opts.env ?? process.env
+  const cliNow = opts.now ?? (() => new Date())
+  const topicModelFactory = opts.topicModelFactory ?? ((config: TopicCliModelConfig) => new ChatCompletionsTopicModel(config))
   const settingsFor = () =>
     new SettingsService(userDataDir, defaultLibraryRoot())
   const resolveRoot = async (optOut?: string): Promise<string> =>
@@ -110,6 +131,69 @@ export async function runCli(argv: string[], opts: { version?: string; userDataD
   const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
   let exitCode = 0
+
+  const topics = program.command('topics').description('基于本地文库生成可追溯选题（子命令:analyze / brief）')
+  topics.command('analyze')
+    .description('分析所选发表时间范围；正文会发送到用户配置的 AI 服务')
+    .option('--range <range>', '24h / 3d / 7d / custom', '24h')
+    .option('--from <date>', 'custom 开始日期 YYYY-MM-DD')
+    .option('--to <date>', 'custom 结束日期 YYYY-MM-DD（包含当天）')
+    .option('--base-url <url>', 'OpenAI Chat Completions 兼容 base URL（或 WXKIT_AI_BASE_URL）')
+    .option('--model <name>', '模型名（或 WXKIT_AI_MODEL）')
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (commandOpts) => {
+      try {
+        const window = resolveTopicWindowArgs(commandOpts, cliNow().getTime())
+        const modelConfig = resolveTopicCliModelConfig(commandOpts, cliEnv)
+        const root = await resolveRoot(commandOpts.out)
+        const selected = selectTopicArticles(await new Library(root).list(), window)
+        process.stderr.write(`正在整理素材：${selected.articles.length} 篇入选，${selected.excluded.length} 篇不在范围或时间不确定。\n`)
+        const result = await analyzeTopics({
+          libraryRoot: root,
+          model: topicModelFactory(modelConfig),
+          store: new TopicRunStore(root),
+          now: cliNow,
+          ...(opts.makeTopicRunId ? { makeRunId: opts.makeTopicRunId } : {}),
+          onStage: stage => {
+            const labels: Record<string, string> = { extract: '正在提取材料依据', propose: '正在形成候选选题', result: '正在保存分析结果' }
+            if (labels[stage]) process.stderr.write(`${labels[stage]}…\n`)
+          },
+        }, { window, articles: selected.articles })
+        const ok = result.status !== 'failed' && result.status !== 'cancelled'
+        outJson({ ok, ...result, timeExcludedCount: selected.excluded.length })
+        exitCode = result.status === 'failed' ? 1 : result.status === 'cancelled' ? 2 : 0
+      } catch (error) {
+        if (error instanceof TopicCliInputError || error instanceof TopicProviderError) {
+          outJson({ ok: false, error: { code: error.code, message: error.message } }); exitCode = 2; return
+        }
+        if (error instanceof TopicInputLimitError) {
+          outJson({ ok: false, error: { code: error.code, message: error.message, actual: error.actual, limit: error.limit } }); exitCode = 1; return
+        }
+        outJson({ ok: false, error: { code: 'TOPIC_ANALYSIS_ERROR', message: error instanceof Error ? error.message : String(error) } }); exitCode = 1
+      }
+    })
+
+  topics.command('brief')
+    .description('从已保存的选题结果生成 Markdown 简报（零模型请求）')
+    .requiredOption('--run <id>', '选题运行 ID')
+    .requiredOption('--topic <id>', '候选选题 ID')
+    .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
+    .action(async (commandOpts) => {
+      try {
+        const root = await resolveRoot(commandOpts.out)
+        const store = new TopicRunStore(root)
+        const run = await store.readResult(String(commandOpts.run))
+        if (run.status !== 'completed' && run.status !== 'partial') throw new Error(`运行 ${run.runId} 状态为 ${run.status}，没有可用候选。`)
+        const card = run.cards.find(item => item.id === String(commandOpts.topic))
+        if (!card) throw new Error(`运行 ${run.runId} 中没有候选 ${commandOpts.topic}。`)
+        const path = await store.writeBrief(run.runId, card.id, buildTopicBrief(card, run))
+        outJson({ ok: true, path, runId: run.runId, topicId: card.id })
+        exitCode = 0
+      } catch (error) {
+        outJson({ ok: false, error: { code: 'TOPIC_RESULT_ERROR', message: error instanceof Error ? error.message : String(error) } })
+        exitCode = 1
+      }
+    })
 
   program
     .command('download')
