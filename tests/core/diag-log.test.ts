@@ -106,7 +106,7 @@ describe('initDiagLog 单例', () => {
     initDiagLog({ dir: '/tmp/x', fs })
     diag()!.info('mocli', 'exit', { code: 0 }, 'ok')
     diag()!.debug('mocli', 'noise')
-    await new Promise((r) => setTimeout(r, 10))
+    await flushDiagLog()
     const written = await fs.readFile('/tmp/x/main.log')
     const lines = written.trim().split('\n')
     expect(lines).toHaveLength(1)
@@ -119,7 +119,7 @@ describe('initDiagLog 单例', () => {
     )
     initDiagLog({ dir: '/d', fs, maxBytes: 5_000_000 })
     diag()!.info('startup', 'snapshot')
-    await new Promise((r) => setTimeout(r, 10))
+    await flushDiagLog()
     // 链位移后新行写进全新的 main.log
     expect(await fs.readFile('/d/main.2.log')).toBe('old-1')
     expect(await fs.readFile('/d/main.1.log')).toBe('old-cur')
@@ -138,7 +138,7 @@ describe('initDiagLog 单例', () => {
     }
     initDiagLog({ dir: '/d', fs, maxBytes: 5_000_000 })
     diag()!.info('startup', 'snapshot')
-    await new Promise((r) => setTimeout(r, 10))
+    await flushDiagLog()
     expect(renameCalls).toBeGreaterThan(0)
     expect(files['/d/main.log'].includes('snapshot')).toBe(true)
   })
@@ -151,7 +151,7 @@ describe('initDiagLog 单例', () => {
     }
     initDiagLog({ dir: '/d', fs })
     expect(() => diag()!.error('download', 'fail', {}, 'x')).not.toThrow()
-    await new Promise((r) => setTimeout(r, 10))
+    await flushDiagLog()
   })
 })
 
@@ -166,7 +166,7 @@ describe('端到端(tmpdir 真 fs)', () => {
       log.info('startup', 'snapshot', { platform: 'darwin', PATH: '/usr/bin:/bin' }, 'boot')
       log.warn('mocli', 'not-found', { bin: 'mocli' })
       log.error('download', 'fail', { url: 'https://mp.weixin.qq.com/s/abc' })
-      await new Promise((r) => setTimeout(r, 20))
+      await flushDiagLog()
       expect(diagLogPath()).toBe(join(dir, 'main.log'))
       const raw = await readFile(join(dir, 'main.log'), 'utf8')
       const lines = raw.trim().split('\n')
@@ -186,7 +186,7 @@ describe('端到端(tmpdir 真 fs)', () => {
       initDiagLog({ dir, maxBytes: 200 })
       const log = diag()!
       for (let i = 0; i < 30; i++) log.info('stress', 'line', { i })
-      await new Promise((r) => setTimeout(r, 50))
+      await flushDiagLog()
       const cur = await readFile(join(dir, 'main.log'), 'utf8')
       const old1 = await readFile(join(dir, 'main.1.log'), 'utf8')
       expect(cur.trim().split('\n').length).toBeGreaterThan(0)

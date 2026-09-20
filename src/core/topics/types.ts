@@ -28,6 +28,53 @@ export interface TopicArticleSelection {
   excluded: Array<{ id: string; publishTime: string; reason: TopicTimeExclusion }>
 }
 
+export type TopicMaterialExclusion =
+  | 'path-outside-library'
+  | 'content-missing'
+  | 'content-unreadable'
+  | 'insufficient-text'
+
+export interface TopicParagraph {
+  id: string
+  groupId: string
+  index: number
+  chunkIndex: number
+  text: string
+}
+
+export interface TopicSnapshotArticle {
+  id: string
+  title: string
+  author: string
+  account: string
+  accountId?: string
+  publishTime: string
+  sourceUrl: string
+  contentHash: string
+  groupId: string
+  warnings: string[]
+}
+
+export interface TopicContentGroup {
+  id: string
+  contentHash: string
+  representativeArticleId: string
+  memberArticleIds: string[]
+  paragraphIds: string[]
+}
+
+export interface TopicMaterialSnapshot {
+  schemaVersion: 1
+  runId: string
+  createdAt: string
+  window: TopicWindow
+  articles: TopicSnapshotArticle[]
+  groups: TopicContentGroup[]
+  paragraphs: TopicParagraph[]
+  excluded: Array<{ id: string; reason: TopicMaterialExclusion; detail?: string }>
+  totalModelChars: number
+}
+
 export type ReaderValueKind = 'knowledge' | 'information-gap' | 'resonance' | 'anxiety-relief' | 'joy'
 
 export interface TopicEvidence {
@@ -39,6 +86,9 @@ export interface TopicEvidence {
   role: 'support' | 'counterpoint' | 'background'
   /** 最终证据必须在快照中匹配；匹配只证明摘录存在，不证明事实真实。 */
   validation: 'matched'
+  sourceTitle: string
+  sourceAccount: string
+  sourceUrl: string
 }
 
 export interface TopicReaderValue {
@@ -84,6 +134,16 @@ export interface TopicFailure {
   message: string
   articleId?: string
   topicId?: string
+}
+
+export interface TopicTraceEvent {
+  time: string
+  stage: 'snapshot' | 'extract' | 'validate-extract' | 'propose' | 'validate-propose' | 'result'
+  status: 'start' | 'done' | 'failed' | 'cancelled'
+  counts?: Record<string, number>
+  durationMs?: number
+  usage?: { inputTokens?: number; outputTokens?: number }
+  error?: { code: string; message: string }
 }
 
 interface TopicRunBase {
