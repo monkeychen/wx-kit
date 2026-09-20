@@ -2,7 +2,7 @@ import { appendFile, chmod, mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { atomicWriteFile } from '../atomic-write'
 import { withPathLock } from '../path-lock'
-import type { TopicMaterialSnapshot, TopicRunResult, TopicTraceEvent } from './types'
+import type { TopicFeedbackEvent, TopicMaterialSnapshot, TopicRunResult, TopicTraceEvent } from './types'
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/
 
@@ -61,6 +61,18 @@ export class TopicRunStore {
     await privateDir(dir)
     const path = join(dir, `${safeId(topicId, 'topic')}.md`)
     await privateAtomicWrite(path, markdown)
+    return path
+  }
+
+  async writeFeedback(event: TopicFeedbackEvent): Promise<string> {
+    safeId(event.id, 'feedback')
+    safeId(event.runId, 'run')
+    safeId(event.topicId, 'topic')
+    if (!['skip', 'watch', 'already-written'].includes(event.decision)) throw new Error('feedback decision 无效。')
+    const dir = join(this.libraryRoot, 'topic-decisions', 'feedback')
+    await privateDir(dir)
+    const path = join(dir, `${event.id}.json`)
+    await privateAtomicWrite(path, `${JSON.stringify(event, null, 2)}\n`)
     return path
   }
 

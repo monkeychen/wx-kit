@@ -6,6 +6,7 @@ import type { CachedRelease } from '../../src/core/update-gate'
 
 export interface ListColumnWidths { account: number; publish: number; download: number }
 export type NewArticleAction = 'notify' | 'download'
+export type TopicDefaultRange = '24h' | '3d' | '7d'
 
 export interface AppSettings {
   libraryRoot: string
@@ -39,6 +40,10 @@ export interface AppSettings {
   mowenMocliPath: string | null
   mowenMocliVersion: string | null
   mowenDetectedAt: string | null         // ISO 8601
+  /** M70 选题 AI：公开配置可进 settings；API Key 独立走 safeStorage，绝不加在这里。 */
+  topicAiBaseUrl: string
+  topicAiModel: string
+  topicDefaultRange: TopicDefaultRange
 }
 
 // 与 renderer 的 library-view 排序键/方向一致;定义在此避免主进程 import renderer
@@ -73,6 +78,9 @@ export class SettingsService {
       mowenMocliPath: null,
       mowenMocliVersion: null,
       mowenDetectedAt: null,
+      topicAiBaseUrl: '',
+      topicAiModel: '',
+      topicDefaultRange: '24h',
     }
   }
 

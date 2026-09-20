@@ -146,6 +146,17 @@ export interface TopicTraceEvent {
   error?: { code: string; message: string }
 }
 
+export type TopicFeedbackDecision = 'skip' | 'watch' | 'already-written'
+
+export interface TopicFeedbackEvent {
+  schemaVersion: 1
+  id: string
+  runId: string
+  topicId: string
+  decision: TopicFeedbackDecision
+  recordedAt: string
+}
+
 interface TopicRunBase {
   schemaVersion: 1
   runId: string

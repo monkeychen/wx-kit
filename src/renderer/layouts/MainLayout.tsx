@@ -9,6 +9,7 @@ const NAV = [
   { to: '/', label: '下载', end: true },
   { to: '/subscriptions', label: '订阅', end: false },
   { to: '/library', label: '文库', end: false },
+  { to: '/topics', label: '选题', end: false },
   { to: '/settings', label: '设置', end: false },
 ]
 

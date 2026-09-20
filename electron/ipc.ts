@@ -46,11 +46,13 @@ import { HTML_TIMEOUT_MS } from '../src/core/fetch-html'
 import { diag, diagLogPath } from '../src/core/diag-log'
 import * as cheerio from 'cheerio'
 import { PRIVATE_API_FEATURE_ENABLED, RETIRED_PRIVATE_API_COMMANDS, retiredPrivateApiError, retiredPrivateApiResponse } from '../src/core/retired-private-api'
+import { registerTopicIpc } from './services/topics-ipc'
 
 const randId = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
 export function registerIpc(settings: SettingsService): void {
   registerMowenIpc(settings)
+  registerTopicIpc(settings)
   const mpGateway = createMpRuntime(app.getPath('userData'))
   const { fetchHtml, fetchBinary } = articleFetchers(mpGateway)
   const libraryFor = async () => new Library((await settings.get()).libraryRoot)

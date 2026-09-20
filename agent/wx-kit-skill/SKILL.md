@@ -4,7 +4,7 @@ description: |
   wx-kit（微信百宝箱）的安装与 CLI 使用指南：按文章 URL 下载微信公众号文章（图文/HTML/PDF/元数据）、
   下载墨问笔记（单篇/按作者批量，需 mocli）、管理本地文库、经微信读书通道检查并增量下载订阅公众号更新
   （每号每次仅最新一篇）、订阅墨问作者并检查新笔记、按真实发表日期查订阅日报、导出创作素材、
-  基于本地文库生成可追溯选题（当前 main / M69 未发布，用户自备兼容模型 API Key）、同步 Astro 站点——stdout 输出纯 JSON，面向 agent 自动化。
+  基于本地文库生成可追溯选题（当前 main / M70 未发布，GUI 与 CLI 均需用户自备兼容模型 API Key）、同步 Astro 站点——stdout 输出纯 JSON，面向 agent 自动化。
   当用户要「下载这篇微信文章」「批量下载这些文章链接」「下载这篇墨问笔记」「批量下载某位墨问作者的文章」
   「检查订阅号有没有新文章」「订阅这个墨问作者」「查今天自动下载了什么」「查某天发表了哪些订阅文章」
   「搜索或导出已下载文章」「从文库找值得写的选题」「wx-kit 报错/出问题了帮我看看」时使用；发现 wx-kit 未安装时，本 skill 提供安装路径；
@@ -18,7 +18,7 @@ description: |
 wx-kit 是 GUI + CLI 同一二进制的桌面应用：无参启动 GUI，命中 CLI 命令白名单时进入 CLI。
 CLI 契约：stdout 纯 JSON，stderr 输出进度；退出码 `0` 成功、`1` 业务失败、`2` 用法错误。
 
-本文以 v0.11.3 已发布能力为基线，并标出当前 main / M69 的未发布 `topics` 命令。安装包没有 `topics` 时先检查版本，不把源码文档当成已发布行为。
+本文以 v0.11.3 已发布能力为基线，并标出当前 main / M70 的未发布选题 GUI 与 `topics` 命令。安装包没有“选题”导航或 `topics` 命令时先检查版本，不把源码文档当成已发布行为。
 
 ## 1. 确认安装
 
@@ -60,8 +60,8 @@ Homebrew 安装后，实际二进制位于 `/Applications/wx-kit.app/Contents/Ma
 | 搜索文库 | `wx-kit library search <关键词> [--account <公众号>]` |
 | 导出素材清单 | `wx-kit library export --ids <id,id>` |
 | 删除文章 | `wx-kit library remove --ids <id,id>` |
-| 从本地文库生成选题（M69 main，未发布） | `wx-kit topics analyze --range 24h` |
-| 从已保存候选生成简报（M69 main，未发布） | `wx-kit topics brief --run <runId> --topic <topicId>` |
+| 从本地文库生成选题（M70 main，未发布） | GUI“选题” / `wx-kit topics analyze --range 24h` |
+| 从已保存候选生成简报（M70 main，未发布） | GUI 点候选后“生成选题简报” / `wx-kit topics brief --run <runId> --topic <topicId>` |
 | 读写公开设置 | `wx-kit settings get [键]` / `wx-kit settings set <键> <值>` |
 
 下载格式可选 `cover,md,html,pdf,meta`。文库根目录默认是 `~/Documents/wx-kit`，也可用 `--out` 指定。
@@ -95,7 +95,7 @@ digest 使用 `count/articles` 而非下载命令的 `total/items`。检查 `ok`
 
 `library export` 输出的 `articles[].contentPath` 是正文绝对路径，正文不内联在 JSON 中；后续分析或写作需要再读取该文件。
 
-`topics analyze` 会把所选时间范围内的正文发送到用户配置的 OpenAI Chat Completions 兼容端点。Key 只从 `WXKIT_AI_API_KEY` 环境变量读取，命令行没有 `--api-key`；使用前应确认目标服务与数据处理规则。选题卡中的传播效果固定为未验证，不得把材料篇数说成推流概率。完整参数、状态和示例见 `references/commands.md` / `references/recipes.md`。
+`topics analyze` 会把所选时间范围内的正文发送到用户配置的 OpenAI Chat Completions 兼容端点。CLI Key 只从 `WXKIT_AI_API_KEY` 环境变量读取，没有 `--api-key`；GUI 在“设置 → 选题 AI”保存，系统加密可用时持久化，否则只保存本次会话并明示。使用前应确认目标服务的数据处理规则。选题卡中的传播效果固定为未验证，不得把材料篇数说成推流概率。完整参数、状态和示例见 `references/commands.md` / `references/recipes.md`。
 
 ## 4. 平台注意事项
 

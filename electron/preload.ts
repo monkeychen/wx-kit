@@ -29,6 +29,18 @@ const api: WxApi = {
   mowenListUserNotes: (uid: string, opts?: { filter?: string; recent?: string; count?: number }) => ipcRenderer.invoke('mowen:listUserNotes', uid, opts),
   mowenSearchNotes: (keyword: string, count?: number) => ipcRenderer.invoke('mowen:searchNotes', keyword, count),
   copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
+  topicsGetConfig: () => ipcRenderer.invoke('topics:getConfig'),
+  topicsSaveConfig: (input) => ipcRenderer.invoke('topics:saveConfig', input),
+  topicsClearKey: () => ipcRenderer.invoke('topics:clearKey'),
+  topicsAnalyze: (input) => ipcRenderer.invoke('topics:analyze', input),
+  topicsCancel: () => ipcRenderer.invoke('topics:cancel'),
+  topicsBrief: (runId, topicId) => ipcRenderer.invoke('topics:brief', { runId, topicId }),
+  topicsFeedback: (runId, topicId, decision) => ipcRenderer.invoke('topics:feedback', { runId, topicId, decision }),
+  onTopicsProgress: (cb) => {
+    const listener = (_event: unknown, payload: { stage: Parameters<typeof cb>[0] }) => cb(payload.stage)
+    ipcRenderer.on('topics:progress', listener)
+    return () => { ipcRenderer.removeListener('topics:progress', listener) }
+  },
   mpAuthStatus: () => ipcRenderer.invoke('mp:authStatus'),
   mpLogin: () => ipcRenderer.invoke('mp:login'),
   mpRelogin: () => ipcRenderer.invoke('mp:relogin'),

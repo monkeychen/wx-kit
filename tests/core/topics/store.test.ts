@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { TopicMaterialSnapshot, TopicRunResult, TopicTraceEvent } from '../../../src/core/topics/types'
+import type { TopicFeedbackEvent, TopicMaterialSnapshot, TopicRunResult, TopicTraceEvent } from '../../../src/core/topics/types'
 import { TopicRunStore } from '../../../src/core/topics/store'
 
 const roots: string[] = []
@@ -70,5 +70,30 @@ describe('选题运行存储', () => {
     await store.writeBrief('broken', 'x', 'seed')
     await import('node:fs/promises').then(fs => fs.writeFile(join(path, 'result.json'), '{bad', 'utf8'))
     await expect(store.readResult('broken')).rejects.toThrow(/损坏/)
+  })
+
+  it('反馈按事件独立原子落盘且同 ID 可安全替换', async () => {
+    const libraryRoot = await root()
+    const store = new TopicRunStore(libraryRoot)
+    const event: TopicFeedbackEvent = {
+      schemaVersion: 1, id: 'feedback-1', runId: 'run-1', topicId: 'topic-1', decision: 'watch', recordedAt: '2026-09-20T04:00:00.000Z',
+    }
+    const path = await store.writeFeedback(event)
+    expect(path).toBe(join(libraryRoot, 'topic-decisions', 'feedback', 'feedback-1.json'))
+    expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(event)
+    expect((await stat(path)).mode & 0o777).toBe(0o600)
+    await store.writeFeedback({ ...event, decision: 'already-written' })
+    expect(JSON.parse(await readFile(path, 'utf8')).decision).toBe('already-written')
+  })
+
+  it.each(['skip', 'watch', 'already-written'] as const)('接受反馈 decision：%s', async decision => {
+    const store = new TopicRunStore(await root())
+    await expect(store.writeFeedback({ schemaVersion: 1, id: `f-${decision}`, runId: 'run-1', topicId: 'topic-1', decision, recordedAt: '2026-09-20T04:00:00.000Z' })).resolves.toMatch(/\.json$/)
+  })
+
+  it('拒绝非法反馈 decision 和路径 ID', async () => {
+    const store = new TopicRunStore(await root())
+    await expect(store.writeFeedback({ schemaVersion: 1, id: '../x', runId: 'run-1', topicId: 'topic-1', decision: 'skip', recordedAt: 'x' })).rejects.toThrow(/ID/)
+    await expect(store.writeFeedback({ schemaVersion: 1, id: 'f-1', runId: 'run-1', topicId: 'topic-1', decision: 'forever-ban', recordedAt: 'x' } as unknown as TopicFeedbackEvent)).rejects.toThrow(/decision/)
   })
 })

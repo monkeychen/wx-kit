@@ -115,6 +115,8 @@ ${vars}
 const log = (...a) => console.log('[e2e]', ...a)
 let failed = false
 const assert = (cond, msg) => { if (cond) { log('✓', msg) } else { failed = true; console.error('[e2e] ✗', msg) } }
+const TOPIC_E2E_KEY = 'wx-kit-topic-e2e-key'
+const topicModelRequests = []
 const readBody = (req) => new Promise((resolve) => {
   let s = ''
   req.on('data', (c) => { s += c })
@@ -153,6 +155,59 @@ async function main() {
         name: '测试订阅号',
         pic: `http://127.0.0.1:${server.address().port}/cover.png`,
         avatar: `http://127.0.0.1:${server.address().port}/cover.png`,
+      }))
+    } else if (u.pathname === '/v1/chat/completions') {
+      const body = JSON.parse((await readBody(req)) || '{}')
+      const input = JSON.parse(body.messages?.find((item) => item.role === 'user')?.content || '{}')
+      topicModelRequests.push({ authorization: req.headers.authorization, taskVersion: input.taskVersion })
+      let content
+      if (input.taskVersion === 'topic-extract-v1') {
+        const paragraphs = input.snapshot?.paragraphs ?? []
+        content = {
+          items: paragraphs.slice(0, 3).map((paragraph, index) => ({
+            id: `x${index + 1}`,
+            groupId: paragraph.groupId,
+            paragraphId: paragraph.id,
+            quote: paragraph.text.slice(0, Math.min(8, paragraph.text.length)),
+            kind: index === 0 ? 'question' : index === 1 ? 'change' : 'opinion',
+            summary: `材料摘要 ${index + 1}`,
+            theme: '普通创作者如何从材料中找到值得写的问题',
+          })),
+        }
+      } else {
+        const extractions = input.extractions ?? []
+        content = {
+          cards: Array.from({ length: 3 }, (_, index) => {
+            const extraction = extractions[index % extractions.length]
+            return {
+              id: `topic-e2e-${index + 1}`,
+              question: `候选问题 ${index + 1}：这组材料能帮读者理解什么？`,
+              angle: `从材料 ${index + 1} 的具体变化切入，不承诺传播结果。`,
+              readerValues: [{
+                kind: index === 0 ? 'knowledge' : index === 1 ? 'information-gap' : 'anxiety-relief',
+                benefit: `让读者获得可核对的收获 ${index + 1}。`,
+                evidenceIds: [`e${index + 1}`],
+              }],
+              rationale: `材料里存在可定位的具体表述 ${index + 1}。`,
+              claims: [{
+                text: `这组材料适合形成解释型文章 ${index + 1}。`,
+                kind: 'editorial-inference',
+                evidenceIds: [`e${index + 1}`],
+              }],
+              evidence: [{ id: `e${index + 1}`, extractionId: extraction.id, role: 'support' }],
+              evidenceConfidence: { level: 'low', reasons: ['只有本地材料，没有读者行为数据。'] },
+              distributionEvidence: 'unverified',
+              limitations: ['平台传播效果没有数据支撑。'],
+              missingEvidence: ['发布后的阅读与反馈数据。'],
+              outline: ['用材料中的具体情境开篇。', '解释背后的原因。', '给出读者可执行的判断方法。'],
+            }
+          }),
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(content) } }],
+        usage: { prompt_tokens: 100, completion_tokens: 50 },
       }))
     } else if (u.pathname === '/pic.png' || u.pathname === '/cover.png') {
       res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG)
@@ -293,6 +348,77 @@ async function main() {
     assert((await win.locator('[data-testid="about-check-update"]').count()) === 1, 'settings keeps the check-update action')
     assert((await win.locator('[data-testid="set-update-check"]').count()) === 1, 'settings keeps the startup-check toggle')
     assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings keeps site-sync help')
+
+    // ============ M70 · 选题 AI 配置 + 三卡决策闭环 ============
+    await win.waitForSelector('[data-testid="topic-ai-section"]', { timeout: 8000 })
+    await win.fill('[data-testid="topic-ai-base-url"]', `${wereadBase}/v1`)
+    await win.fill('[data-testid="topic-ai-model"]', 'fixture-topic-model')
+    await win.fill('[data-testid="topic-ai-key"]', TOPIC_E2E_KEY)
+    await win.click('[data-testid="topic-ai-save"]')
+    await win.waitForFunction(() => {
+      const text = document.querySelector('[data-testid="topic-ai-key-status"]')?.textContent ?? ''
+      return text.includes('已安全保存') || text.includes('仅本次会话')
+    }, { timeout: 8000 })
+    assert(true, 'M70: topic AI config reports persistent or honest session-only key status')
+    await win.getByRole('button', { name: '保存设置', exact: true }).click()
+    await win.waitForSelector('.ant-message-notice:has-text("已保存")', { timeout: 5000 })
+
+    await win.click('[data-testid="nav-选题"]')
+    await win.waitForSelector('[data-testid="topics-page"]', { timeout: 8000 })
+    const initialSelected = await win.locator('[data-testid="topic-card"][aria-checked="true"]').count()
+    assert(initialSelected === 0, 'M70: topic page does not preselect a candidate')
+    await win.click('[data-testid="topic-range"]')
+    await win.locator('.ant-select-dropdown:visible .ant-select-item:has-text("自定义日期")').click()
+    await win.fill('[data-testid="topic-date-from"]', '2026-02-01')
+    await win.fill('[data-testid="topic-date-to"]', '2026-03-31')
+    await win.click('[data-testid="topic-analyze"]')
+    await win.waitForSelector('[data-testid="topic-card"]', { timeout: 30000 })
+    const topicCards = await win.locator('[data-testid="topic-card"]').count()
+    assert(topicCards === 3, `M70: topic analysis renders three equal candidates (got ${topicCards})`)
+    assert((await win.locator('[data-testid="topic-card"][aria-checked="true"]').count()) === 0,
+      'M70: completed analysis still waits for the user to choose')
+    assert(topicModelRequests.length === 2 && topicModelRequests.every(item => item.authorization === `Bearer ${TOPIC_E2E_KEY}`),
+      'M70: local model receives exactly two authenticated stage requests')
+    await win.locator('[data-testid="topic-card"]').first().click()
+    await win.waitForSelector('[data-testid="topic-detail"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="topic-detail"]').innerText()).includes('传播效果未验证'),
+      'M70: detail keeps distribution evidence explicitly unverified')
+    await win.locator('[data-testid="topic-detail"] .ant-tabs-tab:has-text("材料依据")').click()
+    await win.waitForSelector('[data-testid="topic-evidence"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="topic-detail"]').innerText()).includes('摘录存在不等于事实已验证'),
+      'M70: evidence tab distinguishes excerpt matching from fact verification')
+    await win.locator('[data-testid="topic-detail"] .ant-tabs-tab:has-text("怎么下笔")').click()
+    assert((await win.locator('[data-testid="topic-outline"]').count()) === 1, 'M70: outline tab is available without another model request')
+    await win.click('[data-testid="topic-feedback-watch"]')
+    await win.waitForSelector('.ant-message-notice:has-text("已记录")', { timeout: 5000 })
+    await win.click('[data-testid="topic-make-brief"]')
+    await win.waitForSelector('[data-testid="topic-reveal-brief"]', { timeout: 5000 })
+    const topicClipboard = await win.evaluate(() => navigator.clipboard.readText())
+    assert(topicClipboard.includes('# 候选问题 1') && topicClipboard.includes('传播效果：未验证'),
+      'M70: brief is generated and copied as Markdown')
+    assert(topicModelRequests.length === 2, 'M70: switching tabs, feedback and brief do not call the model again')
+    await win.screenshot({ path: '/tmp/wxk-e2e-topics.png', fullPage: true })
+    {
+      const runFiles = readdirSync(join(libraryRoot, 'topic-decisions'), { recursive: true }).map(String)
+        .filter(path => path.endsWith('result.json') || path.endsWith('trace.jsonl'))
+      const persistedOutputs = runFiles.map(path => readFileSync(join(libraryRoot, 'topic-decisions', path), 'utf8')).join('\n')
+      const settingsText = readFileSync(join(userDataDir, 'settings.json'), 'utf8')
+      const mainLogText = readFileSync(join(userDataDir, 'logs', 'main.log'), 'utf8')
+      const inspected = `${settingsText}\n${persistedOutputs}\n${mainLogText}`
+      const submittedBodies = readdirSync(libraryRoot, { recursive: true }).map(String)
+        .filter(path => path.endsWith('content.md') && !path.includes('topic-decisions'))
+        .map(path => readFileSync(join(libraryRoot, path), 'utf8').trim())
+        .filter(Boolean)
+      assert(!inspected.includes(TOPIC_E2E_KEY) && !inspected.includes(`Bearer ${TOPIC_E2E_KEY}`),
+        'M70: settings, result, trace and diagnostic log contain no API key or Authorization')
+      assert(submittedBodies.length >= 3 && submittedBodies.every(body => !persistedOutputs.includes(body) && !mainLogText.includes(body)),
+        'M70: result, trace and diagnostic log do not retain the submitted full article body')
+    }
+    await win.click('[data-testid="nav-设置"]')
+    await win.waitForSelector('[data-testid="topic-ai-section"]', { timeout: 5000 })
+    const savedKeyStatus = await win.locator('[data-testid="topic-ai-key-status"]').innerText()
+    assert(savedKeyStatus.includes('已安全保存') || savedKeyStatus.includes('仅本次会话'),
+      `M70: returning to settings keeps an honest configured-key status (saw: ${savedKeyStatus})`)
 
     // ============ M60 · 设置页墨问集成区块（读缓存渲染，两种状态取其一）============
     await win.waitForSelector('[data-testid="mowen-section"]', { timeout: 8000 })

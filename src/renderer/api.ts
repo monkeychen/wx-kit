@@ -10,6 +10,9 @@ import type { RunCheckResult } from '../../electron/services/subscription-check'
 import type { UpdateInfo, UpdateAsset } from '../core/check-update'
 import type { InstallChannel } from '../core/install-channel'
 import type { MpProtectionStatus } from '../../electron/services/mp-request-gateway'
+import type { TopicAiConfigStatus } from '../../electron/services/topic-ai-config'
+import type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse } from '../../electron/services/topics-service'
+import type { TopicFeedbackDecision, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
 
 export type { HistoryEvent } from '../core/download-history'
 export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
@@ -22,6 +25,9 @@ export type { MowenSubscribedAuthor, MowenNoteRef, MowenUser }
 export type { UpdateInfo, UpdateAsset } from '../core/check-update'
 export type { InstallChannel } from '../core/install-channel'
 export type { MpProtectionStatus } from '../../electron/services/mp-request-gateway'
+export type { TopicAiConfigStatus } from '../../electron/services/topic-ai-config'
+export type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse } from '../../electron/services/topics-service'
+export type { TopicDecisionCard, TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
 
 export interface UpdateChannelInfo { channel: InstallChannel; command: string | null; platform: string; arch: string }
 export interface UpdateProgress { name: string; done: number; total: number }
@@ -66,6 +72,14 @@ export interface WxApi {
    *  authors 为完整作者映射——点作者名联动展开该作者清单要用。 */
   mowenSearchNotes(keyword: string, count?: number): Promise<{ ok: boolean; notes?: { noteId: string; uid: string; title: string; brief: string; url: string; publicAt: number | null; withFee: boolean; withImage: boolean; withText: boolean; wordCount: number | null; viewCount: number | null; favorCount: number | null; authorName?: string }[]; authors?: { uid: string; name: string; intro: string; homeUrl: string }[]; error?: { code: string; message: string } }>
   copyText(text: string): Promise<void>
+  topicsGetConfig(): Promise<TopicAiConfigStatus>
+  topicsSaveConfig(input: { baseUrl: string; model: string; apiKey?: string }): Promise<TopicAiConfigStatus>
+  topicsClearKey(): Promise<TopicAiConfigStatus>
+  topicsAnalyze(input: { window: TopicWindowInput }): Promise<TopicAnalyzeResponse>
+  topicsCancel(): Promise<{ ok: boolean; error?: { code: string; message: string } }>
+  topicsBrief(runId: string, topicId: string): Promise<TopicBriefResponse>
+  topicsFeedback(runId: string, topicId: string, decision: TopicFeedbackDecision): Promise<TopicFeedbackResponse>
+  onTopicsProgress(cb: (stage: TopicTraceEvent['stage']) => void): () => void
   // —— M3.5 批量爬取 ——
   mpAuthStatus(): Promise<{ status: 'missing' | 'present'; valid: false | null; checkedAt?: number }>
   mpLogin(): Promise<MpAuthActionResult>

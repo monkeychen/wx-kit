@@ -6,7 +6,7 @@ import FormatPicker from '../components/FormatPicker'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
-import type { UpdateInfo, UpdateChannelInfo } from '../api'
+import type { TopicAiConfigStatus, UpdateInfo, UpdateChannelInfo } from '../api'
 import type { MpProtectionStatus } from '../api'
 import { useWereadLoginQr } from '../hooks/useWereadLoginQr'
 import type { MpAuthActionResult, MpSessionInfo } from '../api'
@@ -16,6 +16,11 @@ import type { DownloadFormat } from '../../core/types'
 export default function Settings() {
   const [s, setS] = useState<AppSettings | null>(null)
   const [cliLink, setCliLink] = useState<Awaited<ReturnType<typeof api.cliLinkStatus>> | null>(null)
+  const [topicAi, setTopicAi] = useState<TopicAiConfigStatus | null>(null)
+  const [topicAiBaseUrl, setTopicAiBaseUrl] = useState('')
+  const [topicAiModel, setTopicAiModel] = useState('')
+  const [topicAiKey, setTopicAiKey] = useState('')
+  const [topicAiSaving, setTopicAiSaving] = useState(false)
 
   const [ver, setVer] = useState('')
   // M37 更新检查:三态(未查 / 查询中 / 有结果),查不到用 'failed' 与「已是最新」区分开
@@ -42,6 +47,13 @@ export default function Settings() {
   }
 
   useEffect(() => { api.getSettings().then(setS) }, [])
+  useEffect(() => {
+    api.topicsGetConfig().then(value => {
+      setTopicAi(value)
+      setTopicAiBaseUrl(value.baseUrl)
+      setTopicAiModel(value.model)
+    }).catch(() => { /* 选题配置失败不阻断其它设置 */ })
+  }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
   useEffect(() => { api.appVersion().then(setVer).catch(() => { /* 版本号缺失不阻塞设置页 */ }) }, [])
   useEffect(() => { api.updateChannel().then(setChan).catch(() => { /* 渠道识别失败就退回通用引导 */ }) }, [])
@@ -79,6 +91,32 @@ export default function Settings() {
     if (!s) return
     try { await api.saveSettings(s); message.success('已保存') }
     catch (e) { message.error('保存失败：' + (e as Error).message) }
+  }
+  const saveTopicAi = async () => {
+    if (!topicAiKey.trim() && !topicAi?.keyConfigured) {
+      message.warning('首次配置请填写 API Key')
+      return
+    }
+    setTopicAiSaving(true)
+    try {
+      const value = await api.topicsSaveConfig({
+        baseUrl: topicAiBaseUrl,
+        model: topicAiModel,
+        ...(topicAiKey.trim() ? { apiKey: topicAiKey } : {}),
+      })
+      setTopicAi(value)
+      setS(current => current ? { ...current, topicAiBaseUrl: value.baseUrl, topicAiModel: value.model } : current)
+      setTopicAiKey('')
+      message.success('选题 AI 配置已保存')
+    } catch (error) { message.error('保存失败：' + (error as Error).message) }
+    finally { setTopicAiSaving(false) }
+  }
+  const clearTopicAiKey = async () => {
+    try {
+      setTopicAi(await api.topicsClearKey())
+      setTopicAiKey('')
+      message.success('AI Key 已清除')
+    } catch (error) { message.error('清除失败：' + (error as Error).message) }
   }
   const clearHistory = async () => {
     try { await api.historyClear(); message.success('已清空下载历史') }
@@ -412,6 +450,53 @@ export default function Settings() {
               </Button>
             </div>
           )}
+
+          <div className="setting-block" data-testid="topic-ai-section">
+            <div className="setting-label">选题 AI</div>
+            <div className="setting-hint">
+              用你自己的兼容 OpenAI Chat Completions 的服务生成候选选题。
+              分析时，所选文章的正文会发送到下方地址；wx-kit 不会将 Key 写入普通设置、分析结果或诊断日志。
+            </div>
+            <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: 10 }}>
+              <label className="setting-field">
+                <span>Base URL</span>
+                <Input data-testid="topic-ai-base-url" value={topicAiBaseUrl}
+                  onChange={event => setTopicAiBaseUrl(event.target.value)}
+                  placeholder="https://api.example.com/v1" />
+              </label>
+              <label className="setting-field">
+                <span>Model</span>
+                <Input data-testid="topic-ai-model" value={topicAiModel}
+                  onChange={event => setTopicAiModel(event.target.value)}
+                  placeholder="例如 gpt-4.1-mini" />
+              </label>
+              <label className="setting-field">
+                <span>API Key</span>
+                <Input.Password data-testid="topic-ai-key" value={topicAiKey}
+                  onChange={event => setTopicAiKey(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder={topicAi?.keyConfigured ? '已配置；留空即保留原 Key' : '输入 API Key'} />
+              </label>
+              <div className="topic-key-row">
+                <span className={`badge ${topicAi?.keyConfigured ? 'badge-ok' : 'badge-cancel'}`}
+                  data-testid="topic-ai-key-status">
+                  {!topicAi ? '正在读取'
+                    : !topicAi.keyConfigured ? '未配置'
+                      : topicAi.keyPersistent ? '已安全保存' : '仅本次会话，重启需重填'}
+                </span>
+                <Space>
+                  {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除 Key</Button>}
+                  <Button type="primary" loading={topicAiSaving} data-testid="topic-ai-save" onClick={saveTopicAi}>保存 AI 配置</Button>
+                </Space>
+              </div>
+              {topicAi?.keyConfigured && !topicAi.keyPersistent && (
+                <div className="setting-hint" style={{ color: 'var(--amber)' }}>
+                  当前系统加密能力不可用，Key 只保存在本次运行的内存中；退出应用后会丢失。
+                </div>
+              )}
+            </Space>
+          </div>
+
           <div className="setting-block" data-testid="mowen-section">
             <div className="setting-label">墨问集成</div>
             <div className="setting-hint">

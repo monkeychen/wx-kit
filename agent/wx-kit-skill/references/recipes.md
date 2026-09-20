@@ -144,7 +144,7 @@ WX=${WX:-$(command -v wx-kit || echo /Applications/wx-kit.app/Contents/MacOS/wx-
 - 付费/私密笔记如实失败（`MowenNoteUnavailable`），不伪装成功；他人私密笔记不可获取；
 - `check-now` 的检查日志独立于公众号订阅（`mowen-subscriptions.json`），逐作者明细在 `results[]`。
 
-## 9. 从本地文库形成选题简报（当前 main / M69，未发布）
+## 9. 从本地文库形成选题简报（当前 main / M70，未发布）
 
 先在自己的终端配置服务。下面只写变量名，不要把真实 Key 记入脚本、仓库、聊天或问题单。
 
@@ -167,6 +167,8 @@ jq -r '.path' brief.json
 ```
 
 `failed/cancelled` 没有可用卡片；`completed` 也可能合法返回空数组。上面的 `jq -e` 在取 `.cards[0]` 前完成门禁。`brief` 只整理已经验证的本地结果，不产生新的模型费用。
+
+GUI 的等价流程是：“设置 → 选题 AI”保存服务 → “选题”选时间范围 → “寻找选题” → 人工点选一张卡 → “生成选题简报”。简报自动复制到剪贴板，也可在 Finder 中显示文件。
 
 ## 失败处理
 
