@@ -1,5 +1,7 @@
 # M67 · 选题基础契约与 compose 退场实现计划
 
+> **目标版本：v0.12.0（未发布）。产品与验收契约：[`docs/PRD-v0.12.0.md`](../PRD-v0.12.0.md)。**
+
 > **For agentic workers:** Use superpowers:executing-plans to implement this plan task-by-task, with superpowers:test-driven-development for runtime behavior. 按本仓库 AGENTS 在当前目录的 feature 分支执行；各任务顺序完成，评审后自动合回 main，不推送。
 
 **Goal:** 完成旧 compose 的安全退场，并交付可执行的发表时间筛选规则、选题结果类型和十二类可复用语义评估材料。
@@ -8,7 +10,7 @@
 
 **Tech Stack:** TypeScript、现有 Vitest、JSON、Node 文件系统测试读取。
 
-**Spec:** [本地选题决策器设计](../superpowers/specs/2026-09-20-topic-decisions-design.md)
+**Spec:** [v0.12.0 PRD](../PRD-v0.12.0.md) · [本地选题决策器设计](../superpowers/specs/2026-09-20-topic-decisions-design.md)
 
 ## Global Constraints
 

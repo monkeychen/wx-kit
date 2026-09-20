@@ -144,7 +144,7 @@ WX=${WX:-$(command -v wx-kit || echo /Applications/wx-kit.app/Contents/MacOS/wx-
 - 付费/私密笔记如实失败（`MowenNoteUnavailable`），不伪装成功；他人私密笔记不可获取；
 - `check-now` 的检查日志独立于公众号订阅（`mowen-subscriptions.json`），逐作者明细在 `results[]`。
 
-## 9. 从本地文库形成选题简报（当前 main / M70，未发布）
+## 9. 从本地文库形成选题简报（v0.12.0 当前 main，未发布）
 
 先在自己的终端配置服务。下面只写变量名，不要把真实 Key 记入脚本、仓库、聊天或问题单。
 

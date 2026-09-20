@@ -5,7 +5,7 @@
 
 ## 当前状态
 
-- **当前 main：M70 选题 GUI 已完成（未发布，2026-09-20）** — “设置 → 选题 AI”安全 BYOK、“选题”三卡决策页、详情/反馈/简报闭环已接入；本地 fixture Electron e2e 通过，真实外部供应商与选题语义质量仍未验。已发布基线仍为 v0.11.3。
+- **当前 main：v0.12.0 开发能力已完成、尚未发布（2026-09-21）** — M67–M70 交付“本地文库 → 可解释选题卡 → 选题简报”及 GUI/CLI/BYOK 闭环；产品与验收契约见 `docs/PRD-v0.12.0.md`。本地 fixture Electron e2e 已通过，真实自有文库、用户选定供应商与选题语义质量仍是发布前未完成验收。已发布基线仍为 v0.11.3，根包未提前 bump。
 - **v0.11.3 已完成验证与发版(2026-09-19)** —— 打包环境墨问修复(BAD_OUTPUT 三连修)+ M66 统一诊断日志,详见发布史 v0.11.3 行与 `docs/PRD-v0.11.3.md`。
 - **v0.11.2 已完成验证与发版(2026-09-17)** —— 引用卡片(R1)+ 关键词搜索(R2)+ 界面统一,详见上方发布史。**用户手册同步上线** [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md)(GUI 教程型;GUI 截图 + 6 张配套插画均来自真实运行版本); README 加索引。
 - **v0.11.1 已完成验证与发版(2026-09-15)** —— 发布当天另一台机器实录的修复版:mocli 装在 nvm/homebrew,从 Dock/Finder 启动的 wx-kit(GUI 进程不加载 `~/.zshrc`,只拿系统最小 PATH)恒报「未检测到 mocli」,墨问功能整个不可用。修复为三级探测链(which → 常见安装位 → login shell 兜底)+ PATH 注入,GUI/CLI 双入口统一;验收含模拟 launchd 最小 PATH 环境的真机验证(CLI detect 全量返回、GUI 启动 10 秒内 settings 写入绝对路径)。教训与设计复盘见 devlog §57「v0.11.1 发版实录」与宪法墨问段。v0.11.0 及其完整过程(墨问接入 M59–M63、八轮安哥实测修复)见发布史 v0.11.0 行。
@@ -83,12 +83,12 @@
 | **M61** ✅ | v0.11.0（进行中） | R2 正文通道 + 墨问 tab + import：`note/show` 匿名主通道（图片 w_1200 本地化、引用块、音频嵌入、付费 unavailable 如实）+ downloadArticle 顶部 mowen 路由（复用 download 通道）+ 下载页「墨问笔记」tab（搜用户→条件→清单→勾选批量）+ CLI `mowen import`（单篇/--uid 批量/--expand-refs 合集展开）。真机验收全过；publicAt 字符串形态修正实录见 devlog（2026-09-12 完成，627 单测 + e2e 全绿） | `plans/2026-09-11-m61-mowen-content-channel-and-tab.md` |
 | **M63** ✅ | v0.11.0（进行中） | R4 墨问作者订阅：水位比对/检查编排（失败保留失败类型、检查成功才推水位）+ 订阅页墨问 tab（搜索候选带简介→订阅→行内检查→勾选下载/忽略）+ CLI 四命令（subscribe/unsubscribe/list/check-now）+ 调度设置与微信共用（scheduler 独立、canRun 各闸互不阻塞）。真机验收全过（水位调低 4 篇新笔记→自动下载 2+判重 2→复跑零新）。plan 期真机实证修正 PRD：note_ids 非严格倒序，「提前停」改全量过滤（2026-09-14 完成，652 单测 + e2e 全绿） | `plans/2026-09-13-m63-mowen-subscription.md` |
 | **M66** ✅ | v0.11.3 | 统一诊断日志 main.log：JSON 行 + 脱敏红线 + 5MB×3 轮转,默认常开 info;`src/core/diag-log.ts` 纯逻辑+落盘单例(零 electron 依赖),埋点 4 处边界(启动快照含 PATH/mocli 结论、mocli spawn-exit 含 stderr 首行、weread 请求码与耗时、download 篇级结果),设置页「诊断」区打开日志文件夹。同版压入 v0.11.2 后 mocli 修复三连(locate 透传 env、BAD_OUTPUT 带 stderr 摘要、启动 PATH 预置+调度闸门)。设计定案:不引 electron-log、不吞并 audit/check 专用日志、无远程上报。验收契约 `docs/PRD-v0.11.3.md`(2026-09-19 完成,728 单测+三平台产物真机全过) | `plans/2026-09-19-m66-diag-log.md` |
-| **M67** ✅ | 未发布 | 选题基础契约与 compose 退场：清理当前安装/路由入口，保留历史；新增按发表时间的 24h/3d/7d/自定义筛选、日期精度和结果类型；十二类合成评估材料（27 条）。54 个针对用例通过，全量 782 个测试与类型检查通过，独立审查无阻塞问题（2026-09-20 完成）。AI 调用、topics CLI、GUI 与真实语义评估不在本阶段 | `plans/2026-09-20-m67-topic-foundation.md` |
-| **M68** ✅ | 未发布 | 可验证选题分析核心：本地正文快照与完全重复内容组、30 篇/12 万字符护栏、两阶段注入式模型协议、unknown 输出运行时校验、精确摘录与统计重算、manifest/result/trace/brief 私有落盘、可区分的完成/材料不足/部分/取消/失败状态。104 个 topics 用例、全量 832 个测试与类型检查通过（2026-09-20 完成）。真实供应商、Key、CLI/GUI 与语义质量未实现 | `plans/2026-09-20-m68-verifiable-topic-analysis.md` |
-| **M69** ✅ | 未发布 | BYOK 模型适配与 topics CLI：明确支持 OpenAI Chat Completions 兼容协议，Key 仅从环境变量读取；严格 JSON、usage、90 秒超时、零重试和脱敏诊断；`topics analyze/brief` 共享 M68 核心，新增 CLI 白名单与 Skill 说明。本地 HTTP 验收通过，12 个目标文件/147 个目标用例、全量 869 个测试与类型检查通过（2026-09-20 完成）。真实外部供应商和语义质量未验 | `plans/2026-09-20-m69-byok-topics-cli.md` |
-| **M70** ✅ | 未发布 | 选题 GUI 与安全 Key：设置页保存 base URL/model，Key 用 Electron safeStorage 加密持久化（不可用时只存本次会话）；新增“选题”导航，默认 24h、可选 3d/7d/自定义，三候选平等展示且默认不选；同页展开理由/材料/结构，支持事件式反馈与本地 Markdown 简报。fixture Electron e2e 覆盖两次模型请求、零额外页签/反馈/简报请求、Key/Authorization/完整正文日志零泄漏与配置持久状态（2026-09-20 完成）。真实供应商与语义质量未验 | `plans/2026-09-20-m70-topics-gui.md` |
+| **M67** ✅ | v0.12.0（未发布） | 选题基础契约与 compose 退场：清理当前安装/路由入口，保留历史；新增按发表时间的 24h/3d/7d/自定义筛选、日期精度和结果类型；十二类合成评估材料（27 条）。54 个针对用例通过，全量 782 个测试与类型检查通过，独立审查无阻塞问题（2026-09-20 完成）。AI 调用、topics CLI、GUI 与真实语义评估不在本阶段 | `plans/2026-09-20-m67-topic-foundation.md` |
+| **M68** ✅ | v0.12.0（未发布） | 可验证选题分析核心：本地正文快照与完全重复内容组、30 篇/12 万字符护栏、两阶段注入式模型协议、unknown 输出运行时校验、精确摘录与统计重算、manifest/result/trace/brief 私有落盘、可区分的完成/材料不足/部分/取消/失败状态。104 个 topics 用例、全量 832 个测试与类型检查通过（2026-09-20 完成）。真实供应商、Key、CLI/GUI 与语义质量未实现 | `plans/2026-09-20-m68-verifiable-topic-analysis.md` |
+| **M69** ✅ | v0.12.0（未发布） | BYOK 模型适配与 topics CLI：明确支持 OpenAI Chat Completions 兼容协议，Key 仅从环境变量读取；严格 JSON、usage、90 秒超时、零重试和脱敏诊断；`topics analyze/brief` 共享 M68 核心，新增 CLI 白名单与 Skill 说明。本地 HTTP 验收通过，12 个目标文件/147 个目标用例、全量 869 个测试与类型检查通过（2026-09-20 完成）。真实外部供应商和语义质量未验 | `plans/2026-09-20-m69-byok-topics-cli.md` |
+| **M70** ✅ | v0.12.0（未发布） | 选题 GUI 与安全 Key：设置页保存 base URL/model，Key 用 Electron safeStorage 加密持久化（不可用时只存本次会话）；新增“选题”导航，默认 24h、可选 3d/7d/自定义，三候选平等展示且默认不选；同页展开理由/材料/结构，支持事件式反馈与本地 Markdown 简报。fixture Electron e2e 覆盖两次模型请求、零额外页签/反馈/简报请求、Key/Authorization/完整正文日志零泄漏与配置持久状态（2026-09-20 完成）。真实供应商与语义质量未验 | `plans/2026-09-20-m70-topics-gui.md` |
 
-> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`、v0.10.2 `docs/PRD-v0.10.2.md`、v0.10.4 `docs/PRD-v0.10.4.md`（发版后补档）、v0.10.5 `docs/PRD-v0.10.5.md`、v0.10.6 `docs/PRD-v0.10.6.md`、v0.11.0 `docs/PRD-v0.11.0.md`、v0.11.1 `docs/PRD-v0.11.1.md`、v0.11.2 `docs/PRD-v0.11.2.md`、v0.11.3 `docs/PRD-v0.11.3.md`（最新发布验收契约）。
+> PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`、v0.10.2 `docs/PRD-v0.10.2.md`、v0.10.4 `docs/PRD-v0.10.4.md`（发版后补档）、v0.10.5 `docs/PRD-v0.10.5.md`、v0.10.6 `docs/PRD-v0.10.6.md`、v0.11.0 `docs/PRD-v0.11.0.md`、v0.11.1 `docs/PRD-v0.11.1.md`、v0.11.2 `docs/PRD-v0.11.2.md`、v0.11.3 `docs/PRD-v0.11.3.md`（最新已发布验收契约）、v0.12.0 `docs/PRD-v0.12.0.md`（当前未发布选题能力的验收契约）。
 
 ## 版本发布史(最新在前)
 
@@ -128,7 +128,7 @@
 
 ## 下一步 / 候选
 
-**当前工程状态**：M70 已完成但未发布，计划与验收边界见 [`docs/plans/2026-09-20-m70-topics-gui.md`](docs/plans/2026-09-20-m70-topics-gui.md)。下一个有意义的产品验证不是继续加写作功能，而是用真实自有文库和用户明确提供的模型服务评估候选是否真能减少“不知道写什么”的时间。
+**当前工程状态**：v0.12.0 的 M67–M70 已完成但未发布，产品与验收契约见 [`docs/PRD-v0.12.0.md`](docs/PRD-v0.12.0.md)。下一个有意义的产品验证不是继续加写作功能，而是用真实自有文库和用户明确提供的模型服务评估候选是否真能减少“不知道写什么”的时间。
 
 - **首版边界**：本地素材 → 最多三张可解释选题卡 → 同页详情 → 选题简报；初始默认最近 24 小时，用户可选择 3 天/7 天/自定义日期，按发表时间筛选，不自动扩窗。`wx-kit-compose` 当前入口已删除，旧 PRD/计划/发版说明保留。完整写作、配图、排版、自动发布与收费体系仍不在本期范围。
 

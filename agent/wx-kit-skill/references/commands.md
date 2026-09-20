@@ -202,7 +202,7 @@ wx-kit site sync --account <公众号> --slugs-file <文件> [--posts-dir <目�
 
 输出 `{ "ok": true, "postsRoot": "...", "succeeded": 1, "failed": 0, "results": [...] }`。slug 只能含小写字母、数字和连字符；目标目录存在时拒绝覆盖；有单篇失败时继续处理其余，退出码 `1`。
 
-## topics — 本地文库选题（当前 main / M70，未发布）
+## topics — 本地文库选题（v0.12.0 当前 main，未发布）
 
 `topics` 使用 OpenAI Chat Completions 兼容协议。运行时会把选定范围内的正文发送到用户配置的服务；它不是纯本地命令。
 
@@ -225,7 +225,7 @@ wx-kit topics brief --run <runId> --topic <topicId> [--out <文库根目录>]
 - `brief` 读取本地 `result.json` 并生成 Markdown，不再次调用模型。结果保存在 `<库根>/topic-decisions/runs/<runId>/briefs/`。
 - 退出码：完成/部分/材料不足为 `0`；供应商/分析失败为 `1`；参数错误、缺配置和取消为 `2`。
 
-这是当前 main 的未发布开发能力。已安装 v0.11.3 没有该命令，不能据此排查成安装故障。
+这是 v0.12.0 当前 main 的未发布开发能力。已安装 v0.11.3 没有该命令，不能据此排查成安装故障。
 
 M70 同时增加了 GUI“选题”导航：先在“设置 → 选题 AI”填 base URL、model 和 Key，再选 24 小时/3 天/7 天/自定义日期分析。GUI 默认不选中任何候选；点选后才展开理由、材料依据和起笔结构。反馈、切换页签和生成简报都不会再调模型。
 

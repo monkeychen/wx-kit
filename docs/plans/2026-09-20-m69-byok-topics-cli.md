@@ -1,5 +1,7 @@
 # M69 · BYOK 模型适配与 topics CLI 实现计划
 
+> **目标版本：v0.12.0（未发布）。产品与验收契约：[`docs/PRD-v0.12.0.md`](../PRD-v0.12.0.md)。**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans task-by-task, and superpowers:test-driven-development for behavior changes. 在 feature 分支完成、验证、合 main，不 push。
 
 **Goal:** 为 M68 核心接入一种明确的 OpenAI Chat Completions 兼容协议，并交付可用的 `wx-kit topics analyze/brief` CLI。
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Node 全局 fetch / AbortSignal、Commander、现有 Electron CLI 分流、Vitest、本地受控 HTTP/注入 fetch 测试；无新依赖。
 
-**Spec:** [本地选题决策器设计](../superpowers/specs/2026-09-20-topic-decisions-design.md)
+**Spec:** [v0.12.0 PRD](../PRD-v0.12.0.md) · [本地选题决策器设计](../superpowers/specs/2026-09-20-topic-decisions-design.md)
 
 ## Global Constraints
 
@@ -70,7 +72,7 @@ function resolveTopicCliModelConfig(opts: { baseUrl?: string; model?: string }, 
 **Files:** 修改 `electron/cli-dispatch.ts`、`tests/electron/cli-dispatch.test.ts`、`agent/wx-kit-skill/SKILL.md`、`agent/wx-kit-skill/references/commands.md`、`agent/wx-kit-skill/references/recipes.md`、`agent/README.md`、`ROADMAP.md`、devlog。
 
 - [x] **3.1 分流红灯。** `topics` 必须被识别为 CLI；删除白名单项应让测试失败。实现后运行分流测试。
-- [x] **3.2 更新说明。** 明确 M69 为当前 main 未发布能力；示例使用环境变量，不出现真实 Key；提醒正文会发送到用户配置服务。记录 `topics brief` 不调用模型。
+- [x] **3.2 更新说明。** 明确 M69 归属 v0.12.0 当前 main 未发布能力；示例使用环境变量，不出现真实 Key；提醒正文会发送到用户配置服务。记录 `topics brief` 不调用模型。
 - [x] **3.3 受控 HTTP 验收。** 测试内启动 127.0.0.1 临时 server，执行适配器两阶段请求，核对两次请求、路径、Authorization 和响应解析；关闭 server 后再运行，确认失败且零重试。它证明协议实现，不代表任意真实供应商兼容。
 
 ## Task 4：收尾

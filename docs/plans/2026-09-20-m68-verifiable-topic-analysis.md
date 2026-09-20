@@ -1,5 +1,7 @@
 # M68 · 可验证选题分析核心实现计划
 
+> **目标版本：v0.12.0（未发布）。产品与验收契约：[`docs/PRD-v0.12.0.md`](../PRD-v0.12.0.md)。**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Runtime behavior follows superpowers:test-driven-development. Steps use checkbox syntax for tracking.
 
 **Goal:** 在不绑定外部模型供应商的前提下，交付“本地素材快照 → 两阶段模型判断 → 来源/统计校验 → 运行落盘 → 选题简报”的共享核心链路。
@@ -8,7 +10,7 @@
 
 **Tech Stack:** TypeScript、Node `fs/promises` / `crypto` / `path`、现有 Vitest、现有 `atomicWriteFile` 与 `diag()`；不增加依赖。
 
-**Spec:** [本地选题决策器设计](../superpowers/specs/2026-09-20-topic-decisions-design.md)
+**Spec:** [v0.12.0 PRD](../PRD-v0.12.0.md) · [本地选题决策器设计](../superpowers/specs/2026-09-20-topic-decisions-design.md)
 
 ## Global Constraints
 

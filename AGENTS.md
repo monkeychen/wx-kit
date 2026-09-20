@@ -65,14 +65,16 @@ npm 包名与配置背景：无 scope 的 `wx-kit` 被 npm 相似度保护拒绝
 - `src/renderer/`：React 界面，只经 `window.api`（见 `src/renderer/api.ts`）调用能力，**绝不直接 import core**。
 - `tests/`：`tests/core`、`tests/electron` 镜像源码的 vitest 单测；`tests/fixtures` 放样本；`tests/e2e/gui.e2e.mjs` 是 Playwright Electron 端到端。
 
-### 选题能力边界（2026-09-20 产品化定案）
+### 选题模块长期不变量（v0.12.0 起）
 
-- 产品化首个闭环为“本地素材 → 可解释选题卡 → 选题简报”；完整写作、排版、配图、发布与商业交易另议。开发/发布进度仍只看 ROADMAP，不把设计当已上线能力。
-- `src/core/topics/` 放 GUI/CLI 共用的选题纯逻辑与契约；测试镜像到 `tests/core/topics/`。可复用合成评估材料放 `tests/fixtures/topic-decisions/`，真实运行产物只进已忽略的 `output/topic-decisions-evals/`，不提交用户文库或密钥。
-- 默认最近 24 小时，按真实发表时间固定用户所选范围，不自动扩窗。只有日期、没有具体时刻的素材要保留时间精度，不用下载时间补齐。
-- 本地样本数、不同作者数不等于全网热度或独立证据数量；精确摘录匹配不等于事实已验证。传播效果缺少数据时明确未验证，禁止用模型自评分伪装推流概率。
-- 旧 compose 已决定退场；不复用其编排，不维护与 core 并行的另一套选题判断。语义判断规则与确定性计算分离，保留版本和可复用评估。
-- 选题模型为用户自备的外部服务，所选正文会离开本机；Key、Authorization 和正文不得进入 stdout、result、trace 或诊断日志。新模型通道必须记录脱敏后的端点、阶段、状态与耗时，并用真实链路检查敏感值零命中。
+> 当前产品范围、交互默认值、非目标与验收清单只看 ROADMAP 当前状态所指向的 PRD；
+> 本节只保留跨版本的架构、真实性与安全约束。
+
+- `src/core/topics/` 是 GUI/CLI 共用的选题逻辑与契约唯一真相源；不维护与 core 并行的另一套编排或选题判断。
+- 语义判断与确定性计算分离；模型输出始终按不可信输入校验，引用须可回到当次快照，最终统计由程序重算。
+- 本地样本数和账号数不等于全网热度或独立事实来源；精确摘录匹配不等于事实已验证；无外部数据不得输出推流或阅读量承诺。
+- 外部模型通道必须明示正文出机事实；Key 和 Authorization 不得进入普通设置、renderer 可读状态、stdout、result、trace 或诊断日志。result 可保留通过校验的必要证据摘录，不得复制整篇正文；trace 和诊断日志不记录正文或模型请求体。
+- 可复用合成评估材料放 `tests/fixtures/topic-decisions/`；真实运行与语义评估产物只进已忽略的输出目录，不提交用户文库、正文或密钥。
 
 ## 沟通语言（强约束）
 - **与用户的所有交流一律用中文**——回答、解释、提问、进度报告、方案对比，全程中文。
@@ -198,8 +200,8 @@ null 安全）。三条硬约定：
 
 ## 文档索引
 - `ROADMAP.md` — **里程碑状态与路线图（续接看这里）**。状态/进度只在这里维护；各里程碑的详细实现计划放在 `docs/plans/`，其逐里程碑索引也在 ROADMAP 维护。
-- `docs/PRD.md` — 第一阶段（v0.1.0）产品需求（全貌、F1–F5、架构、风控、验收）。**后续每版一份 `docs/PRD-vX.Y.Z.md`**（§4 逐条可勾验收是验收契约），逐版清单见 ROADMAP 的 PRD 索引行。
+- `docs/PRD.md` — 第一阶段（v0.1.0）产品需求（全貌、F1–F5、架构、风控、验收）。**后续每版一份 `docs/PRD-vX.Y.Z.md`**（§4 逐条可勾验收是验收契约），当前契约与逐版清单只在 ROADMAP 的 PRD 索引行维护。
 - `docs/devlog/wx-kit-vibe-coding.md` — vibe-coding 全程复盘（活文档，每完成一个里程碑增补；流程/决策/踩坑/方法论）。
 - `agent/` — 消费 wx-kit 的 skill：`wx-kit-skill/`（能力说明书，CLI 变更须同步刷新，见工作流第 7 条）。已退场创作编排的历史见 ROADMAP，不新增失效安装入口。
 
-> 进度的唯一真相是 `git log` + `ROADMAP.md` + `docs/plans/`，不是散落在指南里的散文。
+> 进度看 `git log` + `ROADMAP.md`，产品验收看当前 `docs/PRD-vX.Y.Z.md`，实现步骤看 `docs/plans/`；不以散落指南为第二真相源。
