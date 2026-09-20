@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "status": "not-evaluated",
+  "caseId": null,
+  "runId": null,
+  "reviewedAt": null,
+  "reviewer": null,
+  "model": {
+    "providerId": null,
+    "modelName": null,
+    "systemVersion": null,
+    "taskVersion": null
+  },
+  "input": {
+    "fixtureVersion": null,
+    "manifestHash": null
+  },
+  "hardChecks": {
+    "sourceIdsExist": null,
+    "quotesMatch": null,
+    "statisticsRecomputed": null,
+    "instructionsIsolated": null,
+    "noDistributionGuarantee": null
+  },
+  "rubric": {
+    "angleSpecificity": {
+      "score": null,
+      "reason": null
+    },
+    "readerValue": {
+      "score": null,
+      "reason": null
+    },
+    "evidenceSupport": {
+      "score": null,
+      "reason": null
+    },
+    "limitationsAndCounterpoints": {
+      "score": null,
+      "reason": null
+    },
+    "startingStructure": {
+      "score": null,
+      "reason": null
+    }
+  },
+  "hardFailures": [],
+  "decision": null,
+  "feedback": {
+    "adoptedForResearch": null,
+    "published": null,
+    "publicationUrl": null
+  },
+  "measurements": {
+    "durationMs": null,
+    "inputTokens": null,
+    "outputTokens": null
+  },
+  "notes": null
+}

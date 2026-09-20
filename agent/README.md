@@ -1,24 +1,17 @@
 # agent/ — wx-kit 的 agent 集成
 
-本目录放**消费 wx-kit 的 Claude Code skill**，与应用代码物理隔离。skill 只经 wx-kit 的 **CLI / 导出文件**取数据，绝不 import 应用代码——换任何 agent 都按同一契约接入。这是 v0.4.0「文库供料 agent」的参考实现。
+本目录放**消费 wx-kit 的能力说明书 Skill**，与应用代码物理隔离。Skill 只经 wx-kit 的 **CLI / 导出文件**取数据，绝不 import 应用代码——换任何 agent 都按同一契约接入。
 
 ## 内含
 
 - `wx-kit-skill/` —— **wx-kit 能力说明书 skill**：安装（brew/npm 自动检测）、按 URL 下载、公众号订阅（微信读书后端）、本地文库、素材导出、站点同步。agent 从零上手 wx-kit 看这个。
   **它是 CLI 契约的唯一真相**——参数、输出结构、错误码只在这里维护，随每次 CLI 变更同步。
-- `wx-kit-compose/` —— 素材创作编排 skill：走「取料 → 选题 → 写作」（带两个人工检查点），定稿后可选发到个人站点；写作委派给 `khazix-writer`。
-  取料的起点可以是**已下载的文库**、GUI 导出的素材清单，也可以是用户给出 URL 后新下载的文章。
-  **它刻意不复述 CLI 参数**，只说「哪一步用哪个能力」——抄来的命令细节不会跟着源头变，这正是它曾落后二十个里程碑的原因。
 
 ## 安装
 
-用 skill-kit（软链接安装）把 `wx-kit-compose` 装进你的 agent：
+将 `wx-kit-skill/` 安装或链接到所用 agent 的 Skill 目录。使用目录中的 `SKILL.md` 作为入口；具体安装机制按对应 agent 的文档操作。
 
-```
-/skill-kit            # 交互选择：安装 → 选本目录的 wx-kit-compose → 选目标 agent
-```
-
-依赖的写作 skill `khazix-writer` 需已安装（它承载笔调）；研究 skill `hv-analysis` 可选（仅旁路深研用）。
+本目录不提供创作编排安装项，也不要求安装任何写作或研究 Skill。选题能力的研发状态见根目录 ROADMAP，不能从设计稿推断已有可用命令。
 
 ## 供料契约
 
@@ -82,8 +75,10 @@
 ## 下游：发到个人站点（可选）
 
 `site sync --ids <id> --slug <slug>` 把文库文章按 Astro 站点规范生成到 `content/posts/<日期>-<slug>/`（纯本地，不联网；需先配 `siteSyncPostsDir`）。
-**compose 默认不做这一步**——发布是不可逆的对外动作，要用户明确要求。
+仅在用户要求同步到所配置站点目录时调用。此命令生成本地内容，不代替站点预览、远端部署或对外发布。
 
-## 设计边界（v0.4.0 既定）
+## 当前能力与产品化方向
 
-wx-kit 只**供料**，不内置创作模块；选题/写作/审阅的编排活在这些外部 skill 里，人在环中。需求见 `docs/PRD-v0.4.0.md` §R3，设计见 `docs/superpowers/specs/2026-06-22-v0.4.0-agent-feed-and-storage-design.md`「M15」节。
+已发布的 CLI 继续负责下载、文库、订阅、素材导出和本地站点内容同步。产品化方向增加“素材到可解释选题简报”，共享核心能力和验收规则；详细设计见 [选题决策器设计](../docs/superpowers/specs/2026-09-20-topic-decisions-design.md)。新入口实际可用以前，本 Skill 不承诺自动选题或写作。
+
+历史上的创作编排参考实现已经退场，原有 PRD、发布说明与复盘保留。素材导出不依赖它，用户仍可把导出的正文交给自己选择的创作工具。
