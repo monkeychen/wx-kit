@@ -398,6 +398,13 @@ async function main() {
     // ============ M70 · 选题 AI 配置 + 三卡决策闭环 ============
     await win.click('[data-testid="settings-cat-ai"]')
     await win.waitForSelector('[data-testid="topic-ai-section"]', { timeout: 8000 })
+    // M73：Base URL 由厂商选择派生；本地 fixture 端点要先切到「自定义」厂商才能编辑
+    await win.click('[data-testid="topic-ai-provider"]')
+    await win.locator('.ant-select-dropdown:visible .ant-select-item:has-text("自定义")').click()
+    await win.waitForFunction(() => {
+      const input = document.querySelector('[data-testid="topic-ai-base-url"]')
+      return input instanceof HTMLInputElement && !input.readOnly
+    }, { timeout: 5000 })
     await win.fill('[data-testid="topic-ai-base-url"]', `${wereadBase}/v1`)
     await win.fill('[data-testid="topic-ai-model"]', 'fixture-topic-model')
     await win.fill('[data-testid="topic-ai-key"]', TOPIC_E2E_KEY)

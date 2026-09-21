@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { createServer } from 'node:http'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { AddressInfo } from 'node:net'
 import { SettingsService } from '../../electron/services/settings'
 import { TopicAiConfigService, type TopicSafeStorage } from '../../electron/services/topic-ai-config'
 import { TopicService } from '../../electron/services/topics-service'
@@ -59,7 +61,7 @@ describe('TopicService（IPC 背后的真实服务）', () => {
 
   it('配置后运行共享核心并推送阶段，renderer 响应不含 Key', async () => {
     const { settings, config } = await setupLibrary()
-    await config.save({ baseUrl: 'http://127.0.0.1:1234/v1', model: 'local', apiKey: 'ipc-secret' })
+    await config.save({ providerId: 'custom', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local', apiKey: 'ipc-secret' })
     const model = new ServiceModel()
     const stages: string[] = []
     const service = new TopicService({ settings, config, now, makeRunId: () => 'run-ipc', makeEventId: () => 'feedback-ipc', modelFactory: () => model })
@@ -79,7 +81,7 @@ describe('TopicService（IPC 背后的真实服务）', () => {
 
   it('同一时刻拒绝第二个分析，并能取消第一个', async () => {
     const { settings, config } = await setupLibrary()
-    await config.save({ baseUrl: 'http://127.0.0.1:1234/v1', model: 'local', apiKey: 'k' })
+    await config.save({ providerId: 'custom', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local', apiKey: 'k' })
     class WaitingModel extends ServiceModel {
       override async extract(_input: TopicExtractionInput, signal?: AbortSignal): Promise<unknown> {
         this.calls++
@@ -93,5 +95,35 @@ describe('TopicService（IPC 背后的真实服务）', () => {
     expect(service.cancel()).toEqual({ ok: true })
     expect(await first).toMatchObject({ ok: true, result: { status: 'cancelled' } })
     expect(service.cancel()).toMatchObject({ ok: false, error: { code: 'NO_TOPIC_ANALYSIS' } })
+  })
+
+  it('测试连接：空 Key 回退已存 Key 发最小请求；无 Key 给可行动错误', async () => {
+    const { settings, config } = await setupLibrary()
+    await config.save({ providerId: 'custom', baseUrl: 'http://127.0.0.1:1/v1', model: 'local', apiKey: 'saved-key' })
+    const service = new TopicService({ settings, config })
+
+    const seenAuth: string[] = []
+    const server = createServer((req, res) => {
+      seenAuth.push(String(req.headers.authorization))
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ choices: [{ message: { content: '' } }], usage: { prompt_tokens: 3, completion_tokens: 1 } }))
+    })
+    await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => resolve()) })
+    const port = (server.address() as AddressInfo).port
+    try {
+      const result = await service.testConnection({ baseUrl: `http://127.0.0.1:${port}/v1`, model: 'local' })
+      expect(result).toMatchObject({ ok: true, model: 'local', usage: { inputTokens: 3, outputTokens: 1 } })
+      expect(seenAuth).toEqual(['Bearer saved-key'])
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
+
+    const fresh = await setupLibrary()
+    const bare = new TopicService({ settings: fresh.settings, config: fresh.config })
+    await expect(bare.testConnection({ baseUrl: 'http://127.0.0.1:1/v1', model: 'local' }))
+      .resolves.toMatchObject({ ok: false, error: { code: 'MISSING_AI_BASE_URL' } })
+    await fresh.config.save({ providerId: 'custom', baseUrl: 'http://127.0.0.1:1/v1', model: 'local' })
+    await expect(bare.testConnection({ baseUrl: 'http://127.0.0.1:1/v1', model: 'local' }))
+      .resolves.toMatchObject({ ok: false, error: { code: 'MISSING_AI_API_KEY' } })
   })
 })

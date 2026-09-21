@@ -193,3 +193,39 @@ describe('OpenAI Chat Completions 兼容选题模型', () => {
     expect(calls).toBe(1)
   })
 })
+
+describe('推理配置下发到请求 body', () => {
+  const captureBody = async (config: ConstructorParameters<typeof ChatCompletionsTopicModel>[0]) => {
+    let body: Record<string, unknown> = {}
+    const model = new ChatCompletionsTopicModel(config, async (_url, init) => {
+      body = JSON.parse(String(init.body))
+      return ok('{"items":[]}')
+    })
+    await model.extract(makeTopicExtractionInput(snapshot))
+    return body
+  }
+
+  it('智谱推理开启 → thinking.enabled，且不下发 reasoning_effort', async () => {
+    const body = await captureBody({ baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k', providerId: 'zhipu', reasoning: true, effort: 'high' })
+    expect(body.thinking).toEqual({ type: 'enabled' })
+    expect(body).not.toHaveProperty('reasoning_effort')
+  })
+
+  it('智谱推理关闭 → thinking.disabled', async () => {
+    const body = await captureBody({ baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k', providerId: 'zhipu', reasoning: false, effort: 'high' })
+    expect(body.thinking).toEqual({ type: 'disabled' })
+  })
+
+  it('OpenAI 推理开启 → reasoning_effort 取配置等级', async () => {
+    const body = await captureBody({ baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k', providerId: 'openai', reasoning: true, effort: 'medium' })
+    expect(body.reasoning_effort).toBe('medium')
+    expect(body).not.toHaveProperty('thinking')
+  })
+
+  it('不配置 reasoning（CLI 路径）→ body 与现状完全一致', async () => {
+    const body = await captureBody({ baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k' })
+    expect(body).not.toHaveProperty('thinking')
+    expect(body).not.toHaveProperty('reasoning_effort')
+    expect(body).not.toHaveProperty('enable_thinking')
+  })
+})

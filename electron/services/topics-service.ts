@@ -3,12 +3,15 @@ import { Library } from '../../src/core/library'
 import { analyzeTopics } from '../../src/core/topics/analyze'
 import { buildTopicBrief } from '../../src/core/topics/brief'
 import type { TopicModel } from '../../src/core/topics/model'
-import { ChatCompletionsTopicModel } from '../../src/core/topics/chat-completions'
+import { ChatCompletionsTopicModel, TopicProviderError } from '../../src/core/topics/chat-completions'
+import type { TopicAiConfigSaveInput, TopicAiConfigStatus } from './topic-ai-config'
+import { testTopicAiConnection } from '../../src/core/topics/test-connection'
+import { isTopicAiProviderId, PROVIDER_CATALOG, type ProviderSpec, type TopicAiProviderId } from '../../src/core/topics/providers'
 import { TopicRunStore } from '../../src/core/topics/store'
 import { resolveTopicWindow, selectTopicArticles } from '../../src/core/topics/time-window'
 import type { TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../../src/core/topics/types'
 import { SettingsService } from './settings'
-import { TopicAiConfigError, TopicAiConfigService, type TopicAiConfigStatus } from './topic-ai-config'
+import { TopicAiConfigError, TopicAiConfigService } from './topic-ai-config'
 
 export type TopicAnalyzeResponse =
   | { ok: true; result: TopicRunResult; timeExcludedCount: number }
@@ -22,13 +25,24 @@ export type TopicFeedbackResponse =
   | { ok: true; path: string }
   | { ok: false; error: { code: string; message: string } }
 
+export type TopicTestConnectionResponse =
+  | { ok: true; model: string; latencyMs: number; usage?: { inputTokens: number; outputTokens: number } }
+  | { ok: false; error: { code: string; message: string } }
+
 export interface TopicServiceDeps {
   settings: SettingsService
   config: TopicAiConfigService
   now?: () => Date
   makeRunId?: () => string
   makeEventId?: () => string
-  modelFactory?: (config: { baseUrl: string; model: string; apiKey: string }) => TopicModel
+  modelFactory?: (config: {
+    providerId: string
+    baseUrl: string
+    model: string
+    apiKey: string
+    reasoning: boolean
+    effort: 'high' | 'medium' | 'low'
+  }) => TopicModel
 }
 
 const errorResponse = (error: unknown, fallback: string) => ({
@@ -50,16 +64,51 @@ export class TopicService {
     this.now = deps.now ?? (() => new Date())
     this.makeRunId = deps.makeRunId ?? (() => `topic-${Date.now()}-${randomUUID().slice(0, 8)}`)
     this.makeEventId = deps.makeEventId ?? (() => `feedback-${Date.now()}-${randomUUID().slice(0, 8)}`)
-    this.modelFactory = deps.modelFactory ?? (config => new ChatCompletionsTopicModel({ baseUrl: config.baseUrl, model: config.model, apiKey: config.apiKey }))
+    this.modelFactory = deps.modelFactory ?? (config => new ChatCompletionsTopicModel({
+      baseUrl: config.baseUrl,
+      model: config.model,
+      apiKey: config.apiKey,
+      providerId: isTopicAiProviderId(config.providerId) ? config.providerId : 'custom',
+      reasoning: config.reasoning,
+      effort: config.effort,
+    }))
   }
 
   getConfig(): Promise<TopicAiConfigStatus> { return this.deps.config.getStatus() }
-  saveConfig(input: { baseUrl: string; model: string; apiKey?: string }): Promise<TopicAiConfigStatus> { return this.deps.config.save(input) }
+  /** 厂商目录是静态数据，renderer 经 IPC 取（renderer 不直接 import core 运行时导出）。 */
+  getProviderCatalog(): Record<TopicAiProviderId, ProviderSpec> { return PROVIDER_CATALOG }
+  saveConfig(input: TopicAiConfigSaveInput): Promise<TopicAiConfigStatus> { return this.deps.config.save(input) }
   clearKey(): Promise<TopicAiConfigStatus> { return this.deps.config.clearKey() }
+
+  /**
+   * 测试连接测的是「草稿配置」：apiKey 为空时回退已存 Key（改端点后不重输 Key 也能测）。
+   * testTopicAiConnection 不抛异常；requireConfig 的失败也要归一成 result。
+   */
+  async testConnection(input: { baseUrl: string; model: string; apiKey?: string }): Promise<TopicTestConnectionResponse> {
+    let apiKey = (input.apiKey ?? '').trim()
+    if (!apiKey) {
+      try {
+        const config = await this.deps.config.requireConfig()
+        apiKey = config.apiKey
+      } catch (error) {
+        return {
+          ok: false,
+          error: {
+            code: error instanceof TopicAiConfigError ? error.code : 'TOPIC_CONFIG_ERROR',
+            message: error instanceof Error ? error.message : String(error),
+          },
+        }
+      }
+    }
+    const result = await testTopicAiConnection({ baseUrl: input.baseUrl, model: input.model, apiKey })
+    return result.ok
+      ? { ok: true, model: result.model, latencyMs: result.latencyMs, usage: result.usage }
+      : { ok: false, error: { code: result.error.code, message: result.error.message } }
+  }
 
   async analyze(input: { window: TopicWindowInput }, onProgress?: (stage: TopicTraceEvent['stage']) => void): Promise<TopicAnalyzeResponse> {
     if (this.active) return { ok: false, error: { code: 'TOPIC_ANALYSIS_RUNNING', message: '已有选题分析正在进行，请等待完成或先取消。' } }
-    let config: { baseUrl: string; model: string; apiKey: string }
+    let config: Awaited<ReturnType<TopicAiConfigService['requireConfig']>>
     try { config = await this.deps.config.requireConfig() }
     catch (error) { return errorResponse(error, 'TOPIC_CONFIG_ERROR') }
     this.active = new AbortController()

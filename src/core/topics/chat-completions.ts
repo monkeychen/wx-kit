@@ -1,10 +1,17 @@
 import { diag, redactFreeText } from '../diag-log'
+import type { TopicAiProviderId, TopicAiReasoningEffort } from './providers'
+import { reasoningBodyFields } from './providers'
 import type { TopicExtractionInput, TopicModel, TopicProposalInput } from './model'
 
 export interface ChatCompletionsConfig {
   baseUrl: string
   model: string
   apiKey: string
+  /** 厂商标识：决定推理参数的厂商约定。CLI 路径不传 → 不下发任何推理参数。 */
+  providerId?: TopicAiProviderId
+  /** undefined = 不配置（保持现状）；true/false = 显式开/关推理 */
+  reasoning?: boolean
+  effort?: TopicAiReasoningEffort
   timeoutMs?: number
 }
 
@@ -93,6 +100,10 @@ export class ChatCompletionsTopicModel implements TopicModel {
         { role: 'system', content: system },
         { role: 'user', content: JSON.stringify(input) },
       ],
+      ...reasoningBodyFields(this.config.providerId ?? 'custom', {
+        reasoning: this.config.reasoning,
+        effort: this.config.effort,
+      }),
     }
     let response: Response
     try {

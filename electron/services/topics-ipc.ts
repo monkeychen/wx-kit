@@ -8,8 +8,10 @@ export function registerTopicIpc(settings: SettingsService): void {
   const topics = new TopicService({ settings, config })
 
   ipcMain.handle('topics:getConfig', () => topics.getConfig())
+  ipcMain.handle('topics:providerCatalog', () => topics.getProviderCatalog())
   ipcMain.handle('topics:saveConfig', (_event, input) => topics.saveConfig(input))
   ipcMain.handle('topics:clearKey', () => topics.clearKey())
+  ipcMain.handle('topics:testConnection', (_event, input) => topics.testConnection(input))
   ipcMain.handle('topics:analyze', (event, input) => topics.analyze(input, stage => {
     if (!event.sender.isDestroyed()) event.sender.send('topics:progress', { stage })
   }))

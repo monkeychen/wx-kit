@@ -667,6 +667,17 @@ body {
   font-size: 12.5px;
   line-height: 1.55;
 }
+/* 测试连接结果（M73，对齐原型 .test-result）：常驻两行省略，hover 原地展开全文。
+   不用浮层——settings-panel 圆角裁剪会吞掉伸出的 tooltip，原地切换最稳。 */
+.settings-test-result { margin: 4px 0 0; border-radius: 8px; padding: 11px 13px; font-size: 12.5px; line-height: 1.6; display: none; }
+.settings-test-result.show { display: block; cursor: help; }
+.settings-test-result .tr-line { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.settings-test-result .tr-tip { display: none; }
+.settings-test-result.show:hover .tr-line { display: none; }
+.settings-test-result.show:hover .tr-tip { display: inline; }
+.settings-test-result.ok { background: var(--jade-wash); color: var(--jade); }
+.settings-test-result.fail { background: var(--cinnabar-wash); color: var(--cinnabar); }
+.settings-test-result.pending { background: var(--paper-sunken); color: var(--ink-soft); }
 /* 行内布局对齐原型：左列标签+短 hint 左对齐；右列控件右对齐（原型 .control{justify-content:flex-end}） */
 .settings-row { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 22px; align-items: center; min-height: 58px; padding: 12px 0; border-top: 1px solid var(--line); }
 .settings-group-title + .settings-row { border-top: 0; padding-top: 0; }
@@ -680,6 +691,10 @@ body {
 .settings-input-fill { flex: 1 1 320px; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .settings-input-fill > .ant-input-affix-wrapper,
 .settings-input-fill > .ant-input { flex: 1 1 auto; min-width: 0; }
+.settings-input-fill > .ant-select,
+.settings-input-fill > .ant-select-selector { flex: 1 1 auto; min-width: 0; }
+.settings-input-fill > .ant-select { flex: 1 1 auto; min-width: 0; }
+.settings-input-fill > .ant-select .ant-select-selector { width: 100%; }
 .settings-input-fill > .ant-space-compact { flex: 1 1 auto; min-width: 0; display: flex; }
 .settings-input-fill > .ant-space-compact > .ant-input-affix-wrapper,
 .settings-input-fill > .ant-space-compact > .ant-input { flex: 1 1 auto; min-width: 0; }
