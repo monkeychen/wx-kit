@@ -63,6 +63,8 @@ describe('reasoningBodyFields：推理参数映射（文档未证实的行为不
     ['qwen', { reasoning: true, effort: 'high' }, { enable_thinking: true }],
     ['qwen', { reasoning: false, effort: 'high' }, { enable_thinking: false }],
     ['openai', { reasoning: true, effort: 'medium' }, { reasoning_effort: 'medium' }],
+    ['openai', { reasoning: true, effort: 'extra' }, { reasoning_effort: 'extra' }],
+    ['openai', { reasoning: true, effort: 'max' }, { reasoning_effort: 'max' }],
     ['openai', { reasoning: false, effort: 'medium' }, {}],
     ['gemini', { reasoning: true, effort: 'low' }, { reasoning_effort: 'low' }],
     ['deepseek', { reasoning: true, effort: 'high' }, {}],

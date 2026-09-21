@@ -50,7 +50,7 @@ function validateBaseUrl(value: string): string {
   return trimmed.replace(/\/+$/, '')
 }
 
-const EFFORTS: readonly TopicAiReasoningEffort[] = ['high', 'medium', 'low']
+const EFFORTS: readonly TopicAiReasoningEffort[] = ['low', 'medium', 'high', 'extra', 'max']
 
 async function exists(path: string): Promise<boolean> {
   try { await readFile(path); return true } catch (error) {
