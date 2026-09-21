@@ -15,6 +15,7 @@ export function registerTopicIpc(settings: SettingsService): void {
   ipcMain.handle('topics:analyze', (event, input) => topics.analyze(input, stage => {
     if (!event.sender.isDestroyed()) event.sender.send('topics:progress', { stage })
   }))
+  ipcMain.handle('topics:runningStatus', () => topics.getRunningStatus())
   ipcMain.handle('topics:cancel', () => topics.cancel())
   ipcMain.handle('topics:brief', (_event, input) => topics.brief(input))
   ipcMain.handle('topics:feedback', (_event, input) => topics.feedback(input))

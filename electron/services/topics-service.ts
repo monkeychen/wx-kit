@@ -55,6 +55,9 @@ const errorResponse = (error: unknown, fallback: string) => ({
 
 export class TopicService {
   private active: AbortController | null = null
+  private activeStage: TopicTraceEvent['stage'] | null = null
+  private activeStartedAt: number | null = null
+  private activeWindow: TopicWindowInput | null = null
   private now: () => Date
   private makeRunId: () => string
   private makeEventId: () => string
@@ -106,12 +109,26 @@ export class TopicService {
       : { ok: false, error: { code: result.error.code, message: result.error.message } }
   }
 
+  /**
+   * M73.1：GUI 切页重挂载后用快照恢复「进行中」现场（范围 + 阶段 + 起始时间 + 取消入口）。
+   * startedAt 用 Date.now 而非注入的 now()——它只服务 UI 计时显示。
+   */
+  getRunningStatus(): { running: boolean; startedAt: number | null; stage: TopicTraceEvent['stage'] | null; window: TopicWindowInput | null } {
+    return this.active
+      ? { running: true, startedAt: this.activeStartedAt, stage: this.activeStage, window: this.activeWindow }
+      : { running: false, startedAt: null, stage: null, window: null }
+  }
+
   async analyze(input: { window: TopicWindowInput }, onProgress?: (stage: TopicTraceEvent['stage']) => void): Promise<TopicAnalyzeResponse> {
     if (this.active) return { ok: false, error: { code: 'TOPIC_ANALYSIS_RUNNING', message: '已有选题分析正在进行，请等待完成或先取消。' } }
     let config: Awaited<ReturnType<TopicAiConfigService['requireConfig']>>
     try { config = await this.deps.config.requireConfig() }
     catch (error) { return errorResponse(error, 'TOPIC_CONFIG_ERROR') }
     this.active = new AbortController()
+    this.activeStartedAt = Date.now()
+    this.activeStage = null
+    this.activeWindow = input.window
+    const trackStage = (stage: TopicTraceEvent['stage']) => { this.activeStage = stage; onProgress?.(stage) }
     try {
       const settings = await this.deps.settings.get()
       const window = resolveTopicWindow(input.window, this.now().getTime())
@@ -122,12 +139,12 @@ export class TopicService {
         store: new TopicRunStore(settings.libraryRoot),
         now: this.now,
         makeRunId: this.makeRunId,
-        onStage: onProgress,
+        onStage: trackStage,
       }, { window, articles: selected.articles, signal: this.active.signal })
       return { ok: true, result, timeExcludedCount: selected.excluded.length }
     } catch (error) {
       return errorResponse(error, 'TOPIC_ANALYSIS_ERROR')
-    } finally { this.active = null }
+    } finally { this.active = null; this.activeStage = null; this.activeStartedAt = null; this.activeWindow = null }
   }
 
   cancel(): { ok: true } | { ok: false; error: { code: string; message: string } } {

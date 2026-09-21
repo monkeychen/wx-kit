@@ -35,6 +35,7 @@ const api: WxApi = {
   topicsClearKey: () => ipcRenderer.invoke('topics:clearKey'),
   topicsTestConnection: (input) => ipcRenderer.invoke('topics:testConnection', input),
   topicsAnalyze: (input) => ipcRenderer.invoke('topics:analyze', input),
+  topicsRunningStatus: () => ipcRenderer.invoke('topics:runningStatus'),
   topicsCancel: () => ipcRenderer.invoke('topics:cancel'),
   topicsBrief: (runId, topicId) => ipcRenderer.invoke('topics:brief', { runId, topicId }),
   topicsFeedback: (runId, topicId, decision) => ipcRenderer.invoke('topics:feedback', { runId, topicId, decision }),
