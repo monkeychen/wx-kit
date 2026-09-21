@@ -44,6 +44,11 @@ export interface AppSettings {
   topicAiBaseUrl: string
   topicAiModel: string
   topicDefaultRange: TopicDefaultRange
+  /** M73 AI 模型设置。provider 为空串=老配置未设置，由 baseUrl 反查目录得出有效厂商 */
+  topicAiProvider: string
+  topicAiPlan: 'payg' | 'plan'
+  topicAiReasoning: boolean
+  topicAiEffort: 'high' | 'medium' | 'low'
 }
 
 // 与 renderer 的 library-view 排序键/方向一致;定义在此避免主进程 import renderer
@@ -81,6 +86,10 @@ export class SettingsService {
       topicAiBaseUrl: '',
       topicAiModel: '',
       topicDefaultRange: '24h',
+      topicAiProvider: '',
+      topicAiPlan: 'payg',
+      topicAiReasoning: true,
+      topicAiEffort: 'high',
     }
   }
 

@@ -10,9 +10,10 @@ import type { RunCheckResult } from '../../electron/services/subscription-check'
 import type { UpdateInfo, UpdateAsset } from '../core/check-update'
 import type { InstallChannel } from '../core/install-channel'
 import type { MpProtectionStatus } from '../../electron/services/mp-request-gateway'
-import type { TopicAiConfigStatus } from '../../electron/services/topic-ai-config'
-import type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse } from '../../electron/services/topics-service'
+import type { TopicAiConfigSaveInput, TopicAiConfigStatus } from '../../electron/services/topic-ai-config'
+import type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse, TopicTestConnectionResponse } from '../../electron/services/topics-service'
 import type { TopicFeedbackDecision, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
+import type { ProviderSpec, TopicAiProviderId } from '../core/topics/providers'
 
 export type { HistoryEvent } from '../core/download-history'
 export type { SubscribedAccount, CheckLogEntry } from '../core/subscriptions'
@@ -25,8 +26,9 @@ export type { MowenSubscribedAuthor, MowenNoteRef, MowenUser }
 export type { UpdateInfo, UpdateAsset } from '../core/check-update'
 export type { InstallChannel } from '../core/install-channel'
 export type { MpProtectionStatus } from '../../electron/services/mp-request-gateway'
-export type { TopicAiConfigStatus } from '../../electron/services/topic-ai-config'
-export type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse } from '../../electron/services/topics-service'
+export type { TopicAiConfigStatus, TopicAiConfigSaveInput } from '../../electron/services/topic-ai-config'
+export type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse, TopicTestConnectionResponse } from '../../electron/services/topics-service'
+export type { TopicAiProviderId, TopicAiPlanId, TopicAiReasoningEffort, ProviderSpec } from '../core/topics/providers'
 export type { TopicDecisionCard, TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
 
 export interface UpdateChannelInfo { channel: InstallChannel; command: string | null; platform: string; arch: string }
@@ -73,8 +75,10 @@ export interface WxApi {
   mowenSearchNotes(keyword: string, count?: number): Promise<{ ok: boolean; notes?: { noteId: string; uid: string; title: string; brief: string; url: string; publicAt: number | null; withFee: boolean; withImage: boolean; withText: boolean; wordCount: number | null; viewCount: number | null; favorCount: number | null; authorName?: string }[]; authors?: { uid: string; name: string; intro: string; homeUrl: string }[]; error?: { code: string; message: string } }>
   copyText(text: string): Promise<void>
   topicsGetConfig(): Promise<TopicAiConfigStatus>
-  topicsSaveConfig(input: { baseUrl: string; model: string; apiKey?: string }): Promise<TopicAiConfigStatus>
+  topicsSaveConfig(input: TopicAiConfigSaveInput): Promise<TopicAiConfigStatus>
   topicsClearKey(): Promise<TopicAiConfigStatus>
+  topicsTestConnection(input: { baseUrl: string; model: string; apiKey?: string }): Promise<TopicTestConnectionResponse>
+  topicsProviderCatalog(): Promise<Record<TopicAiProviderId, ProviderSpec>>
   topicsAnalyze(input: { window: TopicWindowInput }): Promise<TopicAnalyzeResponse>
   topicsCancel(): Promise<{ ok: boolean; error?: { code: string; message: string } }>
   topicsBrief(runId: string, topicId: string): Promise<TopicBriefResponse>

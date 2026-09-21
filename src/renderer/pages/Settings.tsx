@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmented, Tooltip, message } from 'antd'
+import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmented, Tooltip, AutoComplete, message } from 'antd'
 import { FolderOpenOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
 import type { TopicAiConfigStatus, UpdateInfo, UpdateChannelInfo } from '../api'
+import type { ProviderSpec, TopicAiProviderId } from '../api'
 import type { MpProtectionStatus } from '../api'
 import { useWereadLoginQr } from '../hooks/useWereadLoginQr'
 import type { MpAuthActionResult, MpSessionInfo } from '../api'
@@ -23,9 +24,16 @@ export default function Settings() {
   const [cliLink, setCliLink] = useState<Awaited<ReturnType<typeof api.cliLinkStatus>> | null>(null)
   const [topicAi, setTopicAi] = useState<TopicAiConfigStatus | null>(null)
   const [savedTopicAi, setSavedTopicAi] = useState<TopicAiConfigStatus | null>(null)
-  const [topicAiBaseUrl, setTopicAiBaseUrl] = useState('')
-  const [topicAiModel, setTopicAiModel] = useState('')
-  const [topicAiKey, setTopicAiKey] = useState('')
+  // M73 AI 模型草稿：厂商→计费→端点→模型→Key→推理。非 custom 的 baseUrl 由目录派生只读。
+  const [catalog, setCatalog] = useState<Record<TopicAiProviderId, ProviderSpec> | null>(null)
+  const [aiProviderId, setAiProviderId] = useState<TopicAiProviderId>('zhipu')
+  const [aiPlan, setAiPlan] = useState<'payg' | 'plan'>('payg')
+  const [aiBaseUrl, setAiBaseUrl] = useState('')
+  const [aiModel, setAiModel] = useState('')
+  const [aiKey, setAiKey] = useState('')
+  const [aiReasoning, setAiReasoning] = useState(true)
+  const [aiEffort, setAiEffort] = useState<'high' | 'medium' | 'low'>('high')
+  const [connTest, setConnTest] = useState<{ state: 'idle' | 'testing' | 'ok' | 'fail'; title: string; message: string }>({ state: 'idle', title: '', message: '' })
   const [settingsSaving, setSettingsSaving] = useState(false)
 
   const [ver, setVer] = useState('')
@@ -64,11 +72,16 @@ export default function Settings() {
     api.getSettings().then(value => { setS(value); setSavedSettings(structuredClone(value)) })
   }, [])
   useEffect(() => {
+    api.topicsProviderCatalog().then(setCatalog).catch(() => { /* 目录加载失败不阻断其它设置 */ })
     api.topicsGetConfig().then(value => {
       setTopicAi(value)
       setSavedTopicAi(value)
-      setTopicAiBaseUrl(value.baseUrl)
-      setTopicAiModel(value.model)
+      setAiProviderId(value.providerId)
+      setAiPlan(value.plan)
+      setAiBaseUrl(value.baseUrl)
+      setAiModel(value.model)
+      setAiReasoning(value.reasoning)
+      setAiEffort(value.effort)
     }).catch(() => { /* 选题配置失败不阻断其它设置 */ })
   }, [])
   useEffect(() => { api.cliLinkStatus().then(setCliLink) }, [])
@@ -110,7 +123,7 @@ export default function Settings() {
       const value = await api.topicsClearKey()
       setTopicAi(value)
       setSavedTopicAi(value)
-      setTopicAiKey('')
+      setAiKey('')
       message.success('AI Key 已清除')
     } catch (error) { message.error('清除失败：' + (error as Error).message) }
   }
@@ -188,23 +201,87 @@ export default function Settings() {
     } finally { setMpAuthBusy(null) }
   }
 
+  // —— M73 AI 模型：目录派生 ——
+  const providerSpec = catalog?.[aiProviderId]
+  const planOptions = Object.entries(providerSpec?.plans ?? {})
+    .map(([value, plan]) => ({ value, label: plan.label }))
+  const displayBaseUrl = aiProviderId === 'custom' ? aiBaseUrl : providerSpec?.plans[aiPlan]?.baseUrl ?? ''
+  const modelSpec = providerSpec?.models.find(model => model.id === aiModel.trim())
+  // 已知模型按目录显隐推理两行；手输未知模型默认显示（新模型大概率支持，宁可多给开关）
+  const supportsReasoning = modelSpec ? modelSpec.reasoning : true
+  const supportsEffort = modelSpec ? modelSpec.effort : true
+  const idleConnTest = { state: 'idle' as const, title: '', message: '' }
+
+  const changeAiProvider = (id: TopicAiProviderId) => {
+    setAiProviderId(id)
+    const spec = catalog?.[id]
+    if (spec) {
+      const plans = Object.keys(spec.plans) as Array<'payg' | 'plan'>
+      if (!plans.includes(aiPlan)) setAiPlan(plans[0])
+      setAiModel(spec.defaultModel)
+    } else {
+      setAiModel('')
+    }
+    setAiBaseUrl('')
+    setConnTest(idleConnTest)
+  }
+
+  const runConnectionTest = async () => {
+    if (!displayBaseUrl.trim() || !aiModel.trim()) {
+      message.warning('先填写 Base URL 与模型，再测试连接')
+      return
+    }
+    setConnTest({ state: 'testing', title: '', message: '正在发送最小请求…' })
+    const result = await api.topicsTestConnection({
+      baseUrl: displayBaseUrl,
+      model: aiModel,
+      ...(aiKey.trim() ? { apiKey: aiKey } : {}),
+    }).catch((error: Error) => ({ ok: false as const, error: { code: 'IPC_ERROR', message: error.message } }))
+    if (result.ok) {
+      const tokens = result.usage ? ` · 消耗 ${result.usage.inputTokens + result.usage.outputTokens} tokens` : ''
+      setConnTest({ state: 'ok', title: '连接成功', message: `模型 ${result.model} 响应正常 · 延迟 ${result.latencyMs}ms${tokens}。可以直接开始分析。` })
+    } else {
+      const title = result.error.code === 'HTTP_401' ? '认证失败（401）'
+        : result.error.code === 'MODEL_TIMEOUT' ? '连接超时'
+        : `连接失败（${result.error.code}）`
+      const extra = result.error.code === 'HTTP_401'
+        ? ` 请确认 Key 与所选端点一致：按量 Key / 套餐 Key 不能混用，切换上方计费模式后重试。${providerSpec ? providerSpec.keyPrefixHint : ''}`
+        : ''
+      setConnTest({ state: 'fail', title, message: result.error.message + extra })
+    }
+  }
+
   const dirty = useMemo(() => isSettingsDirty({
     savedSettings,
     draftSettings: s,
     savedTopic: savedTopicAi,
-    topicDraft: { baseUrl: topicAiBaseUrl, model: topicAiModel, apiKey: topicAiKey },
-  }), [savedSettings, s, savedTopicAi, topicAiBaseUrl, topicAiModel, topicAiKey])
+    topicDraft: {
+      providerId: aiProviderId, plan: aiPlan, baseUrl: aiBaseUrl, model: aiModel,
+      apiKey: aiKey, reasoning: aiReasoning, effort: aiEffort,
+    },
+  }), [savedSettings, s, savedTopicAi, aiProviderId, aiPlan, aiBaseUrl, aiModel, aiKey, aiReasoning, aiEffort])
 
-  const topicDirty = topicAiKey.trim().length > 0
-    || topicAiBaseUrl.trim() !== (savedTopicAi?.baseUrl.trim() ?? '')
-    || topicAiModel.trim() !== (savedTopicAi?.model.trim() ?? '')
+  const topicDirty = aiKey.trim().length > 0
+    || aiProviderId !== (savedTopicAi?.providerId ?? '')
+    || aiPlan !== (savedTopicAi?.plan ?? 'payg')
+    || aiModel.trim() !== (savedTopicAi?.model.trim() ?? '')
+    || aiReasoning !== (savedTopicAi?.reasoning ?? true)
+    || aiEffort !== (savedTopicAi?.effort ?? 'high')
+    || (aiProviderId === 'custom' && aiBaseUrl.trim() !== (savedTopicAi?.baseUrl.trim() ?? ''))
 
   const saveAll = async () => {
     if (!s || !dirty) return
-    if (topicDirty && !topicAiKey.trim() && !savedTopicAi?.keyConfigured) {
-      message.warning('首次配置请填写 API Key')
-      setActiveCategory('ai')
-      return
+    if (topicDirty) {
+      if (!aiModel.trim()) {
+        message.warning('请选择或输入模型')
+        setActiveCategory('ai')
+        return
+      }
+      if (!aiKey.trim() && !savedTopicAi?.keyConfigured) {
+        message.warning('首次配置请填写 API Key')
+        setActiveCategory('ai')
+        return
+      }
     }
     setSettingsSaving(true)
     try {
@@ -212,11 +289,23 @@ export default function Settings() {
       let nextTopic = savedTopicAi
       if (topicDirty) {
         nextTopic = await api.topicsSaveConfig({
-          baseUrl: topicAiBaseUrl,
-          model: topicAiModel,
-          ...(topicAiKey.trim() ? { apiKey: topicAiKey } : {}),
+          providerId: aiProviderId,
+          plan: aiPlan,
+          baseUrl: displayBaseUrl,
+          model: aiModel,
+          ...(aiKey.trim() ? { apiKey: aiKey } : {}),
+          reasoning: aiReasoning,
+          effort: aiEffort,
         })
-        nextSettings = { ...s, topicAiBaseUrl: nextTopic.baseUrl, topicAiModel: nextTopic.model }
+        nextSettings = {
+          ...s,
+          topicAiBaseUrl: nextTopic.baseUrl,
+          topicAiModel: nextTopic.model,
+          topicAiProvider: nextTopic.providerId,
+          topicAiPlan: nextTopic.plan,
+          topicAiReasoning: nextTopic.reasoning,
+          topicAiEffort: nextTopic.effort,
+        }
       }
       const persisted = await api.saveSettings(nextSettings)
       setS(persisted)
@@ -224,10 +313,14 @@ export default function Settings() {
       if (nextTopic) {
         setTopicAi(nextTopic)
         setSavedTopicAi(nextTopic)
-        setTopicAiBaseUrl(nextTopic.baseUrl)
-        setTopicAiModel(nextTopic.model)
+        setAiProviderId(nextTopic.providerId)
+        setAiPlan(nextTopic.plan)
+        setAiBaseUrl(nextTopic.baseUrl)
+        setAiModel(nextTopic.model)
+        setAiReasoning(nextTopic.reasoning)
+        setAiEffort(nextTopic.effort)
       }
-      setTopicAiKey('')
+      setAiKey('')
       message.success('已保存更改')
     } catch (error) { message.error('保存失败：' + (error as Error).message) }
     finally { setSettingsSaving(false) }
@@ -235,9 +328,16 @@ export default function Settings() {
 
   const revertDraft = () => {
     if (savedSettings) setS(structuredClone(savedSettings))
-    setTopicAiBaseUrl(savedTopicAi?.baseUrl ?? '')
-    setTopicAiModel(savedTopicAi?.model ?? '')
-    setTopicAiKey('')
+    if (savedTopicAi) {
+      setAiProviderId(savedTopicAi.providerId)
+      setAiPlan(savedTopicAi.plan)
+      setAiBaseUrl(savedTopicAi.baseUrl)
+      setAiModel(savedTopicAi.model)
+      setAiReasoning(savedTopicAi.reasoning)
+      setAiEffort(savedTopicAi.effort)
+    }
+    setAiKey('')
+    setConnTest(idleConnTest)
   }
 
   const categoryStatuses: Record<SettingsCategory, SettingsCategoryStatus> = {
@@ -291,9 +391,13 @@ export default function Settings() {
                 <div><span>站点同步</span><strong>{s.siteSyncEnabled ? '已开启' : '未开启'}</strong></div>
               </>}
               {activeCategory === 'ai' && <>
-                <div><span>选题模型</span><strong className={topicAi?.keyConfigured ? 'ok' : ''}>{topicAi ? topicAi.keyConfigured ? '已配置' : '未配置' : '读取中'}</strong></div>
-                <div><span>Key</span><strong>{topicAi ? topicAi.keyConfigured ? topicAi.keyPersistent ? '已安全保存' : '仅本次会话' : '未配置' : '读取中'}</strong></div>
-                <div><span>命令行</span><strong>{cliLink?.status === 'linked' ? '已创建' : '未创建'}</strong></div>
+                <div><span>厂商</span><strong>{providerSpec?.label ?? '读取中'}</strong></div>
+                <div><span>模型</span><strong className={aiModel.trim() ? 'ok' : ''}>{aiModel.trim() || '—'}</strong></div>
+                <div><span>连接状态</span><strong className={connTest.state === 'ok' ? 'ok' : ''}>{
+                  connTest.state === 'idle' ? '未测试'
+                    : connTest.state === 'testing' ? '测试中…'
+                    : connTest.state === 'ok' ? '可用' : '异常'
+                }</strong></div>
               </>}
               {activeCategory === 'system' && <>
                 <div><span>微信请求</span><strong className={mpProtection?.mode === 'active' ? 'ok' : ''}>{mpProtection ? mpProtection.mode === 'active' ? '保护正常' : '已暂停' : '读取中'}</strong></div>
@@ -521,6 +625,79 @@ export default function Settings() {
             )}
           </SettingsGroup>}
 
+          {activeCategory === 'ai' && <SettingsGroup testId="settings-group-topic-ai" legacyTestId="topic-ai-section" title="AI 模型"
+            status={!topicAi ? undefined : topicAi.keyConfigured
+              ? { text: topicAi.keyPersistent ? 'Key 已加密' : 'Key 仅本次会话', tone: topicAi.keyPersistent ? 'ok' : 'warning' }
+              : { text: 'Key 未配置', tone: 'off' }} badgeTestId="topic-ai-key-status" description="配置选题分析使用的模型，端点和计费模式由厂商选择自动确定。">
+            {/* 对齐原型：隐私提示用醒目 callout 而非普通 description（正文出机事实须明示） */}
+            <div className="settings-callout" data-testid="topic-ai-privacy-callout">
+              隐私提示：分析时所选文章正文会发送到你配置的服务；API Key 使用系统安全存储，不会写入普通设置、分析结果或诊断日志。
+            </div>
+            <SettingsRow label="厂商">
+              <Select data-testid="topic-ai-provider" value={aiProviderId} className="settings-input-fill"
+                onChange={(value) => changeAiProvider(value as TopicAiProviderId)}
+                options={(catalog ? Object.entries(catalog) : []).map(([value, spec]) => ({ value, label: spec.label }))} />
+            </SettingsRow>
+            {planOptions.length > 1 && (
+              <SettingsRow label="计费模式" hint="订阅额度每月重置、不累积；按量即用即付。">
+                <Select data-testid="topic-ai-plan" value={aiPlan} className="settings-input-fill"
+                  onChange={(value) => { setAiPlan(value as 'payg' | 'plan'); setConnTest(idleConnTest) }}
+                  options={planOptions} />
+              </SettingsRow>
+            )}
+            <SettingsRow label="Base URL" hint={aiProviderId === 'custom' ? 'OpenAI Chat Completions 兼容地址。' : '由上方选择自动确定。'}>
+              <Input data-testid="topic-ai-base-url" value={displayBaseUrl} className="settings-input-fill"
+                readOnly={aiProviderId !== 'custom'}
+                onChange={event => { setAiBaseUrl(event.target.value); setConnTest(idleConnTest) }}
+                placeholder="https://api.example.com/v1" />
+            </SettingsRow>
+            <SettingsRow label="模型" hint="可从列表选择，也可直接输入新发布的模型名。">
+              <AutoComplete data-testid="topic-ai-model" value={aiModel} className="settings-input-fill"
+                options={(providerSpec?.models ?? []).map(model => ({ value: model.id }))}
+                onChange={value => { setAiModel(value); setConnTest(idleConnTest) }}
+                placeholder="选择或输入模型名" />
+            </SettingsRow>
+            <SettingsRow label="API Key" hint="留空即保留当前 Key。">
+              {/* 不用 antd Space：它会在子元素外包 .ant-space-item，打断 flex 拉伸使输入框缩回内容宽度 */}
+              <div className="settings-input-fill">
+                <Input.Password data-testid="topic-ai-key" value={aiKey}
+                  onChange={event => setAiKey(event.target.value)}
+                  autoComplete="new-password"
+                  placeholder={topicAi?.keyConfigured ? '已配置；留空即保留原 Key' : '输入 API Key'} />
+                {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除</Button>}
+              </div>
+            </SettingsRow>
+            {supportsReasoning && (
+              <SettingsRow label="推理模式" hint="关闭可降低延迟与 Token 消耗。">
+                <Space align="center">
+                  <span className="faint" data-testid="topic-ai-reasoning-state">{aiReasoning ? '已启用' : '已关闭'}</span>
+                  <Switch checked={aiReasoning} data-testid="topic-ai-reasoning" onChange={setAiReasoning} />
+                </Space>
+              </SettingsRow>
+            )}
+            {supportsReasoning && supportsEffort && (
+              <SettingsRow label="推理等级" hint="越高越深入，耗时也越长。">
+                <Select data-testid="topic-ai-effort" value={aiEffort} style={{ width: 220 }}
+                  onChange={value => setAiEffort(value as 'high' | 'medium' | 'low')}
+                  options={[{ value: 'high', label: 'high' }, { value: 'medium', label: 'medium' }, { value: 'low', label: 'low' }]} />
+              </SettingsRow>
+            )}
+            <SettingsRow label="测试连接" hint="发送一次最小请求，验证端点、Key 和模型可用。">
+              <Button data-testid="topic-ai-test" loading={connTest.state === 'testing'} onClick={runConnectionTest}>测试连接</Button>
+            </SettingsRow>
+            {connTest.state !== 'idle' && (
+              <div className={`settings-test-result show ${connTest.state === 'ok' ? 'ok' : connTest.state === 'fail' ? 'fail' : 'pending'}`}
+                data-testid="topic-ai-test-result">
+                {connTest.state === 'testing' ? connTest.message : <>
+                  <strong>{connTest.title}</strong>
+                  <br />
+                  <span className="tr-line">{connTest.message}</span>
+                  <span className="tr-tip"><strong>{connTest.title}</strong> — {connTest.message}</span>
+                </>}
+              </div>
+            )}
+          </SettingsGroup>}
+
           {activeCategory === 'ai' && cliLink?.supported && (
             <SettingsGroup testId="settings-group-cli" title="命令行快捷方式" status={cliLink.status === 'linked' ? { text: '已创建', tone: 'ok' } : { text: '未创建', tone: 'off' }} description="供终端和 AI Agent 调用同一套 wx-kit 能力。">
               <SettingsRow label="命令位置"
@@ -535,35 +712,6 @@ export default function Settings() {
               </SettingsRow>
             </SettingsGroup>
           )}
-
-          {activeCategory === 'ai' && <SettingsGroup testId="settings-group-topic-ai" legacyTestId="topic-ai-section" title="选题 AI"             status={!topicAi ? undefined : topicAi.keyConfigured
-            ? { text: topicAi.keyPersistent ? 'Key 已加密' : 'Key 仅本次会话', tone: topicAi.keyPersistent ? 'ok' : 'warning' }
-            : { text: 'Key 未配置', tone: 'off' }} badgeTestId="topic-ai-key-status" description="分析时，所选文章正文会发送到你配置的服务。">
-            {/* 对齐原型：隐私提示用醒目 callout 而非普通 description（正文出机事实须明示） */}
-            <div className="settings-callout" data-testid="topic-ai-privacy-callout">
-              隐私提示：分析时所选文章正文会发送到你配置的服务；Base URL 与模型名保存在普通设置，API Key 使用系统安全存储。wx-kit 不托管模型额度。
-            </div>
-            <SettingsRow label="Base URL" hint="OpenAI Chat Completions 兼容地址。">
-              <Input data-testid="topic-ai-base-url" value={topicAiBaseUrl} className="settings-input-fill"
-                onChange={event => setTopicAiBaseUrl(event.target.value)}
-                placeholder="https://api.example.com/v1" />
-            </SettingsRow>
-            <SettingsRow label="Model" hint="由你的服务商提供的模型名称。">
-              <Input data-testid="topic-ai-model" value={topicAiModel} className="settings-input-fill"
-                onChange={event => setTopicAiModel(event.target.value)}
-                placeholder="例如 gpt-4.1-mini" />
-            </SettingsRow>
-            <SettingsRow label="API Key" hint="留空即保留当前 Key。">
-              {/* 不用 antd Space：它会在子元素外包 .ant-space-item，打断 flex 拉伸使输入框缩回内容宽度 */}
-              <div className="settings-input-fill">
-                <Input.Password data-testid="topic-ai-key" value={topicAiKey}
-                  onChange={event => setTopicAiKey(event.target.value)}
-                  autoComplete="new-password"
-                  placeholder={topicAi?.keyConfigured ? '已配置；留空即保留原 Key' : '输入 API Key'} />
-                {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除</Button>}
-              </div>
-            </SettingsRow>
-          </SettingsGroup>}
 
           {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-mowen" legacyTestId="mowen-section" title="墨问集成" status={s?.mowenMocliPath
             ? { text: s.mowenMocliVersion ? `已检测 · ${s.mowenMocliVersion}` : '已检测', tone: 'ok' }
