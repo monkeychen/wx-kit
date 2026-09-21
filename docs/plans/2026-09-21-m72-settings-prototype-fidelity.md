@@ -83,4 +83,4 @@ export function SettingsRow(props: {
 - [x] 桌面 Electron 截图与原型逐项人工比对：页头/副标题、1420 容器、248 侧栏、摘要卡、group 卡、行布局和保存条；确认无横向溢出且保存条不挡最后一行。
 - [x] PRD §4.5 按实际结果勾选；ROADMAP 追加 M72；devlog 记录“方向一致不等于设计复原”的教训。
 - [x] 运行 `npm test`、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`、`npm run test:e2e`、`git diff --check`；核对 `package.json` 仍为 0.11.3。
-- [ ] commit -F，合并 main，删除 feature 分支，不 push。
+- [x] commit -F，合并 main，删除 feature 分支，不 push。
