@@ -657,6 +657,16 @@ body {
 .settings-group-status { align-self: start; padding: 4px 8px; border-radius: 999px; background: var(--paper-sunken); color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
 .settings-group-status.ok { background: var(--jade-wash); color: var(--jade); }
 .settings-group-status.warning { background: var(--amber-wash); color: var(--amber); }
+.settings-group-status.off { background: var(--paper-sunken); color: var(--ink-soft); }
+/* 组内提示条（对齐原型 .callout）：隐私出机提示等需要高于普通 description 的视觉权重 */
+.settings-callout {
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: var(--amber-wash);
+  color: var(--amber);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
 .settings-row { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 22px; align-items: center; padding: 15px 0; border-top: 1px solid var(--line); }
 .settings-group-title + .settings-row { border-top: 0; padding-top: 0; }
 .settings-row-copy { display: grid; gap: 4px; }

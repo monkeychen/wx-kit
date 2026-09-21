@@ -302,7 +302,12 @@ export default function Settings() {
             </div>
 
             <div className="settings-panel" data-testid={`settings-panel-${activeCategory}`}>
-          {activeCategory === 'system' && <SettingsGroup testId="settings-group-mp-protection" legacyTestId="mp-protection" title="微信请求保护" description="所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，不会自动重试或探测恢复。">
+          {activeCategory === 'system' && <SettingsGroup testId="settings-group-mp-protection" legacyTestId="mp-protection" title="微信请求保护" description="所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，不会自动重试或探测恢复。"
+            status={!mpProtection ? undefined : mpProtection.mode === 'active'
+              ? { text: '可按需请求', tone: 'ok' }
+              : mpProtection.mode === 'rate-limited'
+                ? { text: '频控熔断', tone: 'warning' }
+                : { text: '已暂停', tone: 'off' }}>
             {mpProtection ? (
               <Space direction="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
                 <div data-testid="mp-protection-mode">
@@ -338,7 +343,10 @@ export default function Settings() {
             ) : <div className="faint" style={{ marginTop: 8 }}>正在读取保护状态…</div>}
           </SettingsGroup>}
 
-          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-weread" legacyTestId="mp-account" title="微信读书账号" description="按公众号下载与订阅通过微信读书获取文章列表（v0.10.0 起）。重新登录会先清除旧凭据再显示二维码；退出登录只删凭据文件，不会删除设置、订阅、文库、下载历史或频控保护状态。">
+          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-weread" legacyTestId="mp-account" title="微信读书账号" description="按公众号下载与订阅通过微信读书获取文章列表（v0.10.0 起）。重新登录会先清除旧凭据再显示二维码；退出登录只删凭据文件，不会删除设置、订阅、文库、下载历史或频控保护状态。"
+            status={!mpSession ? undefined : mpSession.loggedIn
+              ? { text: '已登录', tone: 'ok' }
+              : { text: '未登录', tone: 'off' }}>
             {(mpAuthBusy === 'login' || mpAuthBusy === 'relogin') && (
               <div style={{ textAlign: 'center', margin: '10px 0' }} data-testid="set-weread-qr">
                 {!wereadQr.qrDataUrl && <span className="faint">正在生成二维码…</span>}
@@ -384,7 +392,8 @@ export default function Settings() {
             {mpCleanupError && <div className="setting-hint" style={{ color: 'var(--cinnabar)', marginTop: 6 }}>{mpCleanupError}</div>}
           </SettingsGroup>}
 
-          {activeCategory === 'content' && <SettingsGroup testId="settings-group-library" title="文章库" description="下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。">
+          {activeCategory === 'content' && <SettingsGroup testId="settings-group-library" title="文章库" description="下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。"
+            status={{ text: '正常', tone: 'ok' }}>
             <SettingsRow label="文库位置" hint="若文库列表异常为空或提示索引损坏，可从磁盘各文章目录的 meta.json 重建索引（不动已下载文件）。">
             <Space.Compact style={{ width: '100%' }}>
               <Input value={s.libraryRoot} readOnly />
@@ -426,7 +435,10 @@ export default function Settings() {
             </SettingsRow>
           </SettingsGroup>}
 
-          {activeCategory === 'automation' && <SettingsGroup testId="settings-group-subscriptions" title="订阅" description="检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。">
+          {activeCategory === 'automation' && <SettingsGroup testId="settings-group-subscriptions" title="订阅" description="检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。"
+            status={s.subscriptionAutoCheck
+              ? { text: '已开启', tone: 'ok' }
+              : { text: '已关闭', tone: 'off' }}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <Space align="center">
                 <span style={{ minWidth: 96, display: 'inline-block' }}>自动检查更新</span>
@@ -485,7 +497,10 @@ export default function Settings() {
                 <QuestionCircleOutlined data-testid="site-sync-help"
                   style={{ marginLeft: 6, fontSize: 13, opacity: 0.5, cursor: 'help' }} />
               </Tooltip>
-            </>} description={<>开启后，文库选中文章时会多出「同步到站点」——按个人站点的发布规范生成 <code>YYYY-MM-DD-slug/index.md</code> 与同目录图片。纯本地文件操作，不联网。</>}>
+            </>} description={<>开启后，文库选中文章时会多出「同步到站点」——按个人站点的发布规范生成 <code>YYYY-MM-DD-slug/index.md</code> 与同目录图片。纯本地文件操作，不联网。</>}
+            status={s.siteSyncEnabled
+              ? { text: '已启用', tone: 'ok' }
+              : { text: '未启用', tone: 'off' }}>
             <Space align="center" style={{ marginTop: 8 }}>
               <Switch checked={s.siteSyncEnabled} data-testid="set-site-sync"
                 onChange={(v) => setS({ ...s, siteSyncEnabled: v })} />
@@ -505,7 +520,7 @@ export default function Settings() {
           </SettingsGroup>}
 
           {activeCategory === 'ai' && cliLink?.supported && (
-            <SettingsGroup testId="settings-group-cli" title="命令行快捷方式" description={<>
+            <SettingsGroup testId="settings-group-cli" title="命令行快捷方式" status={cliLink.status === 'linked' ? { text: '已创建', tone: 'ok' } : { text: '未创建', tone: 'off' }} description={<>
                 在 <code>{cliLink.dir}</code> 创建指向应用的快捷命令，便于在终端运行 <code>wx-kit</code>（供 AI agent 调用）。
                 当前状态：{cliLink.status === 'linked' ? '已创建' : cliLink.status === 'conflict' ? '该位置被占用（创建将覆盖）' : '未创建'}
                 {!cliLink.inPath && '；~/bin 不在 PATH，创建时会引导写入 shell 配置'}。
@@ -521,10 +536,13 @@ export default function Settings() {
             </SettingsGroup>
           )}
 
-          {activeCategory === 'ai' && <SettingsGroup testId="settings-group-topic-ai" legacyTestId="topic-ai-section" title="选题 AI" description={<>
-              用你自己的兼容 OpenAI Chat Completions 的服务生成候选选题。
-              分析时，所选文章的正文会发送到下方地址；wx-kit 不会将 Key 写入普通设置、分析结果或诊断日志。
-            </>}>
+          {activeCategory === 'ai' && <SettingsGroup testId="settings-group-topic-ai" legacyTestId="topic-ai-section" title="选题 AI"             status={!topicAi ? undefined : topicAi.keyConfigured
+            ? { text: topicAi.keyPersistent ? 'Key 已加密' : 'Key 仅本次会话', tone: topicAi.keyPersistent ? 'ok' : 'warning' }
+            : { text: 'Key 未配置', tone: 'off' }} description={<>用你自己的兼容 OpenAI Chat Completions 的服务生成候选选题。</>}>
+            {/* 对齐原型：隐私提示用醒目 callout 而非普通 description（正文出机事实须明示） */}
+            <div className="settings-callout" data-testid="topic-ai-privacy-callout">
+              隐私提示：分析时所选文章正文会发送到你配置的服务；Base URL 与模型名保存在普通设置，API Key 使用系统安全存储。wx-kit 不托管模型额度。
+            </div>
             <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: 10 }}>
               <label className="setting-field">
                 <span>Base URL</span>
@@ -564,7 +582,9 @@ export default function Settings() {
             </Space>
           </SettingsGroup>}
 
-          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-mowen" legacyTestId="mowen-section" title="墨问集成" description={<>
+          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-mowen" legacyTestId="mowen-section" title="墨问集成" status={s?.mowenMocliPath
+            ? { text: s.mowenMocliVersion ? `已检测 · ${s.mowenMocliVersion}` : '已检测', tone: 'ok' }
+            : { text: '未检测', tone: 'off' }} description={<>
               接入墨问笔记下载依赖墨问官方命令行 <code>mocli</code>。检测到后，下载页即可使用墨问相关功能。
             </>}>
             {s?.mowenMocliPath ? (
