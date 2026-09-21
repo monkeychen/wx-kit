@@ -1,17 +1,15 @@
 import type { ArticleMeta } from '../types'
 
-/** 选题范围始终按原文发表时间；不保存分析水位或自动扩窗策略。 */
+/** 选题范围始终按原文发表时间；manual 为用户指名选篇，不做时间判定（M75）。 */
 export type TopicWindowInput =
   | { preset: '24h' | '3d' | '7d' }
   | { preset: 'custom'; from: string; to: string }
+  | { preset: 'manual'; articleIds: string[] }
 
-export interface TopicWindow {
-  preset: TopicWindowInput['preset']
-  fromMs: number
-  toMs: number
-  asOfMs: number
-  timeZone: 'Asia/Shanghai'
-}
+/** 判别联合：时间分支按发表窗口纳入/排除；manual 分支带用户指名的 ID，无时间语义。 */
+export type TopicWindow =
+  | { preset: '24h' | '3d' | '7d' | 'custom'; fromMs: number; toMs: number; asOfMs: number; timeZone: 'Asia/Shanghai' }
+  | { preset: 'manual'; articleIds: string[]; asOfMs: number; timeZone: 'Asia/Shanghai' }
 
 export type TopicTimeExclusion =
   | 'unknown-publication-time'

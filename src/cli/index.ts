@@ -53,7 +53,7 @@ import { buildWereadQrFlowHttp } from '../../electron/services/weread-net'
 import type { TopicModel } from '../core/topics/model'
 import { ChatCompletionsTopicModel, TopicProviderError } from '../core/topics/chat-completions'
 import { TopicCliInputError, resolveTopicCliModelConfig, resolveTopicWindowArgs, type TopicCliModelConfig } from '../core/topics/cli-input'
-import { selectTopicArticles } from '../core/topics/time-window'
+import { selectTopicArticles, selectTopicArticlesByIds } from '../core/topics/time-window'
 import { analyzeTopics } from '../core/topics/analyze'
 import { TopicRunStore } from '../core/topics/store'
 import { buildTopicBrief } from '../core/topics/brief'
@@ -134,10 +134,11 @@ export async function runCli(argv: string[], opts: RunCliOptions = {}): Promise<
 
   const topics = program.command('topics').description('基于本地文库生成可追溯选题（子命令:analyze / brief）')
   topics.command('analyze')
-    .description('分析所选发表时间范围；正文会发送到用户配置的 AI 服务')
+    .description('分析所选发表时间范围或手动指定文章；正文会发送到用户配置的 AI 服务')
     .option('--range <range>', '24h / 3d / 7d / custom', '24h')
     .option('--from <date>', 'custom 开始日期 YYYY-MM-DD')
     .option('--to <date>', 'custom 结束日期 YYYY-MM-DD（包含当天）')
+    .option('--article <id...>', '手动指定文库文章 ID（可重复或逗号分隔；与 --range/--from/--to 互斥）')
     .option('--base-url <url>', 'OpenAI Chat Completions 兼容 base URL（或 WXKIT_AI_BASE_URL）')
     .option('--model <name>', '模型名（或 WXKIT_AI_MODEL）')
     .option('-o, --out <dir>', '文章库根目录（默认取设置中的库位置）')
@@ -146,8 +147,18 @@ export async function runCli(argv: string[], opts: RunCliOptions = {}): Promise<
         const window = resolveTopicWindowArgs(commandOpts, cliNow().getTime())
         const modelConfig = resolveTopicCliModelConfig(commandOpts, cliEnv)
         const root = await resolveRoot(commandOpts.out)
-        const selected = selectTopicArticles(await new Library(root).list(), window)
-        process.stderr.write(`正在整理素材：${selected.articles.length} 篇入选，${selected.excluded.length} 篇不在范围或时间不确定。\n`)
+        let selected: { articles: Awaited<ReturnType<Library['list']>>; excluded: unknown[]; missing?: string[] }
+        if (window.preset === 'manual') {
+          const manual = selectTopicArticlesByIds(await new Library(root).list(), window)
+          if (manual.missing.length > 0) {
+            outJson({ ok: false, error: { code: 'UNKNOWN_ARTICLES', message: `文库中找不到文章：${manual.missing.join('、')}` } }); exitCode = 2; return
+          }
+          selected = manual
+          process.stderr.write(`正在整理素材：手动选择 ${manual.articles.length} 篇。\n`)
+        } else {
+          selected = selectTopicArticles(await new Library(root).list(), window)
+          process.stderr.write(`正在整理素材：${selected.articles.length} 篇入选，${selected.excluded.length} 篇不在范围或时间不确定。\n`)
+        }
         const result = await analyzeTopics({
           libraryRoot: root,
           model: topicModelFactory(modelConfig),

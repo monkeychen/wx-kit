@@ -15,9 +15,18 @@ export interface TopicCliModelConfig {
 }
 
 export function resolveTopicWindowArgs(
-  opts: { range?: string; from?: string; to?: string },
+  opts: { range?: string; from?: string; to?: string; article?: string[] },
   asOfMs: number = Date.now(),
 ): TopicWindow {
+  const articles = (opts.article ?? []).flatMap(value => String(value).split(',')).map(id => id.trim()).filter(Boolean)
+  if (articles.length > 0) {
+    // --article 与时间参数互斥：素材源只能有一个。
+    if (opts.range !== undefined || opts.from !== undefined || opts.to !== undefined) {
+      throw new TopicCliInputError('INVALID_TOPIC_RANGE', '--article 与 --range/--from/--to 不能同时使用。')
+    }
+    try { return resolveTopicWindow({ preset: 'manual', articleIds: articles }, asOfMs) }
+    catch (error) { throw new TopicCliInputError('INVALID_TOPIC_RANGE', error instanceof Error ? error.message : String(error)) }
+  }
   const range = (opts.range ?? '24h').trim().toLowerCase()
   if (range === 'custom') {
     if (!opts.from?.trim() || !opts.to?.trim()) {
@@ -32,7 +41,7 @@ export function resolveTopicWindowArgs(
   if (range !== '24h' && range !== '3d' && range !== '7d') {
     throw new TopicCliInputError('INVALID_TOPIC_RANGE', '--range 只接受 24h、3d、7d 或 custom。')
   }
-  return resolveTopicWindow({ preset: range }, asOfMs)
+  return resolveTopicWindow({ preset: range as '24h' | '3d' | '7d' }, asOfMs)
 }
 
 export function resolveTopicCliModelConfig(

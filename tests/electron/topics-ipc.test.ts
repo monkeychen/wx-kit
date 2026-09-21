@@ -108,6 +108,20 @@ describe('TopicService（IPC 背后的真实服务）', () => {
     expect(service.getRunningStatus()).toEqual({ running: false, startedAt: null, stage: null, window: null })
   })
 
+  it('M75 手动选篇：按 ID 命中（含库外时间文章），缺失 ID 显式失败', async () => {
+    const { settings, config } = await setupLibrary()
+    await config.save({ providerId: 'custom', baseUrl: 'http://127.0.0.1:1234/v1', model: 'local', apiKey: 'k' })
+    const model = new ServiceModel()
+    const service = new TopicService({ settings, config, now, makeRunId: () => 'run-manual', modelFactory: () => model })
+
+    const ok = await service.analyze({ window: { preset: 'manual', articleIds: ['a1'] } })
+    expect(ok).toMatchObject({ ok: true, result: { status: 'completed', window: { preset: 'manual', articleIds: ['a1'] } }, timeExcludedCount: 0 })
+
+    const ghost = await service.analyze({ window: { preset: 'manual', articleIds: ['ghost'] } })
+    expect(ghost).toMatchObject({ ok: false, error: { code: 'UNKNOWN_ARTICLES' } })
+    expect((ghost as { error: { message: string } }).error.message).toContain('ghost')
+  })
+
   it('测试连接：空 Key 回退已存 Key 发最小请求；无 Key 给可行动错误', async () => {
     const { settings, config } = await setupLibrary()
     await config.save({ providerId: 'custom', baseUrl: 'http://127.0.0.1:1/v1', model: 'local', apiKey: 'saved-key' })

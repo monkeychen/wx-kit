@@ -26,15 +26,18 @@
   流式下这条很容易触发不了（token 在动），但连接建立前挂死（DNS/TLS 黑洞）需要出口。
 - UI 取消按钮已有（M70），措辞确认覆盖长任务场景。
 
-## 3. 流式输出（SSE）
+## 3. 流式输出（SSE）——模型通道标准形态（2026-09-21 安哥追加：所有对模型的请求都走流）
 
-- 请求体 `stream: true`；`Accept: text/event-stream`。解析 `data: {json}` 行：
-  `choices[0].delta.content`（正文）与 `delta.reasoning_content`（思考），累计 usage 取末个含 usage 的块
-  （`stream_options: { include_usage: true }` 是 OpenAI 扩展——**不支持的服务商端该字段报错时**回退
-  不带 stream_options 重发一次非流式？不做：回退到 stream 无 usage 即可，字段随配置开关默认关，
-  OpenAI/智谱/千问/DeepSeek 文档均支持时再开——第一版**不发 stream_options**，usage 允许缺失）。
-- 兼容：响应 `content-type` 非 event-stream（不支持 stream 的端点）→ 按现有非流式路径解析全量 JSON，
-  功能不倒退。
+- **共用 SSE 解析器** `src/core/topics/sse.ts`：`data: {json}` 行增量解析（处理跨 chunk 断行、
+  `[DONE]`、CRLF），chat-completions 与 test-connection 共用——流式是通道的默认形态，
+  不是某个功能的开关。
+- `ChatCompletionsTopicModel` 请求体固定 `stream: true` + `Accept: text/event-stream`。解析
+  `choices[0].delta.content`（正文）与 `delta.reasoning_content`（思考），累计 usage 取末个含
+  usage 的块。第一版**不发 stream_options**（include_usage 非全商支持），usage 允许缺失。
+- **test-connection 同步改流式**：最小请求 `stream:true`，测「首字节延迟 + 首 token 延迟」——
+  比总耗时更早证明端点/Key/模型可用；结果结构增加 `firstTokenMs`。
+- 兼容回退：响应 `content-type` 非 event-stream（不支持 stream 的端点）→ 按现有非流式路径解析
+  全量 JSON，功能不倒退。
 - 增量链路：`ChatCompletionsConfig.onDelta?(stage, kind:'content'|'reasoning', text)`（构造注入，
   `TopicModel` 接口不变，fixture 零改动）→ TopicService 持 `webContents`，**150ms 节流合并**发
   `topics:stream` 事件 `{ stage, kind, text（窗口内累计片段）, charCount }` → preload `onTopicsStream`。

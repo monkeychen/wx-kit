@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Library } from '../../src/core/library'
+import type { ArticleMeta } from '../../src/core/types'
 import { analyzeTopics } from '../../src/core/topics/analyze'
 import { buildTopicBrief } from '../../src/core/topics/brief'
 import type { TopicModel } from '../../src/core/topics/model'
@@ -8,7 +9,7 @@ import type { TopicAiConfigSaveInput, TopicAiConfigStatus } from './topic-ai-con
 import { testTopicAiConnection } from '../../src/core/topics/test-connection'
 import { isTopicAiProviderId, PROVIDER_CATALOG, type ProviderSpec, type TopicAiProviderId, type TopicAiReasoningEffort } from '../../src/core/topics/providers'
 import { TopicRunStore } from '../../src/core/topics/store'
-import { resolveTopicWindow, selectTopicArticles } from '../../src/core/topics/time-window'
+import { resolveTopicWindow, selectTopicArticles, selectTopicArticlesByIds } from '../../src/core/topics/time-window'
 import type { TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../../src/core/topics/types'
 import { SettingsService } from './settings'
 import { TopicAiConfigError, TopicAiConfigService } from './topic-ai-config'
@@ -29,9 +30,16 @@ export type TopicTestConnectionResponse =
   | { ok: true; model: string; latencyMs: number; usage?: { inputTokens: number; outputTokens: number } }
   | { ok: false; error: { code: string; message: string } }
 
+export type TopicStreamEvent = { stage: 'extract' | 'propose'; kind: 'content' | 'reasoning'; text: string }
+
+/** GUI 长生成不设总超时；仅「连接建立后连续无字节」判死（M75）。 */
+export const DEFAULT_IDLE_TIMEOUT_MS = 180_000
+
 export interface TopicServiceDeps {
   settings: SettingsService
   config: TopicAiConfigService
+  /** M75：模型流式增量出口（IPC 层节流后送 renderer；CLI 不接）。 */
+  onStream?: (event: TopicStreamEvent) => void
   now?: () => Date
   makeRunId?: () => string
   makeEventId?: () => string
@@ -42,6 +50,8 @@ export interface TopicServiceDeps {
     apiKey: string
     reasoning: boolean
     effort: TopicAiReasoningEffort
+    idleTimeoutMs?: number
+    onDelta?: (stage: 'extract' | 'propose', kind: 'content' | 'reasoning', text: string) => void
   }) => TopicModel
 }
 
@@ -74,6 +84,8 @@ export class TopicService {
       providerId: isTopicAiProviderId(config.providerId) ? config.providerId : 'custom',
       reasoning: config.reasoning,
       effort: config.effort,
+      idleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS,
+      ...(config.onDelta ? { onDelta: config.onDelta } : {}),
     }))
   }
 
@@ -132,7 +144,21 @@ export class TopicService {
     try {
       const settings = await this.deps.settings.get()
       const window = resolveTopicWindow(input.window, this.now().getTime())
-      const selected = selectTopicArticles(await new Library(settings.libraryRoot).list(), window)
+      const library = new Library(settings.libraryRoot)
+      let articles: ArticleMeta[]
+      let excludedCount = 0
+      if (window.preset === 'manual') {
+        // M75：用户指名即素材——不做时间判定；找不到就是找不到，不静默丢。
+        const selected = selectTopicArticlesByIds(await library.list(), window)
+        if (selected.missing.length > 0) {
+          return { ok: false as const, error: { code: 'UNKNOWN_ARTICLES', message: `文库中找不到你选择的文章：${selected.missing.join('、')}。可能已被删除，请重新选择。` } }
+        }
+        articles = selected.articles
+      } else {
+        const selected = selectTopicArticles(await library.list(), window)
+        articles = selected.articles
+        excludedCount = selected.excluded.length
+      }
       const result = await analyzeTopics({
         libraryRoot: settings.libraryRoot,
         model: this.modelFactory!(config),
@@ -140,8 +166,8 @@ export class TopicService {
         now: this.now,
         makeRunId: this.makeRunId,
         onStage: trackStage,
-      }, { window, articles: selected.articles, signal: this.active.signal })
-      return { ok: true, result, timeExcludedCount: selected.excluded.length }
+      }, { window, articles, signal: this.active.signal })
+      return { ok: true, result, timeExcludedCount: excludedCount }
     } catch (error) {
       return errorResponse(error, 'TOPIC_ANALYSIS_ERROR')
     } finally { this.active = null; this.activeStage = null; this.activeStartedAt = null; this.activeWindow = null }
