@@ -204,11 +204,23 @@ async function main() {
           }),
         }
       }
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({
-        choices: [{ message: { content: JSON.stringify(content) } }],
-        usage: { prompt_tokens: 100, completion_tokens: 50 },
-      }))
+      const text = JSON.stringify(content)
+      // M75：按请求体 stream 标志分形态响应——生产链路默认 stream:true，
+      // 这里真发 SSE 分块（跨 chunk 拼接走真实解析器），并留出可观察的实时输出窗口。
+      if (body.stream) {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
+        const piece = Math.max(1, Math.ceil(text.length / 6))
+        for (let i = 0; i < text.length; i += piece) {
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: text.slice(i, i + piece) } }] })}\n\n`)
+          await new Promise(r => setTimeout(r, 120))
+        }
+        res.write(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 50 } })}\n\n`)
+        res.write('data: [DONE]\n\n')
+        res.end()
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ choices: [{ message: { content: text } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
+      }
     } else if (u.pathname === '/pic.png' || u.pathname === '/cover.png') {
       res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG)
     } else { res.writeHead(404); res.end('no') }
@@ -426,7 +438,18 @@ async function main() {
     await win.fill('[data-testid="topic-date-from"]', '2026-02-01')
     await win.fill('[data-testid="topic-date-to"]', '2026-03-31')
     await win.click('[data-testid="topic-analyze"]')
+    // M75：流式实时输出面板在结果落地前可见且内容增长
+    await win.waitForSelector('[data-testid="topic-stream"]', { timeout: 8000 })
+    const streamChars = async () => {
+      const text = await win.locator('[data-testid="topic-stream-content"]').innerText()
+      return text.length
+    }
+    const firstRead = await streamChars()
+    await new Promise(r => setTimeout(r, 400))
+    assert(firstRead > 0, 'M75: live stream panel shows model output while running')
     await win.waitForSelector('[data-testid="topic-card"]', { timeout: 30000 })
+    assert((await win.locator('[data-testid="topic-stream"]').count()) === 0,
+      'M75: stream panel clears when the run finishes')
     const topicCards = await win.locator('[data-testid="topic-card"]').count()
     assert(topicCards === 3, `M70: topic analysis renders three equal candidates (got ${topicCards})`)
     assert((await win.locator('[data-testid="topic-card"][aria-checked="true"]').count()) === 0,
@@ -451,6 +474,27 @@ async function main() {
     assert(topicClipboard.includes('# 候选问题 1') && topicClipboard.includes('传播效果：未验证'),
       'M70: brief is generated and copied as Markdown')
     assert(topicModelRequests.length === 2, 'M70: switching tabs, feedback and brief do not call the model again')
+    // M75：手动选篇——选范围→弹层勾选→分析走 manual 通道
+    await win.click('[data-testid="topic-range"]')
+    await win.locator('.ant-select-dropdown:visible .ant-select-item:has-text("手动选择文章")').click()
+    await win.click('[data-testid="topic-manual-pick"]')
+    await win.waitForSelector('[data-testid="topic-manual-list"]', { timeout: 5000 })
+    await win.locator('[data-testid="topic-manual-list"] .topic-manual-row').first().click()
+    await win.locator('[data-testid="topic-manual-list"] .topic-manual-row').nth(1).click()
+    await win.locator('[data-testid="topic-manual-modal"] .ant-btn-primary').click()
+    await win.waitForSelector('[data-testid="topic-manual-count"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="topic-manual-count"]').innerText()).includes('2'),
+      'M75: manual picker keeps the two chosen articles')
+    await win.click('[data-testid="topic-analyze"]')
+    await win.waitForSelector('[data-testid="topic-card"]', { timeout: 30000 })
+    assert(topicModelRequests.length === 4, 'M75: manual run issues its own two authenticated model requests')
+    {
+      const runDirs = readdirSync(join(libraryRoot, 'topic-decisions', 'runs'))
+      const manualRun = runDirs.map(dir => JSON.parse(readFileSync(join(libraryRoot, 'topic-decisions', 'runs', dir, 'result.json'), 'utf8')))
+        .find(run => run.window?.preset === 'manual')
+      assert(!!manualRun && manualRun.window.articleIds.length === 2 && manualRun.status === 'completed',
+        'M75: manual window persists in run result and analysis completes')
+    }
     await win.screenshot({ path: '/tmp/wxk-e2e-topics.png', fullPage: true })
     {
       const runFiles = readdirSync(join(libraryRoot, 'topic-decisions'), { recursive: true }).map(String)
