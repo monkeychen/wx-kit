@@ -1955,3 +1955,28 @@ M73 把「选题 AI」三行裸配置升级为多厂商 AI 模型设置：7 厂�
 
 教训泛化：**凡是"长任务 + 可切换页面"的 GUI，任务状态必须存在页面组件之外**，与订阅数据
 （Query/Mutation cache）同理。写进度 UI 之前先问：用户切走了，这个状态活下来了吗？
+
+## §74 M74：协议要自含——prompt 不给枚举值，模型只能猜（2026-09-21）
+
+安哥接真实供应商第一次跑通到校验环节，15 条提取全灭：INVALID_EXTRACTION_KIND ×10、
+QUOTE_NOT_FOUND ×5。看代码才意识到「调通 API」和「跑通闭环」是两个里程碑：HTTP、鉴权、
+超时这些确实通了（能拿到模型回复），死在**提示词协议不完整**——`stageInstruction` 只写了
+`{"items":[{"id","groupId","paragraphId","quote","kind",…}]}` 字段名清单：
+
+- `kind` 合法值是 core 校验器里的 `EXTRACTION_KINDS` 集合，**prompt 里一个字没提**，
+  模型不知道存在 fact-claim/opinion/question/emotion/change/counterpoint 六选一的契约；
+- `quote` 的「逐字」要求只写在 rules 第 2 条的抽象表述里（"逐字摘录"），没写"必须是该
+  段落 text 的连续子串、不得改写拼接"，模型自然做了"合理转述"。
+
+fixture 模型按 schema 吐合法输出，所以这个缺口在 957 个单测 + e2e 下全程隐形——**用
+echo 正确形状的桩测不出契约本身没送达**。修法就是把协议写进 prompt 本体（枚举值、逐字
+定义、ID 来源），并加断言锁住 prompt 含枚举值。
+
+同时按安哥要求给 dev 模式加终端交互追踪（`src/core/topics/debug.ts`）：
+`WXKIT_DEBUG=1`（`npm run dev` 经 `VITE_DEV_SERVER_URL` 信号自动开启）把请求体预览、
+HTTP 状态与耗时、`reasoning_content`、完整响应、**逐条校验失败对比（模型摘录 vs 段落
+实际文本）**打到主进程 stderr。刻意与 main.log 隔离——诊断日志有零正文红线，这个开关是
+用户主动要求观察本地交互，不破坏那条边界。
+
+教训泛化：给模型的结构化输出协议，**校验器的每一条约束都必须在 prompt 里有对应表述**；
+否则你在测「模型能不能读心」。桩测只证管道，真供应商第一次调用才证契约送达。
