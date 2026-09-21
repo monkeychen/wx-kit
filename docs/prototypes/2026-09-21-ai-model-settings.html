@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>wx-kit 设置 · AI 模型（选题 AI 重设计原型）</title>
+<style>
+  :root {
+    --paper:#faf7f0; --raised:#fffdf8; --sunken:#f3ede1; --ink:#211c15;
+    --soft:#6c6354; --faint:#a59c89; --red:#b5462f; --red-wash:#f6e7df;
+    --jade:#3f6b51; --jade-wash:#e6efe7; --amber:#9a6b1e; --amber-wash:#f3e9d4;
+    --line:rgba(33,28,21,.10); --line-strong:rgba(33,28,21,.18);
+    --shadow:0 1px 2px rgba(33,28,21,.04),0 8px 24px rgba(33,28,21,.06);
+    --serif:"Source Han Serif SC","Songti SC",serif;
+    --sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:var(--sans)}
+  body{background-image:radial-gradient(rgba(33,28,21,.025) .7px,transparent .7px);background-size:10px 10px}
+  button,input,select{font:inherit;color:inherit}
+
+  .mast{height:68px;padding:0 40px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(var(--raised),var(--paper));position:sticky;top:0;z-index:20}
+  .brand{display:flex;align-items:baseline;gap:13px}
+  .brand strong{font:700 22px var(--serif);letter-spacing:.06em}
+  .brand span{font-size:11px;letter-spacing:.26em;color:var(--red)}
+  .topnav{display:flex;gap:28px;color:var(--soft);font-size:15px}
+  .topnav b{color:var(--ink);position:relative}
+  .topnav b:after{content:"";position:absolute;height:2px;background:var(--red);left:0;right:0;bottom:-24px}
+
+  .page{max-width:1420px;margin:0 auto;padding:38px 40px 70px}
+  .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--red);font-weight:650}
+  h1{font:700 32px/1.2 var(--serif);margin:7px 0 8px}
+
+  .shell{display:grid;grid-template-columns:248px minmax(0,1fr);gap:22px;margin-top:28px;align-items:start}
+  .side{position:sticky;top:92px;background:var(--raised);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px}
+  .side-title{padding:10px 12px 8px;font-size:11px;letter-spacing:.18em;color:var(--faint);text-transform:uppercase}
+  .side button{width:100%;border:0;background:transparent;text-align:left;border-radius:9px;padding:12px;display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;color:var(--soft);cursor:pointer;margin:2px 0}
+  .side button:hover{background:var(--sunken);color:var(--ink)}
+  .side button.active{background:var(--red-wash);color:var(--red)}
+  .ico{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--sunken);font-size:14px}
+  .active .ico{background:var(--red);color:white}
+  .navcopy{display:grid;gap:2px}
+  .navcopy strong{font-size:14px}
+  .navcopy small{font-size:11px;color:var(--faint);font-weight:400}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--jade)}
+  .dot.off{background:var(--faint)}
+
+  .main{min-width:0}
+  .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:2px 2px 16px}
+  .panel-head h2{font:700 24px/1.3 var(--serif);margin:0 0 5px}
+  .panel-head p{margin:0;color:var(--soft);font-size:13px}
+  .count{font-size:12px;color:var(--faint);padding-top:5px}
+
+  .summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+  .summary-card{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:13px 15px;display:grid;gap:4px}
+  .summary-card span{font-size:11px;color:var(--faint)}
+  .summary-card strong{font-size:14px}
+  .ok{color:var(--jade)}
+
+  .group{background:var(--raised);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+  .group-title{padding:18px 20px 10px;display:flex;justify-content:space-between;align-items:start}
+  .group-title h3{font-size:16px;margin:0 0 4px}
+  .group-title p{font-size:12.5px;color:var(--soft);margin:0;line-height:1.55}
+  .badge{padding:3px 9px;border-radius:999px;font-size:11px;background:var(--jade-wash);color:var(--jade);white-space:nowrap}
+  .badge.off{background:var(--sunken);color:var(--soft)}
+  .badge.warn{background:var(--amber-wash);color:var(--amber)}
+
+  .row{min-height:58px;padding:12px 20px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(180px,260px) minmax(0,1fr);gap:22px;align-items:center}
+  .row-copy{display:grid;gap:3px}
+  .row-copy strong{font-size:13.5px}
+  .row-copy small{font-size:11.5px;color:var(--faint);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .control{display:flex;justify-content:flex-end;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+  .input-fill{flex:1 1 320px;display:flex;align-items:center;gap:8px;min-width:0}
+  .input,.select{height:36px;border:1px solid var(--line-strong);border-radius:7px;background:var(--paper);padding:0 10px;flex:1 1 auto;min-width:0}
+  .select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23a59c89' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px;cursor:pointer}
+  .input-suffix{display:flex;align-items:center;gap:0;flex:1 1 auto;min-width:0}
+  .input-suffix .input{border-radius:7px 0 0 7px}
+  .input-suffix .suffix{height:36px;display:grid;place-items:center;padding:0 12px;border:1px solid var(--line-strong);border-left:0;border-radius:0 7px 7px 0;background:var(--sunken);color:var(--soft);font-size:12px;white-space:nowrap}
+
+  .btn{height:36px;border:1px solid var(--line-strong);border-radius:7px;background:var(--raised);padding:0 14px;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--red);color:var(--red)}
+  .btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+  .btn.primary:hover{filter:brightness(1.06);color:#fff}
+  .btn.danger{border-color:#d8826f;color:var(--red)}
+  .btn.small{height:30px;font-size:12px;padding:0 10px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .callout{margin:0 20px 14px;padding:11px 13px;background:var(--amber-wash);border-radius:8px;color:#76531a;font-size:12px;line-height:1.55}
+
+  /* 测试连接结果：常驻两行省略；hover 原地展开全文。
+     不用绝对定位浮层——.group 有 overflow:hidden，浮层伸出组外会被裁剪不可见 */
+  .test-result{margin:0 20px 14px;border-radius:8px;padding:11px 13px;font-size:12.5px;line-height:1.6;display:none}
+  .test-result.show{display:block;cursor:help}
+  .test-result .tr-line{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .test-result .tr-tip{display:none}
+  .test-result.show:hover .tr-line{display:none}
+  .test-result.show:hover .tr-tip{display:inline}
+  .test-result.ok{background:var(--jade-wash);color:var(--jade)}
+  .test-result.fail{background:var(--red-wash);color:var(--red)}
+
+  .savebar{position:sticky;bottom:14px;background:rgba(255,253,248,.94);backdrop-filter:blur(14px);border:1px solid var(--line-strong);border-radius:11px;box-shadow:0 8px 30px rgba(33,28,21,.14);padding:11px 14px;margin-top:18px;display:flex;align-items:center;justify-content:space-between;z-index:10}
+  .savebar span{font-size:12.5px;color:var(--soft)}
+  .prototype-note{margin-top:18px;color:var(--faint);font-size:11.5px;text-align:center}
+
+  @media(max-width:900px){
+    .page{padding:26px 20px 60px}
+    .shell{grid-template-columns:1fr}
+    .side{position:static;display:flex;overflow:auto}
+    .side-title{display:none}
+    .side button{min-width:170px}
+    .summary{grid-template-columns:1fr}
+    .row{grid-template-columns:1fr}
+    .control{justify-content:flex-start}
+  }
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="brand"><strong>微信百宝箱</strong><span>WX-KIT</span></div>
+  <nav class="topnav"><span>下载</span><span>订阅</span><span>文库</span><span>选题</span><b>设置</b></nav>
+</header>
+<main class="page">
+  <div class="eyebrow">Settings</div>
+  <h1>设置</h1>
+
+  <div class="shell">
+    <aside class="side">
+      <div class="side-title">设置分类</div>
+      <button><span class="ico">▣</span><span class="navcopy"><strong>文库与下载</strong><small>保存位置、格式、历史</small></span><i class="dot"></i></button>
+      <button><span class="ico">◎</span><span class="navcopy"><strong>账号与平台</strong><small>微信读书、墨问</small></span><i class="dot"></i></button>
+      <button><span class="ico">↻</span><span class="navcopy"><strong>自动化与发布</strong><small>订阅检查、站点同步</small></span><i class="dot off"></i></button>
+      <button class="active"><span class="ico">✦</span><span class="navcopy"><strong>AI 与工具</strong><small>模型、命令行</small></span><i class="dot"></i></button>
+      <button><span class="ico">⚙</span><span class="navcopy"><strong>系统与支持</strong><small>保护、诊断、更新</small></span><i class="dot"></i></button>
+    </aside>
+
+    <section class="main">
+      <div class="panel-head">
+        <div>
+          <h2>AI 与工具</h2>
+          <p>配置选题分析使用的模型，以及供 Agent 调用的命令行入口。</p>
+        </div>
+        <span class="count">2 组设置</span>
+      </div>
+
+      <div class="summary">
+        <div class="summary-card"><span>当前厂商</span><strong id="sum-provider">智谱清言</strong></div>
+        <div class="summary-card"><span>模型</span><strong id="sum-model" class="ok">glm-5.3-flash</strong></div>
+        <div class="summary-card"><span>连接状态</span><strong id="sum-status">未测试</strong></div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">
+          <div><h3>AI 模型</h3></div>
+          <span class="badge" id="model-badge">Key 已加密</span>
+        </div>
+
+        <div class="callout">隐私提示：分析时所选文章正文会发送到你配置的服务；API Key 使用系统安全存储，不会写入普通设置、分析结果或诊断日志。</div>
+
+        <div class="row">
+          <div class="row-copy"><strong>厂商</strong></div>
+          <div class="control">
+            <select class="select" id="sel-provider" style="flex:1 1 100%">
+              <option value="zhipu">智谱</option>
+              <option value="qwen">千问</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="kimi">Kimi</option>
+              <option value="minimax">MiniMax</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google</option>
+              <option value="custom">自定义（OpenAI 兼容）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" id="row-auth">
+          <div class="row-copy"><strong>计费模式</strong><small>订阅额度每月重置、不累积；按量即用即付。</small></div>
+          <div class="control">
+            <select class="select" id="sel-auth" style="flex:1 1 100%">
+              <option value="payg">按量付费</option>
+              <option value="plan">订阅付费</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-copy"><strong>Base URL</strong><small>由上方选择自动确定。</small></div>
+          <div class="control">
+            <div class="input-fill"><input class="input" id="inp-baseurl" readonly value="https://open.bigmodel.cn/api/paas/v4"></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-copy"><strong>模型</strong><small>可从列表选择，也可直接输入新发布的模型名。</small></div>
+          <div class="control">
+            <div class="input-fill">
+              <input class="input" id="inp-model" list="model-list" placeholder="选择或输入模型名" value="glm-5.3-flash">
+              <datalist id="model-list"></datalist>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" id="row-key">
+          <div class="row-copy"><strong>API Key</strong><small id="key-hint">留空即保留当前 Key。</small></div>
+          <div class="control">
+            <div class="input-fill">
+              <input class="input" id="inp-key" type="password" placeholder="已配置；留空即保留原 Key">
+              <button class="btn danger small" id="btn-clear">清除</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" id="row-reasoning">
+          <div class="row-copy"><strong>推理模式</strong><small>关闭可降低延迟与 Token 消耗。</small></div>
+          <div class="control">
+            <select class="select" id="sel-reasoning" style="flex:0 1 220px">
+              <option value="enabled">启用</option>
+              <option value="disabled">关闭</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" id="row-effort">
+          <div class="row-copy"><strong>推理等级</strong><small>越高越深入，耗时也越长。</small></div>
+          <div class="control">
+            <select class="select" id="sel-effort" style="flex:0 1 220px">
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-copy"><strong>测试连接</strong><small>用当前配置发一条最小请求验证可用性；测完自动显示延迟与用量。</small></div>
+          <div class="control">
+            <button class="btn" id="btn-test">测试连接</button>
+          </div>
+        </div>
+
+        <div class="test-result" id="test-result"></div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">
+          <div><h3>命令行快捷方式</h3><p>供终端和 AI Agent 调用同一套 wx-kit 能力。</p></div>
+          <span class="badge">已创建</span>
+        </div>
+        <div class="row">
+          <div class="row-copy"><strong>命令位置</strong><small>~/bin/wx-kit，已在 PATH 中。</small></div>
+          <div class="control"><button class="btn">重新创建</button></div>
+        </div>
+      </div>
+
+      <div class="savebar">
+        <span id="save-state">本页没有未保存的更改</span>
+        <div>
+          <button class="btn">撤销</button>
+          <button class="btn primary">保存更改</button>
+        </div>
+      </div>
+      <div class="prototype-note">交互原型 · 厂商/认证/模型联动与测试连接可点 · 不会发起真实请求</div>
+    </section>
+  </div>
+</main>
+
+<script>
+// —— 7 厂商 + 自定义的联动数据（按安哥提供的 2026 参数材料整理）——
+// 本版只做 API-KEY 认证；plans: payg=按量付费 / plan=订阅付费（Coding/Token Plan 套餐端点）
+// reasoning: 模型是否支持思考开关；effort: 是否支持等级
+const PROVIDERS = {
+  zhipu: {
+    label: '智谱',
+    plans: { payg: { label: '按量付费', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+             plan: { label: '订阅付费', baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4' } },
+    keyPrefixHint: 'Coding Plan 的 Key 在 plan.bigmodel.cn 「API Keys」页创建；按量 Key 在开放平台创建。',
+    models: [
+      { id: 'glm-5.3-flash', label: 'glm-5.3-flash', reasoning: true, effort: true },
+      { id: 'glm-5.3', label: 'glm-5.3', reasoning: true, effort: true },
+      { id: 'glm-5.3-flashx', label: 'glm-5.3-flashx', reasoning: true, effort: true },
+    ],
+    defaultModel: 'glm-5.3-flash',
+  },
+  qwen: {
+    label: '千问',
+    plans: { payg: { label: '按量付费', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+             plan: { label: '订阅付费', baseUrl: 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1' } },
+    keyPrefixHint: '按量 Key 以 sk- 开头；Token Plan Key 以 sk-sp- 开头，选错端点会 401。',
+    models: [
+      { id: 'qwen3.8-flash', label: 'qwen3.8-flash', reasoning: true, effort: true },
+      { id: 'qwen3.8-max', label: 'qwen3.8-max', reasoning: true, effort: true },
+      { id: 'qwen3.7-plus', label: 'qwen3.7-plus', reasoning: true, effort: true },
+    ],
+    defaultModel: 'qwen3.8-flash',
+  },
+  deepseek: {
+    label: 'DeepSeek',
+    plans: { payg: { label: '按量付费', baseUrl: 'https://api.deepseek.com/v1' } },
+    keyPrefixHint: '旧 deepseek-chat / deepseek-reasoner 已于 2026-07 下线，请使用新模型名。',
+    models: [
+      { id: 'deepseek-flash', label: 'deepseek-flash', reasoning: true, effort: true },
+      { id: 'deepseek-v4-pro', label: 'deepseek-v4-pro', reasoning: true, effort: true },
+    ],
+    defaultModel: 'deepseek-flash',
+  },
+  kimi: {
+    label: 'Kimi',
+    plans: { payg: { label: '按量付费', baseUrl: 'https://api.moonshot.cn/v1' } },
+    keyPrefixHint: '旧 moonshot-v1 系列与 kimi-latest 已下线，请使用 kimi-k3。',
+    models: [
+      { id: 'kimi-k3', label: 'kimi-k3', reasoning: true, effort: true },
+      { id: 'kimi-k2.7-code', label: 'kimi-k2.7-code', reasoning: true, effort: false },
+    ],
+    defaultModel: 'kimi-k3',
+  },
+  minimax: {
+    label: 'MiniMax',
+    plans: { payg: { label: '按量付费', baseUrl: 'https://api.minimax.chat/v1' } },
+    keyPrefixHint: '在 MiniMax 开放平台「API Key」页创建。',
+    models: [
+      { id: 'MiniMax-M3', label: 'MiniMax-M3', reasoning: true, effort: false },
+      { id: 'MiniMax-M2.7-highspeed', label: 'MiniMax-M2.7-highspeed', reasoning: true, effort: false },
+    ],
+    defaultModel: 'MiniMax-M3',
+  },
+  openai: {
+    label: 'OpenAI',
+    plans: { payg: { label: '按量付费', baseUrl: 'https://api.openai.com/v1' } },
+    keyPrefixHint: 'Key 以 sk- 开头。',
+    models: [
+      { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol', reasoning: true, effort: true },
+      { id: 'gpt-4o', label: 'gpt-4o', reasoning: false, effort: false },
+      { id: 'o3-mini', label: 'o3-mini', reasoning: true, effort: true },
+      { id: 'o1', label: 'o1', reasoning: true, effort: true },
+    ],
+    defaultModel: 'gpt-5.6-sol',
+  },
+  gemini: {
+    label: 'Google',
+    plans: { payg: { label: '按量付费', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' } },
+    keyPrefixHint: 'AI Studio Key 以 AIza 开头。',
+    models: [
+      { id: 'gemini-3.8-flash', label: 'gemini-3.8-flash', reasoning: true, effort: true },
+      { id: 'gemini-3.1-pro', label: 'gemini-3.1-pro', reasoning: true, effort: true },
+      { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash', reasoning: true, effort: true },
+    ],
+    defaultModel: 'gemini-3.8-flash',
+  },
+  custom: {
+    label: '自定义',
+    plans: { payg: { label: '按量付费', baseUrl: '' } },
+    keyPrefixHint: '任何 OpenAI Chat Completions 兼容服务。',
+    models: [],
+    defaultModel: '',
+  },
+}
+
+const $ = id => document.getElementById(id)
+const state = { provider: 'zhipu', auth: 'payg', model: 'glm-5.3-flash' }
+
+function apply(keepModel = false) {
+  const p = PROVIDERS[state.provider]
+  // 计费模式选项
+  const authSel = $('sel-auth')
+  authSel.innerHTML = Object.entries(p.plans)
+    .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')
+  if (!p.plans[state.auth]) state.auth = Object.keys(p.plans)[0]
+  authSel.value = state.auth
+  // Base URL：自定义厂商可编辑，其余只读自动
+  $('inp-baseurl').value = p.plans[state.auth].baseUrl || ''
+  $('inp-baseurl').readOnly = state.provider !== 'custom'
+  $('row-auth').style.display = Object.keys(p.plans).length > 1 ? '' : 'none'
+  // 模型：datalist 提供候选，input 可自由输入（新模型无需等更新）
+  const list = $('model-list')
+  list.innerHTML = p.models.map(m => `<option value="${m.id}">`).join('')
+  if (!keepModel) $('inp-model').value = state.provider === 'custom' ? '' : p.defaultModel
+  // 推理支持：已知模型按能力显隐；手输的未知模型默认显示两行
+  const known = p.models.find(m => m.id === $('inp-model').value.trim())
+  const supportsReasoning = known ? known.reasoning : true
+  const supportsEffort = known ? known.effort : true
+  $('row-reasoning').style.display = supportsReasoning ? '' : 'none'
+  $('row-effort').style.display = supportsReasoning && supportsEffort ? '' : 'none'
+  // Key 行：本版全部 API-KEY 认证，Key 恒为必填
+  $('row-key').style.display = ''
+  // summary
+  $('sum-provider').textContent = state.provider === 'custom' ? '自定义' : p.label
+  $('sum-model').textContent = $('inp-model').value.trim() || '—'
+  $('save-state').textContent = '有未保存的更改'
+}
+
+$('sel-provider').addEventListener('change', e => { state.provider = e.target.value; apply() })
+$('sel-auth').addEventListener('change', e => { state.auth = e.target.value; apply(true) })
+$('inp-model').addEventListener('input', e => {
+  state.model = e.target.value.trim()
+  const p = PROVIDERS[state.provider]
+  const known = p.models.find(m => m.id === state.model)
+  $('row-reasoning').style.display = known && !known.reasoning ? 'none' : ''
+  $('row-effort').style.display = known && !known.effort ? 'none' : ''
+  $('sum-model').textContent = state.model || '—'
+  $('save-state').textContent = '有未保存的更改'
+})
+$('sel-reasoning').addEventListener('change', () => { $('save-state').textContent = '有未保存的更改' })
+$('sel-effort').addEventListener('change', () => { $('save-state').textContent = '有未保存的更改' })
+$('inp-key').addEventListener('input', () => { $('save-state').textContent = '有未保存的更改' })
+
+// 测试连接：演示三态（成功/失败/超时），真实实现将发最小 chat 请求
+const scenarios = [
+  { cls: 'ok', title: '连接成功', text: '模型 glm-5.3-flash 响应正常 · 延迟 890ms · 消耗 57 tokens（约 0.0011 元）。可以直接开始分析。' },
+  { cls: 'fail', title: '认证失败（401）', text: 'Key 无效或与计费模式不匹配。请确认 Key 与所选端点一致：按量 Key / 套餐 Key 不能混用，切换上方计费模式后重试。智谱 Coding Plan 的 Key 在 plan.bigmodel.cn 创建；通义 Token Plan 的 Key 以 sk-sp- 开头。' },
+  { cls: 'fail', title: '连接超时', text: '服务在 10 秒内未响应。请检查网络或代理后重试。' },
+]
+let testIdx = 0
+$('btn-test').addEventListener('click', () => {
+  const r = $('test-result')
+  r.className = 'test-result show'
+  r.style.background = 'var(--sunken)'; r.style.color = 'var(--soft)'
+  r.textContent = '正在发送最小请求…'
+  $('btn-test').disabled = true
+  setTimeout(() => {
+    const s = scenarios[testIdx % scenarios.length]; testIdx++
+    r.className = `test-result show ${s.cls}`
+    r.style.background = ''; r.style.color = ''
+    // 常驻两行省略 + hover 展开全文（CSS tooltip，兼容内嵌 webview）
+    r.innerHTML = `<strong>${s.title}</strong><br><span class="tr-line">${s.text}</span><span class="tr-tip"><strong>${s.title}</strong> — ${s.text}</span>`
+    $('sum-status').textContent = s.cls === 'ok' ? '可用' : '异常'
+    $('sum-status').className = s.cls === 'ok' ? 'ok' : ''
+    $('btn-test').disabled = false
+  }, 900)
+})
+
+apply()
+$('save-state').textContent = '本页没有未保存的更改'
+</script>
+</body>
+</html>
