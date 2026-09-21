@@ -554,13 +554,14 @@ export default function Settings() {
                 placeholder="例如 gpt-4.1-mini" />
             </SettingsRow>
             <SettingsRow label="API Key" hint="留空即保留当前 Key。">
-              <Space align="center" className="settings-input-fill">
+              {/* 不用 antd Space：它会在子元素外包 .ant-space-item，打断 flex 拉伸使输入框缩回内容宽度 */}
+              <div className="settings-input-fill">
                 <Input.Password data-testid="topic-ai-key" value={topicAiKey}
                   onChange={event => setTopicAiKey(event.target.value)}
                   autoComplete="new-password"
                   placeholder={topicAi?.keyConfigured ? '已配置；留空即保留原 Key' : '输入 API Key'} />
                 {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除</Button>}
-              </Space>
+              </div>
             </SettingsRow>
             <div className="settings-row" style={{ border: 0, minHeight: 'auto' }}>
               <div className="settings-row-copy">
