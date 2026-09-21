@@ -155,6 +155,7 @@ export default function Topics() {
   const [to, setTo] = useState('')
   const [loading, setLoading] = useState(false)
   const [stage, setStage] = useState('')
+  const [elapsed, setElapsed] = useState(0)
   const [result, setResult] = useState<TopicRunResult | null>(null)
   const [excludedCount, setExcludedCount] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -163,6 +164,13 @@ export default function Topics() {
 
   useEffect(() => { api.topicsGetConfig().then(setConfig).catch(() => setConfig(null)) }, [])
   useEffect(() => api.onTopicsProgress(next => setStage(stageLabel(next))), [])
+  // 加载计时：让人分得清「在跑」和「卡死」。模型请求 90s 超时，接近上限时提示。
+  useEffect(() => {
+    if (!loading) { setElapsed(0); return }
+    const startedAt = Date.now()
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [loading])
 
   const analyze = async () => {
     if (!configReady(config)) { message.warning('先配置选题 AI 服务'); return }
@@ -229,12 +237,18 @@ export default function Topics() {
         )}
 
         {loading && (
-          <div className="surface topic-loading"><Spin /><strong>{stage || '正在分析'}</strong><span>这一次只读取你选定时间范围内的本地素材。</span></div>
+          <div className="surface topic-loading">
+            <Spin />
+            <strong>{stage || '正在分析'}</strong>
+            <span>已等待 {elapsed} 秒{elapsed >= 60 ? '，素材多时单次模型请求最长约 90 秒，可随时取消' : '，这一次只读取你选定时间范围内的本地素材'}</span>
+          </div>
         )}
 
         {notice && (
           <Alert className="topic-alert" type={notice.tone} showIcon message={notice.text}
-            description={excludedCount > 0 ? `另有 ${excludedCount} 篇因发表时间不在所选范围或不确定而未纳入。` : undefined} />
+            description={excludedCount > 0
+              ? `另有 ${excludedCount} 篇因发表时间不在所选范围或不确定而未纳入；需要分析它们时，调整上方素材范围后重新分析。`
+              : undefined} />
         )}
 
         {cards.length > 0 && (

@@ -107,7 +107,13 @@ export class ChatCompletionsTopicModel implements TopicModel {
         stage, endpoint: this.endpoint, model: this.descriptor.modelName,
         outcome: 'network-error', ms: Date.now() - startedAt,
       })
+      // 三种中断要分开报：用户取消透传 AbortError；等待响应超时是 TimeoutError；
+      // 其余才是真正的网络错误。超时给行动引导而不是裸英文。
       if (error instanceof Error && error.name === 'AbortError') throw error
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        throw new TopicProviderError('MODEL_TIMEOUT',
+          `AI 服务在 ${Math.round(this.timeoutMs / 1000)} 秒内没有返回（素材越多耗时越长）。可缩小素材时间范围后重试，或稍后再试一次。`)
+      }
       throw new TopicProviderError('NETWORK_ERROR', redactFreeText(error instanceof Error ? error.message : String(error)))
     }
     diag()?.info('topics-ai', 'chat-completions', {

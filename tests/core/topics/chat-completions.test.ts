@@ -180,4 +180,16 @@ describe('OpenAI Chat Completions 兼容选题模型', () => {
     await expect(model.extract(makeTopicExtractionInput(snapshot))).rejects.toMatchObject({ name: 'AbortError' })
     expect(calls).toBe(1)
   })
+
+  it('等待响应超时抛 MODEL_TIMEOUT 并带中文引导（区别于用户取消）', async () => {
+    let calls = 0
+    const model = new ChatCompletionsTopicModel({ baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k', timeoutMs: 20 }, async () => {
+      calls++
+      return new Promise((_resolve, reject) => setTimeout(() => reject(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })), 40))
+    })
+    await expect(model.extract(makeTopicExtractionInput(snapshot))).rejects.toSatisfy((error: TopicProviderError) => {
+      return error.code === 'MODEL_TIMEOUT' && error.message.includes('秒内没有返回') && error.message.includes('缩小素材时间范围')
+    })
+    expect(calls).toBe(1)
+  })
 })

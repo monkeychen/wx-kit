@@ -10,6 +10,7 @@ import {
   type TopicModel,
 } from './model'
 import { buildTopicSnapshot, type TopicSnapshotDeps } from './snapshot'
+import { TopicProviderError } from './chat-completions'
 import { TopicRunStore } from './store'
 import type { TopicFailure, TopicRunResult, TopicTraceEvent, TopicWindow } from './types'
 import { TopicModelOutputError, parseTopicExtractions, validateTopicProposals } from './validate'
@@ -36,6 +37,8 @@ const isAbort = (error: unknown, signal?: AbortSignal): boolean => signal?.abort
 
 function failureOf(error: unknown): TopicFailure {
   if (error instanceof TopicModelOutputError) return { code: error.code, message: redactFreeText(error.message) }
+  // 超时保留专用码与引导文案，不与通用网络错误混在一起
+  if (error instanceof TopicProviderError) return { code: error.code, message: redactFreeText(error.message) }
   return { code: 'MODEL_REQUEST_FAILED', message: redactFreeText(error instanceof Error ? error.message : String(error)) }
 }
 
