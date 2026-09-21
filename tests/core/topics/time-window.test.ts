@@ -3,6 +3,13 @@ import type { ArticleMeta } from '../../../src/core/types'
 import type { TopicWindowInput } from '../../../src/core/topics/types'
 import { classifyTopicPublication, resolveTopicWindow, selectTopicArticles, selectTopicArticlesByIds } from '../../../src/core/topics/time-window'
 
+/** 测试里绝大多数场景是时间窗口；manual 分支单独测。返回类型窄化到时间分支。 */
+function timeWindow(input: Parameters<typeof resolveTopicWindow>[0], asOf = AS_OF): Exclude<ReturnType<typeof resolveTopicWindow>, { preset: 'manual' }> {
+  const window = resolveTopicWindow(input, asOf)
+  if (window.preset === 'manual') throw new Error('测试期望时间窗口')
+  return window
+}
+
 const AS_OF = Date.parse('2026-09-20T04:00:00Z')
 const article = (id: string, publishTime: string): ArticleMeta => ({
   id, title: '同名文章', author: '合成作者', account: '合成账号', publishTime,
@@ -58,7 +65,7 @@ describe('选题时间范围', () => {
 })
 
 describe('原文时间及精度', () => {
-  const window = resolveTopicWindow(undefined, AS_OF)
+  const window = timeWindow(undefined)
 
   it.each([
     ['2026-09-19 12:00', true],
@@ -82,13 +89,13 @@ describe('原文时间及精度', () => {
   })
 
   it('较长范围完整覆盖的日期精度文章可以入选', () => {
-    expect(classifyTopicPublication('2026-09-19', resolveTopicWindow({ preset: '3d' }, AS_OF))).toEqual({
+    expect(classifyTopicPublication('2026-09-19', timeWindow({ preset: '3d' }))).toEqual({
       included: true, precision: 'day', publishedAtMs: Date.parse('2026-09-18T16:00:00Z'),
     })
   })
 
   it('自定义日期范围完整接纳指定日的日期精度文章', () => {
-    const custom = resolveTopicWindow({ preset: 'custom', from: '2026-09-19', to: '2026-09-19' }, AS_OF)
+    const custom = timeWindow({ preset: 'custom', from: '2026-09-19', to: '2026-09-19' })
     expect(classifyTopicPublication('2026-09-19', custom).included).toBe(true)
     expect(classifyTopicPublication('2026-09-20 00:00', custom))
       .toEqual({ included: false, reason: 'outside-window' })
@@ -111,13 +118,13 @@ describe('原文时间及精度', () => {
 describe('按发表时间筛选文库元信息', () => {
   it('忽略下载时间和订阅状态，并保留同名不同文章', () => {
     const input = [article('old', '2026-09-18 12:00'), article('new-a', '2026-09-20 10:00'), article('new-b', '2026-09-20 11:00')]
-    const result = selectTopicArticles(input, resolveTopicWindow(undefined, AS_OF))
+    const result = selectTopicArticles(input, timeWindow(undefined))
     expect(result.articles.map(a => a.id)).toEqual(['new-a', 'new-b'])
     expect(result.excluded).toEqual([{ id: 'old', publishTime: '2026-09-18 12:00', reason: 'outside-window' }])
   })
 
   it('空输入返回空结果，不自动扩大范围', () => {
-    expect(selectTopicArticles([], resolveTopicWindow(undefined, AS_OF))).toEqual({ articles: [], excluded: [] })
+    expect(selectTopicArticles([], timeWindow(undefined))).toEqual({ articles: [], excluded: [] })
   })
 
   it('未知和不精确的时间留痕，不改变原数组或对象', () => {
@@ -127,7 +134,7 @@ describe('按发表时间筛选文库元信息', () => {
       Object.freeze(article('valid', '2026-09-20 08:00')),
     ])
     const original = JSON.stringify(input)
-    const result = selectTopicArticles(input, resolveTopicWindow(undefined, AS_OF))
+    const result = selectTopicArticles(input, timeWindow(undefined))
     expect(result.articles.map(a => a.id)).toEqual(['valid'])
     expect(result.excluded).toEqual([
       { id: 'unknown', publishTime: '', reason: 'unknown-publication-time' },

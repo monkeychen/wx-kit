@@ -8,6 +8,15 @@ import type { TopicAiConfigStatus } from '../../electron/services/topic-ai-confi
 import type { TopicAnalyzeResponse } from '../../electron/services/topics-service'
 import type { TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
 
+export interface TopicStreamView {
+  stage: 'extract' | 'propose'
+  /** 环形尾部缓冲：UI 只展示最新片段，全文再长也不撑爆内存。 */
+  contentTail: string
+  reasoningTail: string
+  contentChars: number
+  reasoningChars: number
+}
+
 export interface TopicRunSnapshot {
   running: boolean
   stage: TopicTraceEvent['stage'] | null
@@ -17,11 +26,16 @@ export interface TopicRunSnapshot {
   error: string | null
   timeExcludedCount: number
   selectedId: string | null
+  /** M75：模型流式输出的实时视图；运行结束（成功/失败/取消）即清空。 */
+  stream: TopicStreamView | null
 }
+
+const TAIL_CHARS = 4000
+const clipTail = (current: string, append: string) => (current + append).slice(-TAIL_CHARS)
 
 export const initialSnapshot: TopicRunSnapshot = {
   running: false, stage: null, startedAt: null, window: null,
-  result: null, error: null, timeExcludedCount: 0, selectedId: null,
+  result: null, error: null, timeExcludedCount: 0, selectedId: null, stream: null,
 }
 
 type Listener = (snapshot: TopicRunSnapshot) => void
@@ -31,6 +45,7 @@ export interface TopicRunStoreDeps {
   topicsCancel: () => Promise<{ ok: boolean; error?: { code: string; message: string } }>
   topicsRunningStatus: () => Promise<{ running: boolean; startedAt: number | null; stage: TopicTraceEvent['stage'] | null; window: TopicWindowInput | null }>
   onTopicsProgress: (cb: (stage: TopicTraceEvent['stage']) => void) => () => void
+  onTopicsStream: (cb: (event: { stage: 'extract' | 'propose'; kind: 'content' | 'reasoning'; text: string }) => void) => () => void
 }
 
 export function configReady(config: TopicAiConfigStatus | null): boolean {
@@ -47,6 +62,17 @@ export class TopicRunStore {
     deps.onTopicsProgress(stage => {
       if (!this.snapshot.running || this.unsubscribed) return
       this.set({ stage })
+    })
+    deps.onTopicsStream(event => {
+      if (!this.snapshot.running || this.unsubscribed) return
+      const base: TopicStreamView = this.snapshot.stream?.stage === event.stage
+        ? this.snapshot.stream
+        : { stage: event.stage, contentTail: '', reasoningTail: '', contentChars: 0, reasoningChars: 0 }
+      this.set({
+        stream: event.kind === 'content'
+          ? { ...base, contentTail: clipTail(base.contentTail, event.text), contentChars: base.contentChars + event.text.length }
+          : { ...base, reasoningTail: clipTail(base.reasoningTail, event.text), reasoningChars: base.reasoningChars + event.text.length },
+      })
     })
   }
 
@@ -65,7 +91,7 @@ export class TopicRunStore {
     const status = await this.deps.topicsRunningStatus()
     if (status.running && !this.snapshot.running) {
       // 主进程在跑而本地不知道（例：另一窗口触发的）——恢复进行中现场。
-      this.set({ running: true, startedAt: status.startedAt, stage: status.stage, window: status.window, result: null, error: null, timeExcludedCount: 0, selectedId: null })
+      this.set({ running: true, startedAt: status.startedAt, stage: status.stage, window: status.window, result: null, error: null, timeExcludedCount: 0, selectedId: null, stream: this.snapshot.stream })
     } else if (!status.running && this.snapshot.running && !this.awaitingAnalyze) {
       // 本地以为在跑但主进程空闲且无在途 Promise：收尾，避免假死进度条。
       this.set({ running: false, startedAt: null, stage: null })
@@ -77,7 +103,7 @@ export class TopicRunStore {
 
   start(window: TopicWindowInput): boolean {
     if (this.snapshot.running) return false
-    this.set({ running: true, stage: 'snapshot', startedAt: Date.now(), window, result: null, error: null, timeExcludedCount: 0, selectedId: null })
+    this.set({ running: true, stage: 'snapshot', startedAt: Date.now(), window, result: null, error: null, timeExcludedCount: 0, selectedId: null, stream: null })
     void this.run(window)
     return true
   }
@@ -88,13 +114,13 @@ export class TopicRunStore {
       const response = await this.deps.topicsAnalyze({ window })
       if (!this.snapshot.running) return // 被 reset/新运行取代，结果不落地
       if (response.ok) {
-        this.set({ running: false, stage: null, startedAt: null, result: response.result, timeExcludedCount: response.timeExcludedCount })
+        this.set({ running: false, stage: null, startedAt: null, stream: null, result: response.result, timeExcludedCount: response.timeExcludedCount })
       } else {
-        this.set({ running: false, stage: null, startedAt: null, error: response.error.message })
+        this.set({ running: false, stage: null, startedAt: null, stream: null, error: response.error.message })
       }
     } catch (error) {
       if (!this.snapshot.running) return
-      this.set({ running: false, stage: null, startedAt: null, error: (error as Error).message })
+      this.set({ running: false, stage: null, startedAt: null, stream: null, error: (error as Error).message })
     } finally {
       this.awaitingAnalyze = false
     }
@@ -146,12 +172,14 @@ export function getTopicRunStore(): TopicRunStore {
     topicsCancel: () => m.api.topicsCancel(),
     topicsRunningStatus: () => m.api.topicsRunningStatus(),
     onTopicsProgress: (cb: (stage: TopicTraceEvent['stage']) => void) => m.api.onTopicsProgress(cb),
+    onTopicsStream: cb => m.api.onTopicsStream(cb),
   }))
   singleton = new TopicRunStore({
     topicsAnalyze: async input => (await apiPromise!).topicsAnalyze(input),
     topicsCancel: async () => (await apiPromise!).topicsCancel(),
     topicsRunningStatus: async () => (await apiPromise!).topicsRunningStatus(),
     onTopicsProgress: cb => { void apiPromise!.then(deps => deps.onTopicsProgress(cb)); return () => {} },
+    onTopicsStream: cb => { void apiPromise!.then(deps => deps.onTopicsStream(cb)); return () => {} },
   })
   return singleton
 }

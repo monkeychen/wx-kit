@@ -27,7 +27,7 @@ export type TopicFeedbackResponse =
   | { ok: false; error: { code: string; message: string } }
 
 export type TopicTestConnectionResponse =
-  | { ok: true; model: string; latencyMs: number; usage?: { inputTokens: number; outputTokens: number } }
+  | { ok: true; model: string; latencyMs: number; firstByteMs?: number; usage?: { inputTokens: number; outputTokens: number } }
   | { ok: false; error: { code: string; message: string } }
 
 export type TopicStreamEvent = { stage: 'extract' | 'propose'; kind: 'content' | 'reasoning'; text: string }
@@ -84,7 +84,7 @@ export class TopicService {
       providerId: isTopicAiProviderId(config.providerId) ? config.providerId : 'custom',
       reasoning: config.reasoning,
       effort: config.effort,
-      idleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS,
+      idleTimeoutMs: config.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS,
       ...(config.onDelta ? { onDelta: config.onDelta } : {}),
     }))
   }
@@ -117,7 +117,7 @@ export class TopicService {
     }
     const result = await testTopicAiConnection({ baseUrl: input.baseUrl, model: input.model, apiKey })
     return result.ok
-      ? { ok: true, model: result.model, latencyMs: result.latencyMs, usage: result.usage }
+      ? { ok: true, model: result.model, latencyMs: result.latencyMs, firstByteMs: result.firstByteMs, usage: result.usage }
       : { ok: false, error: { code: result.error.code, message: result.error.message } }
   }
 
@@ -161,7 +161,12 @@ export class TopicService {
       }
       const result = await analyzeTopics({
         libraryRoot: settings.libraryRoot,
-        model: this.modelFactory!(config),
+        model: this.modelFactory!({
+          ...config,
+          onDelta: this.deps.onStream
+            ? (stage, kind, text) => this.deps.onStream?.({ stage, kind, text })
+            : undefined,
+        }),
         store: new TopicRunStore(settings.libraryRoot),
         now: this.now,
         makeRunId: this.makeRunId,

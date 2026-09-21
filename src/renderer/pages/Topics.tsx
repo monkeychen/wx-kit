@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { Alert, Button, Select, Space, Spin, Tabs, Tag, message } from 'antd'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Alert, Button, Input, Modal, Select, Space, Spin, Tabs, Tag, Checkbox, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import type { ArticleMeta } from '../../core/types'
 import type {
   TopicAiConfigStatus,
   TopicDecisionCard,
@@ -20,14 +21,14 @@ import {
 } from '../topic-view'
 import { configReady, getTopicRunStore } from '../topic-run-store'
 
-type TopicPreset = TopicWindowInput['preset']
-
 const RANGE_OPTIONS = [
   { value: '24h', label: '最近 24 小时' },
   { value: '3d', label: '最近 3 天' },
   { value: '7d', label: '最近 7 天' },
   { value: 'custom', label: '自定义日期' },
+  { value: 'manual', label: '手动选择文章' },
 ]
+const MAX_MANUAL = 30
 
 function usableCards(result: TopicRunResult | null): TopicDecisionCard[] {
   return result?.status === 'completed' || result?.status === 'partial' ? result.cards : []
@@ -144,14 +145,73 @@ function TopicDetail({ card, runId }: { card: TopicDecisionCard; runId: string }
   )
 }
 
+/** M75：手动选篇弹层——文库全文标题搜索 + 勾选，上限与 core 护栏一致。 */
+function ManualPickModal({ open, selected, onCancel, onConfirm }: {
+  open: boolean
+  selected: string[]
+  onCancel: () => void
+  onConfirm: (ids: string[]) => void
+}) {
+  const [articles, setArticles] = useState<ArticleMeta[] | null>(null)
+  const [keyword, setKeyword] = useState('')
+  const [draft, setDraft] = useState<string[]>(selected)
+
+  useEffect(() => { if (open) { setDraft(selected); setKeyword('') } }, [open, selected])
+  useEffect(() => {
+    if (!open || articles !== null) return
+    api.libraryList().then(setArticles).catch(() => { setArticles([]); message.error('读取文库失败') })
+  }, [open, articles])
+
+  const byId = useMemo(() => new Map((articles ?? []).map(article => [article.id, article])), [articles])
+  const filtered = useMemo(() => {
+    const list = articles ?? []
+    const text = keyword.trim().toLowerCase()
+    const hit = text ? list.filter(article => article.title.toLowerCase().includes(text) || article.account.toLowerCase().includes(text)) : list
+    // 已选但未命中的文章排最前，保证能取消勾选
+    const chosen = draft.map(id => byId.get(id)).filter((a): a is ArticleMeta => !!a && !hit.includes(a))
+    return [...chosen, ...hit]
+  }, [articles, keyword, draft, byId])
+
+  const toggle = (id: string, checked: boolean) => {
+    setDraft(current => {
+      if (!checked) return current.filter(item => item !== id)
+      if (current.length >= MAX_MANUAL) { message.warning(`一次最多选择 ${MAX_MANUAL} 篇`); return current }
+      return [...current, id]
+    })
+  }
+
+  return (
+    <Modal open={open} title={`选择文章作为素材（${draft.length}/${MAX_MANUAL}）`} data-testid="topic-manual-modal"
+      okText="确定" cancelText="取消" width={640}
+      onCancel={onCancel} onOk={() => { if (draft.length === 0) message.warning('至少选择一篇文章'); else onConfirm(draft) }}>
+      <Input.Search placeholder="按标题或公众号搜索" allowClear value={keyword} onChange={event => setKeyword(event.target.value)} style={{ marginBottom: 12 }} />
+      <div className="topic-manual-list" data-testid="topic-manual-list">
+        {articles === null && <Spin style={{ margin: 24 }} />}
+        {articles !== null && filtered.length === 0 && <p className="faint">{articles.length === 0 ? '文库还是空的，先去下载一些文章。' : '没有匹配的文章。'}</p>}
+        {filtered.map(article => (
+          <label className="topic-manual-row" key={article.id}>
+            <Checkbox checked={draft.includes(article.id)} onChange={event => toggle(article.id, event.target.checked)} />
+            <div className="topic-manual-copy">
+              <strong>{article.title}</strong>
+              <span>{article.account} · {article.publishTime || '时间未知'}</span>
+            </div>
+          </label>
+        ))}
+      </div>
+    </Modal>
+  )
+}
+
 export default function Topics() {
   const navigate = useNavigate()
   const store = useMemo(getTopicRunStore, [])
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const [config, setConfig] = useState<TopicAiConfigStatus | null>(null)
-  const preset = (snapshot.window?.preset ?? '24h') as TopicPreset
+  const [manualOpen, setManualOpen] = useState(false)
+  const preset = (snapshot.window?.preset ?? '24h') as TopicWindowInput['preset']
   const from = snapshot.window?.preset === 'custom' ? snapshot.window.from : ''
   const to = snapshot.window?.preset === 'custom' ? snapshot.window.to : ''
+  const manualIds = snapshot.window?.preset === 'manual' ? snapshot.window.articleIds : []
   const loading = snapshot.running
   const stage = snapshot.stage ? stageLabel(snapshot.stage) : ''
   const [elapsed, setElapsed] = useState(0)
@@ -164,7 +224,7 @@ export default function Topics() {
   useEffect(() => { api.topicsGetConfig().then(setConfig).catch(() => setConfig(null)) }, [])
   // 挂载时与主进程对账：分析在跑但本地不知道（例如另一处触发）时恢复现场。
   useEffect(() => { void store.sync() }, [store])
-  // 加载计时：让人分得清「在跑」和「卡死」。模型请求 90s 超时，接近上限时提示。
+  // 加载计时：让人分得清「在跑」和「卡死」。M75 起无总超时（长生成正常），
   // 起点用 snapshot.startedAt——切页再回来计时不归零。
   useEffect(() => {
     if (!loading || !snapshot.startedAt) { setElapsed(0); return }
@@ -179,8 +239,10 @@ export default function Topics() {
   const analyze = async () => {
     if (!configReady(config)) { message.warning('先配置 AI 模型服务'); navigate('/settings'); return }
     if (preset === 'custom' && (!from || !to)) { message.warning('请选择完整的开始和结束日期'); return }
-    const window: TopicWindowInput = preset === 'custom' ? { preset, from, to } : { preset }
-    if (!store.start(window)) message.info('已有选题分析正在进行')
+    if (preset === 'manual' && manualIds.length === 0) { setManualOpen(true); return }
+    if (preset === 'manual') store.start({ preset: 'manual', articleIds: manualIds })
+    else if (preset === 'custom') store.start({ preset: 'custom', from, to })
+    else store.start({ preset })
   }
 
   const cancel = async () => {
@@ -189,6 +251,13 @@ export default function Topics() {
   }
 
   const notice = result ? resultNotice(result) : null
+  const stream = snapshot.stream
+  // 实时输出滚动跟随：新内容到达即贴底，用户不手动往上翻就一直跟在尾部。
+  const streamRef = useRef<HTMLPreElement>(null)
+  useEffect(() => {
+    const node = streamRef.current
+    if (node) node.scrollTop = node.scrollHeight
+  }, [stream?.contentTail, stream?.reasoningTail])
 
   return (
     <div className="page" data-testid="topics-page">
@@ -205,12 +274,26 @@ export default function Topics() {
           <div className="topic-range-control">
             <label>素材范围</label>
             <Select data-testid="topic-range" value={preset} options={RANGE_OPTIONS} style={{ width: 168 }} disabled={loading}
-              onChange={(value: TopicPreset) => setWindow(value === 'custom' ? { preset: 'custom', from, to } : { preset: value })} />
+              onChange={(value: TopicWindowInput['preset']) => {
+                if (value === 'custom') setWindow({ preset: 'custom', from: '', to: '' })
+                else if (value === 'manual') setWindow({ preset: 'manual', articleIds: [] })
+                else setWindow({ preset: value })
+              }} />
             {preset === 'custom' && (
               <div className="topic-custom-dates">
                 <input type="date" data-testid="topic-date-from" value={from} disabled={loading} onChange={event => setWindow({ preset: 'custom', from: event.target.value, to })} />
                 <span>至</span>
                 <input type="date" data-testid="topic-date-to" value={to} disabled={loading} onChange={event => setWindow({ preset: 'custom', from, to: event.target.value })} />
+              </div>
+            )}
+            {preset === 'manual' && (
+              <div className="topic-manual-picker" data-testid="topic-manual-picker">
+                {manualIds.length === 0
+                  ? <Button data-testid="topic-manual-pick" disabled={loading} onClick={() => setManualOpen(true)}>选择文章</Button>
+                  : <>
+                      <span className="faint" data-testid="topic-manual-count">已选 {manualIds.length} 篇</span>
+                      <Button size="small" disabled={loading} onClick={() => setManualOpen(true)}>修改</Button>
+                    </>}
               </div>
             )}
           </div>
@@ -225,7 +308,7 @@ export default function Topics() {
         {!configReady(config) && config !== null && (
           <Alert className="topic-alert" type="warning" showIcon
             message="还不能开始分析"
-            description="请先设置兼容 OpenAI Chat Completions 的 base URL、model 和 API Key。"
+            description="请先在设置里配置 AI 模型服务（厂商、模型和 API Key）。"
             action={<Button data-testid="topic-go-settings" onClick={() => navigate('/settings')}>前往设置</Button>} />
         )}
 
@@ -233,7 +316,18 @@ export default function Topics() {
           <div className="surface topic-loading">
             <Spin />
             <strong>{stage || '正在分析'}</strong>
-            <span>已等待 {elapsed} 秒{elapsed >= 60 ? '，素材多时单次模型请求最长约 90 秒，可随时取消' : '，这一次只读取你选定时间范围内的本地素材'}</span>
+            <span>已等待 {elapsed} 秒{elapsed >= 60 ? '，素材多时模型生成会更久，可随时取消' : '，这一次只读取你选定素材范围内的本地素材'}</span>
+          </div>
+        )}
+
+        {loading && stream && (
+          <div className="surface topic-stream" data-testid="topic-stream">
+            <div className="topic-stream-head">
+              <strong>{stream.stage === 'extract' ? '模型正在提取材料依据' : '模型正在形成候选选题'}</strong>
+              <span className="faint">正文 {stream.contentChars} 字{stream.reasoningChars ? ` · 思考 ${stream.reasoningChars} 字` : ''}</span>
+            </div>
+            {stream.reasoningTail && <pre className="topic-stream-reasoning" data-testid="topic-stream-reasoning">{stream.reasoningTail}</pre>}
+            <pre ref={streamRef} className="topic-stream-content" data-testid="topic-stream-content">{stream.contentTail}</pre>
           </div>
         )}
 
@@ -271,6 +365,10 @@ export default function Topics() {
 
         {selected && result && <TopicDetail card={selected} runId={result.runId} />}
       </div>
+
+      <ManualPickModal open={manualOpen} selected={manualIds}
+        onCancel={() => setManualOpen(false)}
+        onConfirm={ids => { setWindow({ preset: 'manual', articleIds: ids }); setManualOpen(false) }} />
     </div>
   )
 }
