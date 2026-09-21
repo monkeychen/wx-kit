@@ -7,16 +7,19 @@ const WINDOW: TopicWindowInput = { preset: '24h' }
 
 function fakeDeps() {
   const progressListeners: Array<(stage: TopicTraceEvent['stage']) => void> = []
+  const streamListeners: Array<(event: { stage: 'extract' | 'propose'; kind: 'content' | 'reasoning'; text: string }) => void> = []
   let analyzeResolve: ((r: TopicAnalyzeResponse) => void) | null = null
   const deps: TopicRunStoreDeps = {
     topicsAnalyze: vi.fn(() => new Promise<TopicAnalyzeResponse>(resolve => { analyzeResolve = resolve })),
     topicsCancel: vi.fn(async () => ({ ok: true as const })),
     topicsRunningStatus: vi.fn(async () => ({ running: false, startedAt: null, stage: null, window: null })),
     onTopicsProgress: cb => { progressListeners.push(cb); return () => {} },
+    onTopicsStream: cb => { streamListeners.push(cb); return () => {} },
   }
   const emitProgress = (stage: TopicTraceEvent['stage']) => progressListeners.forEach(l => l(stage))
+  const emitStream = (event: { stage: 'extract' | 'propose'; kind: 'content' | 'reasoning'; text: string }) => streamListeners.forEach(l => l(event))
   const finishAnalyze = (r: TopicAnalyzeResponse) => analyzeResolve?.(r)
-  return { deps, emitProgress, finishAnalyze: () => finishAnalyze({ ok: true, result: { status: 'completed', runId: 'r1', cards: [] } as never, timeExcludedCount: 2 }), finishError: () => finishAnalyze({ ok: false, error: { code: 'X', message: 'boom' } }) }
+  return { deps, emitProgress, emitStream, finishAnalyze: () => finishAnalyze({ ok: true, result: { status: 'completed', runId: 'r1', cards: [] } as never, timeExcludedCount: 2 }), finishError: () => finishAnalyze({ ok: false, error: { code: 'X', message: 'boom' } }) }
 }
 
 describe('TopicRunStore 会话状态', () => {
@@ -110,6 +113,29 @@ describe('TopicRunStore 会话状态', () => {
     await deps.topicsCancel.call(store)
     store.reset()
     expect(seen).toEqual([true])
+  })
+
+  it('流式事件在无订阅者时也累积尾部（切页不丢已生成文本），新阶段自动换段', () => {
+    const { deps, emitStream } = fakeDeps()
+    const store = new TopicRunStore(deps)
+    store.start(WINDOW)
+    emitStream({ stage: 'extract', kind: 'content', text: '{"items":' })
+    emitStream({ stage: 'extract', kind: 'reasoning', text: '先想一下' })
+    emitStream({ stage: 'extract', kind: 'content', text: '[]}' })
+    let snap = store.getSnapshot()
+    expect(snap.stream).toMatchObject({ stage: 'extract', contentTail: '{"items":[]}', reasoningTail: '先想一下', contentChars: 12, reasoningChars: 4 })
+    emitStream({ stage: 'propose', kind: 'content', text: '{"cards"' })
+    snap = store.getSnapshot()
+    expect(snap.stream).toMatchObject({ stage: 'propose', contentTail: '{"cards"', contentChars: 8 })
+  })
+
+  it('运行结束后流式缓冲清空（结果页不留过期输出）', async () => {
+    const { deps, emitStream, finishAnalyze } = fakeDeps()
+    const store = new TopicRunStore(deps)
+    store.start(WINDOW)
+    emitStream({ stage: 'extract', kind: 'content', text: 'x' })
+    await finishAnalyze()
+    expect(store.getSnapshot().stream).toBe(null)
   })
 
   it('selectTopic 记录选中卡片（切页恢复详情展开）', () => {

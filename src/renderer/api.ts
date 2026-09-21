@@ -85,6 +85,7 @@ export interface WxApi {
   topicsBrief(runId: string, topicId: string): Promise<TopicBriefResponse>
   topicsFeedback(runId: string, topicId: string, decision: TopicFeedbackDecision): Promise<TopicFeedbackResponse>
   onTopicsProgress(cb: (stage: TopicTraceEvent['stage']) => void): () => void
+  onTopicsStream(cb: (event: { stage: 'extract' | 'propose'; kind: 'content' | 'reasoning'; text: string }) => void): () => void
   // —— M3.5 批量爬取 ——
   mpAuthStatus(): Promise<{ status: 'missing' | 'present'; valid: false | null; checkedAt?: number }>
   mpLogin(): Promise<MpAuthActionResult>

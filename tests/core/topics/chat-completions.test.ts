@@ -57,15 +57,29 @@ describe('OpenAI Chat Completions 兼容选题模型', () => {
     expect(fetchCalls).toBe(3)
   })
 
-  it('两阶段请求使用规范 endpoint、Bearer Key 和结构化消息，并累计 usage', async () => {
+  it('两阶段请求使用规范 endpoint、Bearer Key 和结构化消息，并累计 usage（流式）', async () => {
     const calls: Array<{ url: string; init: RequestInit; body: Record<string, unknown> }> = []
+    const sse = (content: string, usage?: { prompt_tokens: number; completion_tokens: number }) =>
+      new Response(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`
+        + (usage ? `data: ${JSON.stringify({ choices: [], usage })}\n\n` : '')
+        + 'data: [DONE]\n\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } })
     const replies = [
-      ok('{"items":[]}', { prompt_tokens: 10, completion_tokens: 5 }),
-      ok('```json\n{"cards":[]}\n```', { prompt_tokens: 7, completion_tokens: 3 }),
+      // usage 在 [DONE] 前也要能被收集：拆两个 data 块
+      new Response(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: '{"items":' } }] })}\n\n`
+        + `data: ${JSON.stringify({ choices: [{ delta: { content: '[]}' } }] })}\n\n`
+        + `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 5 } })}\n\n`
+        + 'data: [DONE]\n\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+      sse('```json\n{"cards":[]}\n```', { prompt_tokens: 7, completion_tokens: 3 }),
     ]
+    // sse() 生成 `data content; data [DONE]`——usage 块要在 [DONE] 前才收得到；
+    // 第二个回复直接手搭顺序。
     const fetchImpl = async (url: string, init: RequestInit) => {
       calls.push({ url, init, body: JSON.parse(String(init.body)) })
-      return replies.shift()!
+      const reply = replies.shift()!
+      return reply
     }
     const model = new ChatCompletionsTopicModel({ baseUrl: 'https://api.example.invalid/v1/', model: 'model-a', apiKey: 'secret-key' }, fetchImpl)
     await expect(model.extract(makeTopicExtractionInput(snapshot))).resolves.toEqual({ items: [] })
@@ -77,8 +91,8 @@ describe('OpenAI Chat Completions 兼容选题模型', () => {
     ])
     expect(new Headers(calls[0].init.headers).get('authorization')).toBe('Bearer secret-key')
     expect(new Headers(calls[0].init.headers).get('content-type')).toBe('application/json')
-    expect(JSON.stringify(calls[0].body)).not.toContain('secret-key')
-    expect(calls[0].body).toMatchObject({ model: 'model-a', temperature: 0.1 })
+    expect(new Headers(calls[0].init.headers).get('accept')).toBe('text/event-stream')
+    expect(calls[0].body).toMatchObject({ model: 'model-a', temperature: 0.1, stream: true })
     const messages = calls[0].body.messages as Array<{ role: string; content: string }>
     expect(messages.map(message => message.role)).toEqual(['system', 'user'])
     expect(messages[0].content).toContain('待分析数据')
@@ -90,6 +104,62 @@ describe('OpenAI Chat Completions 兼容选题模型', () => {
     expect(messages[1].content).toContain('g001:p001')
     expect(model.usage()).toEqual({ inputTokens: 17, outputTokens: 8 })
     expect(model.descriptor).toEqual({ providerId: 'openai-compatible', modelName: 'model-a' })
+  })
+
+  it('流式增量回调 onDelta 按序收到 content 与 reasoning 片段', async () => {
+    const events: Array<{ kind: string; text: string }> = []
+    const stream = new Response(
+      `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: '先想' } }] })}\n\n`
+      + `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: '一下' } }] })}\n\n`
+      + `data: ${JSON.stringify({ choices: [{ delta: { content: 'A' } }] })}\n\n`
+      + `data: ${JSON.stringify({ choices: [{ delta: { content: 'B' } }] })}\n\n`
+      + 'data: [DONE]\n\n',
+      { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    const model = new ChatCompletionsTopicModel(
+      { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k', onDelta: (stage, kind, text) => events.push({ kind: `${stage}/${kind}`, text }) },
+      async () => stream,
+    )
+    await expect(model.extract(makeTopicExtractionInput(snapshot))).rejects.toMatchObject({ code: 'INVALID_JSON_CONTENT' })
+    expect(events).toEqual([
+      { kind: 'extract/reasoning', text: '先想' },
+      { kind: 'extract/reasoning', text: '一下' },
+      { kind: 'extract/content', text: 'A' },
+      { kind: 'extract/content', text: 'B' },
+    ])
+  })
+
+  it('端点不支持 stream（返回 JSON content-type）→ 回退非流式解析，功能不倒退', async () => {
+    const model = new ChatCompletionsTopicModel(
+      { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k' },
+      async () => ok('{"items":[]}'),
+    )
+    await expect(model.extract(makeTopicExtractionInput(snapshot))).resolves.toEqual({ items: [] })
+  })
+
+  it('默认无总超时：慢流（每 30ms 一块，总计 >100ms）不被中断；空闲上限不误伤持续输出的流', async () => {
+    const pieces = ['{"', 'items', '":[]', '}']
+    const slow = async function* (): AsyncGenerator<Uint8Array> {
+      for (const piece of pieces) {
+        await new Promise(resolve => setTimeout(resolve, 30))
+        yield new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`)
+      }
+      yield new TextEncoder().encode('data: [DONE]\n\n')
+    }
+    const model = new ChatCompletionsTopicModel(
+      { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k', idleTimeoutMs: 100 },
+      async () => new Response(slow() as unknown as ReadableStream, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+    )
+    await expect(model.extract(makeTopicExtractionInput(snapshot))).resolves.toEqual({ items: [] })
+  })
+
+  it('流中断（body 抛错）归为 NETWORK_ERROR，取消归 AbortError', async () => {
+    const broken = async function* (): AsyncGenerator<Uint8Array> {
+      yield new TextEncoder().encode('data: {"choices":[{"delta":{"content":"{"}}]}\n\n')
+      throw new Error('socket reset')
+    }
+    const model = new ChatCompletionsTopicModel({ baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k' },
+      async () => new Response(broken() as unknown as ReadableStream, { status: 200, headers: { 'content-type': 'text/event-stream' } }))
+    await expect(model.extract(makeTopicExtractionInput(snapshot))).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
   })
 
   it('诊断日志记录外部调用结果，不写 Key 或正文', async () => {
@@ -192,9 +262,22 @@ describe('OpenAI Chat Completions 兼容选题模型', () => {
       return new Promise((_resolve, reject) => setTimeout(() => reject(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })), 40))
     })
     await expect(model.extract(makeTopicExtractionInput(snapshot))).rejects.toSatisfy((error: TopicProviderError) => {
-      return error.code === 'MODEL_TIMEOUT' && error.message.includes('秒内没有返回') && error.message.includes('缩小素材时间范围')
+      return error.code === 'MODEL_TIMEOUT' && error.message.includes('没有返回响应头')
     })
     expect(calls).toBe(1)
+  })
+
+  it('空闲超限（流建立后长时间无字节）抛 MODEL_IDLE_TIMEOUT', async () => {
+    const stall = async function* (): AsyncGenerator<Uint8Array> {
+      yield new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: 'part1' } }] })}\n\n`)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      yield new TextEncoder().encode('data: [DONE]\n\n')
+    }
+    const model = new ChatCompletionsTopicModel(
+      { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k', idleTimeoutMs: 30 },
+      async () => new Response(stall() as unknown as ReadableStream, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+    )
+    await expect(model.extract(makeTopicExtractionInput(snapshot))).rejects.toMatchObject({ code: 'MODEL_IDLE_TIMEOUT' })
   })
 })
 

@@ -7,6 +7,14 @@ const okEnvelope = (usage?: Record<string, number>) => new Response(
   { status: 200, headers: { 'content-type': 'application/json' } },
 )
 
+/** 流式信封：一个 delta 块 + 可选 usage + [DONE]。 */
+const sseEnvelope = (usage?: Record<string, number>, content = 'PONG') => new Response(
+  `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`
+  + (usage ? `data: ${JSON.stringify({ choices: [], usage })}\n\n` : '')
+  + 'data: [DONE]\n\n',
+  { status: 200, headers: { 'content-type': 'text/event-stream' } },
+)
+
 /** 断言成功并收窄类型（TS 不从 expect 推断判别联合）。 */
 function assertOk(result: TestConnectionResult): asserts result is Extract<TestConnectionResult, { ok: true }> {
   if (!result.ok) throw new Error(`期望成功，实际 ${result.error.code}: ${result.error.message}`)
@@ -75,6 +83,43 @@ describe('AI 连接测试（最小连通性请求）', () => {
     const result = await testTopicAiConnection(
       { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k' },
       async () => new Response('<html>gateway</html>', { status: 200 }),
+    )
+    assertFail(result)
+    expect(result.error.code).toBe('INVALID_RESPONSE')
+  })
+
+  it('流式请求：stream:true + accept SSE；首 token 延迟透出', async () => {
+    const calls: Array<{ body: Record<string, unknown>; headers: Headers }> = []
+    const fetchImpl: TopicFetch = async (_url, init) => {
+      calls.push({ body: JSON.parse(String(init.body)), headers: new Headers(init.headers) })
+      return sseEnvelope({ prompt_tokens: 12, completion_tokens: 1 })
+    }
+    const result = await testTopicAiConnection(
+      { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k' },
+      fetchImpl,
+    )
+    assertOk(result)
+    expect(calls[0].body).toMatchObject({ stream: true })
+    expect(calls[0].headers.get('accept')).toBe('text/event-stream')
+    expect(result.usage).toEqual({ inputTokens: 12, outputTokens: 1 })
+    expect(result.firstByteMs).toBeTypeOf('number')
+  })
+
+  it('流式 reasoning 模型 content 全空也算连通（不要求正文）', async () => {
+    const result = await testTopicAiConnection(
+      { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k' },
+      async () => new Response(
+        `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: '思考中' } }] })}\n\n`
+        + 'data: [DONE]\n\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+    )
+    assertOk(result)
+  })
+
+  it('SSE 中途非法块归类协议错误，不伪装成功', async () => {
+    const result = await testTopicAiConnection(
+      { baseUrl: 'https://api.example.invalid/v1', model: 'm', apiKey: 'k' },
+      async () => new Response('data: not-json\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } }),
     )
     assertFail(result)
     expect(result.error.code).toBe('INVALID_RESPONSE')

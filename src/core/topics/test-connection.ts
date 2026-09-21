@@ -1,9 +1,12 @@
-// AI 连接测试（M73）：发最小 chat 请求验证端点 + Key + 模型可用。
+// AI 连接测试（M73，M75 起走流式）：发最小 chat 请求验证端点 + Key + 模型可用。
 // 测的是「草稿配置」——renderer 传显式参数，apiKey 为空时由主进程回退已存 Key 再进来。
+// M75：与选题请求同走 stream:true（安哥：所有对模型的调用都流式）——首字节/首 token 延迟
+// 比总耗时更早证明通道活着；不支持 SSE 的端点按 JSON 回退解析，功能不倒退。
 // 失败以 result 对象返回（不抛异常），上层无需 try/catch。
 
 import { diag, redactFreeText } from '../diag-log'
 import { TopicProviderError, type TopicFetch } from './chat-completions'
+import { createChatDeltaAccumulator, iterateSseData } from './sse'
 
 export interface TestConnectionInput {
   baseUrl: string
@@ -13,7 +16,7 @@ export interface TestConnectionInput {
 }
 
 export type TestConnectionResult =
-  | { ok: true; model: string; latencyMs: number; usage?: { inputTokens: number; outputTokens: number } }
+  | { ok: true; model: string; latencyMs: number; firstByteMs?: number; usage?: { inputTokens: number; outputTokens: number } }
   | { ok: false; error: TopicProviderError }
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -50,23 +53,46 @@ export async function testTopicAiConnection(
   try {
     const response = await fetchImpl(endpoint.toString(), {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, max_tokens: 1, stream: true, messages: [{ role: 'user', content: 'ping' }] }),
       signal: timeout,
     })
     if (!response.ok) {
       const summary = redactFreeText((await response.text()).slice(0, 500))
       throw new TopicProviderError(`HTTP_${response.status}`, `AI 服务返回 HTTP ${response.status}${summary ? `：${summary}` : ''}`)
     }
-    const raw = await response.text()
-    let envelope: unknown
-    try { envelope = JSON.parse(raw) } catch { throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应不是合法 JSON。') }
-    if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
-      throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应结构无效。')
-    }
+    // M75：与选题请求同走 stream:true——首字节延迟比总耗时更早证明通道活着。
     // 只验证「服务能答」：reasoning 模型可能把 max_tokens 全花在思考上导致 content 为空，
-    // 因此不要求 choices[0].message.content 存在。usage 有则透出，没有不编造。
-    const usage = (envelope as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } }).usage
+    // 因此不要求正文存在。usage 有则透出，没有不编造；SSE 之外按 JSON 回退（不倒退功能）。
+    const contentType = response.headers.get('content-type') ?? ''
+    let usage: { inputTokens: number; outputTokens: number } | undefined
+    let firstByteMs: number | undefined
+    if (contentType.includes('text/event-stream') && response.body) {
+      const acc = createChatDeltaAccumulator()
+      try {
+        for await (const data of iterateSseData(response.body)) {
+          firstByteMs ??= Date.now() - startedAt
+          acc.push(data)
+        }
+      } catch (error) {
+        throw new TopicProviderError('INVALID_RESPONSE', error instanceof Error ? `流式响应异常：${error.message}` : '流式响应异常。')
+      }
+      const finished = acc.finish()
+      if (finished.usage?.inputTokens !== undefined && finished.usage.outputTokens !== undefined) {
+        usage = { inputTokens: finished.usage.inputTokens, outputTokens: finished.usage.outputTokens }
+      }
+    } else {
+      const raw = await response.text()
+      let envelope: unknown
+      try { envelope = JSON.parse(raw) } catch { throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应不是合法 JSON。') }
+      if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
+        throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应结构无效。')
+      }
+      const jsonUsage = (envelope as { usage?: { prompt_tokens?: number; completion_tokens?: number } }).usage
+      if (typeof jsonUsage?.prompt_tokens === 'number' && typeof jsonUsage.completion_tokens === 'number') {
+        usage = { inputTokens: jsonUsage.prompt_tokens, outputTokens: jsonUsage.completion_tokens }
+      }
+    }
     const latencyMs = Date.now() - startedAt
     diag()?.info('topics-ai', 'test-connection', {
       endpoint: endpoint.toString(), model, status: response.status, ok: true, ms: latencyMs,
@@ -75,9 +101,8 @@ export async function testTopicAiConnection(
       ok: true,
       model,
       latencyMs,
-      usage: typeof usage?.prompt_tokens === 'number' && typeof usage?.completion_tokens === 'number'
-        ? { inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }
-        : undefined,
+      ...(firstByteMs !== undefined ? { firstByteMs } : {}),
+      usage,
     }
   } catch (error) {
     const latencyMs = Date.now() - startedAt

@@ -22,6 +22,7 @@ describe('固定选题评估材料的发表时间口径', () => {
   for (const sample of suite.cases) {
     it(`${sample.id}: ${sample.name}`, () => {
       const window = resolveTopicWindow(sample.window, Date.parse(sample.asOf))
+      if (window.preset === 'manual') throw new Error('评估材料只用时间窗口')
       const result = selectTopicArticles(sample.materials.map(m => m.article), window)
       expect(result.articles.map(m => m.id)).toEqual(sample.expected.includedIds)
       expect(result.excluded.map(m => ({ id: m.id, reason: m.reason }))).toEqual(sample.expected.excluded)

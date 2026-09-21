@@ -1,4 +1,10 @@
-import type { TopicDecisionCard, TopicRunResult } from './types'
+import type { TopicDecisionCard, TopicRunResult, TopicWindow } from './types'
+
+/** 素材范围的人类可读表述；manual 没有起止时间（M75）。 */
+function windowLabel(window: TopicWindow): string {
+  if (window.preset === 'manual') return `手动选择的 ${window.articleIds.length} 篇文章`
+  return `${new Date(window.fromMs).toISOString()} 至 ${new Date(window.toMs).toISOString()}`
+}
 
 const VALUE_LABELS = {
   knowledge: '知识',
@@ -48,7 +54,7 @@ export function buildTopicBrief(
     '',
     `- 运行：${run.runId}`,
     `- 生成时间：${run.createdAt}`,
-    `- 素材范围：${new Date(run.window.fromMs).toISOString()} 至 ${new Date(run.window.toMs).toISOString()}`,
+    `- 素材范围：${windowLabel(run.window)}`,
     '- 传播效果：未验证',
     '',
     '## 写作角度', '', inline(card.angle), '',

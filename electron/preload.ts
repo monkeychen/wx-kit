@@ -44,6 +44,11 @@ const api: WxApi = {
     ipcRenderer.on('topics:progress', listener)
     return () => { ipcRenderer.removeListener('topics:progress', listener) }
   },
+  onTopicsStream: (cb) => {
+    const listener = (_event: unknown, payload: Parameters<typeof cb>[0]) => cb(payload)
+    ipcRenderer.on('topics:stream', listener)
+    return () => { ipcRenderer.removeListener('topics:stream', listener) }
+  },
   mpAuthStatus: () => ipcRenderer.invoke('mp:authStatus'),
   mpLogin: () => ipcRenderer.invoke('mp:login'),
   mpRelogin: () => ipcRenderer.invoke('mp:relogin'),
