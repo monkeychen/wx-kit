@@ -1900,3 +1900,31 @@ M72 把原型文件设为视觉契约，而非灵感图。恢复“所有账户�
 保存条。完整 fixture e2e 通过，94 个测试文件、909 个单测、TypeScript 通过；lint 为
 0 error，保留两个既有测试导入 warning。教训是：用户说“100%复原”时，原型中的文案、
 结构和比例都是需求，不能以“功能没变”为由自行取舍。
+
+## §72 M73：设置项可以自由，请求体必须收敛（2026-09-21）
+
+M73 把「选题 AI」三行裸配置升级为多厂商 AI 模型设置：7 厂商 + 自定义、计费模式
+（按量/订阅端点自动切换）、模型可选可输、推理开关与等级、测试连接。原型
+`ai-model-settings-v2.html` 经多轮迭代确认后作为视觉与交互契约。
+
+三条设计决策值得留档：
+
+1. **目录是唯一真相源，端点不信任客户端**。`src/core/topics/providers.ts` 声明
+   每厂商的 baseUrl/plan/模型能力；保存时服务端按 provider+plan 派生端点，GUI 传
+   什么 URL 都只对 custom 生效。老配置迁移不回写：getStatus 时按已存 baseUrl
+   反查目录，查不到归 custom，下次保存自然落盘。
+2. **文档未证实的参数不下发**。推理参数只对有把握的厂商映射：智谱
+   `thinking.type`、千问 `enable_thinking`、OpenAI/Google `reasoning_effort`；
+   DeepSeek/Kimi/MiniMax/自定义保持无参数（模型原生行为），不猜 2026 请求体格式。
+   `reasoning` 未配置时（CLI 路径）body 与历史版本逐字节一致。
+3. **测试连接测草稿，不是已存配置**。用户改完端点先测再存才是真实路径；Key 留空
+   时主进程回退已存 Key——换端点不重输 Key 也能测。结果不持久化，连接状态只
+   属于本次会话。
+
+踩坑两条：antd `AutoComplete` 的 `data-testid` 落在 Select 包装 div 上，e2e
+`fill` 必须打内部 `input`（与 M71 的 InputNumber 是同族坑）；`.settings-test-result`
+用 hover 原地切换展示全文而非浮层——settings-panel 的圆角裁剪会吞掉伸出的 tooltip，
+这在原型里已验证过一次，落地时直接沿用。
+
+最终 96 个测试文件、957 单测 + Electron fixture e2e 全绿，类型检查通过，lint
+0 error。CLI 与 `agent/wx-kit-skill` 零改动（`WXKIT_AI_*` 仍只认 baseUrl/model/key）。
