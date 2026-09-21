@@ -35,6 +35,7 @@ export default function Settings() {
   const [chan, setChan] = useState<UpdateChannelInfo | null>(null)
   const [dl, setDl] = useState<{ done: number; total: number } | null>(null)
   const [mpProtection, setMpProtection] = useState<MpProtectionStatus | null>(null)
+  const [logPath, setLogPath] = useState<string | null>(null)
   const [mpSession, setMpSession] = useState<MpSessionInfo | null>(null)
   const [mpAuthBusy, setMpAuthBusy] = useState<'login' | 'relogin' | 'logout' | null>(null)
   const [mpCleanupError, setMpCleanupError] = useState('')
@@ -75,6 +76,7 @@ export default function Settings() {
   useEffect(() => { api.updateChannel().then(setChan).catch(() => { /* 渠道识别失败就退回通用引导 */ }) }, [])
   useEffect(() => api.onUpdateProgress((p) => setDl({ done: p.done, total: p.total })), [])
   useEffect(() => { api.mpSessionInfo().then(setMpSession).catch(() => {}) }, [])
+  useEffect(() => { api.diagLogPath().then(r => setLogPath(r.path)).catch(() => {}) }, [])
   useEffect(() => {
     let active = true
     const refresh = () => api.mpProtectionStatus().then((value) => { if (active) setMpProtection(value) }).catch(() => {})
@@ -260,7 +262,7 @@ export default function Settings() {
         <div className="page-head">
           <div className="eyebrow">Settings</div>
           <h1 className="page-title">设置</h1>
-          <p className="page-sub">所有账户、服务与偏好仍在这里，通过分类降低寻找成本。</p>        </div>
+        </div>
 
         <div className="settings-shell">
           <SettingsCategoryNav value={activeCategory} onChange={setActiveCategory} statuses={categoryStatuses} />
@@ -395,8 +397,8 @@ export default function Settings() {
           {activeCategory === 'content' && <SettingsGroup testId="settings-group-library" title="文章库" description="文章、图片与索引的本地保存位置。"
             status={{ text: '正常', tone: 'ok' }}>
             <SettingsRow label="文库位置" hint="修改后不迁移旧文件，可随时改回。">
-              <Space.Compact>
-                <Input value={s.libraryRoot} readOnly style={{ minWidth: 320 }} />
+              <Space.Compact className="settings-input-fill">
+                <Input value={s.libraryRoot} readOnly />
                 <Button icon={<FolderOpenOutlined />} onClick={choose}>选择目录</Button>
               </Space.Compact>
             </SettingsRow>
@@ -506,8 +508,8 @@ export default function Settings() {
             </SettingsRow>
             {s.siteSyncEnabled && (
               <SettingsRow label="站点目录" hint="Astro 站点的 content/posts 目录，纯本地文件操作。">
-                <Space.Compact>
-                  <Input value={s.siteSyncPostsDir} data-testid="set-site-sync-dir" style={{ minWidth: 320 }}
+                <Space.Compact className="settings-input-fill">
+                  <Input value={s.siteSyncPostsDir} data-testid="set-site-sync-dir"
                     onChange={(e) => setS({ ...s, siteSyncPostsDir: e.target.value })}
                     placeholder="站点 content/posts 目录" />
                   <Button icon={<FolderOpenOutlined />} onClick={async () => {
@@ -542,18 +544,18 @@ export default function Settings() {
               隐私提示：分析时所选文章正文会发送到你配置的服务；Base URL 与模型名保存在普通设置，API Key 使用系统安全存储。wx-kit 不托管模型额度。
             </div>
             <SettingsRow label="Base URL" hint="OpenAI Chat Completions 兼容地址。">
-              <Input data-testid="topic-ai-base-url" value={topicAiBaseUrl} style={{ minWidth: 320 }}
+              <Input data-testid="topic-ai-base-url" value={topicAiBaseUrl} className="settings-input-fill"
                 onChange={event => setTopicAiBaseUrl(event.target.value)}
                 placeholder="https://api.example.com/v1" />
             </SettingsRow>
             <SettingsRow label="Model" hint="由你的服务商提供的模型名称。">
-              <Input data-testid="topic-ai-model" value={topicAiModel} style={{ minWidth: 320 }}
+              <Input data-testid="topic-ai-model" value={topicAiModel} className="settings-input-fill"
                 onChange={event => setTopicAiModel(event.target.value)}
                 placeholder="例如 gpt-4.1-mini" />
             </SettingsRow>
             <SettingsRow label="API Key" hint="留空即保留当前 Key。">
-              <Space align="center">
-                <Input.Password data-testid="topic-ai-key" value={topicAiKey} style={{ minWidth: 260 }}
+              <Space align="center" className="settings-input-fill">
+                <Input.Password data-testid="topic-ai-key" value={topicAiKey}
                   onChange={event => setTopicAiKey(event.target.value)}
                   autoComplete="new-password"
                   placeholder={topicAi?.keyConfigured ? '已配置；留空即保留原 Key' : '输入 API Key'} />
@@ -579,9 +581,9 @@ export default function Settings() {
             ? { text: s.mowenMocliVersion ? `已检测 · ${s.mowenMocliVersion}` : '已检测', tone: 'ok' }
             : { text: '未检测', tone: 'off' }} description="发现用户与批量清单依赖 mocli，正文下载仍由 wx-kit 完成。">
             {s?.mowenMocliPath ? (
-              <SettingsRow label="mocli 路径" hint="墨问官方命令行，检测到后下载页即可使用墨问相关功能。">
+              <SettingsRow label="mocli 路径" hint="检测到后，下载页即可使用墨问相关功能。">
                 <Space align="center">
-                  <code data-testid="mowen-path">{s.mowenMocliPath}</code>
+                  <code data-testid="mowen-path" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.mowenMocliPath}</code>
                   <Button loading={mowenChecking} onClick={redetectMowen} data-testid="mowen-redetect">重新检测</Button>
                 </Space>
               </SettingsRow>
@@ -603,13 +605,16 @@ export default function Settings() {
 
           {activeCategory === 'system' && <SettingsGroup testId="settings-group-diagnostics" title="诊断" description="日志已自动脱敏，不会远程上传。">
             <SettingsRow label="main.log" hint="报障时可把日志文件发给开发者。">
-              <Button data-testid="diag-open-logs"
-                onClick={async () => {
-                  try {
-                    const r = await api.diagOpenLogsFolder()
-                    if (!r.ok) message.warning(r.error ?? '打开失败')
-                  } catch { message.error('打开日志文件夹失败') }
-                }}>打开日志文件夹</Button>
+              <Space.Compact className="settings-input-fill" data-testid="diag-log-row">
+                <Input value={logPath ?? '读取中…'} readOnly />
+                <Button data-testid="diag-open-logs"
+                  onClick={async () => {
+                    try {
+                      const r = await api.diagOpenLogsFolder()
+                      if (!r.ok) message.warning(r.error ?? '打开失败')
+                    } catch { message.error('打开日志文件夹失败') }
+                  }}>打开日志文件夹</Button>
+              </Space.Compact>
             </SettingsRow>
           </SettingsGroup>}
 

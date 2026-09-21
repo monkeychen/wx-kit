@@ -70,6 +70,7 @@ export function registerIpc(settings: SettingsService): void {
 
   // M66 诊断区:报障话术「设置→打开日志文件夹,把 main.log 发我」。
   // showItemInFolder 在 Finder 里选中文件;日志尚无一行时退回打开目录。
+  ipcMain.handle('diag:logPath', async () => ({ path: diagLogPath() }))
   ipcMain.handle('diag:openLogsFolder', async () => {
     const p = diagLogPath()
     if (!p) return { ok: false as const, error: '日志尚未初始化' }

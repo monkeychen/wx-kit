@@ -672,10 +672,17 @@ body {
 .settings-group-title + .settings-row { border-top: 0; padding-top: 0; }
 .settings-row-copy { display: grid; gap: 3px; }
 .settings-row-copy strong { color: var(--ink); font-size: 13.5px; }
-.settings-row-copy small { color: var(--ink-faint); font-size: 11.5px; line-height: 1.45; }
+.settings-row-copy small { color: var(--ink-faint); font-size: 11.5px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .settings-row-control { min-width: 0; display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
 .settings-row-control > .ant-space-compact { max-width: 100%; }
 .settings-row-control > .ant-space { flex-wrap: wrap; justify-content: flex-end; }
+/* 输入类控件统一尺寸：弹性占满控制列（原型 .input{min-width:220px} 的全宽版） */
+.settings-input-fill { flex: 1 1 320px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.settings-input-fill > .ant-input-affix-wrapper,
+.settings-input-fill > .ant-input { flex: 1 1 auto; min-width: 0; }
+.settings-input-fill > .ant-space-compact { flex: 1 1 auto; min-width: 0; display: flex; }
+.settings-input-fill > .ant-space-compact > .ant-input-affix-wrapper,
+.settings-input-fill > .ant-space-compact > .ant-input { flex: 1 1 auto; min-width: 0; }
 /* 原型 chips（默认格式）右对齐排布 */
 .settings-row-control .formats-chips { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 900px) {

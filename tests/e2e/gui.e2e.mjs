@@ -235,9 +235,11 @@ async function main() {
     JSON.stringify({ vid: '17207435', accessToken: 'SHORT8', refreshToken: 'web@fake-e2e-token-long-value-for-wr_skey', name: 'e2e', updatedAt: Date.now() }))
   log('libraryRoot', libraryRoot)
 
+  // 无头/受限会话（agent 沙箱、CI）GPU 与 Chromium 沙箱起不来——WXKIT_E2E_HEADLESS=1 时禁用
+  const headlessFlags = process.env.WXKIT_E2E_HEADLESS ? ['--disable-gpu', '--no-sandbox'] : []
   const app = await electron.launch({
     executablePath: electronPath,
-    args: [projectRoot, `--user-data-dir=${userDataDir}`],
+    args: [projectRoot, `--user-data-dir=${userDataDir}`, ...headlessFlags],
     cwd: projectRoot,
     env: { ...process.env, WXKIT_WEREAD_BASE: wereadBase, WXKIT_MOWEN_BASE: mowenBase },
   })
@@ -346,8 +348,8 @@ async function main() {
       'M71: settings opens on content category')
     assert((await win.locator('[data-testid="settings-panel-accounts"]').count()) === 0,
       'M71: inactive category is not rendered')
-    assert((await win.locator('.page-sub').innerText()) === '所有账户、服务与偏好仍在这里，通过分类降低寻找成本。',
-      'M72: settings restores the approved page subtitle')
+    assert((await win.locator('.page-sub').count()) === 0,
+      'M72: settings page renders no subtitle (removed by design)')
     assert((await win.locator('[data-testid="settings-panel-content"] [data-testid^="settings-group-"]').count()) === 2,
       'M72: content category renders exactly two independent group cards')
     assert((await win.locator('[data-testid="settings-group-library"]').count()) === 1,

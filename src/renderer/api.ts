@@ -146,6 +146,7 @@ export interface WxApi {
 
   /** M66 诊断:打开日志文件夹(Finder 选中 main.log);返回日志路径用于展示 */
   diagOpenLogsFolder(): Promise<{ ok: boolean; path?: string; error?: string }>
+  diagLogPath(): Promise<{ path: string | null }>
 }
 
 declare global {
