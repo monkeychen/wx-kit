@@ -1,3 +1,4 @@
+import { preview, topicTrace } from './debug'
 import type { TopicExtractionItem, TopicExtractionKind } from './model'
 import type {
   ReaderValueKind,
@@ -85,10 +86,12 @@ export function parseTopicExtractions(raw: unknown, snapshot: TopicMaterialSnaps
       continue
     }
     if (!paragraph.text.includes(quote)) {
+      topicTrace(`  ✗ ${id} QUOTE_NOT_FOUND\n    模型摘录：${preview(quote)}\n    段落 ${paragraphId} 实际文本：${preview(paragraph.text)}`)
       failures.push(failure('QUOTE_NOT_FOUND', `摘录不能在段落 ${paragraphId} 中逐字定位。`, id))
       continue
     }
     if (!kind || !EXTRACTION_KINDS.has(kind as TopicExtractionKind)) {
+      topicTrace(`  ✗ ${id} INVALID_EXTRACTION_KIND kind=${JSON.stringify(kind)}（允许值：${[...EXTRACTION_KINDS].join('/')}）`)
       failures.push(failure('INVALID_EXTRACTION_KIND', `提取项 ${id} 的类型不受支持。`, id))
       continue
     }

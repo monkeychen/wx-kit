@@ -36,6 +36,10 @@ function userArgs(): string[] {
 }
 
 async function main() {
+  // npm run dev（vite-plugin-electron 注入 VITE_DEV_SERVER_URL）下默认开启选题 AI 交互
+  // 追踪：完整请求/响应/校验明细打主进程 stderr → 终端。显式设 WXKIT_DEBUG=0 可关。
+  // 只在 dev 信号下开：e2e/生产不带 VITE_DEV_SERVER_URL，不会把正文写进日志流。
+  if (process.env.VITE_DEV_SERVER_URL && process.env.WXKIT_DEBUG === undefined) process.env.WXKIT_DEBUG = '1'
   const args = userArgs()
 
   if (isCliInvocation(args)) {
