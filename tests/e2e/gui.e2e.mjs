@@ -404,7 +404,7 @@ async function main() {
     await win.click('[data-testid="settings-save"]')
     await win.waitForFunction(() => {
       const text = document.querySelector('[data-testid="topic-ai-key-status"]')?.textContent ?? ''
-      return text.includes('已安全保存') || text.includes('仅本次会话')
+      return text.includes('已安全保存') || text.includes('已加密') || text.includes('仅本次会话')
     }, { timeout: 8000 })
     assert(true, 'M70: topic AI config reports persistent or honest session-only key status')
     await win.waitForSelector('.ant-message-notice:has-text("已保存更改")', { timeout: 5000 })
@@ -464,7 +464,7 @@ async function main() {
     await win.click('[data-testid="settings-cat-ai"]')
     await win.waitForSelector('[data-testid="topic-ai-section"]', { timeout: 5000 })
     const savedKeyStatus = await win.locator('[data-testid="topic-ai-key-status"]').innerText()
-    assert(savedKeyStatus.includes('已安全保存') || savedKeyStatus.includes('仅本次会话'),
+    assert(savedKeyStatus.includes('已安全保存') || savedKeyStatus.includes('已加密') || savedKeyStatus.includes('仅本次会话'),
       `M70: returning to settings keeps an honest configured-key status (saw: ${savedKeyStatus})`)
 
     // ============ M60 · 设置页墨问集成区块（读缓存渲染，两种状态取其一）============

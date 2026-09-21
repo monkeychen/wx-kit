@@ -4,6 +4,7 @@ export function SettingsGroup({
   title,
   description,
   status,
+  badgeTestId,
   testId,
   legacyTestId,
   children,
@@ -11,6 +12,8 @@ export function SettingsGroup({
   title: ReactNode
   description: ReactNode
   status?: { text: string; tone: 'ok' | 'off' | 'warning' }
+  /** 状态徽章的 data-testid（需要测试定位徽章文本时传） */
+  badgeTestId?: string
   testId?: string
   legacyTestId?: string
   children: ReactNode
@@ -22,7 +25,7 @@ export function SettingsGroup({
           <h3>{title}</h3>
           <p>{description}</p>
         </div>
-        {status && <span className={`settings-group-status ${status.tone}`}>{status.text}</span>}
+        {status && <span className={`settings-group-status ${status.tone}`} data-testid={badgeTestId}>{status.text}</span>}
       </header>
       <div data-testid={legacyTestId}>{children}</div>
     </section>

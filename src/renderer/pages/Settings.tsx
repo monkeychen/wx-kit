@@ -538,7 +538,7 @@ export default function Settings() {
 
           {activeCategory === 'ai' && <SettingsGroup testId="settings-group-topic-ai" legacyTestId="topic-ai-section" title="选题 AI"             status={!topicAi ? undefined : topicAi.keyConfigured
             ? { text: topicAi.keyPersistent ? 'Key 已加密' : 'Key 仅本次会话', tone: topicAi.keyPersistent ? 'ok' : 'warning' }
-            : { text: 'Key 未配置', tone: 'off' }} description="分析时，所选文章正文会发送到你配置的服务。">
+            : { text: 'Key 未配置', tone: 'off' }} badgeTestId="topic-ai-key-status" description="分析时，所选文章正文会发送到你配置的服务。">
             {/* 对齐原型：隐私提示用醒目 callout 而非普通 description（正文出机事实须明示） */}
             <div className="settings-callout" data-testid="topic-ai-privacy-callout">
               隐私提示：分析时所选文章正文会发送到你配置的服务；Base URL 与模型名保存在普通设置，API Key 使用系统安全存储。wx-kit 不托管模型额度。
@@ -563,19 +563,6 @@ export default function Settings() {
                 {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除</Button>}
               </div>
             </SettingsRow>
-            <div className="settings-row" style={{ border: 0, minHeight: 'auto' }}>
-              <div className="settings-row-copy">
-                <span className={`badge ${topicAi?.keyConfigured ? 'badge-ok' : 'badge-cancel'}`}
-                  data-testid="topic-ai-key-status">
-                  {!topicAi ? '正在读取'
-                    : !topicAi.keyConfigured ? '未配置'
-                      : topicAi.keyPersistent ? '已安全保存' : '仅本次会话，重启需重填'}
-                </span>
-                {topicAi?.keyConfigured && !topicAi.keyPersistent && (
-                  <small style={{ color: 'var(--amber)' }}>系统加密能力不可用，Key 仅存于本次运行内存。</small>
-                )}
-              </div>
-            </div>
           </SettingsGroup>}
 
           {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-mowen" legacyTestId="mowen-section" title="墨问集成" status={s?.mowenMocliPath
