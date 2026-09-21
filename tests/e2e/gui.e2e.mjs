@@ -406,7 +406,8 @@ async function main() {
       return input instanceof HTMLInputElement && !input.readOnly
     }, { timeout: 5000 })
     await win.fill('[data-testid="topic-ai-base-url"]', `${wereadBase}/v1`)
-    await win.fill('[data-testid="topic-ai-model"]', 'fixture-topic-model')
+    // AutoComplete 的 testid 在 antd Select 包装层上，fill 要打内部 input
+    await win.fill('[data-testid="topic-ai-model"] input', 'fixture-topic-model')
     await win.fill('[data-testid="topic-ai-key"]', TOPIC_E2E_KEY)
     await win.click('[data-testid="settings-save"]')
     await win.waitForFunction(() => {
