@@ -1928,3 +1928,30 @@ M73 把「选题 AI」三行裸配置升级为多厂商 AI 模型设置：7 厂�
 
 最终 96 个测试文件、957 单测 + Electron fixture e2e 全绿，类型检查通过，lint
 0 error。CLI 与 `agent/wx-kit-skill` 零改动（`WXKIT_AI_*` 仍只认 baseUrl/model/key）。
+
+## §73 M73.1：分析在主进程跑，状态却住在会被卸载的组件里（2026-09-21）
+
+安哥实测报障：点「寻找选题」后切页再切回，进度消失；再点按钮提示"已有选题分析正在进行，
+请等待完成或先取消"——但界面上既没有进度也没有取消按钮。这是**死锁体验**：提示让用户
+等或取消，可执行两者的 UI 恰好是唯一被丢掉的东西。
+
+根因一句话：**执行与状态的进程边界不一致**。分析在主进程跑（切页不影响它），但"进行中"
+的全部证据（loading、stage、计时器、结果、选中卡）都存在 `Topics.tsx` 的 useState 里，
+路由切换=组件卸载=状态清零。`api.onTopicsProgress` 的订阅也随卸载退订——切页期间的阶段
+事件直接丢弃。
+
+修法是把 run state 提升到 React 之外：`src/renderer/topic-run-store.ts` 会话级 store，
+组件用 `useSyncExternalStore` 订阅，挂载/卸载只进出订阅，**analyze 的 Promise 由 store
+持有**——页面不存在时事件照样落快照，切回来看到完整现场（含从主进程 `startedAt` 续算的
+计时和取消按钮）。主进程侧补 `topics:runningStatus`（阶段+起始时间+范围），挂载时 `sync()`
+对账：本地不知道但主进程在跑→收养；本地以为在跑但 Promise 不在途（热重载边角）→收尾，
+两边都不留假死进度条。
+
+两个顺手的设计决定值得留档：
+1. **运行中锁定素材范围选择**——进度条显示的范围必须就是正在跑的范围，可改不可见是歧义源。
+2. **store 可测性靠 deps 注入**：`window.api` 只在浏览器存在，ESM 又不能同步 require，
+   所以单例工厂用延迟 `import('./api')` 包一层代理型 deps，测试注入 fake deps 直接跑在
+   node vitest 下——10 个 store 用例零 DOM 环境。
+
+教训泛化：**凡是"长任务 + 可切换页面"的 GUI，任务状态必须存在页面组件之外**，与订阅数据
+（Query/Mutation cache）同理。写进度 UI 之前先问：用户切走了，这个状态活下来了吗？
