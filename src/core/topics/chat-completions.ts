@@ -2,6 +2,7 @@ import { diag, redactFreeText } from '../diag-log'
 import type { TopicAiProviderId, TopicAiReasoningEffort } from './providers'
 import { reasoningBodyFields } from './providers'
 import type { TopicExtractionInput, TopicModel, TopicProposalInput } from './model'
+import { preview, topicTrace } from './debug'
 
 export interface ChatCompletionsConfig {
   baseUrl: string
@@ -49,9 +50,11 @@ function parseJsonContent(content: string): unknown {
 }
 
 function stageInstruction(stage: 'extract' | 'propose'): string {
+  // 协议必须自含：只给字段名不给枚举值，模型只能猜 kind——真实供应商曾因此
+  // 整批 INVALID_EXTRACTION_KIND/QUOTE_NOT_FOUND（校验全挂，无卡可用）。
   return stage === 'extract'
-    ? '只返回 JSON object：{"items":[{"id","groupId","paragraphId","quote","kind","summary","theme"}]}。items 可以为空。'
-    : '只返回 JSON object：{"cards":[...]}。每张卡包含 id/question/angle/readerValues/rationale/claims/evidence/evidenceConfidence/distributionEvidence/limitations/missingEvidence/outline；不得提供 statistics。cards 可以为空且最多三张。'
+    ? '只返回 JSON object，不要输出其它文字、解释或 Markdown 围栏之外的内容：{"items":[{"id":"x1","groupId":"g001","paragraphId":"g001:p001","quote":"…","kind":"…","summary":"…","theme":"…"}]}。items 可以为空。要求：quote 必须是从该段落 text 中逐字复制的连续片段（不改写、不拼接、不加省略号）；kind 只能是 fact-claim、opinion、question、emotion、change、counterpoint 六个值之一；groupId/paragraphId 必须来自输入 snapshot 的 groups/paragraphs。'
+    : '只返回 JSON object：{"cards":[…]}，不要输出其它文字。每张卡包含 id/question/angle/readerValues/rationale/claims/evidence/evidenceConfidence/distributionEvidence/limitations/missingEvidence/outline，其中不得提供 statistics。cards 可以为空且最多三张。'
 }
 
 export class ChatCompletionsTopicModel implements TopicModel {
@@ -106,6 +109,7 @@ export class ChatCompletionsTopicModel implements TopicModel {
       }),
     }
     let response: Response
+    topicTrace(`→ ${stage} 请求 POST ${this.endpoint} model=${this.descriptor.modelName} body=${JSON.stringify(body).length} 字符\n${preview(JSON.stringify(body, null, 2))}`)
     try {
       response = await this.fetchImpl(this.endpoint, {
         method: 'POST',
@@ -114,6 +118,7 @@ export class ChatCompletionsTopicModel implements TopicModel {
         signal,
       })
     } catch (error) {
+      topicTrace(`← ${stage} 请求失败 ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`)
       diag()?.warn('topics-ai', 'chat-completions', {
         stage, endpoint: this.endpoint, model: this.descriptor.modelName,
         outcome: 'network-error', ms: Date.now() - startedAt,
@@ -132,16 +137,24 @@ export class ChatCompletionsTopicModel implements TopicModel {
       status: response.status, ok: response.ok, ms: Date.now() - startedAt,
     })
     const raw = await response.text()
+    topicTrace(`← ${stage} 响应 HTTP ${response.status}（${Date.now() - startedAt}ms，${raw.length} 字符）`)
     if (!response.ok) {
       const summary = redactFreeText(raw.slice(0, 500))
+      topicTrace(`  错误体：${preview(raw.slice(0, 2000))}`)
       throw new TopicProviderError(`HTTP_${response.status}`, `AI 服务返回 HTTP ${response.status}${summary ? `：${summary}` : ''}`)
     }
     let envelope: unknown
-    try { envelope = JSON.parse(raw) } catch { throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应不是合法 JSON。') }
+    try { envelope = JSON.parse(raw) } catch { topicTrace(`  非 JSON 响应：${preview(raw.slice(0, 2000))}`); throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应不是合法 JSON。') }
     if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应结构无效。')
-    const obj = envelope as { choices?: Array<{ message?: { content?: unknown } }>; usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } }
+    const obj = envelope as { choices?: Array<{ message?: { content?: unknown; reasoning_content?: unknown } }>; usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } }
     const content = obj.choices?.[0]?.message?.content
-    if (typeof content !== 'string') throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应缺少 choices[0].message.content。')
+    if (typeof content !== 'string') {
+      topicTrace(`  响应缺少 content，完整 envelope：\n${preview(JSON.stringify(envelope, null, 2))}`)
+      throw new TopicProviderError('INVALID_RESPONSE', 'AI 服务响应缺少 choices[0].message.content。')
+    }
+    const reasoning = obj.choices?.[0]?.message?.reasoning_content
+    if (typeof reasoning === 'string' && reasoning.trim()) topicTrace(`  思考过程（${reasoning.length} 字符）：\n${preview(reasoning)}`)
+    topicTrace(`  content：\n${preview(content)}`)
     if (typeof obj.usage?.prompt_tokens === 'number' && obj.usage.prompt_tokens >= 0) this.inputTokens += obj.usage.prompt_tokens
     if (typeof obj.usage?.completion_tokens === 'number' && obj.usage.completion_tokens >= 0) this.outputTokens += obj.usage.completion_tokens
     return parseJsonContent(content)

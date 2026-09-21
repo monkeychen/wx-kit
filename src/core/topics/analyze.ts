@@ -12,6 +12,7 @@ import {
 import { buildTopicSnapshot, type TopicSnapshotDeps } from './snapshot'
 import { TopicProviderError } from './chat-completions'
 import { TopicRunStore } from './store'
+import { topicTrace } from './debug'
 import type { TopicFailure, TopicRunResult, TopicTraceEvent, TopicWindow } from './types'
 import { TopicModelOutputError, parseTopicExtractions, validateTopicProposals } from './validate'
 
@@ -114,6 +115,7 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
 
     stage = 'validate-extract'
     const extracted = parseTopicExtractions(rawExtractions, snapshot)
+    topicTrace(`校验 extract：${extracted.items.length} 有效 / ${extracted.failures.length} 失败`)
     await trace({ stage, status: 'done', counts: { valid: extracted.items.length, invalid: extracted.failures.length } })
     if (extracted.items.length === 0 && extracted.failures.length > 0) {
       return persist({
@@ -131,6 +133,7 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
 
     stage = 'validate-propose'
     const proposed = validateTopicProposals(rawProposals, { snapshot, extractions: extracted.items })
+    topicTrace(`校验 propose：${proposed.cards.length} 卡 / ${proposed.failures.length} 失败${proposed.failures.length ? `（${proposed.failures.map(f => f.code).join(', ')}）` : ''}`)
     await trace({ stage, status: 'done', counts: { valid: proposed.cards.length, invalid: proposed.failures.length } })
     const failures = [...extracted.failures, ...proposed.failures]
     if (proposed.cards.length === 0 && proposed.failures.length > 0) {

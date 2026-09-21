@@ -90,7 +90,15 @@ describe('TopicService（IPC 背后的真实服务）', () => {
     }
     const service = new TopicService({ settings, config, now, makeRunId: () => 'run-wait', modelFactory: () => new WaitingModel() })
     const first = service.analyze({ window: { preset: '24h' } })
-    await new Promise(resolve => setTimeout(resolve, 10))
+    // 轮询等阶段推进到 extract（snapshot 含文件 IO；全量并行跑时 10ms 定时不够，勿改回）
+    const waitStage = async (want: string) => {
+      for (let i = 0; i < 200; i++) {
+        if (service.getRunningStatus().stage === want) return
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      throw new Error(`stage 未在 2s 内到达 ${want}：${JSON.stringify(service.getRunningStatus())}`)
+    }
+    await waitStage('extract')
     expect(await service.analyze({ window: { preset: '24h' } })).toMatchObject({ ok: false, error: { code: 'TOPIC_ANALYSIS_RUNNING' } })
     // M73.1：运行状态可查询（切页重挂载后 renderer 靠它恢复「进行中」现场，含范围与取消入口）
     expect(service.getRunningStatus()).toEqual({ running: true, startedAt: expect.any(Number), stage: 'extract', window: { preset: '24h' } })

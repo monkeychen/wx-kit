@@ -83,6 +83,10 @@ describe('OpenAI Chat Completions 兼容选题模型', () => {
     expect(messages.map(message => message.role)).toEqual(['system', 'user'])
     expect(messages[0].content).toContain('待分析数据')
     expect(messages[0].content).toContain('items')
+    // 协议自含性：kind 枚举值与逐字摘录要求必须出现在 prompt 里——真实供应商曾因
+    // prompt 只给字段名而整批返回 INVALID_EXTRACTION_KIND/QUOTE_NOT_FOUND。
+    expect(messages[0].content).toContain('fact-claim、opinion、question、emotion、change、counterpoint')
+    expect(messages[0].content).toContain('逐字')
     expect(messages[1].content).toContain('g001:p001')
     expect(model.usage()).toEqual({ inputTokens: 17, outputTokens: 8 })
     expect(model.descriptor).toEqual({ providerId: 'openai-compatible', modelName: 'model-a' })
