@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Alert, Button, Select, Space, Spin, Tabs, Tag, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -18,6 +18,7 @@ import {
   stageLabel,
   statisticsLabel,
 } from '../topic-view'
+import { configReady, getTopicRunStore } from '../topic-run-store'
 
 type TopicPreset = TopicWindowInput['preset']
 
@@ -30,10 +31,6 @@ const RANGE_OPTIONS = [
 
 function usableCards(result: TopicRunResult | null): TopicDecisionCard[] {
   return result?.status === 'completed' || result?.status === 'partial' ? result.cards : []
-}
-
-function configReady(config: TopicAiConfigStatus | null): boolean {
-  return !!config?.baseUrl.trim() && !!config.model.trim() && config.keyConfigured
 }
 
 function TopicDetail({ card, runId }: { card: TopicDecisionCard; runId: string }) {
@@ -149,50 +146,46 @@ function TopicDetail({ card, runId }: { card: TopicDecisionCard; runId: string }
 
 export default function Topics() {
   const navigate = useNavigate()
+  const store = useMemo(getTopicRunStore, [])
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const [config, setConfig] = useState<TopicAiConfigStatus | null>(null)
-  const [preset, setPreset] = useState<TopicPreset>('24h')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [stage, setStage] = useState('')
+  const preset = (snapshot.window?.preset ?? '24h') as TopicPreset
+  const from = snapshot.window?.preset === 'custom' ? snapshot.window.from : ''
+  const to = snapshot.window?.preset === 'custom' ? snapshot.window.to : ''
+  const loading = snapshot.running
+  const stage = snapshot.stage ? stageLabel(snapshot.stage) : ''
   const [elapsed, setElapsed] = useState(0)
-  const [result, setResult] = useState<TopicRunResult | null>(null)
-  const [excludedCount, setExcludedCount] = useState(0)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const result = snapshot.result
+  const excludedCount = snapshot.timeExcludedCount
+  const selectedId = snapshot.selectedId
   const cards = useMemo(() => usableCards(result), [result])
   const selected = cards.find(card => card.id === selectedId) ?? null
 
   useEffect(() => { api.topicsGetConfig().then(setConfig).catch(() => setConfig(null)) }, [])
-  useEffect(() => api.onTopicsProgress(next => setStage(stageLabel(next))), [])
+  // 挂载时与主进程对账：分析在跑但本地不知道（例如另一处触发）时恢复现场。
+  useEffect(() => { void store.sync() }, [store])
   // 加载计时：让人分得清「在跑」和「卡死」。模型请求 90s 超时，接近上限时提示。
+  // 起点用 snapshot.startedAt——切页再回来计时不归零。
   useEffect(() => {
-    if (!loading) { setElapsed(0); return }
-    const startedAt = Date.now()
-    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000)
+    if (!loading || !snapshot.startedAt) { setElapsed(0); return }
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - snapshot.startedAt!) / 1000)))
+    tick()
+    const timer = setInterval(tick, 1000)
     return () => clearInterval(timer)
-  }, [loading])
+  }, [loading, snapshot.startedAt])
+
+  const setWindow = (window: TopicWindowInput) => store.selectWindow(window)
 
   const analyze = async () => {
-    if (!configReady(config)) { message.warning('先配置选题 AI 服务'); return }
+    if (!configReady(config)) { message.warning('先配置 AI 模型服务'); navigate('/settings'); return }
     if (preset === 'custom' && (!from || !to)) { message.warning('请选择完整的开始和结束日期'); return }
     const window: TopicWindowInput = preset === 'custom' ? { preset, from, to } : { preset }
-    setLoading(true)
-    setStage('正在准备分析')
-    setResult(null)
-    setSelectedId(null)
-    setExcludedCount(0)
-    try {
-      const response = await api.topicsAnalyze({ window })
-      if (!response.ok) { message.error(response.error.message); return }
-      setResult(response.result)
-      setExcludedCount(response.timeExcludedCount)
-    } catch (error) { message.error('分析失败：' + (error as Error).message) }
-    finally { setLoading(false); setStage('') }
+    if (!store.start(window)) message.info('已有选题分析正在进行')
   }
 
   const cancel = async () => {
-    const response = await api.topicsCancel()
-    if (!response.ok) message.info(response.error?.message ?? '当前没有正在进行的分析。')
+    const response = await store.cancel()
+    if (!response.ok && response.message) message.info(response.message)
   }
 
   const notice = result ? resultNotice(result) : null
@@ -211,13 +204,13 @@ export default function Topics() {
         <section className="surface topic-toolbar">
           <div className="topic-range-control">
             <label>素材范围</label>
-            <Select data-testid="topic-range" value={preset} options={RANGE_OPTIONS} style={{ width: 168 }}
-              onChange={(value: TopicPreset) => setPreset(value)} />
+            <Select data-testid="topic-range" value={preset} options={RANGE_OPTIONS} style={{ width: 168 }} disabled={loading}
+              onChange={(value: TopicPreset) => setWindow(value === 'custom' ? { preset: 'custom', from, to } : { preset: value })} />
             {preset === 'custom' && (
               <div className="topic-custom-dates">
-                <input type="date" data-testid="topic-date-from" value={from} onChange={event => setFrom(event.target.value)} />
+                <input type="date" data-testid="topic-date-from" value={from} disabled={loading} onChange={event => setWindow({ preset: 'custom', from: event.target.value, to })} />
                 <span>至</span>
-                <input type="date" data-testid="topic-date-to" value={to} onChange={event => setTo(event.target.value)} />
+                <input type="date" data-testid="topic-date-to" value={to} disabled={loading} onChange={event => setWindow({ preset: 'custom', from, to: event.target.value })} />
               </div>
             )}
           </div>
@@ -257,7 +250,7 @@ export default function Topics() {
               {cards.map((card, index) => (
                 <button key={card.id} type="button" role="radio" aria-checked={selectedId === card.id}
                   className={`topic-card${selectedId === card.id ? ' selected' : ''}`}
-                  data-testid="topic-card" onClick={() => setSelectedId(card.id)}>
+                  data-testid="topic-card" onClick={() => store.selectTopic(card.id)}>
                   <div className="topic-card-index">0{index + 1}</div>
                   <h2>{card.question}</h2>
                   <p>{card.angle}</p>

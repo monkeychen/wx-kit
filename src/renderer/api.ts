@@ -80,6 +80,7 @@ export interface WxApi {
   topicsTestConnection(input: { baseUrl: string; model: string; apiKey?: string }): Promise<TopicTestConnectionResponse>
   topicsProviderCatalog(): Promise<Record<TopicAiProviderId, ProviderSpec>>
   topicsAnalyze(input: { window: TopicWindowInput }): Promise<TopicAnalyzeResponse>
+  topicsRunningStatus(): Promise<{ running: boolean; startedAt: number | null; stage: TopicTraceEvent['stage'] | null; window: TopicWindowInput | null }>
   topicsCancel(): Promise<{ ok: boolean; error?: { code: string; message: string } }>
   topicsBrief(runId: string, topicId: string): Promise<TopicBriefResponse>
   topicsFeedback(runId: string, topicId: string, decision: TopicFeedbackDecision): Promise<TopicFeedbackResponse>

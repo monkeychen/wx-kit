@@ -92,9 +92,12 @@ describe('TopicService（IPC 背后的真实服务）', () => {
     const first = service.analyze({ window: { preset: '24h' } })
     await new Promise(resolve => setTimeout(resolve, 10))
     expect(await service.analyze({ window: { preset: '24h' } })).toMatchObject({ ok: false, error: { code: 'TOPIC_ANALYSIS_RUNNING' } })
+    // M73.1：运行状态可查询（切页重挂载后 renderer 靠它恢复「进行中」现场，含范围与取消入口）
+    expect(service.getRunningStatus()).toEqual({ running: true, startedAt: expect.any(Number), stage: 'extract', window: { preset: '24h' } })
     expect(service.cancel()).toEqual({ ok: true })
     expect(await first).toMatchObject({ ok: true, result: { status: 'cancelled' } })
     expect(service.cancel()).toMatchObject({ ok: false, error: { code: 'NO_TOPIC_ANALYSIS' } })
+    expect(service.getRunningStatus()).toEqual({ running: false, startedAt: null, stage: null, window: null })
   })
 
   it('测试连接：空 Key 回退已存 Key 发最小请求；无 Key 给可行动错误', async () => {
