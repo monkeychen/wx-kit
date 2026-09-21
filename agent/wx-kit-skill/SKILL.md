@@ -95,7 +95,7 @@ digest 使用 `count/articles` 而非下载命令的 `total/items`。检查 `ok`
 
 `library export` 输出的 `articles[].contentPath` 是正文绝对路径，正文不内联在 JSON 中；后续分析或写作需要再读取该文件。
 
-`topics analyze` 会把所选时间范围内的正文发送到用户配置的 OpenAI Chat Completions 兼容端点。CLI Key 只从 `WXKIT_AI_API_KEY` 环境变量读取，没有 `--api-key`；GUI 在“设置 → 选题 AI”保存，系统加密可用时持久化，否则只保存本次会话并明示。使用前应确认目标服务的数据处理规则。选题卡中的传播效果固定为未验证，不得把材料篇数说成推流概率。完整参数、状态和示例见 `references/commands.md` / `references/recipes.md`。
+`topics analyze` 会把所选时间范围内的正文发送到用户配置的 OpenAI Chat Completions 兼容端点。CLI Key 只从 `WXKIT_AI_API_KEY` 环境变量读取，没有 `--api-key`；GUI 在“设置 → AI 模型”保存（M73 起为多厂商选择，端点按厂商自动确定），系统加密可用时持久化，否则只保存本次会话并明示。使用前应确认目标服务的数据处理规则。选题卡中的传播效果固定为未验证，不得把材料篇数说成推流概率。完整参数、状态和示例见 `references/commands.md` / `references/recipes.md`。
 
 ## 4. 平台注意事项
 

@@ -1,5 +1,6 @@
 # M73 — AI 模型设置（厂商选择 · 计费模式 · 推理开关 · 测试连接）
 
+> 状态：**已完成**（2026-09-21，merge `70d6c15`；推理等级五档修正随 `1f8c3d7` 合入）。
 > 原型已确认：`docs/prototypes/ai-model-settings-v2.html`（安哥 2026-09-21 拍板「原型没问题，下一步」）。
 > 本里程碑把「选题 AI」三行裸配置升级为多厂商 AI 模型设置。
 
@@ -15,7 +16,7 @@
 
 ### 2. 推理参数下发（chat-completions）
 
-`ChatCompletionsConfig` 增加 `reasoning?: boolean`、`effort?: 'high'|'medium'|'low'`。
+`ChatCompletionsConfig` 增加 `reasoning?: boolean`、`effort?: 'low'|'medium'|'high'|'extra'|'max'`（五档，安哥 2026-09-21 修正；初稿误写三档）。
 映射规则集中在 providers 目录里声明（`reasoningParam`），chat-completions 只负责拼 body：
 
 | 厂商 | reasoning 开/关参数 | effort 参数 |
