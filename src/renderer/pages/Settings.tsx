@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Input, Button, Space, InputNumber, Popconfirm, Switch, Select, Segmented, Tooltip, message } from 'antd'
 import { FolderOpenOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
+import SettingsCategoryNav, { type SettingsCategoryStatus } from '../components/SettingsCategoryNav'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
@@ -12,15 +13,19 @@ import { useWereadLoginQr } from '../hooks/useWereadLoginQr'
 import type { MpAuthActionResult, MpSessionInfo } from '../api'
 import { DMG_POST_INSTALL_HINT } from '../../core/install-channel'
 import type { DownloadFormat } from '../../core/types'
+import { SETTINGS_CATEGORIES, isSettingsDirty, type SettingsCategory } from '../settings-view'
 
 export default function Settings() {
   const [s, setS] = useState<AppSettings | null>(null)
+  const [savedSettings, setSavedSettings] = useState<AppSettings | null>(null)
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('content')
   const [cliLink, setCliLink] = useState<Awaited<ReturnType<typeof api.cliLinkStatus>> | null>(null)
   const [topicAi, setTopicAi] = useState<TopicAiConfigStatus | null>(null)
+  const [savedTopicAi, setSavedTopicAi] = useState<TopicAiConfigStatus | null>(null)
   const [topicAiBaseUrl, setTopicAiBaseUrl] = useState('')
   const [topicAiModel, setTopicAiModel] = useState('')
   const [topicAiKey, setTopicAiKey] = useState('')
-  const [topicAiSaving, setTopicAiSaving] = useState(false)
+  const [settingsSaving, setSettingsSaving] = useState(false)
 
   const [ver, setVer] = useState('')
   // M37 更新检查:三态(未查 / 查询中 / 有结果),查不到用 'failed' 与「已是最新」区分开
@@ -40,16 +45,26 @@ export default function Settings() {
     setMowenChecking(true)
     try {
       await api.mowenDetect()
-      setS(await api.getSettings())
+      const persisted = await api.getSettings()
+      setSavedSettings(persisted)
+      setS(current => current ? {
+        ...current,
+        mowenMocliPath: persisted.mowenMocliPath,
+        mowenMocliVersion: persisted.mowenMocliVersion,
+        mowenDetectedAt: persisted.mowenDetectedAt,
+      } : persisted)
       message.success('已重新检测')
     } catch (e) { message.error('检测失败：' + (e as Error).message) }
     finally { setMowenChecking(false) }
   }
 
-  useEffect(() => { api.getSettings().then(setS) }, [])
+  useEffect(() => {
+    api.getSettings().then(value => { setS(value); setSavedSettings(structuredClone(value)) })
+  }, [])
   useEffect(() => {
     api.topicsGetConfig().then(value => {
       setTopicAi(value)
+      setSavedTopicAi(value)
       setTopicAiBaseUrl(value.baseUrl)
       setTopicAiModel(value.model)
     }).catch(() => { /* 选题配置失败不阻断其它设置 */ })
@@ -87,33 +102,11 @@ export default function Settings() {
     const dir = await api.chooseDir()
     if (dir && s) setS({ ...s, libraryRoot: dir })
   }
-  const save = async () => {
-    if (!s) return
-    try { await api.saveSettings(s); message.success('已保存') }
-    catch (e) { message.error('保存失败：' + (e as Error).message) }
-  }
-  const saveTopicAi = async () => {
-    if (!topicAiKey.trim() && !topicAi?.keyConfigured) {
-      message.warning('首次配置请填写 API Key')
-      return
-    }
-    setTopicAiSaving(true)
-    try {
-      const value = await api.topicsSaveConfig({
-        baseUrl: topicAiBaseUrl,
-        model: topicAiModel,
-        ...(topicAiKey.trim() ? { apiKey: topicAiKey } : {}),
-      })
-      setTopicAi(value)
-      setS(current => current ? { ...current, topicAiBaseUrl: value.baseUrl, topicAiModel: value.model } : current)
-      setTopicAiKey('')
-      message.success('选题 AI 配置已保存')
-    } catch (error) { message.error('保存失败：' + (error as Error).message) }
-    finally { setTopicAiSaving(false) }
-  }
   const clearTopicAiKey = async () => {
     try {
-      setTopicAi(await api.topicsClearKey())
+      const value = await api.topicsClearKey()
+      setTopicAi(value)
+      setSavedTopicAi(value)
       setTopicAiKey('')
       message.success('AI Key 已清除')
     } catch (error) { message.error('清除失败：' + (error as Error).message) }
@@ -192,6 +185,68 @@ export default function Settings() {
     } finally { setMpAuthBusy(null) }
   }
 
+  const dirty = useMemo(() => isSettingsDirty({
+    savedSettings,
+    draftSettings: s,
+    savedTopic: savedTopicAi,
+    topicDraft: { baseUrl: topicAiBaseUrl, model: topicAiModel, apiKey: topicAiKey },
+  }), [savedSettings, s, savedTopicAi, topicAiBaseUrl, topicAiModel, topicAiKey])
+
+  const topicDirty = topicAiKey.trim().length > 0
+    || topicAiBaseUrl.trim() !== (savedTopicAi?.baseUrl.trim() ?? '')
+    || topicAiModel.trim() !== (savedTopicAi?.model.trim() ?? '')
+
+  const saveAll = async () => {
+    if (!s || !dirty) return
+    if (topicDirty && !topicAiKey.trim() && !savedTopicAi?.keyConfigured) {
+      message.warning('首次配置请填写 API Key')
+      setActiveCategory('ai')
+      return
+    }
+    setSettingsSaving(true)
+    try {
+      let nextSettings = s
+      let nextTopic = savedTopicAi
+      if (topicDirty) {
+        nextTopic = await api.topicsSaveConfig({
+          baseUrl: topicAiBaseUrl,
+          model: topicAiModel,
+          ...(topicAiKey.trim() ? { apiKey: topicAiKey } : {}),
+        })
+        nextSettings = { ...s, topicAiBaseUrl: nextTopic.baseUrl, topicAiModel: nextTopic.model }
+      }
+      const persisted = await api.saveSettings(nextSettings)
+      setS(persisted)
+      setSavedSettings(structuredClone(persisted))
+      if (nextTopic) {
+        setTopicAi(nextTopic)
+        setSavedTopicAi(nextTopic)
+        setTopicAiBaseUrl(nextTopic.baseUrl)
+        setTopicAiModel(nextTopic.model)
+      }
+      setTopicAiKey('')
+      message.success('已保存更改')
+    } catch (error) { message.error('保存失败：' + (error as Error).message) }
+    finally { setSettingsSaving(false) }
+  }
+
+  const revertDraft = () => {
+    if (savedSettings) setS(structuredClone(savedSettings))
+    setTopicAiBaseUrl(savedTopicAi?.baseUrl ?? '')
+    setTopicAiModel(savedTopicAi?.model ?? '')
+    setTopicAiKey('')
+  }
+
+  const categoryStatuses: Record<SettingsCategory, SettingsCategoryStatus> = {
+    content: 'ok',
+    accounts: mpSession?.loggedIn && s?.mowenMocliPath ? 'ok' : mpSession?.loggedIn || s?.mowenMocliPath ? 'warning' : 'off',
+    automation: s?.subscriptionAutoCheck || s?.siteSyncEnabled ? 'ok' : 'off',
+    ai: topicAi?.keyConfigured ? 'ok' : 'off',
+    system: mpProtection?.mode && mpProtection.mode !== 'active' ? 'warning' : 'ok',
+  }
+
+  const category = SETTINGS_CATEGORIES.find(item => item.id === activeCategory)!
+
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
   return (
@@ -202,8 +257,45 @@ export default function Settings() {
           <h1 className="page-title">设置</h1>
         </div>
 
-        <div className="surface">
-          <div className="setting-block" data-testid="mp-protection">
+        <div className="settings-shell">
+          <SettingsCategoryNav value={activeCategory} onChange={setActiveCategory} statuses={categoryStatuses} />
+          <div className="settings-main">
+            <div className="settings-panel-head">
+              <div>
+                <h2>{category.label}</h2>
+                <p>{category.description}</p>
+              </div>
+            </div>
+            <div className="settings-summary" data-testid={`settings-summary-${activeCategory}`}>
+              {activeCategory === 'content' && <>
+                <div><span>文库</span><strong>{s.libraryRoot.replace(/^\/Users\/[^/]+/, '~')}</strong></div>
+                <div><span>默认格式</span><strong>{s.defaultFormats.length} 种</strong></div>
+                <div><span>视频</span><strong className={s.downloadVideos ? 'ok' : ''}>{s.downloadVideos ? '自动下载' : '跳过'}</strong></div>
+              </>}
+              {activeCategory === 'accounts' && <>
+                <div><span>微信读书</span><strong className={mpSession?.loggedIn ? 'ok' : ''}>{mpSession ? mpSession.loggedIn ? '已登录' : '未登录' : '读取中'}</strong></div>
+                <div><span>墨问 CLI</span><strong className={s.mowenMocliPath ? 'ok' : ''}>{s.mowenMocliPath ? '已检测' : '未检测'}</strong></div>
+                <div><span>数据</span><strong>仅保存在本机</strong></div>
+              </>}
+              {activeCategory === 'automation' && <>
+                <div><span>订阅检查</span><strong className={s.subscriptionAutoCheck ? 'ok' : ''}>{s.subscriptionAutoCheck ? '已开启' : '未开启'}</strong></div>
+                <div><span>新文章</span><strong>{s.subscriptionNewArticleAction === 'download' ? '自动下载' : '仅提示'}</strong></div>
+                <div><span>站点同步</span><strong>{s.siteSyncEnabled ? '已开启' : '未开启'}</strong></div>
+              </>}
+              {activeCategory === 'ai' && <>
+                <div><span>选题模型</span><strong className={topicAi?.keyConfigured ? 'ok' : ''}>{topicAi ? topicAi.keyConfigured ? '已配置' : '未配置' : '读取中'}</strong></div>
+                <div><span>Key</span><strong>{topicAi ? topicAi.keyConfigured ? topicAi.keyPersistent ? '已安全保存' : '仅本次会话' : '未配置' : '读取中'}</strong></div>
+                <div><span>命令行</span><strong>{cliLink?.status === 'linked' ? '已创建' : '未创建'}</strong></div>
+              </>}
+              {activeCategory === 'system' && <>
+                <div><span>微信请求</span><strong className={mpProtection?.mode === 'active' ? 'ok' : ''}>{mpProtection ? mpProtection.mode === 'active' ? '保护正常' : '已暂停' : '读取中'}</strong></div>
+                <div><span>诊断日志</span><strong>默认开启</strong></div>
+                <div><span>当前版本</span><strong>v{ver || '—'}</strong></div>
+              </>}
+            </div>
+
+            <div className="surface settings-panel" data-testid={`settings-panel-${activeCategory}`}>
+          {activeCategory === 'system' && <div className="setting-block" data-testid="mp-protection">
             <div className="setting-label">微信请求保护</div>
             <div className="setting-hint">
               所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，
@@ -242,9 +334,9 @@ export default function Settings() {
                 )}
               </Space>
             ) : <div className="faint" style={{ marginTop: 8 }}>正在读取保护状态…</div>}
-          </div>
+          </div>}
 
-          <div className="setting-block" data-testid="mp-account">
+          {activeCategory === 'accounts' && <div className="setting-block" data-testid="mp-account">
             <div className="setting-label">微信读书账号</div>
             <div className="setting-hint">
               按公众号下载与订阅通过微信读书获取文章列表（v0.10.0 起）。
@@ -294,9 +386,9 @@ export default function Settings() {
               ) : <span className="faint" data-testid="set-mp-status">正在读取登录状态…</span>}
             </Space>
             {mpCleanupError && <div className="setting-hint" style={{ color: 'var(--cinnabar)', marginTop: 6 }}>{mpCleanupError}</div>}
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'content' && <div className="setting-block">
             <div className="setting-label">文章库位置</div>
             <div className="setting-hint">下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。</div>
             <Space.Compact style={{ width: '100%' }}>
@@ -310,16 +402,16 @@ export default function Settings() {
               okText="重建" cancelText="取消" onConfirm={rebuildIndex}>
               <Button style={{ marginTop: 8 }}>重建索引</Button>
             </Popconfirm>
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'content' && <div className="setting-block">
             <div className="setting-label">默认下载格式</div>
             <div className="setting-hint">新建下载时预选这些格式，仍可临时调整。</div>
             <FormatPicker value={s.defaultFormats}
               onChange={(v: DownloadFormat[]) => setS({ ...s, defaultFormats: v })} />
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'content' && <div className="setting-block">
             <div className="setting-label">文中视频</div>
             <div className="setting-hint">
               文章里带视频时一并下载（和图片一样，属于文章内容，无需在格式里勾选）。
@@ -330,23 +422,23 @@ export default function Settings() {
                 onChange={(v) => setS({ ...s, downloadVideos: v })} />
               <span className="faint">{s.downloadVideos ? '有视频就下载' : '跳过视频（正文会注明"含视频未下载"）'}</span>
             </Space>
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'content' && <div className="setting-block">
             <div className="setting-label">下载历史</div>
             <div className="setting-hint">仅保留下载「动作」的记录，超期自动清理。清空或超期<b>只删记录，不会删除已下载的文件</b>。</div>
             <Space align="center" wrap>
               <span>保留最近</span>
-              <InputNumber min={1} max={3650} value={s.historyRetentionDays}
+              <InputNumber min={1} max={3650} value={s.historyRetentionDays} data-testid="set-history-retention"
                 onChange={(v) => setS({ ...s, historyRetentionDays: v ?? 365 })} addonAfter="天" />
               <Popconfirm title="清空下载历史？" description="只清记录，不删已下载的文件。"
                 okText="清空" cancelText="取消" onConfirm={clearHistory}>
                 <Button danger>清空下载历史</Button>
               </Popconfirm>
             </Space>
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'automation' && <div className="setting-block">
             <div className="setting-label">订阅</div>
             <div className="setting-hint">检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。</div>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -387,9 +479,9 @@ export default function Settings() {
                 <span className="faint" style={{ fontSize: 12.5 }}>完整检查历史,含每次失败原因</span>
               </Space>
             </Space>
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'automation' && <div className="setting-block">
             <div className="setting-label">
               站点同步
               {/* 建站指引藏在 ? 后面:只有「也想搭个站」的人才需要,常驻正文是噪音 */}
@@ -430,9 +522,9 @@ export default function Settings() {
                 }}>选择目录</Button>
               </Space.Compact>
             )}
-          </div>
+          </div>}
 
-          {cliLink?.supported && (
+          {activeCategory === 'ai' && cliLink?.supported && (
             <div className="setting-block">
               <div className="setting-label">命令行快捷方式</div>
               <div className="setting-hint">
@@ -451,7 +543,7 @@ export default function Settings() {
             </div>
           )}
 
-          <div className="setting-block" data-testid="topic-ai-section">
+          {activeCategory === 'ai' && <div className="setting-block" data-testid="topic-ai-section">
             <div className="setting-label">选题 AI</div>
             <div className="setting-hint">
               用你自己的兼容 OpenAI Chat Completions 的服务生成候选选题。
@@ -486,7 +578,6 @@ export default function Settings() {
                 </span>
                 <Space>
                   {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除 Key</Button>}
-                  <Button type="primary" loading={topicAiSaving} data-testid="topic-ai-save" onClick={saveTopicAi}>保存 AI 配置</Button>
                 </Space>
               </div>
               {topicAi?.keyConfigured && !topicAi.keyPersistent && (
@@ -495,9 +586,9 @@ export default function Settings() {
                 </div>
               )}
             </Space>
-          </div>
+          </div>}
 
-          <div className="setting-block" data-testid="mowen-section">
+          {activeCategory === 'accounts' && <div className="setting-block" data-testid="mowen-section">
             <div className="setting-label">墨问集成</div>
             <div className="setting-hint">
               接入墨问笔记下载依赖墨问官方命令行 <code>mocli</code>。检测到后，下载页即可使用墨问相关功能。
@@ -516,9 +607,9 @@ export default function Settings() {
             )}
             <Button style={{ marginTop: 8 }} size="small" loading={mowenChecking}
               onClick={redetectMowen} data-testid="mowen-redetect">重新检测</Button>
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'system' && <div className="setting-block">
             <div className="setting-label">诊断</div>
             <div className="setting-hint">
               运行日志记录启动环境与外部请求(已自动脱敏),报障时请把 main.log 一并发给开发者。
@@ -530,9 +621,9 @@ export default function Settings() {
                   if (!r.ok) message.warning(r.error ?? '打开失败')
                 } catch { message.error('打开日志文件夹失败') }
               }}>打开日志文件夹</Button>
-          </div>
+          </div>}
 
-          <div className="setting-block">
+          {activeCategory === 'system' && <div className="setting-block">
             <div className="setting-label">关于</div>
             <div className="setting-hint">
               wx-kit（微信百宝箱）当前版本 <strong data-testid="about-version">v{ver || '—'}</strong>
@@ -624,11 +715,18 @@ export default function Settings() {
                 每天最多查一次，只向 GitHub 请求版本信息，<b>不上传任何数据</b>；关掉后仅在你点「检查更新」时联网。
               </div>
             </div>
-          </div>
-        </div>
+          </div>}
+            </div>
 
-        <div style={{ marginTop: 24 }}>
-          <Button type="primary" size="large" onClick={save} style={{ paddingInline: 32 }}>保存设置</Button>
+            <div className={`settings-save-bar${dirty ? ' dirty' : ''}`} data-testid="settings-save-bar">
+              <span data-testid="settings-dirty-state">{dirty ? '有未保存的更改' : '没有未保存的更改'}</span>
+              <Space>
+                <Button data-testid="settings-revert" disabled={!dirty || settingsSaving} onClick={revertDraft}>撤销</Button>
+                <Button type="primary" data-testid="settings-save" disabled={!dirty}
+                  loading={settingsSaving} onClick={saveAll}>保存更改</Button>
+              </Space>
+            </div>
+          </div>
         </div>
       </div>
     </div>

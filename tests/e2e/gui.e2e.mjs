@@ -337,31 +337,67 @@ async function main() {
 
     // ============ M5 · 设置（库根 + 微信读书 + 保护 + 订阅）============
     await win.click('[data-testid="nav-设置"]')
+    await win.waitForSelector('[data-testid="settings-category-nav"]', { timeout: 10000 })
+    for (const id of ['content', 'accounts', 'automation', 'ai', 'system']) {
+      assert((await win.locator(`[data-testid="settings-cat-${id}"]`).count()) === 1,
+        `M71: settings category ${id} is present`)
+    }
+    assert((await win.locator('[data-testid="settings-panel-content"]').count()) === 1,
+      'M71: settings opens on content category')
+    assert((await win.locator('[data-testid="settings-panel-accounts"]').count()) === 0,
+      'M71: inactive category is not rendered')
     await win.waitForSelector('input[readonly]', { timeout: 10000 })
     assert((await win.inputValue('input[readonly]')) === libraryRoot, 'settings shows the seeded library root')
+
+    await win.click('[data-testid="settings-cat-accounts"]')
+    await win.waitForSelector('[data-testid="settings-panel-accounts"]', { timeout: 5000 })
     assert((await win.locator('[data-testid="mp-account"]').count()) === 1, 'v0.10.0: WeRead account section is present')
     const mpStatus = await win.locator('[data-testid="set-mp-status"]').innerText()
     assert(mpStatus.includes('已登录'), `v0.10.0: seeded WeRead creds reported as logged in (saw "${mpStatus}")`)
     assert((await win.locator('[data-testid="set-mp-logout"]').count()) === 1, 'v0.10.0: logout action is present')
-    assert((await win.locator('[data-testid="mp-protection"]').count()) === 1, 'v0.10.0: request-protection settings are present')
+
+    await win.click('[data-testid="settings-cat-automation"]')
+    await win.waitForSelector('[data-testid="settings-panel-automation"]', { timeout: 5000 })
     assert((await win.locator('[data-testid="set-subs-auto"]').count()) === 1, 'v0.10.0: subscription settings are present')
+    assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings keeps site-sync help')
+    await win.click('[data-testid="set-site-sync"]')
+    assert((await win.locator('[data-testid="settings-dirty-state"]').innerText()).includes('未保存'),
+      'M71: editing a persistent setting marks the shared save bar dirty')
+    await win.click('[data-testid="settings-cat-content"]')
+    await win.click('[data-testid="settings-cat-automation"]')
+    const siteSwitchClass = await win.locator('[data-testid="set-site-sync"]').getAttribute('class')
+    assert(siteSwitchClass?.includes('ant-switch-checked'), 'M71: category switching preserves the unsaved draft')
+    await win.click('[data-testid="settings-revert"]')
+    const revertedSiteClass = await win.locator('[data-testid="set-site-sync"]').getAttribute('class')
+    assert(!revertedSiteClass?.includes('ant-switch-checked'), 'M71: revert restores the last saved setting')
+    await win.click('[data-testid="settings-cat-content"]')
+    await win.fill('[data-testid="set-history-retention"]', '366')
+    await win.click('[data-testid="settings-save"]')
+    await win.waitForSelector('.ant-message-notice:has-text("已保存更改")', { timeout: 5000 })
+    await win.click('[data-testid="settings-cat-accounts"]')
+    await win.click('[data-testid="settings-cat-content"]')
+    assert((await win.locator('[data-testid="set-history-retention"]').inputValue()) === '366',
+      'M71: shared save persists ordinary settings across category navigation')
+
+    await win.click('[data-testid="settings-cat-system"]')
+    await win.waitForSelector('[data-testid="settings-panel-system"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="mp-protection"]').count()) === 1, 'v0.10.0: request-protection settings are present')
     assert((await win.locator('[data-testid="about-check-update"]').count()) === 1, 'settings keeps the check-update action')
     assert((await win.locator('[data-testid="set-update-check"]').count()) === 1, 'settings keeps the startup-check toggle')
-    assert((await win.locator('[data-testid="site-sync-help"]').count()) === 1, 'settings keeps site-sync help')
 
     // ============ M70 · 选题 AI 配置 + 三卡决策闭环 ============
+    await win.click('[data-testid="settings-cat-ai"]')
     await win.waitForSelector('[data-testid="topic-ai-section"]', { timeout: 8000 })
     await win.fill('[data-testid="topic-ai-base-url"]', `${wereadBase}/v1`)
     await win.fill('[data-testid="topic-ai-model"]', 'fixture-topic-model')
     await win.fill('[data-testid="topic-ai-key"]', TOPIC_E2E_KEY)
-    await win.click('[data-testid="topic-ai-save"]')
+    await win.click('[data-testid="settings-save"]')
     await win.waitForFunction(() => {
       const text = document.querySelector('[data-testid="topic-ai-key-status"]')?.textContent ?? ''
       return text.includes('已安全保存') || text.includes('仅本次会话')
     }, { timeout: 8000 })
     assert(true, 'M70: topic AI config reports persistent or honest session-only key status')
-    await win.getByRole('button', { name: '保存设置', exact: true }).click()
-    await win.waitForSelector('.ant-message-notice:has-text("已保存")', { timeout: 5000 })
+    await win.waitForSelector('.ant-message-notice:has-text("已保存更改")', { timeout: 5000 })
 
     await win.click('[data-testid="nav-选题"]')
     await win.waitForSelector('[data-testid="topics-page"]', { timeout: 8000 })
@@ -415,12 +451,14 @@ async function main() {
         'M70: result, trace and diagnostic log do not retain the submitted full article body')
     }
     await win.click('[data-testid="nav-设置"]')
+    await win.click('[data-testid="settings-cat-ai"]')
     await win.waitForSelector('[data-testid="topic-ai-section"]', { timeout: 5000 })
     const savedKeyStatus = await win.locator('[data-testid="topic-ai-key-status"]').innerText()
     assert(savedKeyStatus.includes('已安全保存') || savedKeyStatus.includes('仅本次会话'),
       `M70: returning to settings keeps an honest configured-key status (saw: ${savedKeyStatus})`)
 
     // ============ M60 · 设置页墨问集成区块（读缓存渲染，两种状态取其一）============
+    await win.click('[data-testid="settings-cat-accounts"]')
     await win.waitForSelector('[data-testid="mowen-section"]', { timeout: 8000 })
     // 启动检测是 fire-and-forget，等它的 settings 写入落地后再断言（检测到/未检测到都算通过，形态必须二选一）
     await win.waitForTimeout(1500)
@@ -431,6 +469,7 @@ async function main() {
     assert((await win.locator('[data-testid="mowen-redetect"]').count()) === 1, 'M60: re-detect button is present')
 
     // ============ M66 · 设置页诊断区(按钮在,IPC 走通返回日志路径) ============
+    await win.click('[data-testid="settings-cat-system"]')
     assert((await win.locator('[data-testid="diag-open-logs"]').count()) === 1, 'M66: diag open-logs button is present')
     {
       // 点击会真调 shell.showItemInFolder(Finder 打开目录)——e2e 沙箱 userData 下无副作用风险,
@@ -439,6 +478,8 @@ async function main() {
       assert(diagResp?.ok === true && /main\.log$/.test(diagResp.path ?? ''),
         `M66: diag IPC returns ok + log path (saw ${JSON.stringify(diagResp)})`)
     }
+    await win.click('[data-testid="settings-cat-content"]')
+    await win.screenshot({ path: '/tmp/wxk-e2e-settings-m71.png', fullPage: true })
 
     // ============ M9/M23 · 文库组织(a1/a2/a3) ============
     await win.click('[data-testid="nav-文库"]')
@@ -755,6 +796,7 @@ async function main() {
 
     // ============ M49 · 现存设置继续可用（site-sync tooltip）============
     await win.click('[data-testid="nav-设置"]')
+    await win.click('[data-testid="settings-cat-automation"]')
     await win.locator('[data-testid="site-sync-help"]').hover()
     await win.waitForSelector('.ant-tooltip-container', { timeout: 5000 })
     const tipText = await win.locator('.ant-tooltip-container').innerText()
