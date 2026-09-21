@@ -21,7 +21,7 @@ export interface TopicAiDraft {
   model: string
   apiKey: string
   reasoning: boolean
-  effort: 'high' | 'medium' | 'low'
+  effort: 'low' | 'medium' | 'high' | 'extra' | 'max'
 }
 
 export const SETTINGS_CATEGORIES: readonly SettingsCategoryDefinition[] = [

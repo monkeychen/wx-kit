@@ -121,6 +121,10 @@ describe('选题 AI 配置', () => {
     expect(status).toMatchObject({ providerId: 'zhipu', plan: 'payg', reasoning: false, effort: 'high' })
     await service.save({ providerId: 'openai', model: 'o3-mini', reasoning: true, effort: 'medium' })
     expect(await service.requireConfig()).toMatchObject({ providerId: 'openai', reasoning: true, effort: 'medium' })
+    await service.save({ providerId: 'openai', model: 'o3-mini', reasoning: true, effort: 'max' })
+    expect(await service.requireConfig()).toMatchObject({ effort: 'max' })
+    await service.save({ providerId: 'openai', model: 'o3-mini', reasoning: true, effort: 'ultra' as never })
+    expect(await service.requireConfig()).toMatchObject({ effort: 'high' })
   })
 
   it('老配置迁移：settings 只有 baseUrl 时按目录反查厂商；未知端点归自定义；空端点归默认智谱', async () => {

@@ -32,7 +32,7 @@ export default function Settings() {
   const [aiModel, setAiModel] = useState('')
   const [aiKey, setAiKey] = useState('')
   const [aiReasoning, setAiReasoning] = useState(true)
-  const [aiEffort, setAiEffort] = useState<'high' | 'medium' | 'low'>('high')
+  const [aiEffort, setAiEffort] = useState<'low' | 'medium' | 'high' | 'extra' | 'max'>('high')
   const [connTest, setConnTest] = useState<{ state: 'idle' | 'testing' | 'ok' | 'fail'; title: string; message: string }>({ state: 'idle', title: '', message: '' })
   const [settingsSaving, setSettingsSaving] = useState(false)
 
@@ -678,8 +678,14 @@ export default function Settings() {
             {supportsReasoning && supportsEffort && (
               <SettingsRow label="推理等级" hint="越高越深入，耗时也越长。">
                 <Select data-testid="topic-ai-effort" value={aiEffort} style={{ width: 220 }}
-                  onChange={value => setAiEffort(value as 'high' | 'medium' | 'low')}
-                  options={[{ value: 'high', label: 'high' }, { value: 'medium', label: 'medium' }, { value: 'low', label: 'low' }]} />
+                  onChange={value => setAiEffort(value as 'low' | 'medium' | 'high' | 'extra' | 'max')}
+                  options={[
+                    { value: 'low', label: 'low' },
+                    { value: 'medium', label: 'medium' },
+                    { value: 'high', label: 'high' },
+                    { value: 'extra', label: 'extra' },
+                    { value: 'max', label: 'max' },
+                  ]} />
               </SettingsRow>
             )}
             <SettingsRow label="测试连接" hint="发送一次最小请求，验证端点、Key 和模型可用。">

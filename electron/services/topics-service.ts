@@ -6,7 +6,7 @@ import type { TopicModel } from '../../src/core/topics/model'
 import { ChatCompletionsTopicModel, TopicProviderError } from '../../src/core/topics/chat-completions'
 import type { TopicAiConfigSaveInput, TopicAiConfigStatus } from './topic-ai-config'
 import { testTopicAiConnection } from '../../src/core/topics/test-connection'
-import { isTopicAiProviderId, PROVIDER_CATALOG, type ProviderSpec, type TopicAiProviderId } from '../../src/core/topics/providers'
+import { isTopicAiProviderId, PROVIDER_CATALOG, type ProviderSpec, type TopicAiProviderId, type TopicAiReasoningEffort } from '../../src/core/topics/providers'
 import { TopicRunStore } from '../../src/core/topics/store'
 import { resolveTopicWindow, selectTopicArticles } from '../../src/core/topics/time-window'
 import type { TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../../src/core/topics/types'
@@ -41,7 +41,7 @@ export interface TopicServiceDeps {
     model: string
     apiKey: string
     reasoning: boolean
-    effort: 'high' | 'medium' | 'low'
+    effort: TopicAiReasoningEffort
   }) => TopicModel
 }
 

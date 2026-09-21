@@ -48,7 +48,7 @@ export interface AppSettings {
   topicAiProvider: string
   topicAiPlan: 'payg' | 'plan'
   topicAiReasoning: boolean
-  topicAiEffort: 'high' | 'medium' | 'low'
+  topicAiEffort: 'low' | 'medium' | 'high' | 'extra' | 'max'
 }
 
 // 与 renderer 的 library-view 排序键/方向一致;定义在此避免主进程 import renderer

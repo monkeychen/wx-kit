@@ -3,7 +3,7 @@
 // 参数映射原则：文档未证实的参数不下发——宁可保持模型原生行为，也不猜请求体格式。
 
 export type TopicAiPlanId = 'payg' | 'plan'
-export type TopicAiReasoningEffort = 'high' | 'medium' | 'low'
+export type TopicAiReasoningEffort = 'low' | 'medium' | 'high' | 'extra' | 'max'
 
 /** 推理参数的厂商约定。null = 不下发任何推理参数（模型原生行为）。 */
 type ReasoningParamStyle = 'zhipu-thinking' | 'qwen-enable-thinking' | 'openai-reasoning-effort' | null
