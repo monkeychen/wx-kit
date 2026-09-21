@@ -346,6 +346,14 @@ async function main() {
       'M71: settings opens on content category')
     assert((await win.locator('[data-testid="settings-panel-accounts"]').count()) === 0,
       'M71: inactive category is not rendered')
+    assert((await win.locator('.page-sub').innerText()) === '所有账户、服务与偏好仍在这里，通过分类降低寻找成本。',
+      'M72: settings restores the approved page subtitle')
+    assert((await win.locator('[data-testid="settings-panel-content"] [data-testid^="settings-group-"]').count()) === 2,
+      'M72: content category renders exactly two independent group cards')
+    assert((await win.locator('[data-testid="settings-group-library"]').count()) === 1,
+      'M72: library group is distinct from download preferences')
+    assert((await win.locator('[data-testid="settings-group-download"]').count()) === 1,
+      'M72: download preference group is distinct')
     await win.waitForSelector('input[readonly]', { timeout: 10000 })
     assert((await win.inputValue('input[readonly]')) === libraryRoot, 'settings shows the seeded library root')
 

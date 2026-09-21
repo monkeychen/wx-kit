@@ -575,15 +575,19 @@ body {
 .setting-hint { color: var(--ink-soft); font-size: 13px; margin-bottom: 14px; }
 .settings-shell {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   gap: 22px;
-  max-width: 1280px;
+  max-width: 1420px;
   margin: 0 auto;
   align-items: start;
 }
 .settings-category-nav {
   position: sticky;
-  top: 18px;
+  top: 92px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-soft);
   padding: 10px;
   z-index: 3;
 }
@@ -629,6 +633,7 @@ body {
 .settings-panel-head { min-height: 54px; display: flex; justify-content: space-between; align-items: flex-start; margin: 1px 2px 13px; }
 .settings-panel-head h2 { margin: 0 0 5px; font-family: var(--font-serif); font-size: 24px; line-height: 1.3; }
 .settings-panel-head p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+.settings-panel-count { padding: 5px 9px; border-radius: 999px; background: var(--paper-sunken); color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
 .settings-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .settings-summary > div {
   min-width: 0; display: grid; gap: 4px; padding: 13px 15px;
@@ -637,7 +642,28 @@ body {
 .settings-summary span { color: var(--ink-faint); font-size: 11px; }
 .settings-summary strong { overflow: hidden; color: var(--ink); font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
 .settings-summary strong.ok { color: var(--jade); }
-.settings-panel { overflow: hidden; }
+.settings-panel { overflow: visible; }
+.settings-group {
+  margin-bottom: 14px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-soft);
+}
+.settings-group-title { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.settings-group-title h3 { margin: 0 0 5px; font-family: var(--font-serif); font-size: 18px; line-height: 1.3; }
+.settings-group-title p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
+.settings-group-status { align-self: start; padding: 4px 8px; border-radius: 999px; background: var(--paper-sunken); color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
+.settings-group-status.ok { background: var(--jade-wash); color: var(--jade); }
+.settings-group-status.warning { background: var(--amber-wash); color: var(--amber); }
+.settings-row { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 22px; align-items: center; padding: 15px 0; border-top: 1px solid var(--line); }
+.settings-group-title + .settings-row { border-top: 0; padding-top: 0; }
+.settings-row-copy { display: grid; gap: 4px; }
+.settings-row-copy strong { color: var(--ink); font-size: 14px; }
+.settings-row-copy small { color: var(--ink-soft); font-size: 12.5px; line-height: 1.55; }
+.settings-row-control { min-width: 0; }
+.settings-row-control > .ant-space-compact { max-width: 100%; }
 .settings-save-bar {
   position: sticky;
   bottom: 14px;
@@ -663,6 +689,7 @@ body {
   .settings-category-caption { display: none; }
   .settings-category-button { min-width: 178px; margin: 0; }
   .settings-summary { grid-template-columns: 1fr; }
+  .settings-row { grid-template-columns: 1fr; gap: 10px; }
 }
 
 /* ---------- 动画 ---------- */

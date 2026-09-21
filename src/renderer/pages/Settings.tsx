@@ -4,6 +4,7 @@ import { FolderOpenOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { api } from '../api'
 import FormatPicker from '../components/FormatPicker'
 import SettingsCategoryNav, { type SettingsCategoryStatus } from '../components/SettingsCategoryNav'
+import { SettingsGroup, SettingsRow } from '../components/SettingsGroup'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AppSettings } from '../../../electron/services/settings'
@@ -246,6 +247,10 @@ export default function Settings() {
   }
 
   const category = SETTINGS_CATEGORIES.find(item => item.id === activeCategory)!
+  const categoryCount: Record<SettingsCategory, string> = {
+    content: '4 项设置', accounts: '2 个连接', automation: '2 组设置',
+    ai: '2 组设置', system: '高级设置',
+  }
 
   if (!s) return <div className="page"><div className="faint">加载中…</div></div>
 
@@ -255,6 +260,7 @@ export default function Settings() {
         <div className="page-head">
           <div className="eyebrow">Settings</div>
           <h1 className="page-title">设置</h1>
+          <p className="page-sub">所有账户、服务与偏好仍在这里，通过分类降低寻找成本。</p>
         </div>
 
         <div className="settings-shell">
@@ -265,6 +271,7 @@ export default function Settings() {
                 <h2>{category.label}</h2>
                 <p>{category.description}</p>
               </div>
+              <span className="settings-panel-count">{categoryCount[activeCategory]}</span>
             </div>
             <div className="settings-summary" data-testid={`settings-summary-${activeCategory}`}>
               {activeCategory === 'content' && <>
@@ -294,13 +301,8 @@ export default function Settings() {
               </>}
             </div>
 
-            <div className="surface settings-panel" data-testid={`settings-panel-${activeCategory}`}>
-          {activeCategory === 'system' && <div className="setting-block" data-testid="mp-protection">
-            <div className="setting-label">微信请求保护</div>
-            <div className="setting-hint">
-              所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，
-              不会自动重试或探测恢复。
-            </div>
+            <div className="settings-panel" data-testid={`settings-panel-${activeCategory}`}>
+          {activeCategory === 'system' && <SettingsGroup testId="settings-group-mp-protection" legacyTestId="mp-protection" title="微信请求保护" description="所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，不会自动重试或探测恢复。">
             {mpProtection ? (
               <Space direction="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
                 <div data-testid="mp-protection-mode">
@@ -334,15 +336,9 @@ export default function Settings() {
                 )}
               </Space>
             ) : <div className="faint" style={{ marginTop: 8 }}>正在读取保护状态…</div>}
-          </div>}
+          </SettingsGroup>}
 
-          {activeCategory === 'accounts' && <div className="setting-block" data-testid="mp-account">
-            <div className="setting-label">微信读书账号</div>
-            <div className="setting-hint">
-              按公众号下载与订阅通过微信读书获取文章列表（v0.10.0 起）。
-              重新登录会先清除旧凭据再显示二维码；退出登录只删凭据文件，
-              不会删除设置、订阅、文库、下载历史或频控保护状态。
-            </div>
+          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-weread" legacyTestId="mp-account" title="微信读书账号" description="按公众号下载与订阅通过微信读书获取文章列表（v0.10.0 起）。重新登录会先清除旧凭据再显示二维码；退出登录只删凭据文件，不会删除设置、订阅、文库、下载历史或频控保护状态。">
             {(mpAuthBusy === 'login' || mpAuthBusy === 'relogin') && (
               <div style={{ textAlign: 'center', margin: '10px 0' }} data-testid="set-weread-qr">
                 {!wereadQr.qrDataUrl && <span className="faint">正在生成二维码…</span>}
@@ -386,47 +382,38 @@ export default function Settings() {
               ) : <span className="faint" data-testid="set-mp-status">正在读取登录状态…</span>}
             </Space>
             {mpCleanupError && <div className="setting-hint" style={{ color: 'var(--cinnabar)', marginTop: 6 }}>{mpCleanupError}</div>}
-          </div>}
+          </SettingsGroup>}
 
-          {activeCategory === 'content' && <div className="setting-block">
-            <div className="setting-label">文章库位置</div>
-            <div className="setting-hint">下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。</div>
+          {activeCategory === 'content' && <SettingsGroup testId="settings-group-library" title="文章库" description="下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。">
+            <SettingsRow label="文库位置" hint="若文库列表异常为空或提示索引损坏，可从磁盘各文章目录的 meta.json 重建索引（不动已下载文件）。">
             <Space.Compact style={{ width: '100%' }}>
               <Input value={s.libraryRoot} readOnly />
               <Button icon={<FolderOpenOutlined />} onClick={choose}>选择目录</Button>
             </Space.Compact>
-            <div className="setting-hint" style={{ marginTop: 10 }}>
-              若文库列表异常为空或提示索引损坏，可从磁盘各文章目录的 meta.json 重建索引（不动已下载文件）。
-            </div>
+            </SettingsRow>
+            <SettingsRow label="文库索引" hint="扫描库目录重建 library.json，不会删除任何文章文件。">
             <Popconfirm title="重建文库索引？" description="扫描库目录重建 library.json，不会删除任何文章文件。"
               okText="重建" cancelText="取消" onConfirm={rebuildIndex}>
-              <Button style={{ marginTop: 8 }}>重建索引</Button>
+              <Button>重建索引</Button>
             </Popconfirm>
-          </div>}
+            </SettingsRow>
+          </SettingsGroup>}
 
-          {activeCategory === 'content' && <div className="setting-block">
-            <div className="setting-label">默认下载格式</div>
-            <div className="setting-hint">新建下载时预选这些格式，仍可临时调整。</div>
+          {activeCategory === 'content' && <SettingsGroup testId="settings-group-download" title="下载偏好" description="新建下载时预选这些格式，仍可临时调整。">
+            <SettingsRow label="默认下载格式">
             <FormatPicker value={s.defaultFormats}
               onChange={(v: DownloadFormat[]) => setS({ ...s, defaultFormats: v })} />
-          </div>}
+            </SettingsRow>
 
-          {activeCategory === 'content' && <div className="setting-block">
-            <div className="setting-label">文中视频</div>
-            <div className="setting-hint">
-              文章里带视频时一并下载（和图片一样，属于文章内容，无需在格式里勾选）。
-              单个视频可达上百 MB——按公众号批量抓取前想省流量可以关掉。
-            </div>
+            <SettingsRow label="文中视频" hint="文章里带视频时一并下载（和图片一样，属于文章内容，无需在格式里勾选）。单个视频可达上百 MB——按公众号批量抓取前想省流量可以关掉。">
             <Space align="center">
               <Switch checked={s.downloadVideos} data-testid="set-download-videos"
                 onChange={(v) => setS({ ...s, downloadVideos: v })} />
               <span className="faint">{s.downloadVideos ? '有视频就下载' : '跳过视频（正文会注明"含视频未下载"）'}</span>
             </Space>
-          </div>}
+            </SettingsRow>
 
-          {activeCategory === 'content' && <div className="setting-block">
-            <div className="setting-label">下载历史</div>
-            <div className="setting-hint">仅保留下载「动作」的记录，超期自动清理。清空或超期<b>只删记录，不会删除已下载的文件</b>。</div>
+            <SettingsRow label="下载历史" hint={<>仅保留下载「动作」的记录，超期自动清理。清空或超期<b>只删记录，不会删除已下载的文件</b>。</>}>
             <Space align="center" wrap>
               <span>保留最近</span>
               <InputNumber min={1} max={3650} value={s.historyRetentionDays} data-testid="set-history-retention"
@@ -436,11 +423,10 @@ export default function Settings() {
                 <Button danger>清空下载历史</Button>
               </Popconfirm>
             </Space>
-          </div>}
+            </SettingsRow>
+          </SettingsGroup>}
 
-          {activeCategory === 'automation' && <div className="setting-block">
-            <div className="setting-label">订阅</div>
-            <div className="setting-hint">检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。</div>
+          {activeCategory === 'automation' && <SettingsGroup testId="settings-group-subscriptions" title="订阅" description="检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。">
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <Space align="center">
                 <span style={{ minWidth: 96, display: 'inline-block' }}>自动检查更新</span>
@@ -479,11 +465,9 @@ export default function Settings() {
                 <span className="faint" style={{ fontSize: 12.5 }}>完整检查历史,含每次失败原因</span>
               </Space>
             </Space>
-          </div>}
+          </SettingsGroup>}
 
-          {activeCategory === 'automation' && <div className="setting-block">
-            <div className="setting-label">
-              站点同步
+          {activeCategory === 'automation' && <SettingsGroup testId="settings-group-site-sync" title={<>站点同步
               {/* 建站指引藏在 ? 后面:只有「也想搭个站」的人才需要,常驻正文是噪音 */}
               <Tooltip
                 placement="right"
@@ -501,11 +485,7 @@ export default function Settings() {
                 <QuestionCircleOutlined data-testid="site-sync-help"
                   style={{ marginLeft: 6, fontSize: 13, opacity: 0.5, cursor: 'help' }} />
               </Tooltip>
-            </div>
-            <div className="setting-hint">
-              开启后，文库选中文章时会多出「同步到站点」——按个人站点的发布规范生成
-              <code>YYYY-MM-DD-slug/index.md</code> 与同目录图片。纯本地文件操作，不联网。
-            </div>
+            </>} description={<>开启后，文库选中文章时会多出「同步到站点」——按个人站点的发布规范生成 <code>YYYY-MM-DD-slug/index.md</code> 与同目录图片。纯本地文件操作，不联网。</>}>
             <Space align="center" style={{ marginTop: 8 }}>
               <Switch checked={s.siteSyncEnabled} data-testid="set-site-sync"
                 onChange={(v) => setS({ ...s, siteSyncEnabled: v })} />
@@ -522,16 +502,14 @@ export default function Settings() {
                 }}>选择目录</Button>
               </Space.Compact>
             )}
-          </div>}
+          </SettingsGroup>}
 
           {activeCategory === 'ai' && cliLink?.supported && (
-            <div className="setting-block">
-              <div className="setting-label">命令行快捷方式</div>
-              <div className="setting-hint">
+            <SettingsGroup testId="settings-group-cli" title="命令行快捷方式" description={<>
                 在 <code>{cliLink.dir}</code> 创建指向应用的快捷命令，便于在终端运行 <code>wx-kit</code>（供 AI agent 调用）。
                 当前状态：{cliLink.status === 'linked' ? '已创建' : cliLink.status === 'conflict' ? '该位置被占用（创建将覆盖）' : '未创建'}
                 {!cliLink.inPath && '；~/bin 不在 PATH，创建时会引导写入 shell 配置'}。
-              </div>
+              </>}>
               {cliLink.transient && (
                 <div className="setting-hint" style={{ color: 'var(--warning, #d46b08)' }}>
                   当前从开发/构建目录运行，命令行入口暂不可创建；从正式安装的 wx-kit 启动后可用。
@@ -540,15 +518,13 @@ export default function Settings() {
               <Button style={{ marginTop: 8 }} onClick={createCliLink} data-testid="set-cli-link">
                 {cliLink.status === 'linked' ? '重新创建' : '创建命令行快捷方式'}
               </Button>
-            </div>
+            </SettingsGroup>
           )}
 
-          {activeCategory === 'ai' && <div className="setting-block" data-testid="topic-ai-section">
-            <div className="setting-label">选题 AI</div>
-            <div className="setting-hint">
+          {activeCategory === 'ai' && <SettingsGroup testId="settings-group-topic-ai" legacyTestId="topic-ai-section" title="选题 AI" description={<>
               用你自己的兼容 OpenAI Chat Completions 的服务生成候选选题。
               分析时，所选文章的正文会发送到下方地址；wx-kit 不会将 Key 写入普通设置、分析结果或诊断日志。
-            </div>
+            </>}>
             <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: 10 }}>
               <label className="setting-field">
                 <span>Base URL</span>
@@ -586,13 +562,11 @@ export default function Settings() {
                 </div>
               )}
             </Space>
-          </div>}
+          </SettingsGroup>}
 
-          {activeCategory === 'accounts' && <div className="setting-block" data-testid="mowen-section">
-            <div className="setting-label">墨问集成</div>
-            <div className="setting-hint">
+          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-mowen" legacyTestId="mowen-section" title="墨问集成" description={<>
               接入墨问笔记下载依赖墨问官方命令行 <code>mocli</code>。检测到后，下载页即可使用墨问相关功能。
-            </div>
+            </>}>
             {s?.mowenMocliPath ? (
               <div className="setting-hint" data-testid="mowen-status-installed">
                 已检测到 mocli：<code data-testid="mowen-path">{s.mowenMocliPath}</code>
@@ -607,13 +581,11 @@ export default function Settings() {
             )}
             <Button style={{ marginTop: 8 }} size="small" loading={mowenChecking}
               onClick={redetectMowen} data-testid="mowen-redetect">重新检测</Button>
-          </div>}
+          </SettingsGroup>}
 
-          {activeCategory === 'system' && <div className="setting-block">
-            <div className="setting-label">诊断</div>
-            <div className="setting-hint">
+          {activeCategory === 'system' && <SettingsGroup testId="settings-group-diagnostics" title="诊断" description={<>
               运行日志记录启动环境与外部请求(已自动脱敏),报障时请把 main.log 一并发给开发者。
-            </div>
+            </>}>
             <Button style={{ marginTop: 8 }} size="small" data-testid="diag-open-logs"
               onClick={async () => {
                 try {
@@ -621,14 +593,12 @@ export default function Settings() {
                   if (!r.ok) message.warning(r.error ?? '打开失败')
                 } catch { message.error('打开日志文件夹失败') }
               }}>打开日志文件夹</Button>
-          </div>}
+          </SettingsGroup>}
 
-          {activeCategory === 'system' && <div className="setting-block">
-            <div className="setting-label">关于</div>
-            <div className="setting-hint">
+          {activeCategory === 'system' && <SettingsGroup testId="settings-group-about" title="关于" description={<>
               wx-kit（微信百宝箱）当前版本 <strong data-testid="about-version">v{ver || '—'}</strong>
               ——与命令行 <code>wx-kit --version</code> 同源。
-            </div>
+            </>}>
             <Space style={{ marginTop: 8 }} wrap>
               <Button size="small" data-testid="about-homepage"
                 onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit')}>项目主页</Button>
@@ -715,7 +685,7 @@ export default function Settings() {
                 每天最多查一次，只向 GitHub 请求版本信息，<b>不上传任何数据</b>；关掉后仅在你点「检查更新」时联网。
               </div>
             </div>
-          </div>}
+          </SettingsGroup>}
             </div>
 
             <div className={`settings-save-bar${dirty ? ' dirty' : ''}`} data-testid="settings-save-bar">
