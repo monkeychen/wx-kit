@@ -260,8 +260,7 @@ export default function Settings() {
         <div className="page-head">
           <div className="eyebrow">Settings</div>
           <h1 className="page-title">设置</h1>
-          <p className="page-sub">所有账户、服务与偏好仍在这里，通过分类降低寻找成本。</p>
-        </div>
+          <p className="page-sub">所有账户、服务与偏好仍在这里，通过分类降低寻找成本。</p>        </div>
 
         <div className="settings-shell">
           <SettingsCategoryNav value={activeCategory} onChange={setActiveCategory} statuses={categoryStatuses} />
@@ -269,7 +268,7 @@ export default function Settings() {
             <div className="settings-panel-head">
               <div>
                 <h2>{category.label}</h2>
-                <p>{category.description}</p>
+                <p>{category.panelDescription}</p>
               </div>
               <span className="settings-panel-count">{categoryCount[activeCategory]}</span>
             </div>
@@ -302,48 +301,50 @@ export default function Settings() {
             </div>
 
             <div className="settings-panel" data-testid={`settings-panel-${activeCategory}`}>
-          {activeCategory === 'system' && <SettingsGroup testId="settings-group-mp-protection" legacyTestId="mp-protection" title="微信请求保护" description="所有公众号后台、文章和媒体请求共用一个全局队列。检测到频控会立即停止，不会自动重试或探测恢复。"
+          {activeCategory === 'system' && <SettingsGroup testId="settings-group-mp-protection" legacyTestId="mp-protection" title="微信请求保护" description="所有公众号、文章和媒体请求共用全局队列；频控时立即停手。"
             status={!mpProtection ? undefined : mpProtection.mode === 'active'
               ? { text: '可按需请求', tone: 'ok' }
               : mpProtection.mode === 'rate-limited'
                 ? { text: '频控熔断', tone: 'warning' }
                 : { text: '已暂停', tone: 'off' }}>
             {mpProtection ? (
-              <Space direction="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
-                <div data-testid="mp-protection-mode">
+              <>
+                <SettingsRow label="队列状态"
+                  hint={<>
+                    <span data-testid="mp-protection-next">上次请求 {mpProtection.lastRequestAt ? new Date(mpProtection.lastRequestAt).toLocaleString() : '暂无'}，本进程排队 {mpProtection.queued} 项，最早可执行：{mpProtection.mode === 'active' && mpProtection.nextAllowedAt > Date.now()
+                      ? new Date(mpProtection.nextAllowedAt).toLocaleString()
+                      : mpProtection.mode === 'active' ? '现在' : '需先手动恢复请求许可'}</span>。
+                  </>}>
+                  {mpProtection.mode === 'active' ? (
+                    <Popconfirm title="暂停所有微信请求？"
+                      description="暂停后下载、订阅等需要微信网络的动作都会停止，本地浏览不受影响。"
+                      okText="暂停" cancelText="取消" onConfirm={pauseMpRequests}>
+                      <Button danger data-testid="mp-protection-pause">暂停所有微信请求</Button>
+                    </Popconfirm>
+                  ) : (
+                    <Popconfirm
+                      title="恢复微信请求许可？"
+                      description="恢复动作本身不会联网；之后只有你的明确操作或已开启的订阅计划才会申请请求。"
+                      okText="恢复" cancelText="继续暂停" onConfirm={resumeMpRequests}>
+                      <Button type="primary" data-testid="mp-protection-resume">恢复请求许可</Button>
+                    </Popconfirm>
+                  )}
+                </SettingsRow>
+                <div data-testid="mp-protection-mode" className="setting-hint" style={{ marginTop: 4 }}>
                   当前状态：<strong>{mpProtection.mode === 'active' ? '已启用保护，可按需请求'
                     : mpProtection.mode === 'rate-limited' ? '频控熔断，所有微信请求已停止'
                       : '用户暂停，所有微信请求已停止'}</strong>
                 </div>
                 {(mpProtection.pausedReason || mpProtection.rateLimitSignal) && (
-                  <div className="setting-hint" data-testid="mp-protection-reason">
+                  <div className="setting-hint" data-testid="mp-protection-reason" style={{ marginTop: 4 }}>
                     {mpProtection.pausedReason ?? mpProtection.rateLimitSignal}
                   </div>
                 )}
-                <div className="setting-hint">
-                  上次请求：{mpProtection.lastRequestAt ? new Date(mpProtection.lastRequestAt).toLocaleString() : '暂无'}；
-                  本进程排队：{mpProtection.queued} 项
-                </div>
-                <div className="setting-hint" data-testid="mp-protection-next">
-                  最早可执行：{mpProtection.mode === 'active' && mpProtection.nextAllowedAt > Date.now()
-                    ? new Date(mpProtection.nextAllowedAt).toLocaleString()
-                    : mpProtection.mode === 'active' ? '现在' : '需先手动恢复请求许可'}
-                </div>
-                {mpProtection.mode === 'active' ? (
-                  <Button danger onClick={pauseMpRequests} data-testid="mp-protection-pause">暂停所有微信请求</Button>
-                ) : (
-                  <Popconfirm
-                    title="恢复微信请求许可？"
-                    description="恢复动作本身不会联网；之后只有你的明确操作或已开启的订阅计划才会申请请求。"
-                    okText="恢复" cancelText="继续暂停" onConfirm={resumeMpRequests}>
-                    <Button type="primary" data-testid="mp-protection-resume">恢复请求许可</Button>
-                  </Popconfirm>
-                )}
-              </Space>
+              </>
             ) : <div className="faint" style={{ marginTop: 8 }}>正在读取保护状态…</div>}
           </SettingsGroup>}
 
-          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-weread" legacyTestId="mp-account" title="微信读书账号" description="按公众号下载与订阅通过微信读书获取文章列表（v0.10.0 起）。重新登录会先清除旧凭据再显示二维码；退出登录只删凭据文件，不会删除设置、订阅、文库、下载历史或频控保护状态。"
+          {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-weread" legacyTestId="mp-account" title="微信读书账号" description="用于识别公众号和订阅最新文章。"
             status={!mpSession ? undefined : mpSession.loggedIn
               ? { text: '已登录', tone: 'ok' }
               : { text: '未登录', tone: 'off' }}>
@@ -358,20 +359,19 @@ export default function Settings() {
                 )}
               </div>
             )}
-            <Space align="center" style={{ marginTop: 8 }} wrap>
+            <SettingsRow label="当前账号"
+              hint={mpSession?.loggedIn && mpSession.loginAt ? `扫码于 ${new Date(mpSession.loginAt).toLocaleString()}，不影响文库文件。` : '扫码后即可按公众号下载与订阅。'}>
               {mpCleanupError ? (
-                <>
+                <Space align="center">
                   <span data-testid="set-mp-status" style={{ color: 'var(--cinnabar)' }}>
                     退出未完成，仍可能残留登录数据
                   </span>
                   <Button danger loading={mpAuthBusy === 'logout'} onClick={doMpLogout}
                     data-testid="set-mp-logout-retry">重试清理</Button>
-                </>
+                </Space>
               ) : mpSession?.loggedIn ? (
-                <>
-                  <span className="faint" data-testid="set-mp-status">
-                    已登录{mpSession.loginAt ? ` · 扫码于 ${new Date(mpSession.loginAt).toLocaleString()}` : ''}
-                  </span>
+                <Space align="center">
+                  <span className="faint" data-testid="set-mp-status">已登录</span>
                   <Button loading={mpAuthBusy === 'relogin'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'relogin'}
                     onClick={() => doMpLogin(true)} data-testid="set-mp-relogin">重新登录</Button>
                   <Popconfirm title="彻底退出登录？"
@@ -380,103 +380,99 @@ export default function Settings() {
                     <Button danger loading={mpAuthBusy === 'logout'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'logout'}
                       data-testid="set-mp-logout">退出登录</Button>
                   </Popconfirm>
-                </>
+                </Space>
               ) : mpSession ? (
-                <>
+                <Space align="center">
                   <span className="faint" data-testid="set-mp-status">未登录</span>
                   <Button type="primary" loading={mpAuthBusy === 'login'} disabled={mpAuthBusy !== null && mpAuthBusy !== 'login'}
                     onClick={() => doMpLogin(false)} data-testid="set-mp-login">扫码登录</Button>
-                </>
+                </Space>
               ) : <span className="faint" data-testid="set-mp-status">正在读取登录状态…</span>}
-            </Space>
+            </SettingsRow>
             {mpCleanupError && <div className="setting-hint" style={{ color: 'var(--cinnabar)', marginTop: 6 }}>{mpCleanupError}</div>}
           </SettingsGroup>}
 
-          {activeCategory === 'content' && <SettingsGroup testId="settings-group-library" title="文章库" description="下载的文章与图片都保存在这里。改后文库列表会暂时变空，旧文章仍在原目录、可改回找回（不会自动迁移）。"
+          {activeCategory === 'content' && <SettingsGroup testId="settings-group-library" title="文章库" description="文章、图片与索引的本地保存位置。"
             status={{ text: '正常', tone: 'ok' }}>
-            <SettingsRow label="文库位置" hint="若文库列表异常为空或提示索引损坏，可从磁盘各文章目录的 meta.json 重建索引（不动已下载文件）。">
-            <Space.Compact style={{ width: '100%' }}>
-              <Input value={s.libraryRoot} readOnly />
-              <Button icon={<FolderOpenOutlined />} onClick={choose}>选择目录</Button>
-            </Space.Compact>
+            <SettingsRow label="文库位置" hint="修改后不迁移旧文件，可随时改回。">
+              <Space.Compact>
+                <Input value={s.libraryRoot} readOnly style={{ minWidth: 320 }} />
+                <Button icon={<FolderOpenOutlined />} onClick={choose}>选择目录</Button>
+              </Space.Compact>
             </SettingsRow>
-            <SettingsRow label="文库索引" hint="扫描库目录重建 library.json，不会删除任何文章文件。">
-            <Popconfirm title="重建文库索引？" description="扫描库目录重建 library.json，不会删除任何文章文件。"
-              okText="重建" cancelText="取消" onConfirm={rebuildIndex}>
-              <Button>重建索引</Button>
-            </Popconfirm>
-            </SettingsRow>
-          </SettingsGroup>}
-
-          {activeCategory === 'content' && <SettingsGroup testId="settings-group-download" title="下载偏好" description="新建下载时预选这些格式，仍可临时调整。">
-            <SettingsRow label="默认下载格式">
-            <FormatPicker value={s.defaultFormats}
-              onChange={(v: DownloadFormat[]) => setS({ ...s, defaultFormats: v })} />
-            </SettingsRow>
-
-            <SettingsRow label="文中视频" hint="文章里带视频时一并下载（和图片一样，属于文章内容，无需在格式里勾选）。单个视频可达上百 MB——按公众号批量抓取前想省流量可以关掉。">
-            <Space align="center">
-              <Switch checked={s.downloadVideos} data-testid="set-download-videos"
-                onChange={(v) => setS({ ...s, downloadVideos: v })} />
-              <span className="faint">{s.downloadVideos ? '有视频就下载' : '跳过视频（正文会注明"含视频未下载"）'}</span>
-            </Space>
-            </SettingsRow>
-
-            <SettingsRow label="下载历史" hint={<>仅保留下载「动作」的记录，超期自动清理。清空或超期<b>只删记录，不会删除已下载的文件</b>。</>}>
-            <Space align="center" wrap>
-              <span>保留最近</span>
-              <InputNumber min={1} max={3650} value={s.historyRetentionDays} data-testid="set-history-retention"
-                onChange={(v) => setS({ ...s, historyRetentionDays: v ?? 365 })} addonAfter="天" />
-              <Popconfirm title="清空下载历史？" description="只清记录，不删已下载的文件。"
-                okText="清空" cancelText="取消" onConfirm={clearHistory}>
-                <Button danger>清空下载历史</Button>
+            <SettingsRow label="文库索引" hint="列表异常为空时，从文章目录重建。">
+              <Popconfirm title="重建文库索引？" description="扫描库目录重建 library.json，不会删除任何文章文件。"
+                okText="重建" cancelText="取消" onConfirm={rebuildIndex}>
+                <Button>重建索引</Button>
               </Popconfirm>
-            </Space>
             </SettingsRow>
           </SettingsGroup>}
 
-          {activeCategory === 'automation' && <SettingsGroup testId="settings-group-subscriptions" title="订阅" description="检查仅在应用打开时进行；关闭时错过的检查会在下次启动补做一次。"
+          {activeCategory === 'content' && <SettingsGroup testId="settings-group-download" title="下载偏好" description="新任务的默认选择，下载时仍可临时调整。">
+            <SettingsRow label="默认格式" hint="封面、Markdown、网页与元数据。">
+              <FormatPicker value={s.defaultFormats}
+                onChange={(v: DownloadFormat[]) => setS({ ...s, defaultFormats: v })} />
+            </SettingsRow>
+
+            <SettingsRow label="文中视频" hint="视频可能较大，可在单次下载时覆盖。">
+              <Space align="center">
+                <span className="faint">{s.downloadVideos ? '有视频就下载' : '跳过视频'}</span>
+                <Switch checked={s.downloadVideos} data-testid="set-download-videos"
+                  onChange={(v) => setS({ ...s, downloadVideos: v })} />
+              </Space>
+            </SettingsRow>
+
+            <SettingsRow label="下载历史" hint="只清操作记录，不删除已下载文章。">
+              <Space align="center">
+                <InputNumber min={1} max={3650} value={s.historyRetentionDays} data-testid="set-history-retention"
+                  onChange={(v) => setS({ ...s, historyRetentionDays: v ?? 365 })} addonAfter="天" />
+                <Popconfirm title="清空下载历史？" description="只清记录，不删已下载的文件。"
+                  okText="清空" cancelText="取消" onConfirm={clearHistory}>
+                  <Button danger>清空历史</Button>
+                </Popconfirm>
+              </Space>
+            </SettingsRow>
+          </SettingsGroup>}
+
+          {activeCategory === 'automation' && <SettingsGroup testId="settings-group-subscriptions" title="订阅自动检查" description="仅在应用打开时运行，错过的检查在下次启动补做。"
             status={s.subscriptionAutoCheck
               ? { text: '已开启', tone: 'ok' }
               : { text: '已关闭', tone: 'off' }}>
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <SettingsRow label="自动检查" hint="公众号与墨问作者共用这套调度偏好。">
               <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>自动检查更新</span>
+                <span className="faint">{s.subscriptionAutoCheck ? '开启' : '关闭'}</span>
                 <Switch checked={s.subscriptionAutoCheck} data-testid="set-subs-auto"
                   onChange={(v) => setS({ ...s, subscriptionAutoCheck: v })} />
               </Space>
-              <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>检查频率</span>
-                <Segmented value={s.subscriptionScheduleMode} data-testid="set-subs-mode"
-                  onChange={(v) => setS({ ...s, subscriptionScheduleMode: v as 'daily' | 'interval' })}
-                  options={[{ label: '每天某时刻', value: 'daily' }, { label: '每隔N小时', value: 'interval' }]} />
-              </Space>
+            </SettingsRow>
+            <SettingsRow label="检查频率" hint="可选每天固定时刻或间隔小时。">
               {s.subscriptionScheduleMode === 'daily' ? (
                 <Space align="center">
-                  <span style={{ minWidth: 96, display: 'inline-block' }}>每日检查时刻</span>
+                  <Segmented value={s.subscriptionScheduleMode} data-testid="set-subs-mode"
+                    onChange={(v) => setS({ ...s, subscriptionScheduleMode: v as 'daily' | 'interval' })}
+                    options={[{ label: '每天某时刻', value: 'daily' }, { label: '每隔N小时', value: 'interval' }]} />
                   <input type="time" value={s.subscriptionCheckTime} data-testid="set-subs-time"
                     onChange={(e) => setS({ ...s, subscriptionCheckTime: e.target.value })}
                     style={{ height: 32, padding: '0 8px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--paper)', color: 'var(--ink)' }} />
                 </Space>
               ) : (
                 <Space align="center">
-                  <span style={{ minWidth: 96, display: 'inline-block' }}>每隔</span>
+                  <Segmented value={s.subscriptionScheduleMode} data-testid="set-subs-mode"
+                    onChange={(v) => setS({ ...s, subscriptionScheduleMode: v as 'daily' | 'interval' })}
+                    options={[{ label: '每天某时刻', value: 'daily' }, { label: '每隔N小时', value: 'interval' }]} />
                   <InputNumber min={1} max={24} value={s.subscriptionIntervalHours} data-testid="set-subs-interval"
                     onChange={(v) => setS({ ...s, subscriptionIntervalHours: v ?? 6 })} addonAfter="小时" />
                 </Space>
               )}
+            </SettingsRow>
+            <SettingsRow label="发现新文章时" hint="只提示，或自动下载到文库。完整检查历史见检查日志。">
               <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>发现新文章时</span>
-                <Select value={s.subscriptionNewArticleAction} style={{ width: 160 }} data-testid="set-subs-action"
+                <Select value={s.subscriptionNewArticleAction} style={{ width: 140 }} data-testid="set-subs-action"
                   onChange={(v) => setS({ ...s, subscriptionNewArticleAction: v })}
                   options={[{ value: 'notify', label: '仅提示' }, { value: 'download', label: '自动下载' }]} />
+                <Button onClick={() => api.subscriptionsOpenLog()} data-testid="set-open-checklog">检查日志</Button>
               </Space>
-              <Space align="center">
-                <span style={{ minWidth: 96, display: 'inline-block' }}>检查日志</span>
-                <Button size="small" onClick={() => api.subscriptionsOpenLog()} data-testid="set-open-checklog">📄 打开检查日志</Button>
-                <span className="faint" style={{ fontSize: 12.5 }}>完整检查历史,含每次失败原因</span>
-              </Space>
-            </Space>
+            </SettingsRow>
           </SettingsGroup>}
 
           {activeCategory === 'automation' && <SettingsGroup testId="settings-group-site-sync" title={<>站点同步
@@ -497,140 +493,142 @@ export default function Settings() {
                 <QuestionCircleOutlined data-testid="site-sync-help"
                   style={{ marginLeft: 6, fontSize: 13, opacity: 0.5, cursor: 'help' }} />
               </Tooltip>
-            </>} description={<>开启后，文库选中文章时会多出「同步到站点」——按个人站点的发布规范生成 <code>YYYY-MM-DD-slug/index.md</code> 与同目录图片。纯本地文件操作，不联网。</>}
+            </>} description="把文库文章转换为 Astro 站点目录，不会自动发布。"
             status={s.siteSyncEnabled
               ? { text: '已启用', tone: 'ok' }
               : { text: '未启用', tone: 'off' }}>
-            <Space align="center" style={{ marginTop: 8 }}>
-              <Switch checked={s.siteSyncEnabled} data-testid="set-site-sync"
-                onChange={(v) => setS({ ...s, siteSyncEnabled: v })} />
-              <span>{s.siteSyncEnabled ? '已开启' : '已关闭'}</span>
-            </Space>
+            <SettingsRow label="启用站点同步" hint="开启后，文库批量栏显示「同步到站点」。">
+              <Space align="center">
+                <span className="faint">{s.siteSyncEnabled ? '开启' : '关闭'}</span>
+                <Switch checked={s.siteSyncEnabled} data-testid="set-site-sync"
+                  onChange={(v) => setS({ ...s, siteSyncEnabled: v })} />
+              </Space>
+            </SettingsRow>
             {s.siteSyncEnabled && (
-              <Space.Compact style={{ width: '100%', marginTop: 10 }}>
-                <Input value={s.siteSyncPostsDir} data-testid="set-site-sync-dir"
-                  onChange={(e) => setS({ ...s, siteSyncPostsDir: e.target.value })}
-                  placeholder="站点 content/posts 目录" />
-                <Button icon={<FolderOpenOutlined />} onClick={async () => {
-                  const dir = await api.chooseDir()
-                  if (dir) setS({ ...s, siteSyncPostsDir: dir })
-                }}>选择目录</Button>
-              </Space.Compact>
+              <SettingsRow label="站点目录" hint="Astro 站点的 content/posts 目录，纯本地文件操作。">
+                <Space.Compact>
+                  <Input value={s.siteSyncPostsDir} data-testid="set-site-sync-dir" style={{ minWidth: 320 }}
+                    onChange={(e) => setS({ ...s, siteSyncPostsDir: e.target.value })}
+                    placeholder="站点 content/posts 目录" />
+                  <Button icon={<FolderOpenOutlined />} onClick={async () => {
+                    const dir = await api.chooseDir()
+                    if (dir) setS({ ...s, siteSyncPostsDir: dir })
+                  }}>选择目录</Button>
+                </Space.Compact>
+              </SettingsRow>
             )}
           </SettingsGroup>}
 
           {activeCategory === 'ai' && cliLink?.supported && (
-            <SettingsGroup testId="settings-group-cli" title="命令行快捷方式" status={cliLink.status === 'linked' ? { text: '已创建', tone: 'ok' } : { text: '未创建', tone: 'off' }} description={<>
-                在 <code>{cliLink.dir}</code> 创建指向应用的快捷命令，便于在终端运行 <code>wx-kit</code>（供 AI agent 调用）。
-                当前状态：{cliLink.status === 'linked' ? '已创建' : cliLink.status === 'conflict' ? '该位置被占用（创建将覆盖）' : '未创建'}
-                {!cliLink.inPath && '；~/bin 不在 PATH，创建时会引导写入 shell 配置'}。
-              </>}>
-              {cliLink.transient && (
-                <div className="setting-hint" style={{ color: 'var(--warning, #d46b08)' }}>
-                  当前从开发/构建目录运行，命令行入口暂不可创建；从正式安装的 wx-kit 启动后可用。
-                </div>
-              )}
-              <Button style={{ marginTop: 8 }} onClick={createCliLink} data-testid="set-cli-link">
-                {cliLink.status === 'linked' ? '重新创建' : '创建命令行快捷方式'}
-              </Button>
+            <SettingsGroup testId="settings-group-cli" title="命令行快捷方式" status={cliLink.status === 'linked' ? { text: '已创建', tone: 'ok' } : { text: '未创建', tone: 'off' }} description="供终端和 AI Agent 调用同一套 wx-kit 能力。">
+              <SettingsRow label="命令位置"
+                hint={<>{cliLink.dir}。{cliLink.status === 'conflict' && '该位置被占用（创建将覆盖）'}{!cliLink.inPath && '；~/bin 不在 PATH，创建时会引导写入 shell 配置'}。</>}>
+                {cliLink.transient ? (
+                  <span className="faint" style={{ color: 'var(--warning, #d46b08)' }}>开发目录运行中，暂不可创建</span>
+                ) : (
+                  <Button onClick={createCliLink} data-testid="set-cli-link">
+                    {cliLink.status === 'linked' ? '重新创建' : '创建命令行快捷方式'}
+                  </Button>
+                )}
+              </SettingsRow>
             </SettingsGroup>
           )}
 
           {activeCategory === 'ai' && <SettingsGroup testId="settings-group-topic-ai" legacyTestId="topic-ai-section" title="选题 AI"             status={!topicAi ? undefined : topicAi.keyConfigured
             ? { text: topicAi.keyPersistent ? 'Key 已加密' : 'Key 仅本次会话', tone: topicAi.keyPersistent ? 'ok' : 'warning' }
-            : { text: 'Key 未配置', tone: 'off' }} description={<>用你自己的兼容 OpenAI Chat Completions 的服务生成候选选题。</>}>
+            : { text: 'Key 未配置', tone: 'off' }} description="分析时，所选文章正文会发送到你配置的服务。">
             {/* 对齐原型：隐私提示用醒目 callout 而非普通 description（正文出机事实须明示） */}
             <div className="settings-callout" data-testid="topic-ai-privacy-callout">
               隐私提示：分析时所选文章正文会发送到你配置的服务；Base URL 与模型名保存在普通设置，API Key 使用系统安全存储。wx-kit 不托管模型额度。
             </div>
-            <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: 10 }}>
-              <label className="setting-field">
-                <span>Base URL</span>
-                <Input data-testid="topic-ai-base-url" value={topicAiBaseUrl}
-                  onChange={event => setTopicAiBaseUrl(event.target.value)}
-                  placeholder="https://api.example.com/v1" />
-              </label>
-              <label className="setting-field">
-                <span>Model</span>
-                <Input data-testid="topic-ai-model" value={topicAiModel}
-                  onChange={event => setTopicAiModel(event.target.value)}
-                  placeholder="例如 gpt-4.1-mini" />
-              </label>
-              <label className="setting-field">
-                <span>API Key</span>
-                <Input.Password data-testid="topic-ai-key" value={topicAiKey}
+            <SettingsRow label="Base URL" hint="OpenAI Chat Completions 兼容地址。">
+              <Input data-testid="topic-ai-base-url" value={topicAiBaseUrl} style={{ minWidth: 320 }}
+                onChange={event => setTopicAiBaseUrl(event.target.value)}
+                placeholder="https://api.example.com/v1" />
+            </SettingsRow>
+            <SettingsRow label="Model" hint="由你的服务商提供的模型名称。">
+              <Input data-testid="topic-ai-model" value={topicAiModel} style={{ minWidth: 320 }}
+                onChange={event => setTopicAiModel(event.target.value)}
+                placeholder="例如 gpt-4.1-mini" />
+            </SettingsRow>
+            <SettingsRow label="API Key" hint="留空即保留当前 Key。">
+              <Space align="center">
+                <Input.Password data-testid="topic-ai-key" value={topicAiKey} style={{ minWidth: 260 }}
                   onChange={event => setTopicAiKey(event.target.value)}
                   autoComplete="new-password"
                   placeholder={topicAi?.keyConfigured ? '已配置；留空即保留原 Key' : '输入 API Key'} />
-              </label>
-              <div className="topic-key-row">
+                {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除</Button>}
+              </Space>
+            </SettingsRow>
+            <div className="settings-row" style={{ border: 0, minHeight: 'auto' }}>
+              <div className="settings-row-copy">
                 <span className={`badge ${topicAi?.keyConfigured ? 'badge-ok' : 'badge-cancel'}`}
                   data-testid="topic-ai-key-status">
                   {!topicAi ? '正在读取'
                     : !topicAi.keyConfigured ? '未配置'
                       : topicAi.keyPersistent ? '已安全保存' : '仅本次会话，重启需重填'}
                 </span>
-                <Space>
-                  {topicAi?.keyConfigured && <Button danger data-testid="topic-ai-clear-key" onClick={clearTopicAiKey}>清除 Key</Button>}
-                </Space>
+                {topicAi?.keyConfigured && !topicAi.keyPersistent && (
+                  <small style={{ color: 'var(--amber)' }}>系统加密能力不可用，Key 仅存于本次运行内存。</small>
+                )}
               </div>
-              {topicAi?.keyConfigured && !topicAi.keyPersistent && (
-                <div className="setting-hint" style={{ color: 'var(--amber)' }}>
-                  当前系统加密能力不可用，Key 只保存在本次运行的内存中；退出应用后会丢失。
-                </div>
-              )}
-            </Space>
+            </div>
           </SettingsGroup>}
 
           {activeCategory === 'accounts' && <SettingsGroup testId="settings-group-mowen" legacyTestId="mowen-section" title="墨问集成" status={s?.mowenMocliPath
             ? { text: s.mowenMocliVersion ? `已检测 · ${s.mowenMocliVersion}` : '已检测', tone: 'ok' }
-            : { text: '未检测', tone: 'off' }} description={<>
-              接入墨问笔记下载依赖墨问官方命令行 <code>mocli</code>。检测到后，下载页即可使用墨问相关功能。
-            </>}>
+            : { text: '未检测', tone: 'off' }} description="发现用户与批量清单依赖 mocli，正文下载仍由 wx-kit 完成。">
             {s?.mowenMocliPath ? (
-              <div className="setting-hint" data-testid="mowen-status-installed">
-                已检测到 mocli：<code data-testid="mowen-path">{s.mowenMocliPath}</code>
-                {s.mowenMocliVersion && <>（版本 <span data-testid="mowen-version">{s.mowenMocliVersion}</span>）</>}
-              </div>
+              <SettingsRow label="mocli 路径" hint="墨问官方命令行，检测到后下载页即可使用墨问相关功能。">
+                <Space align="center">
+                  <code data-testid="mowen-path">{s.mowenMocliPath}</code>
+                  <Button loading={mowenChecking} onClick={redetectMowen} data-testid="mowen-redetect">重新检测</Button>
+                </Space>
+              </SettingsRow>
             ) : (
-              <div className="setting-hint" data-testid="mowen-status-missing">
-                未检测到 mocli。请先安装并完成认证：
-                <pre style={{ margin: '6px 0 0' }}><code>npm install -g @mowenxd/cli{'\n'}mocli auth init --apik &lt;你的墨问 API Key&gt;</code></pre>
-                <span className="faint">API Key 在墨问小程序「我的 → 开发者 → 我的 API Key」获取。</span>
-              </div>
+              <>
+                <div className="setting-hint" data-testid="mowen-status-missing">
+                  未检测到 mocli。请先安装并完成认证：
+                  <pre style={{ margin: '6px 0 0' }}><code>npm install -g @mowenxd/cli{'\n'}mocli auth init --apik &lt;你的墨问 API Key&gt;</code></pre>
+                  <span className="faint">API Key 在墨问小程序「我的 → 开发者 → 我的 API Key」获取。</span>
+                </div>
+                <Button style={{ marginTop: 8 }} loading={mowenChecking}
+                  onClick={redetectMowen} data-testid="mowen-redetect">重新检测</Button>
+              </>
             )}
-            <Button style={{ marginTop: 8 }} size="small" loading={mowenChecking}
-              onClick={redetectMowen} data-testid="mowen-redetect">重新检测</Button>
+            {s?.mowenMocliPath && <div className="setting-hint" data-testid="mowen-status-installed" style={{ marginTop: 8 }}>
+              已检测到 mocli{s.mowenMocliVersion ? <>（版本 <span data-testid="mowen-version">{s.mowenMocliVersion}</span>）</> : null}，下载页即可使用墨问相关功能。
+            </div>}
           </SettingsGroup>}
 
-          {activeCategory === 'system' && <SettingsGroup testId="settings-group-diagnostics" title="诊断" description={<>
-              运行日志记录启动环境与外部请求(已自动脱敏),报障时请把 main.log 一并发给开发者。
-            </>}>
-            <Button style={{ marginTop: 8 }} size="small" data-testid="diag-open-logs"
-              onClick={async () => {
-                try {
-                  const r = await api.diagOpenLogsFolder()
-                  if (!r.ok) message.warning(r.error ?? '打开失败')
-                } catch { message.error('打开日志文件夹失败') }
-              }}>打开日志文件夹</Button>
+          {activeCategory === 'system' && <SettingsGroup testId="settings-group-diagnostics" title="诊断" description="日志已自动脱敏，不会远程上传。">
+            <SettingsRow label="main.log" hint="报障时可把日志文件发给开发者。">
+              <Button data-testid="diag-open-logs"
+                onClick={async () => {
+                  try {
+                    const r = await api.diagOpenLogsFolder()
+                    if (!r.ok) message.warning(r.error ?? '打开失败')
+                  } catch { message.error('打开日志文件夹失败') }
+                }}>打开日志文件夹</Button>
+            </SettingsRow>
           </SettingsGroup>}
 
-          {activeCategory === 'system' && <SettingsGroup testId="settings-group-about" title="关于" description={<>
-              wx-kit（微信百宝箱）当前版本 <strong data-testid="about-version">v{ver || '—'}</strong>
-              ——与命令行 <code>wx-kit --version</code> 同源。
-            </>}>
-            <Space style={{ marginTop: 8 }} wrap>
-              <Button size="small" data-testid="about-homepage"
-                onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit')}>项目主页</Button>
-              <Button size="small" data-testid="about-check-update" loading={updState === 'checking'}
-                onClick={checkUpdateNow}>检查更新</Button>
-              {updState === 'done' && upd && !upd.hasUpdate && (
-                <span className="faint" data-testid="about-up-to-date">已是最新 v{upd.latest}</span>
-              )}
-              {updState === 'failed' && (
-                <span className="faint" data-testid="about-check-failed">暂时查不到(网络问题),稍后再试</span>
-              )}
-            </Space>
+          {activeCategory === 'system' && <SettingsGroup testId="settings-group-about" title="关于 wx-kit" description="版本、更新渠道和项目入口。">
+            <SettingsRow label={<span>当前版本 <strong data-testid="about-version">v{ver || '—'}</strong></span>}
+              hint="启动时每天最多检查一次更新，不上传其它数据。">
+              <Space align="center">
+                <Button data-testid="about-homepage"
+                  onClick={() => api.openExternal('https://github.com/monkeychen/wx-kit')}>项目主页</Button>
+                <Button data-testid="about-check-update" loading={updState === 'checking'}
+                  onClick={checkUpdateNow}>检查更新</Button>
+                {updState === 'done' && upd && !upd.hasUpdate && (
+                  <span className="faint" data-testid="about-up-to-date">已是最新 v{upd.latest}</span>
+                )}
+                {updState === 'failed' && (
+                  <span className="faint" data-testid="about-check-failed">暂时查不到(网络问题),稍后再试</span>
+                )}
+              </Space>
+            </SettingsRow>
 
             {/* 有新版才展开:版本号 + 发布说明 + 按渠道给一键动作 */}
             {upd?.hasUpdate && (
@@ -695,16 +693,13 @@ export default function Settings() {
               </div>
             )}
 
-            <div style={{ marginTop: 12 }}>
+            <SettingsRow label="启动时检查更新" hint="每天最多查一次，只向 GitHub 请求版本信息，不上传任何数据。">
               <Space align="center">
+                <span className="faint">{s.updateCheckEnabled ? '开启' : '关闭'}</span>
                 <Switch checked={s.updateCheckEnabled} data-testid="set-update-check"
                   onChange={(v) => setS({ ...s, updateCheckEnabled: v })} />
-                <span>启动时检查更新</span>
               </Space>
-              <div className="setting-hint" style={{ marginTop: 4 }}>
-                每天最多查一次，只向 GitHub 请求版本信息，<b>不上传任何数据</b>；关掉后仅在你点「检查更新」时联网。
-              </div>
-            </div>
+            </SettingsRow>
           </SettingsGroup>}
             </div>
 

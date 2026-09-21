@@ -34,7 +34,7 @@ export function SettingsRow({
   hint,
   children,
 }: {
-  label: string
+  label: ReactNode
   hint?: ReactNode
   children: ReactNode
 }) {
