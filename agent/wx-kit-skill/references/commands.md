@@ -212,14 +212,17 @@ export WXKIT_AI_MODEL='model-name'
 export WXKIT_AI_API_KEY='在自己的终端中填写'
 
 wx-kit topics analyze [--range 24h|3d|7d|custom] [--from YYYY-MM-DD --to YYYY-MM-DD] \
+  [--article <id...>] \
   [--base-url <url>] [--model <name>] [--out <文库根目录>]
 
 wx-kit topics brief --run <runId> --topic <topicId> [--out <文库根目录>]
 ```
 
 - 初始范围为最近 24 小时，按原文发表时间筛选；`custom` 必须同时给 `--from/--to`，包含结束日。
+- `--article`（可重复或逗号分隔）为 M75 手动选篇：直接指定文库文章 ID 作素材，不做时间判定，与 `--range/--from/--to` 互斥；文库中找不到的 ID 以 `UNKNOWN_ARTICLES` 失败（退出码 2）。文章 ID 来自 `library list/search` 输出的 `id`。
 - `--base-url` / `--model` 优先于同名环境变量；Key 固定读取 `WXKIT_AI_API_KEY`，没有 `--api-key`，避免进入 shell 历史。
 - `analyze` 最多处理 30 篇有效文章和 120,000 个去重正文字符，超限会在模型请求前失败；不会静默截断或自动扩窗。
+- 对模型的请求走 SSE 流式（M75）；不设总超时，长生成正常完成，中断方式是用户终止进程。`WXKIT_DEBUG=1` 可把与大模型的完整请求/响应打到 stderr（排障用）。
 - stdout 返回 `{ok,status,runId,cards,timeExcludedCount,...}`。`completed` 可合法地没有候选；`partial` 代表有卡片也有校验失败；`failed` 是请求或验证失败，不能说成没有值得写的题目。
 - `cards[].statistics.sourceAccountCount` 是材料中账号身份数，不代表独立事实来源；`distributionEvidence` 首版固定为 `unverified`。
 - `brief` 读取本地 `result.json` 并生成 Markdown，不再次调用模型。结果保存在 `<库根>/topic-decisions/runs/<runId>/briefs/`。
@@ -227,7 +230,7 @@ wx-kit topics brief --run <runId> --topic <topicId> [--out <文库根目录>]
 
 这是 v0.12.0 当前 main 的未发布开发能力。已安装 v0.11.3 没有该命令，不能据此排查成安装故障。
 
-M70 起增加 GUI“选题”导航：先在“设置 → AI 模型”完成配置，再选 24 小时/3 天/7 天/自定义日期分析。GUI 默认不选中任何候选；点选后才展开理由、材料依据和起笔结构。反馈、切换页签和生成简报都不会再调模型。
+M70 起增加 GUI“选题”导航：先在“设置 → AI 模型”完成配置，再选 24 小时/3 天/7 天/自定义日期/手动选择文章分析。GUI 默认不选中任何候选；点选后才展开理由、材料依据和起笔结构。反馈、切换页签和生成简报都不会再调模型。M75 的 GUI 增强：「手动选择文章」弹层从文库搜索并勾选（上限 30 篇）；分析期间页面显示模型实时输出（正文与思考分段、自动滚动），运行中可随时取消，切走再回来进度与已生成内容不丢；没有总超时限制，长时间无响应会明确报空闲超时。
 
 M73 把该设置升级为多厂商：选择厂商（智谱/千问/DeepSeek/Kimi/MiniMax/OpenAI/Google/自定义）和计费模式后端点自动确定（自定义需手填 base URL）；模型可从候选选也可自由输入；推理开关与五档等级（low/medium/high/extra/max）按厂商能力显示；保存前可“测试连接”验证端点、Key 和模型。注意 GUI 配置与上面 CLI 的 `WXKIT_AI_*` 环境变量互相独立：CLI 路径仍是 baseUrl/model/key 三项，不读厂商目录。
 
