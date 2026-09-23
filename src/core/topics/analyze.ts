@@ -16,6 +16,19 @@ import { topicTrace } from './debug'
 import type { TopicFailure, TopicRunResult, TopicTraceEvent, TopicWindow } from './types'
 import { TopicModelOutputError, parseTopicExtractions, validateTopicProposals } from './validate'
 
+/**
+ * 失败摘要：按 code 归并计数，并附上第一条失败的具体原因（含模型实际给出的取值）。
+ * M76：只报 code 时用户看不出模型错在哪——「INVALID_DISTRIBUTION_EVIDENCE ×3」和
+ * 「…实际收到 "未验证"」的可行动性差一个量级。
+ */
+function summarizeFailures(failures: TopicFailure[]): string {
+  const counts = new Map<string, number>()
+  for (const item of failures) counts.set(item.code, (counts.get(item.code) ?? 0) + 1)
+  const list = [...counts].map(([code, count]) => (count > 1 ? `${code} ×${count}` : code)).join('、')
+  const detail = failures.find(item => item.message)?.message ?? ''
+  return detail ? `${list} —— ${detail}` : list
+}
+
 export interface AnalyzeTopicsDeps {
   libraryRoot: string
   model: TopicModel
@@ -120,7 +133,7 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
     if (extracted.items.length === 0 && extracted.failures.length > 0) {
       return persist({
         ...base(), status: 'failed', cards: [],
-        error: { code: 'NO_VALID_EXTRACTIONS', message: `模型材料提取没有通过校验：${extracted.failures.map(item => item.code).join(', ')}` },
+        error: { code: 'NO_VALID_EXTRACTIONS', message: `模型材料提取没有通过校验：${summarizeFailures(extracted.failures)}` },
       })
     }
 
@@ -139,7 +152,7 @@ export async function analyzeTopics(deps: AnalyzeTopicsDeps, input: AnalyzeTopic
     if (proposed.cards.length === 0 && proposed.failures.length > 0) {
       return persist({
         ...base(), status: 'failed', cards: [],
-        error: { code: 'NO_VALID_CARDS', message: `模型候选没有通过校验：${proposed.failures.map(item => item.code).join(', ')}` },
+        error: { code: 'NO_VALID_CARDS', message: `模型候选没有通过校验：${summarizeFailures(proposed.failures)}` },
       })
     }
     notify('result')

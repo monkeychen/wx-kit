@@ -91,12 +91,14 @@ describe('TopicService（IPC 背后的真实服务）', () => {
     const service = new TopicService({ settings, config, now, makeRunId: () => 'run-wait', modelFactory: () => new WaitingModel() })
     const first = service.analyze({ window: { preset: '24h' } })
     // 轮询等阶段推进到 extract（snapshot 含文件 IO；全量并行跑时 10ms 定时不够，勿改回）
+    // 轮询等阶段推进到 extract（snapshot 含文件 IO；全量并行跑时机器忙，用 deadline 而非固定次数）
     const waitStage = async (want: string) => {
-      for (let i = 0; i < 200; i++) {
+      const deadline = Date.now() + 5000
+      for (;;) {
         if (service.getRunningStatus().stage === want) return
+        if (Date.now() > deadline) throw new Error(`stage 未在 5s 内到达 ${want}：${JSON.stringify(service.getRunningStatus())}`)
         await new Promise(resolve => setTimeout(resolve, 10))
       }
-      throw new Error(`stage 未在 2s 内到达 ${want}：${JSON.stringify(service.getRunningStatus())}`)
     }
     await waitStage('extract')
     expect(await service.analyze({ window: { preset: '24h' } })).toMatchObject({ ok: false, error: { code: 'TOPIC_ANALYSIS_RUNNING' } })

@@ -1,5 +1,9 @@
 import { preview, topicTrace } from './debug'
 import type { TopicExtractionItem, TopicExtractionKind } from './model'
+import {
+  asSet, CLAIM_KINDS, CONFIDENCE_LEVELS, DISTRIBUTION_EVIDENCE_VALUE,
+  EVIDENCE_ROLES, EXTRACTION_KINDS, MAX_CARDS, MAX_EXTRACTIONS, VALUE_KINDS,
+} from './prompts/contract'
 import type {
   ReaderValueKind,
   TopicClaim,
@@ -11,19 +15,13 @@ import type {
   TopicStatistics,
 } from './types'
 
-const EXTRACTION_KINDS = new Set<TopicExtractionKind>([
-  'fact-claim', 'opinion', 'question', 'emotion', 'change', 'counterpoint',
-])
-const VALUE_KINDS = new Set<ReaderValueKind>([
-  'knowledge', 'information-gap', 'resonance', 'anxiety-relief', 'joy',
-])
-const CLAIM_KINDS = new Set<TopicClaim['kind']>([
-  'source-fact-claim', 'source-opinion', 'editorial-inference',
-])
-const EVIDENCE_ROLES = new Set<TopicEvidence['role']>(['support', 'counterpoint', 'background'])
-const CONFIDENCE_LEVELS = new Set<TopicDecisionCard['evidenceConfidence']['level']>(['high', 'medium', 'low'])
-const MAX_EXTRACTIONS = 200
-const MAX_CARDS = 3
+// M76：约束常量不再本地声明——与发给模型的提示词共用 prompts/contract 的同一份，
+// 校验器加的每条规则在 prompt 里都有对应表述。
+const EXTRACTION_KINDS_SET = asSet(EXTRACTION_KINDS)
+const VALUE_KINDS_SET = asSet(VALUE_KINDS)
+const CLAIM_KINDS_SET = asSet(CLAIM_KINDS)
+const EVIDENCE_ROLES_SET = asSet(EVIDENCE_ROLES)
+const CONFIDENCE_LEVELS_SET = asSet(CONFIDENCE_LEVELS)
 
 type Obj = Record<string, unknown>
 type ValidatedEvidenceRef = Pick<TopicEvidence, 'id' | 'paragraphId' | 'quote' | 'role' | 'validation'>
@@ -90,8 +88,8 @@ export function parseTopicExtractions(raw: unknown, snapshot: TopicMaterialSnaps
       failures.push(failure('QUOTE_NOT_FOUND', `摘录不能在段落 ${paragraphId} 中逐字定位。`, id))
       continue
     }
-    if (!kind || !EXTRACTION_KINDS.has(kind as TopicExtractionKind)) {
-      topicTrace(`  ✗ ${id} INVALID_EXTRACTION_KIND kind=${JSON.stringify(kind)}（允许值：${[...EXTRACTION_KINDS].join('/')}）`)
+    if (!kind || !EXTRACTION_KINDS_SET.has(kind as TopicExtractionKind)) {
+      topicTrace(`  ✗ ${id} INVALID_EXTRACTION_KIND kind=${JSON.stringify(kind)}（允许值：${EXTRACTION_KINDS.join('/')}）`)
       failures.push(failure('INVALID_EXTRACTION_KIND', `提取项 ${id} 的类型不受支持。`, id))
       continue
     }
@@ -123,8 +121,10 @@ function parseRawEvidence(value: unknown, extractions: Map<string, TopicExtracti
     const id = nonEmpty(entry.id)
     const extractionId = nonEmpty(entry.extractionId)
     const role = nonEmpty(entry.role)
-    if (!id || !extractionId || !role || !EVIDENCE_ROLES.has(role as TopicEvidence['role']) || ids.has(id)) {
-      return { evidence: [], extractionIds, error: failure('INVALID_EVIDENCE', '材料依据缺少 ID、角色或出现重复。') }
+    if (!id || !extractionId || !role || !EVIDENCE_ROLES_SET.has(role as TopicEvidence['role']) || ids.has(id)) {
+      const actual = role && !EVIDENCE_ROLES_SET.has(role as TopicEvidence['role'])
+        ? `（role 收到 ${JSON.stringify(role)}，只接受 ${EVIDENCE_ROLES.join('/')}）` : ''
+      return { evidence: [], extractionIds, error: failure('INVALID_EVIDENCE', `材料依据缺少 ID、角色或出现重复。${actual}`) }
     }
     const extraction = extractions.get(extractionId)
     if (!extraction) return { evidence: [], extractionIds, error: failure('UNKNOWN_EXTRACTION', `材料依据引用了不存在的提取项 ${extractionId}。`) }
@@ -150,8 +150,10 @@ function parseReaderValues(value: unknown, evidenceIds: Set<string>): TopicReade
     const kind = nonEmpty(entry.kind)
     const benefit = nonEmpty(entry.benefit)
     const refs = stringList(entry.evidenceIds)
-    if (!kind || !VALUE_KINDS.has(kind as ReaderValueKind) || !benefit || !refs?.length || seen.has(kind)) {
-      return failure('INVALID_READER_VALUE', '读者价值类型、受益解释或引用无效。')
+    if (!kind || !VALUE_KINDS_SET.has(kind as ReaderValueKind) || !benefit || !refs?.length || seen.has(kind)) {
+      const actual = kind && !VALUE_KINDS_SET.has(kind as ReaderValueKind)
+        ? `（kind 收到 ${JSON.stringify(kind)}，只接受 ${VALUE_KINDS.join('/')}）` : ''
+      return failure('INVALID_READER_VALUE', `读者价值类型、受益解释或引用无效。${actual}`)
     }
     if (refs.some(id => !evidenceIds.has(id))) return failure('UNKNOWN_EVIDENCE', '读者价值引用了不存在的材料依据。')
     seen.add(kind)
@@ -168,8 +170,10 @@ function parseClaims(value: unknown, evidenceIds: Set<string>): TopicClaim[] | T
     const text = nonEmpty(entry.text)
     const kind = nonEmpty(entry.kind)
     const refs = stringList(entry.evidenceIds)
-    if (!text || !kind || !CLAIM_KINDS.has(kind as TopicClaim['kind']) || !refs?.length) {
-      return failure('INVALID_CLAIM', '候选陈述缺少文本、类型或引用。')
+    if (!text || !kind || !CLAIM_KINDS_SET.has(kind as TopicClaim['kind']) || !refs?.length) {
+      const actual = kind && !CLAIM_KINDS_SET.has(kind as TopicClaim['kind'])
+        ? `（kind 收到 ${JSON.stringify(kind)}，只接受 ${CLAIM_KINDS.join('/')}）` : ''
+      return failure('INVALID_CLAIM', `候选陈述缺少文本、类型或引用。${actual}`)
     }
     if (refs.some(id => !evidenceIds.has(id))) return failure('UNKNOWN_EVIDENCE', '候选陈述引用了不存在的材料依据。')
     result.push({ text, kind: kind as TopicClaim['kind'], evidenceIds: refs })
@@ -221,8 +225,12 @@ export function validateTopicProposals(raw: unknown, context: {
     const rationale = nonEmpty(obj.rationale)
     if (!question || !angle || !rationale) { failures.push(failure('INVALID_TOPIC_TEXT', '候选缺少问题、角度或理由。', id)); continue }
     if ('statistics' in obj) { failures.push(failure('MODEL_SUPPLIED_STATISTICS', '最终统计只能由程序计算。', id)); continue }
-    if (obj.distributionEvidence !== undefined && obj.distributionEvidence !== 'unverified') {
-      failures.push(failure('INVALID_DISTRIBUTION_EVIDENCE', '传播效果没有可验证数据。', id)); continue
+    if (obj.distributionEvidence !== undefined && obj.distributionEvidence !== DISTRIBUTION_EVIDENCE_VALUE) {
+      // 打印并回报实际收到的值：这类失败几乎总是 prompt 没把取值约束送达，看一眼就知道差在哪。
+      const actual = JSON.stringify(obj.distributionEvidence)
+      topicTrace(`  ✗ ${id} INVALID_DISTRIBUTION_EVIDENCE 收到 ${actual}（只接受省略或 "${DISTRIBUTION_EVIDENCE_VALUE}"）`)
+      failures.push(failure('INVALID_DISTRIBUTION_EVIDENCE',
+        `传播效果没有可验证数据：字段只能省略或填 "${DISTRIBUTION_EVIDENCE_VALUE}"，实际收到 ${actual}。`, id)); continue
     }
     const evidenceResult = parseRawEvidence(obj.evidence, extractionMap)
     if (evidenceResult.error) { failures.push({ ...evidenceResult.error, topicId: id }); continue }
@@ -234,8 +242,10 @@ export function validateTopicProposals(raw: unknown, context: {
     const confidence = isObj(obj.evidenceConfidence) ? obj.evidenceConfidence : {}
     const level = nonEmpty(confidence.level)
     const reasons = stringList(confidence.reasons)
-    if (!level || !CONFIDENCE_LEVELS.has(level as TopicDecisionCard['evidenceConfidence']['level']) || !reasons?.length) {
-      failures.push(failure('INVALID_CONFIDENCE', '依据把握必须有等级和具体理由。', id)); continue
+    if (!level || !CONFIDENCE_LEVELS_SET.has(level as TopicDecisionCard['evidenceConfidence']['level']) || !reasons?.length) {
+      const actual = level && !CONFIDENCE_LEVELS_SET.has(level as TopicDecisionCard['evidenceConfidence']['level'])
+        ? `（level 收到 ${JSON.stringify(level)}，只接受 ${CONFIDENCE_LEVELS.join('/')}）` : ''
+      failures.push(failure('INVALID_CONFIDENCE', `依据把握必须有等级和具体理由。${actual}`, id)); continue
     }
     const limitations = stringList(obj.limitations)
     const missingEvidence = stringList(obj.missingEvidence)
@@ -261,7 +271,7 @@ export function validateTopicProposals(raw: unknown, context: {
       id, question, angle, readerValues, rationale, claims, evidence,
       statistics: statisticsFor(evidence, context.snapshot),
       evidenceConfidence: { level: level as TopicDecisionCard['evidenceConfidence']['level'], reasons },
-      distributionEvidence: 'unverified',
+      distributionEvidence: DISTRIBUTION_EVIDENCE_VALUE,
       limitations,
       missingEvidence,
       outline,
