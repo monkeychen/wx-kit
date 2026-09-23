@@ -116,6 +116,20 @@ describe('可验证选题分析编排', () => {
     expect(result.failures.map(failure => failure.code)).toEqual(['UNKNOWN_EXTRACTION'])
   })
 
+  it('M76：候选全灭时错误里带失败原因与模型实际取值（只报 code 无法行动）', async () => {
+    const root = await tempRoot()
+    const bad = { ...goodCard, distributionEvidence: '未验证' }
+    const model = new FakeModel(extraction, { cards: [bad, { ...bad, id: 'topic-2' }] })
+    const result = await analyzeTopics({ libraryRoot: root, model, store: new TopicRunStore(root), now: fixedNow, makeRunId: () => 'run-badcards' }, {
+      window, articles: [await material(root)],
+    })
+    expect(result.status).toBe('failed')
+    if (result.status !== 'failed') throw new Error('unexpected status')
+    expect(result.error.code).toBe('NO_VALID_CARDS')
+    expect(result.error.message).toContain('INVALID_DISTRIBUTION_EVIDENCE ×2')
+    expect(result.error.message).toContain('未验证')
+  })
+
   it('模型明确返回空候选时是完成的空结果', async () => {
     const root = await tempRoot()
     const result = await analyzeTopics({ libraryRoot: root, model: new FakeModel(extraction, { cards: [] }), store: new TopicRunStore(root), now: fixedNow, makeRunId: () => 'run-no-cards' }, {

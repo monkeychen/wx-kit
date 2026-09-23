@@ -4,6 +4,7 @@ import { reasoningBodyFields } from './providers'
 import type { TopicExtractionInput, TopicModel, TopicProposalInput } from './model'
 import { createChatDeltaAccumulator, iterateSseData } from './sse'
 import { preview, topicTrace } from './debug'
+import { stageInstruction } from './prompts'
 
 export interface ChatCompletionsConfig {
   baseUrl: string
@@ -53,14 +54,6 @@ function parseJsonContent(content: string): unknown {
   } catch {
     throw new TopicProviderError('INVALID_JSON_CONTENT', '模型内容不是严格的 JSON object。')
   }
-}
-
-function stageInstruction(stage: 'extract' | 'propose'): string {
-  // 协议必须自含：只给字段名不给枚举值，模型只能猜 kind——真实供应商曾因此
-  // 整批 INVALID_EXTRACTION_KIND/QUOTE_NOT_FOUND（校验全挂，无卡可用）。
-  return stage === 'extract'
-    ? '只返回 JSON object，不要输出其它文字、解释或 Markdown 围栏之外的内容：{"items":[{"id":"x1","groupId":"g001","paragraphId":"g001:p001","quote":"…","kind":"…","summary":"…","theme":"…"}]}。items 可以为空。要求：quote 必须是从该段落 text 中逐字复制的连续片段（不改写、不拼接、不加省略号）；kind 只能是 fact-claim、opinion、question、emotion、change、counterpoint 六个值之一；groupId/paragraphId 必须来自输入 snapshot 的 groups/paragraphs。'
-    : '只返回 JSON object：{"cards":[…]}，不要输出其它文字。每张卡包含 id/question/angle/readerValues/rationale/claims/evidence/evidenceConfidence/distributionEvidence/limitations/missingEvidence/outline，其中不得提供 statistics。cards 可以为空且最多三张。'
 }
 
 export class ChatCompletionsTopicModel implements TopicModel {

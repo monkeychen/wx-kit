@@ -116,6 +116,16 @@ describe('选题卡校验与统计重算', () => {
     ])
   })
 
+  it('distributionEvidence 省略即可；填错时失败信息带实际收到的值（M76：模型曾自造取值）', () => {
+    const withoutField: Record<string, unknown> = { ...goodCard }
+    delete withoutField.distributionEvidence
+    expect(validateTopicProposals({ cards: [withoutField] }, { snapshot, extractions }).cards.map(c => c.id)).toEqual(['topic-1'])
+
+    const result = validateTopicProposals({ cards: [{ ...goodCard, id: 'zh-value', distributionEvidence: '未验证' }] }, { snapshot, extractions })
+    expect(result.failures.map(f => f.code)).toEqual(['INVALID_DISTRIBUTION_EVIDENCE'])
+    expect(result.failures[0].message).toContain('未验证')
+  })
+
   it('未知 evidence ID、重复候选 ID 和缺少把握理由都不会进入结果', () => {
     const result = validateTopicProposals({ cards: [
       goodCard,

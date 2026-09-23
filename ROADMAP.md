@@ -5,7 +5,7 @@
 
 ## 当前状态
 
-- **当前 main：v0.12.0 开发能力已完成、尚未发布（2026-09-21）** — M67–M75 交付“本地文库 → 可解释选题卡 → 选题简报”的 GUI/CLI/BYOK 闭环（含多厂商 AI 模型设置），并完成设置页五类信息架构及已确认原型保真复原；产品与验收契约见 `docs/PRD-v0.12.0.md`。本地 fixture Electron e2e 已通过，真实自有文库、用户选定供应商与选题语义质量仍是发布前未完成验收。已发布基线仍为 v0.11.3，根包未提前 bump。
+- **当前 main：v0.12.0 开发能力已完成、尚未发布（2026-09-21）** — M67–M76 交付“本地文库 → 可解释选题卡 → 选题简报”的 GUI/CLI/BYOK 闭环（含多厂商 AI 模型设置），并完成设置页五类信息架构及已确认原型保真复原；产品与验收契约见 `docs/PRD-v0.12.0.md`。本地 fixture Electron e2e 已通过，真实自有文库、用户选定供应商与选题语义质量仍是发布前未完成验收。已发布基线仍为 v0.11.3，根包未提前 bump。
 - **v0.11.3 已完成验证与发版(2026-09-19)** —— 打包环境墨问修复(BAD_OUTPUT 三连修)+ M66 统一诊断日志,详见发布史 v0.11.3 行与 `docs/PRD-v0.11.3.md`。
 - **v0.11.2 已完成验证与发版(2026-09-17)** —— 引用卡片(R1)+ 关键词搜索(R2)+ 界面统一,详见上方发布史。**用户手册同步上线** [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md)(GUI 教程型;GUI 截图 + 6 张配套插画均来自真实运行版本); README 加索引。
 - **v0.11.1 已完成验证与发版(2026-09-15)** —— 发布当天另一台机器实录的修复版:mocli 装在 nvm/homebrew,从 Dock/Finder 启动的 wx-kit(GUI 进程不加载 `~/.zshrc`,只拿系统最小 PATH)恒报「未检测到 mocli」,墨问功能整个不可用。修复为三级探测链(which → 常见安装位 → login shell 兜底)+ PATH 注入,GUI/CLI 双入口统一;验收含模拟 launchd 最小 PATH 环境的真机验证(CLI detect 全量返回、GUI 启动 10 秒内 settings 写入绝对路径)。教训与设计复盘见 devlog §57「v0.11.1 发版实录」与宪法墨问段。v0.11.0 及其完整过程(墨问接入 M59–M63、八轮安哥实测修复)见发布史 v0.11.0 行。
@@ -92,6 +92,7 @@
 | **M73** ✅ | v0.12.0（未发布） | 多厂商 AI 模型设置：`providers.ts` 厂商目录为唯一真相源（智谱/千问/DeepSeek/Kimi/MiniMax/OpenAI/Google + 自定义，端点按厂商+计费服务端派生，GUI 传 URL 只对自定义生效）；推理参数只下发有文档依据的厂商（智谱 thinking / 千问 enable_thinking / OpenAI·Google reasoning_effort，等级五档 low→max，其余保持无参数）；测试连接测草稿配置（Key 留空回退已存 Key，结果仅会话内）；老 baseUrl 反查目录迁移不回写。96 个测试文件、959 个单测、TypeScript、lint 与 Electron fixture e2e 通过（2026-09-21 完成） | `plans/2026-09-21-m73-ai-model-settings.md` |
 | **M74** ✅ | v0.12.0（未发布） | 提示词协议自含 + dev 交互追踪（真实供应商首诊）：extract prompt 内嵌 kind 枚举值、逐字摘录定义与 ID 来源（此前只给字段名，真实模型整批校验失败而 fixture 全绿）；`WXKIT_DEBUG=1`（dev 自动开）把完整请求/响应/逐条校验失败对比打到终端，只进终端不进 main.log（2026-09-21 完成） | `docs/devlog §74` |
 | **M75** ✅ | v0.12.0（未发布） | 手动选篇 + 全链路流式（安哥真实使用三项反馈）：素材范围新增「手动选择文章」（GUI 文库勾选弹层 / CLI `--article`，用户指名不做时间判定，缺失 ID 显式失败）；所有模型调用改 SSE 流式（含测试连接，首字节延迟透出；端点不支持流时回退 JSON）；GUI/终端实时显示模型生成过程（150ms 节流、切页不丢、思考与正文分段）；取消 90s 总超时——长生成正常，用户随时可取消，仅保留空闲上限。98 个测试文件、990 个单测、TypeScript、lint 与 Electron fixture e2e（SSE 真分块）通过（2026-09-22 完成） | `plans/2026-09-21-m75-topics-manual-selection-streaming.md` |
+| **M76** ✅ | v0.12.0（未发布） | 提示词升格为契约一等公民（真实供应商第二次全灭 `INVALID_DISTRIBUTION_EVIDENCE`，与 M74 同一病根）：枚举与护栏收进 `src/core/topics/prompts/contract.ts` 单一真相源，validate 与两条阶段指令共用同一份且指令文本由常量生成；propose 指令写全卡片 schema（各层枚举值、引用只能指向输入提取项、禁止 statistics、distributionEvidence 只能省略或 `unverified`）；枚举类失败与 `NO_VALID_CARDS` 错误回报模型实际取值。99 个测试文件、1001 个单测、TypeScript、lint 与 Electron fixture e2e 通过（2026-09-23 完成） | `plans/2026-09-23-m76-prompt-as-contract.md` |
 
 > PRD:v0.1.0 `docs/PRD.md`、v0.2.0 `docs/PRD-v0.2.0.md`、v0.3.0 `docs/PRD-v0.3.0.md`、v0.4.0 `docs/PRD-v0.4.0.md`、v0.5.0 `docs/PRD-v0.5.0.md`、v0.5.1 `docs/PRD-v0.5.1.md`、v0.5.2 `docs/PRD-v0.5.2.md`、v0.5.3 `docs/PRD-v0.5.3.md`、v0.5.4 `docs/PRD-v0.5.4.md`、v0.5.5 `docs/PRD-v0.5.5.md`、v0.6.0 `docs/PRD-v0.6.0.md`、v0.7.0 `docs/PRD-v0.7.0.md`、v0.8.0 `docs/PRD-v0.8.0.md`、v0.8.1 `docs/PRD-v0.8.1.md`、v0.8.2 `docs/PRD-v0.8.2.md`、v0.8.3 `docs/PRD-v0.8.3.md`、v0.8.4 `docs/PRD-v0.8.4.md`、v0.8.5 `docs/PRD-v0.8.5.md`、v0.8.6 `docs/PRD-v0.8.6.md`（未发布历史方案）、v0.8.7 `docs/PRD-v0.8.7.md`（未发布、已取消）、v0.9.0 `docs/PRD-v0.9.0.md`、v0.10.0 `docs/PRD-v0.10.0.md`、v0.10.1 `docs/PRD-v0.10.1.md`、v0.10.2 `docs/PRD-v0.10.2.md`、v0.10.4 `docs/PRD-v0.10.4.md`（发版后补档）、v0.10.5 `docs/PRD-v0.10.5.md`、v0.10.6 `docs/PRD-v0.10.6.md`、v0.11.0 `docs/PRD-v0.11.0.md`、v0.11.1 `docs/PRD-v0.11.1.md`、v0.11.2 `docs/PRD-v0.11.2.md`、v0.11.3 `docs/PRD-v0.11.3.md`（最新已发布验收契约）、v0.12.0 `docs/PRD-v0.12.0.md`（当前未发布选题能力的验收契约）。
 
@@ -133,7 +134,7 @@
 
 ## 下一步 / 候选
 
-**当前工程状态**：v0.12.0 的 M67–M75 已完成但未发布，产品与验收契约见 [`docs/PRD-v0.12.0.md`](docs/PRD-v0.12.0.md)。下一个有意义的产品验证不是继续加写作功能，而是用真实自有文库和用户明确提供的模型服务评估候选是否真能减少“不知道写什么”的时间。
+**当前工程状态**：v0.12.0 的 M67–M76 已完成但未发布，产品与验收契约见 [`docs/PRD-v0.12.0.md`](docs/PRD-v0.12.0.md)。下一个有意义的产品验证不是继续加写作功能，而是用真实自有文库和用户明确提供的模型服务评估候选是否真能减少“不知道写什么”的时间。
 
 - **首版边界**：本地素材 → 最多三张可解释选题卡 → 同页详情 → 选题简报；初始默认最近 24 小时，用户可选择 3 天/7 天/自定义日期，按发表时间筛选，不自动扩窗。`wx-kit-compose` 当前入口已删除，旧 PRD/计划/发版说明保留。完整写作、配图、排版、自动发布与收费体系仍不在本期范围。
 
