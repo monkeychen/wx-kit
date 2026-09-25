@@ -132,7 +132,8 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 - **`wxfile://` 协议**：阅读器读本地图片用，路径严格限制在库根内（`electron/protocol.ts` 的 `resolveWxfilePath`，含编码 `..` 穿越防护）。
 - **HTML 阅读器 iframe** 用 `sandbox`（无 `allow-scripts`）：安全，但意味着 Playwright 无法在其内部执行脚本。**要看 HTML 视图的实际内容，别在 iframe 里跑断言**——用主进程 `net.fetch(iframeSrc)` 取 wxfile 源码文本再断言字符串（M59 起有先例，M64 的引用卡片用例沿用）；动态渲染（如图片真的加载出来）仍由 md 视图的 `naturalWidth>0` 等价证明。
 - **e2e 里 mock 不同链路要用不同拦法**（M64 实录）：微信读书靠 `WXKIT_WEREAD_BASE` + `persist:mpweixin` 会话上的 webRequest 重定向；墨问 `note/show` 走 Node 的 `fetch`（undici）、**不经 Chromium 会话，webRequest 拦不到**，只能用 `WXKIT_MOWEN_BASE` 换 base。墨问下载的 e2e 入口走**「按链接下载」tab 粘 `note.mowen.cn/detail/<id>`**（`downloadArticle` 有墨问路由），**不经 mocli**——mocli 是外部二进制，隔离环境有无不定，不能进 e2e。
-- **e2e 只能在主会话/本地跑**：子 agent 的沙箱解析不了 electron 二进制。GUI fixture e2e 只覆盖当前有效页面，不再设置“微信网络封锁模式”；另用隔离文库执行真实文章 URL 下载验收，不能用 fixture 结果替代真实链路。Antd v6 会在两个汉字按钮文本间自动插空格（"阅 读"），写选择器时注意。
+- **e2e 只能在主会话/本地跑**：子 agent 的沙箱解析不了 electron 二进制。GUI fixture e2e 只覆盖当前有效页面，不再设置“微信网络封锁模式”；另用隔离文库执行真实文章 URL 下载验收，不能用 fixture 结果替代真实链路。Antd v6 会在两个汉字按钮文本间自动插空格（"阅 读"），写选择器时注意。AI 会话/受限环境跑 e2e 必须带 `WXKIT_E2E_HEADLESS=1` 前缀（launch 时加 `--disable-gpu --no-sandbox`，否则 GPU 进程起不来直接 FATAL "GPU process isn't usable"；M78 固化进 gui.e2e.mjs）。
+- **antd Modal 的 `data-testid` 不能用作 e2e 可见性断言**（M78 两次实录）：testid 落在常驻的 `.ant-modal-root` 上，其子 `.ant-modal-wrap` 是 fixed 定位不占布局流，父容器高度恒为 0——**无论弹层开或关 Playwright 都判 hidden**。等弹层「开着」要等其内部元素（如里面的控件/列表）；同理懒加载内容（如「看一眼」摘要）出现元素时可能在「加载中…」，要 `waitForFunction` 等真实文本就位再断言。
 - **commit message 含反引号/`$`/`!` 时必须用 `git commit -F <文件>`,不能用 `-m "…"`**(2026-07-26 实录):
   双引号里的反引号会被 shell 当**命令替换真的执行**。当时 message 里写了 `` `brew update` ``/`` `brew list` ``
   作说明,结果**真跑了 `brew update`**(把本机 Homebrew 从旧版升到 6.0.12、更新 4 个 tap),
