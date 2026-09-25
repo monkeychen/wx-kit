@@ -59,4 +59,7 @@ export function registerTopicIpc(settings: SettingsService): void {
   ipcMain.handle('topics:cancel', () => topics.cancel())
   ipcMain.handle('topics:brief', (_event, input) => topics.brief(input))
   ipcMain.handle('topics:feedback', (_event, input) => topics.feedback(input))
+  ipcMain.handle('topics:history', (_event, input) => topics.history(input?.limit))
+  ipcMain.handle('topics:readRun', (_event, input) => topics.readRun(input))
+  ipcMain.handle('topics:deleteRunFiles', (_event, input) => topics.deleteRunFiles(input))
 }

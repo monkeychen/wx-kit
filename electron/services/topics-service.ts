@@ -8,7 +8,7 @@ import { ChatCompletionsTopicModel } from '../../src/core/topics/chat-completion
 import type { TopicAiConfigSaveInput, TopicAiConfigStatus } from './topic-ai-config'
 import { testTopicAiConnection } from '../../src/core/topics/test-connection'
 import { isTopicAiProviderId, PROVIDER_CATALOG, type ProviderSpec, type TopicAiProviderId, type TopicAiReasoningEffort } from '../../src/core/topics/providers'
-import { TopicRunStore } from '../../src/core/topics/store'
+import { TopicRunStore, type TopicRunSummary } from '../../src/core/topics/store'
 import { resolveTopicWindow, selectTopicArticles, selectTopicArticlesByIds } from '../../src/core/topics/time-window'
 import type { TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../../src/core/topics/types'
 import { SettingsService } from './settings'
@@ -216,5 +216,39 @@ export class TopicService {
       })
       return { ok: true, path }
     } catch (error) { return errorResponse(error, 'TOPIC_FEEDBACK_ERROR') }
+  }
+
+  /** M78 历史选题：结果本就按 run 落盘（result/manifest/feedback），这里只补列举与回看入口。 */
+  async history(limit?: number): Promise<TopicRunSummary[]> {
+    const settings = await this.deps.settings.get()
+    return new TopicRunStore(settings.libraryRoot).listRunSummaries(limit)
+  }
+
+  /** M78 删除历史：物理清除该 run 的落盘文件。返回是否确有文件被删。 */
+  async deleteRunFiles(input: { runId: string }): Promise<{ ok: true } | { ok: false; error: { code: string; message: string } }> {
+    try {
+      const settings = await this.deps.settings.get()
+      const store = new TopicRunStore(settings.libraryRoot)
+      await store.readResult(input.runId) // 不存在的 runId 显式失败，不静默成功
+      await store.deleteRun(input.runId)
+      return { ok: true }
+    } catch (error) { return errorResponse(error, 'TOPIC_RESULT_ERROR') }
+  }
+
+  async readRun(input: { runId: string }): Promise<
+    | { ok: true; result: TopicRunResult; articleTitles: string[]; feedback: Array<{ topicId: string; decision: TopicFeedbackDecision }> }
+    | { ok: false; error: { code: string; message: string } }
+  > {
+    try {
+      const settings = await this.deps.settings.get()
+      const store = new TopicRunStore(settings.libraryRoot)
+      const result = await store.readResult(input.runId)
+      const articleTitles = await store.readManifest(input.runId).then(m => m.articles.map(item => item.title)).catch(() => [])
+      const events = await store.readFeedback(input.runId)
+      // 同一候选多次反馈时取最后一次——回看页显示的是当前状态而非轨迹。
+      const latest = new Map<string, TopicFeedbackDecision>()
+      for (const event of events) latest.set(event.topicId, event.decision)
+      return { ok: true, result, articleTitles, feedback: [...latest].map(([topicId, decision]) => ({ topicId, decision })) }
+    } catch (error) { return errorResponse(error, 'TOPIC_RESULT_ERROR') }
   }
 }

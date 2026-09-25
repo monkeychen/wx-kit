@@ -39,6 +39,9 @@ const api: WxApi = {
   topicsCancel: () => ipcRenderer.invoke('topics:cancel'),
   topicsBrief: (runId, topicId) => ipcRenderer.invoke('topics:brief', { runId, topicId }),
   topicsFeedback: (runId, topicId, decision) => ipcRenderer.invoke('topics:feedback', { runId, topicId, decision }),
+  topicsHistory: (limit?: number) => ipcRenderer.invoke('topics:history', { limit }),
+  topicsReadRun: (runId: string) => ipcRenderer.invoke('topics:readRun', { runId }),
+  topicsDeleteRunFiles: (runId: string) => ipcRenderer.invoke('topics:deleteRunFiles', { runId }),
   onTopicsProgress: (cb) => {
     const listener = (_event: unknown, payload: { stage: Parameters<typeof cb>[0] }) => cb(payload.stage)
     ipcRenderer.on('topics:progress', listener)

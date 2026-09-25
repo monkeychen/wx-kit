@@ -12,7 +12,8 @@ import type { InstallChannel } from '../core/install-channel'
 import type { MpProtectionStatus } from '../../electron/services/mp-request-gateway'
 import type { TopicAiConfigSaveInput, TopicAiConfigStatus } from '../../electron/services/topic-ai-config'
 import type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse, TopicTestConnectionResponse } from '../../electron/services/topics-service'
-import type { TopicFeedbackDecision, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
+import type { TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
+import type { TopicRunSummary } from '../core/topics/store'
 import type { ProviderSpec, TopicAiProviderId } from '../core/topics/providers'
 
 export type { HistoryEvent } from '../core/download-history'
@@ -30,6 +31,7 @@ export type { TopicAiConfigStatus, TopicAiConfigSaveInput } from '../../electron
 export type { TopicAnalyzeResponse, TopicBriefResponse, TopicFeedbackResponse, TopicTestConnectionResponse } from '../../electron/services/topics-service'
 export type { TopicAiProviderId, TopicAiPlanId, TopicAiReasoningEffort, ProviderSpec } from '../core/topics/providers'
 export type { TopicDecisionCard, TopicFeedbackDecision, TopicRunResult, TopicTraceEvent, TopicWindowInput } from '../core/topics/types'
+export type { TopicRunSummary } from '../core/topics/store'
 
 export interface UpdateChannelInfo { channel: InstallChannel; command: string | null; platform: string; arch: string }
 export interface UpdateProgress { name: string; done: number; total: number }
@@ -84,6 +86,9 @@ export interface WxApi {
   topicsCancel(): Promise<{ ok: boolean; error?: { code: string; message: string } }>
   topicsBrief(runId: string, topicId: string): Promise<TopicBriefResponse>
   topicsFeedback(runId: string, topicId: string, decision: TopicFeedbackDecision): Promise<TopicFeedbackResponse>
+  topicsHistory(limit?: number): Promise<TopicRunSummary[]>
+  topicsReadRun(runId: string): Promise<{ ok: true; result: TopicRunResult; articleTitles: string[]; feedback: Array<{ topicId: string; decision: TopicFeedbackDecision }> } | { ok: false; error: { code: string; message: string } }>
+  topicsDeleteRunFiles(runId: string): Promise<{ ok: true } | { ok: false; error: { code: string; message: string } }>
   onTopicsProgress(cb: (stage: TopicTraceEvent['stage']) => void): () => void
   onTopicsStream(cb: (event: { stage: 'extract' | 'propose'; kind: 'content' | 'reasoning'; text: string }) => void): () => void
   // —— M3.5 批量爬取 ——

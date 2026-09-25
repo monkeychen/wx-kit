@@ -19,6 +19,17 @@ const manifest: TopicMaterialSnapshot = {
   schemaVersion: 1, runId: 'run-1', createdAt: '2026-09-20T04:00:00.000Z', window,
   articles: [], groups: [], paragraphs: [], excluded: [], totalModelChars: 0,
 }
+const snapshotArticle = {
+  id: 'a-1', title: 't', author: 'x', account: 'acc', publishTime: '2026-09-20T03:00:00.000Z',
+  sourceUrl: 'https://mp.weixin.qq.com/s/x', contentHash: 'h', groupId: 'g1', warnings: [],
+}
+const cardTemplate = {
+  id: 'topic-1', question: 'q', angle: 'a', rationale: 'r', limitations: [], outline: [],
+  readerValues: [], evidence: [], claims: [], missingEvidence: [],
+  statistics: { relatedArticleCount: 1, sourceAccountCount: 1, contentGroupCount: 1, publishedDates: [] },
+  distributionEvidence: 'unverified' as const,
+  evidenceConfidence: { level: 'medium' as const, reasons: [] },
+}
 const result: TopicRunResult = {
   schemaVersion: 1, runId: 'run-1', window, manifestPath: '/library/topic-decisions/runs/run-1/manifest.json',
   createdAt: '2026-09-20T04:00:00.000Z', durationMs: 12, status: 'completed', cards: [],
@@ -95,5 +106,68 @@ describe('选题运行存储', () => {
     const store = new TopicRunStore(await root())
     await expect(store.writeFeedback({ schemaVersion: 1, id: '../x', runId: 'run-1', topicId: 'topic-1', decision: 'skip', recordedAt: 'x' })).rejects.toThrow(/ID/)
     await expect(store.writeFeedback({ schemaVersion: 1, id: 'f-1', runId: 'run-1', topicId: 'topic-1', decision: 'forever-ban', recordedAt: 'x' } as unknown as TopicFeedbackEvent)).rejects.toThrow(/decision/)
+  })
+
+  it('listRunSummaries：按时间倒序、附素材篇数与候选标题、limit 生效', async () => {
+    const libraryRoot = await root()
+    const store = new TopicRunStore(libraryRoot)
+    for (const [id, at] of [['run-a', '2026-09-20T04:00:00.000Z'], ['run-b', '2026-09-21T04:00:00.000Z']] as const) {
+      await store.writeManifest(id, { ...manifest, runId: id, createdAt: at, articles: [{ ...snapshotArticle, title: `文章-${id}` }] })
+      await store.writeResult(id, { ...result, runId: id, createdAt: at, cards: [{ ...cardTemplate, question: `问题-${id}` }] })
+    }
+    const list = await store.listRunSummaries()
+    expect(list.map(item => item.runId)).toEqual(['run-b', 'run-a'])
+    expect(list[0].articleCount).toBe(1)
+    expect(list[0].articleTitles).toEqual(['文章-run-b'])
+    expect(list[0].cardQuestions).toContain('问题-run-b')
+    expect((await store.listRunSummaries(1)).map(item => item.runId)).toEqual(['run-b'])
+  })
+
+  it('listRunSummaries：目录不存在返回空，损坏条目跳过不影响其余', async () => {
+    const libraryRoot = await root()
+    const store = new TopicRunStore(libraryRoot)
+    expect(await store.listRunSummaries()).toEqual([])
+    await store.writeResult('run-ok', { ...result, runId: 'run-ok' })
+    await import('node:fs/promises').then(async fs => {
+      const dir = join(libraryRoot, 'topic-decisions', 'runs', 'run-bad')
+      await fs.mkdir(dir, { recursive: true })
+      await fs.writeFile(join(dir, 'result.json'), '{bad', 'utf8')
+    })
+    const list = await store.listRunSummaries()
+    expect(list.map(item => item.runId)).toEqual(['run-ok'])
+  })
+
+  it('readManifest 校验 runId 一致；readFeedback 只取该 run 且按时间正序', async () => {
+    const libraryRoot = await root()
+    const store = new TopicRunStore(libraryRoot)
+    await store.writeManifest('run-1', manifest)
+    expect((await store.readManifest('run-1')).runId).toBe('run-1')
+    await expect(store.readManifest('missing')).rejects.toThrow()
+
+    const base = { schemaVersion: 1 as const, runId: 'run-1', topicId: 'topic-1' }
+    await store.writeFeedback({ ...base, id: 'f-2', decision: 'skip', recordedAt: '2026-09-20T05:00:00.000Z' })
+    await store.writeFeedback({ ...base, id: 'f-1', decision: 'watch', recordedAt: '2026-09-20T04:00:00.000Z' })
+    await store.writeFeedback({ ...base, id: 'f-x', runId: 'run-2', topicId: 'topic-1', decision: 'skip', recordedAt: '2026-09-20T04:00:00.000Z' })
+    const events = await store.readFeedback('run-1')
+    expect(events.map(item => item.id)).toEqual(['f-1', 'f-2'])
+    expect(events[1].decision).toBe('skip')
+  })
+
+  it('deleteRun：清 run 目录与该 run 的反馈事件，不动别的 run', async () => {
+    const libraryRoot = await root()
+    const store = new TopicRunStore(libraryRoot)
+    await store.writeResult('run-1', result)
+    await store.writeManifest('run-1', manifest)
+    await store.writeBrief('run-1', 'topic-1', '# x')
+    await store.writeFeedback({ schemaVersion: 1, id: 'f-1', runId: 'run-1', topicId: 'topic-1', decision: 'watch', recordedAt: 'x' })
+    await store.writeResult('run-2', { ...result, runId: 'run-2' })
+    await store.writeFeedback({ schemaVersion: 1, id: 'f-2', runId: 'run-2', topicId: 'topic-1', decision: 'skip', recordedAt: 'x' })
+
+    await store.deleteRun('run-1')
+    await expect(store.readResult('run-1')).rejects.toThrow(/不存在/)
+    expect(await store.readFeedback('run-1')).toEqual([])
+    expect(await store.readResult('run-2')).toMatchObject({ runId: 'run-2' })
+    expect((await store.readFeedback('run-2')).map(item => item.id)).toEqual(['f-2'])
+    await expect(store.deleteRun('../escape')).rejects.toThrow(/ID/)
   })
 })
