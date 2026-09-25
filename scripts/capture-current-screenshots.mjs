@@ -42,11 +42,17 @@ async function main() {
   log('article', articleUrl)
   log('output', outputDir)
 
+  // 无头/受限会话（agent 沙箱、CI）GPU 与 Chromium 沙箱起不来——WXKIT_E2E_HEADLESS=1 时禁用
+  const headlessFlags = process.env.WXKIT_E2E_HEADLESS ? ['--disable-gpu', '--no-sandbox'] : []
+  // ELECTRON_RUN_AS_NODE 会让 Electron 以纯 Node 模式启动，打不出调试端口行
+  // （宿主为 Electron 的环境如 WorkBuddy 会注入该变量）。与 gui.e2e.mjs 同款摘除。
+  const cleanEnv = { ...process.env }
+  delete cleanEnv.ELECTRON_RUN_AS_NODE
   const app = await electron.launch({
     executablePath: electronPath,
-    args: [projectRoot, `--user-data-dir=${userDataDir}`],
+    args: [projectRoot, `--user-data-dir=${userDataDir}`, ...headlessFlags],
     cwd: projectRoot,
-    env: { ...process.env },
+    env: { ...cleanEnv },
   })
   const win = await app.firstWindow()
   const errors = []
@@ -88,11 +94,36 @@ async function main() {
     await win.screenshot({ path: join(outputDir, 'reader.png') })
 
     await win.click('[data-testid="nav-设置"]')
+    await win.waitForSelector('[data-testid="settings-category-nav"]', { timeout: 10_000 })
+    // M71 信息架构：设置按分类挂载，元素须先进入对应分类才存在
+    await win.click('[data-testid="settings-cat-content"]')
     await win.waitForSelector('[data-testid="set-download-videos"]', { timeout: 10_000 })
+    await win.click('[data-testid="settings-cat-accounts"]')
+    await win.waitForSelector('[data-testid="mp-account"]', { timeout: 10_000 })
     assert((await win.locator('[data-testid="mp-account"]').count()) === 1, '设置页含微信读书账号入口')
+    await win.click('[data-testid="settings-cat-automation"]')
+    await win.waitForSelector('[data-testid="set-subs-auto"]', { timeout: 10_000 })
     assert((await win.locator('[data-testid="set-subs-auto"]').count()) === 1, '设置页含订阅配置')
+    await win.click('[data-testid="settings-cat-content"]')
+    await win.waitForSelector('[data-testid="set-download-videos"]', { timeout: 10_000 })
     await settleUi(win, true)
     await win.screenshot({ path: join(outputDir, 'settings.png') })
+
+    // v0.12.0：选题页是当前有效页面——截「输入素材 + 选稿弹层」形态（未配置模型，
+    // 不发真实请求；弹层列表来自刚入库的真实文章）。
+    await win.click('[data-testid="nav-选题"]')
+    await win.waitForSelector('[data-testid="topics-page"]', { timeout: 20_000 })
+    await win.click('[data-testid="topic-manual-pick"]')
+    await win.waitForSelector('[data-testid="topic-manual-list"]', { timeout: 20_000 })
+    await win.locator('[data-testid="topic-manual-time"] .ant-segmented-item:has-text("全部")').click()
+    await win.waitForSelector('[data-testid="topic-manual-list"] .topic-manual-row', { timeout: 20_000 })
+    await win.locator('[data-testid="topic-manual-list"] .topic-manual-row').first().click()
+    await settleUi(win, true)
+    await win.screenshot({ path: join(outputDir, 'topics.png') })
+    await win.click('[data-testid="topic-manual-confirm"]')
+    await win.waitForSelector('[data-testid="topic-manual-count"]', { timeout: 10_000 })
+    await settleUi(win, true)
+    await win.screenshot({ path: join(outputDir, 'topics-picked.png') })
 
     const library = JSON.parse(readFileSync(join(libraryRoot, 'library.json'), 'utf8'))
     assert(library.articles?.length === 1, '截图使用真实入库文章')

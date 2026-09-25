@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.11.3-released-success.svg)
+![Status](https://img.shields.io/badge/v0.12.0-released-success.svg)
 
 ## 这是什么
 
@@ -17,31 +17,40 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.11.3）**
+> **当前能力边界（v0.12.0）**
 >
-> v0.11.0 把文库内容源从「只下微信文章」扩到「**微信 + 墨问**」；v0.11.3 聚焦可靠性——墨问功能在打包安装环境开箱即用 + 全程诊断日志：
+> v0.12.0 新增**选题工作台**——把本地素材变成可解释的「今天写什么」：选文章 → 得到最多
+> 三张写明理由、材料依据与起笔结构的候选卡，每条判断可回溯、失败不伪装；同时在
+> 「设置 → AI 模型」接入多厂商模型（BYOK）：
 >
-> - **统一诊断日志**：启动环境、mocli/微信读书/微信文章每次外部调用的关键事实自动落 `main.log`（敏感信息自动打码、5MB×3 自动滚动、无远程上报）；设置页「诊断」一键打开日志文件夹——报障不再靠口头描述；
-> - **墨问打包环境修复**：mocli 装在 nvm/homebrew 或自定义路径的用户，从 Dock/Finder 启动（不加载 `~/.zshrc`、PATH 只有系统四件套）也能正常检测与执行（v0.11.2 及之前部分安装形态恒报 BAD_OUTPUT）；失败消息带真实原因摘要；
->
-> - **墨问笔记下载**：下载页「墨问笔记」tab——按用户名搜索作者（候选带简介）→ 条件拉清单 → 勾选批量下载，或按关键词搜全站（点作者名展开全部笔记）；URL 输入框同时识别墨问笔记地址；合集引用默认渲染引用块，勾选「展开引用子笔记」递归下载；引用卡片在阅读器内联显示标题/摘要/作者；
-> - **墨问作者订阅**：订阅页「墨问作者」tab——搜索作者订阅，定时检查新笔记（与公众号订阅共用频率与自动下载设置），行内清单可见可挑，检查记录独立留痕；
-> - **CLI 对等**：`wx-kit mowen import / detect / search-user / list-user / list-mine / search / subscribe / unsubscribe / list / check-now`；
-> - 文库卡片右键可**复制文章保存路径**；贴图类微信文章自动走浏览器渲染兜底提取正文与图片；
-> - **依赖说明**：墨问发现与订阅检查走 mocli（`npm install -g @mowenxd/cli` 并 `mocli auth init`），未安装时墨问入口显示安装指引，不影响微信功能；
-> - **降级项（微信侧，与 v0.10.6 一致）**：微信读书列表接口仍被服务端按账号限制，订阅每次仅返回该号最新一篇；「按公众号批量下载」入口保持移除。
+> - **选题 GUI**：输入素材（从文库勾选，筛选为主搜索为辅）→ 分析 → 三候选平等展示，
+>   反馈与 Markdown 简报；历史选题可回看、可删除；分析过程 SSE 流式实时可见、可取消；
+> - **选题 CLI**：`wx-kit topics analyze --range 24h|3d|7d|custom | --article <id...>`
+>   与 `wx-kit topics brief`，stdout 纯 JSON 供 agent 消费（时间窗口选材仅 CLI 保留）；
+> - **多厂商 AI 设置**：智谱/千问/DeepSeek/Kimi/MiniMax/OpenAI/Google + 自定义，
+>   Key 经系统加密落盘、绝不进日志；正文出机边界明示；
+> - **Windows 正式支持**：修复 Windows 下阅读器图片/封面全挂的本地协议路径 bug；
+> - **墨问能力（v0.11.x 延续）**：下载页「墨问笔记」tab（搜作者/关键词/按链接）；
+>   订阅页墨问作者订阅；阅读器内联引用卡片；统一诊断日志 `main.log`（脱敏、滚动）；
+> - **降级项（微信侧，与 v0.10.6 一致）**：微信读书列表接口仍被服务端按账号限制，
+>   订阅每次仅返回该号最新一篇；「按公众号批量下载」入口保持移除。
 
 ## 当前界面
 
-以下截图来自 v0.11.3 界面（下载页双 tab 与内容卡片为 v0.11.2 统一后的形态；订阅页平台切换、文库、阅读器与 v0.11.0 一致）。
+以下截图来自 v0.12.0 界面（选题页与设置页为 v0.12.0 形态；下载页双 tab、订阅页
+平台切换、文库、阅读器延续 v0.11.x）。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
 | ![URL 下载完成并写入下载历史](docs/screenshots/download.png) | ![真实文章进入本地文库](docs/screenshots/library.png) |
 
+| 选题：从文库选素材 | 选题：已选素材待分析 |
+|---|---|
+| ![选稿弹层：筛选为主、搜索为辅](docs/screenshots/topics.png) | ![输入素材已选，可寻找选题](docs/screenshots/topics-picked.png) |
+
 | Markdown 阅读器 | 有效设置 |
 |---|---|
-| ![在应用内阅读本地 Markdown 正文](docs/screenshots/reader.png) | ![只保留当前有效配置的设置页](docs/screenshots/settings.png) |
+| ![在应用内阅读本地 Markdown 正文](docs/screenshots/reader.png) | ![分类化的设置页](docs/screenshots/settings.png) |
 
 ## 快速开始
 
@@ -86,11 +95,11 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.11.3：
+前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.12.0：
 
-- Apple Silicon：`wx-kit-0.11.3-arm64.dmg`
-- Intel Mac：`wx-kit-0.11.3.dmg`
-- Windows：`wx-kit.Setup.0.11.3.exe`
+- Apple Silicon：`wx-kit-0.12.0-arm64.dmg`
+- Intel Mac：`wx-kit-0.12.0.dmg`
+- Windows：`wx-kit.Setup.0.12.0.exe`
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -209,7 +218,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.11.3；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
+- 最新已发布版本：v0.12.0；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
