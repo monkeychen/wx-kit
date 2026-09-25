@@ -19,11 +19,15 @@ export function resolveWxfilePath(url: string, root: string): string | null {
   const rawPath = url.slice(pathStart)
 
   // Check each raw segment for dotdot after percent-decoding to catch %2E%2E variants.
+  // 盘符段（C: / C%3A）同样拒绝：Node win32 resolve 对同盘 drive-relative 段会沿用当前
+  // 已解析目录，把「C:」后面的段折叠回库根，绝对路径就被静默拼成了库内假路径
+  // （Windows 实录：root\Users\cza55\...\img-1.webp，不越界、不 403，但文件不存在）。
   for (const seg of rawPath.split('/')) {
     if (!seg) continue
     let decoded: string
     try { decoded = decodeURIComponent(seg) } catch { return null }
     if (decoded === '..' || decoded === '.') return null
+    if (/^[a-zA-Z]:/.test(decoded)) return null
   }
 
   let u: URL

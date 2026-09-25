@@ -85,6 +85,11 @@ describe('TopicService（IPC 背后的真实服务）', () => {
     class WaitingModel extends ServiceModel {
       override async extract(_input: TopicExtractionInput, signal?: AbortSignal): Promise<unknown> {
         this.calls++
+        // stage 标记为 extract 到模型真正被调用之间还有一段 IO；取消可能落在这个缝里。
+        // 真实模型在调用前先判 aborted，fixture 也必须判——否则已 aborted 的 signal
+        // 永远不会再触发 abort 事件，promise 直接挂死（全量跑时机器忙才暴露）。
+        const fail = () => Promise.reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))
+        if (signal?.aborted) return fail()
         return new Promise((_resolve, reject) => signal?.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { name: 'AbortError' })), { once: true }))
       }
     }

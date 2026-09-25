@@ -24,6 +24,18 @@ describe('resolveWxfilePath', () => {
   it('rejects percent-encoded dotdot traversal', () => {
     expect(resolveWxfilePath('wxfile://local/%2E%2E/%2E%2E/etc/passwd', ROOT)).toBeNull()
   })
+  it('rejects drive-letter segment (windows absolute path must not fold into root)', () => {
+    // Windows 实录：toWxfileBase 旧 bug 把绝对路径塞进协议路径，「C:」被 win32 resolve
+    // 折叠回库根，拼出不存在的嵌套路径——不越界、不 403，静默 ERR_FILE_NOT_FOUND。
+    const out = resolveWxfilePath('wxfile://local/' + encodeURIComponent('C:') + '/Users/u/wx-kit/a/images/img-1.webp', ROOT)
+    expect(out).toBeNull()
+    expect(resolveWxfilePath('wxfile://local/C%3A/Users/u/a.png', ROOT)).toBeNull()
+  })
+  it('keeps normal filenames containing colon-like dots (no false positive)', () => {
+    // 文件名允许出现冒号（如「2026-09-20_10:30.md」在部分平台合法）——只拒「字母+:」开头的盘符段
+    const out = resolveWxfilePath('wxfile://local/A/' + encodeURIComponent('2026_09_20_10.30') + '/a.png', ROOT)
+    expect(out).not.toBeNull()
+  })
 })
 
 // M56 后补：HTML 视图 iframe 内点外链会在 iframe 里导航，被微信的嵌入限制响应头阻断
