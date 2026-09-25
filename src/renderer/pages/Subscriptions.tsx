@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Input, Segmented, Switch, Button, Spin, Alert, message, List, Tag, Modal, Checkbox, Popconfirm } from 'antd'
 import { LoadingOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons'
 import { api } from '../api'
@@ -19,6 +19,7 @@ const RESULT_TTL_MS = 8000
 
 export default function Subscriptions() {
   const navigate = useNavigate()
+  const { pathname } = useLocation() // 阅读器「返回」的来源标记
   // 平台切换（M63 R4a）：默认公众号；墨问面板自包含状态，切走即卸载（数据落盘，重进重读）
   const [platform, setPlatform] = useState<'wechat' | 'mowen'>('wechat')
   const [accounts, setAccounts] = useState<SubscribedAccount[]>([])
@@ -257,7 +258,7 @@ export default function Subscriptions() {
                 onChange={() => toggleOne(a.fakeid, item.refId!, all)} data-testid="subs-pending-check" />}
               <a className="subs-pending-title"
                 onClick={() => {
-                  if (item.articleId) { navigate(`/reader/${encodeURIComponent(item.articleId)}`); return }
+                  if (item.articleId) { navigate(`/reader/${encodeURIComponent(item.articleId)}`, { state: { from: pathname } }); return }
                   if (item.url) { api.openExternal(item.url); return }
                   // M58 之前的检查记录没有 url/articleId——重新检查一次即可获得
                   message.info('该条记录来自旧版本检查，重新「检查」一次即可补全文章链接')

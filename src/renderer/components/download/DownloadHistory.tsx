@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { message, Popconfirm } from 'antd'
 import { api, type HistoryEvent } from '../../api'
 
@@ -45,6 +45,8 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
   const [total, setTotal] = useState(0)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const nav = useNavigate()
+  // 阅读器「返回」的来源标记：用当前路由而非硬编码，组件放哪都指向正确页面
+  const { pathname } = useLocation()
 
   // 初载 + reloadKey 变化（下载完成）：从头取 max(PAGE, 已加载)，下载完成时展开顶条
   useEffect(() => {
@@ -136,7 +138,7 @@ export default function DownloadHistory({ reloadKey, onAgain }: Props) {
 
                     <div className="act">
                       {it.status !== 'failed' && it.status !== 'cancelled' && it.id && !it.deleted && (
-                        <button data-testid="history-read" onClick={() => nav(`/reader/${encodeURIComponent(it.id!)}`)}>阅读</button>
+                        <button data-testid="history-read" onClick={() => nav(`/reader/${encodeURIComponent(it.id!)}`, { state: { from: pathname } })}>阅读</button>
                       )}
                       {it.dir && !it.deleted && <button onClick={() => api.reveal(it.dir!)}>文件夹</button>}
                       {it.status === 'failed' && <button className="retry" onClick={() => downloadOne(it.url, ev.formats)}>重试</button>}

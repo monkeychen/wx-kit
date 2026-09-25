@@ -5,7 +5,7 @@
 // 数据源与微信同构：检查明细走 checkLog 的 downloadDetail（fakeid 字段=uid，subscription-view
 // 工具直接复用）；主键 mowen_<noteId> 确定性，articleId 由编排回填、直开阅读器无需反查。
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Alert, Button, Checkbox, Input, List, Modal, Popconfirm, Spin, Switch, Tag, message } from 'antd'
 import { DeleteOutlined, LoadingOutlined } from '@ant-design/icons'
 import { api } from '../../api'
@@ -23,6 +23,7 @@ type PerAuthorResult = MowenCheckResult['results'][number]
 
 export default function MowenPanel() {
   const navigate = useNavigate()
+  const { pathname } = useLocation() // 阅读器「返回」的来源标记（本面板挂在订阅页路由下）
   const [authors, setAuthors] = useState<MowenSubscribedAuthor[]>([])
   const [loading, setLoading] = useState(true)
   const [mocliMissing, setMocliMissing] = useState(false)
@@ -229,7 +230,7 @@ export default function MowenPanel() {
                 onChange={() => toggleOne(a.uid, item.refId!, all)} data-testid="mowen-subs-note-check" />}
               <a className="subs-pending-title"
                 onClick={() => {
-                  if (item.articleId) { navigate(`/reader/${encodeURIComponent(item.articleId)}`); return }
+                  if (item.articleId) { navigate(`/reader/${encodeURIComponent(item.articleId)}`, { state: { from: pathname } }); return }
                   if (item.url) { api.openExternal(item.url); return }
                   message.info('该条记录来自旧版本检查，重新「检查」一次即可补全文章链接')
                 }}

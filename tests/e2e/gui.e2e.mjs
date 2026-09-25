@@ -20,7 +20,7 @@
 // Run: npx vite build && node tests/e2e/gui.e2e.mjs   (or: npm run test:e2e)
 import { _electron as electron } from 'playwright'
 import http from 'node:http'
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -115,6 +115,10 @@ ${vars}
 const log = (...a) => console.log('[e2e]', ...a)
 let failed = false
 const assert = (cond, msg) => { if (cond) { log('✓', msg) } else { failed = true; console.error('[e2e] ✗', msg) } }
+/** M78：runs 目录里是否存在一篇选了 2 篇文章且完成落盘的 manual run。 */
+const manualWindowPersisted = (libraryRoot) => readdirSync(join(libraryRoot, 'topic-decisions', 'runs'))
+  .map(dir => JSON.parse(readFileSync(join(libraryRoot, 'topic-decisions', 'runs', dir, 'result.json'), 'utf8')))
+  .some(run => run.window?.preset === 'manual' && run.window.articleIds?.length === 2 && run.status === 'completed')
 const TOPIC_E2E_KEY = 'wx-kit-topic-e2e-key'
 const topicModelRequests = []
 const readBody = (req) => new Promise((resolve) => {
@@ -249,11 +253,16 @@ async function main() {
 
   // 无头/受限会话（agent 沙箱、CI）GPU 与 Chromium 沙箱起不来——WXKIT_E2E_HEADLESS=1 时禁用
   const headlessFlags = process.env.WXKIT_E2E_HEADLESS ? ['--disable-gpu', '--no-sandbox'] : []
+  // ELECTRON_RUN_AS_NODE 会让被 spawn 的 Electron 以纯 Node 模式启动，永远打印不出
+  // playwright 等待的调试端口行（"Process failed to launch!"）。该变量常见于宿主为
+  // Electron 的环境（如 WorkBuddy spawn 的 AI 会话），必须在这里显式摘除。
+  const cleanEnv = { ...process.env }
+  delete cleanEnv.ELECTRON_RUN_AS_NODE
   const app = await electron.launch({
     executablePath: electronPath,
     args: [projectRoot, `--user-data-dir=${userDataDir}`, ...headlessFlags],
     cwd: projectRoot,
-    env: { ...process.env, WXKIT_WEREAD_BASE: wereadBase, WXKIT_MOWEN_BASE: mowenBase },
+    env: { ...cleanEnv, WXKIT_WEREAD_BASE: wereadBase, WXKIT_MOWEN_BASE: mowenBase },
   })
   const win = await app.firstWindow()
   const errors = []
@@ -433,10 +442,17 @@ async function main() {
     await win.waitForSelector('[data-testid="topics-page"]', { timeout: 8000 })
     const initialSelected = await win.locator('[data-testid="topic-card"][aria-checked="true"]').count()
     assert(initialSelected === 0, 'M70: topic page does not preselect a candidate')
-    await win.click('[data-testid="topic-range"]')
-    await win.locator('.ant-select-dropdown:visible .ant-select-item:has-text("自定义日期")').click()
-    await win.fill('[data-testid="topic-date-from"]', '2026-02-01')
-    await win.fill('[data-testid="topic-date-to"]', '2026-03-31')
+    // M78：GUI 只提供人工选篇——「输入素材」直接打开弹层勾选，不再有范围下拉
+    assert((await win.locator('[data-testid="topic-range"]').count()) === 0, 'M78: range select is gone, input material is the only path')
+    await win.click('[data-testid="topic-manual-pick"]')
+    await win.waitForSelector('[data-testid="topic-manual-list"]', { timeout: 5000 })
+    // M77：默认近 30 天，而 fixture 文章发表在年初——先放宽到全部才看得到素材
+    await win.locator('[data-testid="topic-manual-time"] .ant-segmented-item:has-text("全部")').click()
+    await win.waitForSelector('[data-testid="topic-manual-list"] .topic-manual-row', { timeout: 5000 })
+    await win.locator('[data-testid="topic-manual-list"] .topic-manual-row').first().click()
+    await win.locator('[data-testid="topic-manual-list"] .topic-manual-row').nth(1).click()
+    await win.click('[data-testid="topic-manual-confirm"]')
+    await win.waitForSelector('[data-testid="topic-manual-count"]', { timeout: 5000 })
     await win.click('[data-testid="topic-analyze"]')
     // M75：流式实时输出面板在结果落地前可见且内容增长
     await win.waitForSelector('[data-testid="topic-stream"]', { timeout: 8000 })
@@ -474,27 +490,84 @@ async function main() {
     assert(topicClipboard.includes('# 候选问题 1') && topicClipboard.includes('传播效果：未验证'),
       'M70: brief is generated and copied as Markdown')
     assert(topicModelRequests.length === 2, 'M70: switching tabs, feedback and brief do not call the model again')
-    // M75：手动选篇——选范围→弹层勾选→分析走 manual 通道
-    await win.click('[data-testid="topic-range"]')
-    await win.locator('.ant-select-dropdown:visible .ant-select-item:has-text("手动选择文章")').click()
-    await win.click('[data-testid="topic-manual-pick"]')
+    assert(topicModelRequests.length === 2 && manualWindowPersisted(libraryRoot), 'M78: manual run persists window after picking articles')
+    // M78：重新打开弹层验证筛选不丢已选，确认后再次分析走独立 manual 通道
+    await win.click('[data-testid="topic-manual-edit"]')
     await win.waitForSelector('[data-testid="topic-manual-list"]', { timeout: 5000 })
-    await win.locator('[data-testid="topic-manual-list"] .topic-manual-row').first().click()
-    await win.locator('[data-testid="topic-manual-list"] .topic-manual-row').nth(1).click()
-    await win.locator('[data-testid="topic-manual-modal"] .ant-btn-primary').click()
+    // M77 设计：每次打开筛选重置为默认近 30 天——fixture 文章在年初，先放宽到全部
+    await win.locator('[data-testid="topic-manual-time"] .ant-segmented-item:has-text("全部")').click()
+    await win.waitForSelector('[data-testid="topic-manual-list"] .topic-manual-row', { timeout: 5000 })
+    // M78：「看一眼」——fixture 无 og:description，走正文截断；展开不改变已选
+    await win.locator('[data-testid="topic-manual-peek"]').first().click()
+    await win.waitForSelector('[data-testid="topic-manual-excerpt"]', { timeout: 5000 })
+    // md 懒加载是异步的——等真实正文摘录就位再断言，别把「加载中…」当结果
+    await win.waitForFunction(
+      () => document.querySelector('[data-testid="topic-manual-excerpt"]')?.textContent?.includes('第二段'),
+      null, { timeout: 5000 },
+    )
+    const excerptText = await win.locator('[data-testid="topic-manual-excerpt"]').first().innerText()
+    assert(excerptText.includes('正文') && excerptText.includes('第二段'),
+      `M78: peek shows body excerpt when digest is missing (saw: ${excerptText.slice(0, 40)})`)
+    await win.locator('[data-testid="topic-manual-peek"]').first().click()
+    await win.waitForSelector('[data-testid="topic-manual-excerpt"]', { state: 'detached', timeout: 5000 })
+    // M78：「查看原文」——跳阅读器（fixture 文章有 md），返回后弹层重开、已选保留
+    await win.locator('[data-testid="topic-manual-open"]').first().click()
+    await win.waitForSelector('[data-testid="reader-back"]:has-text("返回选稿")', { timeout: 8000 })
+    assert((await win.locator('.reader-title').innerText()).length > 0, 'M78: open-in-reader renders the article')
+    await win.click('[data-testid="reader-back"]')
+    // Modal 的 data-testid 落在常驻 .ant-modal-root 上（fixed wrap 不占布局流），
+    // visible 判定永远失败——等弹层内部恒渲染的时间筛选控件
+    await win.waitForSelector('[data-testid="topic-manual-time"]', { timeout: 8000 })
+    await win.locator('[data-testid="topic-manual-time"] .ant-segmented-item:has-text("全部")').click()
+    await win.waitForSelector('[data-testid="topic-manual-list"] .topic-manual-row', { timeout: 5000 })
+    // M77：筛选真的收窄——搜一个不存在的词应落到空态，清空后列表回来
+    await win.fill('[data-testid="topic-manual-search"]', 'zzz-不存在的关键词')
+    await win.waitForSelector('[data-testid="topic-manual-empty"]', { timeout: 5000 })
+    await win.fill('[data-testid="topic-manual-search"]', '')
+    await win.waitForSelector('[data-testid="topic-manual-list"] .topic-manual-row', { timeout: 5000 })
+    await win.click('[data-testid="topic-manual-confirm"]')
     await win.waitForSelector('[data-testid="topic-manual-count"]', { timeout: 5000 })
     assert((await win.locator('[data-testid="topic-manual-count"]').innerText()).includes('2'),
-      'M75: manual picker keeps the two chosen articles')
+      'M78: filtering without toggling keeps the two chosen articles')
     await win.click('[data-testid="topic-analyze"]')
     await win.waitForSelector('[data-testid="topic-card"]', { timeout: 30000 })
     assert(topicModelRequests.length === 4, 'M75: manual run issues its own two authenticated model requests')
-    {
-      const runDirs = readdirSync(join(libraryRoot, 'topic-decisions', 'runs'))
-      const manualRun = runDirs.map(dir => JSON.parse(readFileSync(join(libraryRoot, 'topic-decisions', 'runs', dir, 'result.json'), 'utf8')))
-        .find(run => run.window?.preset === 'manual')
-      assert(!!manualRun && manualRun.window.articleIds.length === 2 && manualRun.status === 'completed',
-        'M75: manual window persists in run result and analysis completes')
-    }
+    assert(manualWindowPersisted(libraryRoot), 'M78: manual window persists in run result and analysis completes')
+    // M78：历史选题——run 落盘后可列举、可回看、可返回
+    await win.click('[data-testid="topic-history"]')
+    await win.waitForSelector('[data-testid="topic-history-item"]', { timeout: 5000 })
+    const historyCount = await win.locator('[data-testid="topic-history-item"]').count()
+    assert(historyCount === 2, `M78: history lists both runs (got ${historyCount})`)
+    await win.locator('[data-testid="topic-history-item"]').first().click()
+    await win.waitForSelector('[data-testid="topic-viewing-banner"]', { timeout: 5000 })
+    assert((await win.locator('[data-testid="topic-card"]').count()) === 3, 'M78: viewing a history run renders its cards')
+    await win.locator('[data-testid="topic-card"]').first().click()
+    await win.waitForSelector('[data-testid="topic-detail"]', { timeout: 5000 })
+    await win.click('[data-testid="topic-viewing-back"]')
+    assert((await win.locator('[data-testid="topic-viewing-banner"]').count()) === 0, 'M78: back returns to the current view')
+    // M78：删除历史——确认弹窗内先选方式（卡片单选，默认仅列表移除）再统一确认
+    await win.click('[data-testid="topic-history"]')
+    await win.waitForSelector('[data-testid="topic-history-item"]', { timeout: 5000 })
+    await win.locator('[data-testid="topic-history-item"]').first().locator('[data-testid="topic-history-delete"]').click()
+    // Modal 的 testid 落在常驻 DOM 的 .ant-modal-root 上（hidden），要等弹窗内部内容可见
+    await win.waitForSelector('[data-testid="topic-history-delete-confirm"]', { timeout: 5000 })
+    // 默认选中「仅从列表移除」，直接确认
+    await win.click('[data-testid="topic-history-delete-confirm"]')
+    // 注意不能等 detached：删掉一条后另一条顶成"第一个匹配"，detached 永不满足——等数量
+    await win.waitForFunction(() => document.querySelectorAll('[data-testid="topic-history-item"]').length === 1, undefined, { timeout: 5000 })
+    assert((await win.locator('[data-testid="topic-history-item"]').count()) === 1,
+      'M78: list-only removal hides the run but keeps the others')
+    await win.locator('[data-testid="topic-history-item"]').first().locator('[data-testid="topic-history-delete"]').click()
+    await win.waitForSelector('[data-testid="topic-history-delete-confirm"]', { timeout: 5000 })
+    // 切到「删除本地文件」再确认
+    await win.locator('input[name="topic-delete-mode"]').nth(1).check()
+    await win.click('[data-testid="topic-history-delete-confirm"]')
+    await win.waitForFunction(() => document.querySelectorAll('[data-testid="topic-history-item"]').length === 0, undefined, { timeout: 5000 })
+    // 仅列表移除的那条文件仍在（这就是两种删除方式的差别）
+    const leftoverRuns = existsSync(join(libraryRoot, 'topic-decisions', 'runs'))
+      ? readdirSync(join(libraryRoot, 'topic-decisions', 'runs')).length : 0
+    assert(leftoverRuns === 1, `M78: file deletion clears only its own run (left ${leftoverRuns})`)
+    await win.click('.ant-drawer-close')
     await win.screenshot({ path: '/tmp/wxk-e2e-topics.png', fullPage: true })
     {
       const runFiles = readdirSync(join(libraryRoot, 'topic-decisions'), { recursive: true }).map(String)
@@ -842,11 +915,11 @@ async function main() {
     }, { timeout: 30000 })
     const st1 = await win.locator('[data-testid="subs-item-status"]').first().innerText()
     assert(st1 === '已下载' || st1 === '文库已有', `M58: 单篇下载后状态就地更新 (saw: ${st1})`)
-    // articleId 回填后点标题直开阅读器
+    // articleId 回填后点标题直开阅读器；返回按钮原路回订阅（state.from），不再绕导航
     await win.locator('[data-testid="subs-pending-title"]').first().click()
-    await win.waitForURL(/reader/, { timeout: 8000 })
+    await win.waitForSelector('[data-testid="reader-back"]:has-text("返回订阅")', { timeout: 8000 })
     assert(win.url().includes('/reader/'), `M58: 点已下载文章标题直开阅读器 (${win.url()})`)
-    await win.click('[data-testid="nav-订阅"]')
+    await win.click('[data-testid="reader-back"]')
     await win.waitForSelector('[data-testid="subs-row"]', { timeout: 8000 })
     // 下载成功后 newRefs 清零——展开入口不得随之消失（v0.10.6 实录：自动下载后列表无法展开）
     await win.waitForSelector('[data-testid="subs-expand"]', { timeout: 8000 })
@@ -887,6 +960,10 @@ async function main() {
     assert(refHtml.includes('《子笔记标题甲》'), 'M64: 引用卡片带被引用笔记标题（v0.11.2 R1 核心）')
     assert(refHtml.includes('子笔记作者丙'), 'M64: 引用卡片带被引用笔记作者')
     assert(!refHtml.includes('引用笔记（'), 'M64: 旧尾部追加块已退场（同一信息不再两处重复）')
+    // 下载历史入口进阅读器，返回按钮原路回下载页（state.from）
+    await win.click('[data-testid="reader-back"]')
+    await win.waitForSelector('[data-testid="url-input"]', { timeout: 8000 })
+    assert(true, 'M64: 下载入口进阅读器后「返回下载」回到下载页')
 
     const mowenMdRel = readdirSync(libraryRoot, { recursive: true }).map(String)
       .find((p) => p.endsWith('content.md') && p.includes('墨问'))

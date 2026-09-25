@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Input, Select, Segmented, Spin, Popconfirm, FloatButton, Modal, Button, Space, message } from 'antd'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import ArticleRow from '../components/ArticleRow'
@@ -49,6 +49,7 @@ export default function Library() {
   const widthsRef = useRef(widths)
   useEffect(() => { widthsRef.current = widths }, [widths])
   const nav = useNavigate()
+  const { pathname } = useLocation() // 阅读器「返回」的来源标记
 
   const load = async () => {
     setLoading(true)
@@ -121,7 +122,7 @@ export default function Library() {
     window.addEventListener('mouseup', onUp)
   }
 
-  const read = (id: string) => nav(`/reader/${encodeURIComponent(id)}`)
+  const read = (id: string) => nav(`/reader/${encodeURIComponent(id)}`, { state: { from: pathname } })
   const delSingle = async (id: string) => {
     try { await api.libraryRemove(id); message.success('已删除'); setSel((s) => { const n = new Set(s); n.delete(id); return n }); await load() }
     catch (e) { message.error('删除失败：' + (e as Error).message) }

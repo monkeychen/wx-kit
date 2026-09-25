@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { Segmented, Button, Spin, Empty } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
@@ -23,6 +23,25 @@ export default function Reader() {
   const [kind, setKind] = useState<'md' | 'html'>('md')
   const [md, setMd] = useState('')
   const [loading, setLoading] = useState(true)
+  // 返回目标三档：选稿弹层（sessionStorage 标记，返回时恢复弹层现场）>
+  // 跳转来源（入口 nav 时的 state.from，如订阅/下载页）> 兜底文库。
+  const location = useLocation()
+  const fromState = (location.state as { from?: string } | null)?.from
+  const fromTopicsPick = sessionStorage.getItem('wxk-topics-pick-return') !== null
+  const backLabel = fromTopicsPick ? '返回选稿'
+    : fromState === '/subscriptions' ? '返回订阅'
+    : fromState === '/' ? '返回下载'
+    : '返回文库'
+  const goBack = () => {
+    if (fromTopicsPick) {
+      // 不在这里删标记：选稿页挂载时才消费它。写成 'return' 表示「经返回按钮回去」，
+      // 若用户绕路（侧边导航）回选稿，标记停在 '1'，弹层不会误开。
+      sessionStorage.setItem('wxk-topics-pick-return', 'return')
+      nav('/topics')
+      return
+    }
+    nav(typeof fromState === 'string' ? fromState : '/library')
+  }
 
   useEffect(() => {
     (async () => {
@@ -49,7 +68,7 @@ export default function Reader() {
   return (
     <>
       <div className="reader-bar">
-        <Button icon={<ArrowLeftOutlined />} onClick={() => nav('/library')}>返回文库</Button>
+        <Button icon={<ArrowLeftOutlined />} data-testid="reader-back" onClick={goBack}>{backLabel}</Button>
         <span className="font-serif" style={{ flex: 1, fontWeight: 600, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.title}</span>
         <Segmented value={kind} onChange={(v) => setKind(v as 'md' | 'html')}
           options={[
