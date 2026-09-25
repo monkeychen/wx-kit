@@ -1,6 +1,6 @@
 // tests/renderer/library-view.test.ts
 import { describe, it, expect } from 'vitest'
-import { accountName, accountOptions, filterByAccount, sortArticles, groupByAccount } from '../../src/renderer/library-view'
+import { accountName, accountOptions, filterByAccount } from '../../src/renderer/library-view'
 import type { ArticleMeta } from '../../src/core/types'
 
 const mk = (over: Partial<ArticleMeta>): ArticleMeta => ({

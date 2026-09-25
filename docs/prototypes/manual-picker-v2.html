@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>wx-kit · 手动选稿弹层改版原型 v2（可交互）</title>
+<style>
+  :root {
+    --paper:#faf7f0; --raised:#fffdf8; --sunken:#f3ede1;
+    --ink:#211c15; --soft:#6c6354; --faint:#a59c89;
+    --red:#b5462f; --red-soft:#c9603f; --red-wash:#f6e7df;
+    --jade:#3f6b51; --jade-wash:#e6efe7;
+    --amber:#9a6b1e; --amber-wash:#f3e9d4;
+    --line:rgba(33,28,21,.10); --line-strong:rgba(33,28,21,.18);
+    --shadow:0 1px 2px rgba(33,28,21,.04),0 8px 24px rgba(33,28,21,.06);
+    --serif:"Source Han Serif SC","Noto Serif SC","Songti SC","STSong",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{background-image:radial-gradient(rgba(33,28,21,.022) .7px,transparent .7px);background-size:11px 11px}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+
+  /* ---------- 应用外壳 ---------- */
+  .mast{height:68px;padding:0 40px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(var(--raised),var(--paper))}
+  .brand{display:flex;align-items:baseline;gap:13px}
+  .brand strong{font:700 22px var(--serif);letter-spacing:.06em}
+  .brand span{font-size:11px;letter-spacing:.26em;color:var(--red)}
+  .topnav{display:flex;gap:28px;color:var(--soft);font-size:15px}
+  .topnav b{color:var(--ink);position:relative;font-weight:600}
+  .topnav b:after{content:"";position:absolute;height:2px;background:var(--red);left:0;right:0;bottom:-24px}
+  .page{max-width:1180px;margin:0 auto;padding:34px 40px 70px}
+  .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--red);font-weight:650}
+  h1{font:700 30px/1.15 var(--serif);margin:7px 0 8px}
+  .page-sub{color:var(--soft);font-size:14.5px;margin-top:8px}
+  .surface{background:var(--raised);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+  .toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding:18px 20px;margin-top:26px;flex-wrap:wrap}
+  .field{display:grid;gap:6px}
+  .field label{font-size:12px;color:var(--soft)}
+  .toolbar .right{display:flex;align-items:center;gap:10px}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:10px}
+  .skeleton{height:132px;border-radius:8px;border:1px dashed var(--line-strong);background:var(--sunken);opacity:.55;margin-top:22px}
+
+  /* ---------- 原型工具条 ---------- */
+  /* ---------- 原型工具条（置于遮罩之上，演示时可随时切场景） ---------- */
+  .protobar{position:relative;z-index:95;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--amber-wash);border:1px solid rgba(154,107,30,.22);border-radius:10px;padding:10px 14px;margin-bottom:22px}
+  .protobar .tag{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);font-weight:700}
+  .protobar p{margin:0;font-size:12.5px;color:var(--soft);flex:1 1 340px}
+  .protobar .grp{display:flex;gap:6px;align-items:center}
+  .chip{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--raised);font-size:12.5px;color:var(--soft)}
+  .chip:hover{border-color:var(--red);color:var(--red)}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  .seg{display:inline-flex;background:var(--sunken);border-radius:8px;padding:2px}
+  .seg button{border:0;background:transparent;border-radius:6px;padding:6px 12px;font-size:12.5px;color:var(--soft)}
+  .seg button.on{background:var(--raised);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(33,28,21,.06)}
+
+  /* ---------- 弹层 ---------- */
+  .mask{position:fixed;inset:0;background:rgba(33,28,21,.42);display:grid;place-items:start center;z-index:60;padding:164px 28px 28px;overflow-y:auto}
+  .mask[hidden]{display:none}
+  .modal{width:min(920px,100%);height:min(660px,calc(100vh - 200px));background:var(--paper);border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 24px 70px rgba(33,28,21,.28);display:flex;flex-direction:column;overflow:hidden}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 20px 14px;border-bottom:1px solid var(--line);background:var(--raised)}
+  .modal-head h2{font:700 18px var(--serif);margin:0}
+  .modal-head .sub{font-size:12.5px;color:var(--soft);margin-top:3px}
+  .x{border:0;background:transparent;font-size:18px;color:var(--faint);line-height:1;padding:4px 6px;border-radius:6px}
+  .x:hover{background:var(--sunken);color:var(--ink)}
+
+  .filters{border-bottom:1px solid var(--line);background:var(--raised);padding:12px 20px 14px;display:grid;gap:10px}
+  .filters .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .seg-time{display:inline-flex;background:var(--sunken);border-radius:8px;padding:2px}
+  .seg-time button{border:0;background:transparent;border-radius:6px;height:30px;padding:0 13px;font-size:13px;color:var(--soft)}
+  .seg-time button.on{background:var(--raised);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(33,28,21,.06)}
+  .select{height:34px;border:1px solid var(--line-strong);border-radius:7px;background:var(--paper);padding:0 30px 0 10px;font-size:13px;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23a59c89' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 11px center;cursor:pointer}
+  .search{position:relative;flex:1 1 260px;min-width:220px}
+  .search input{width:100%;height:34px;border:1px solid var(--line-strong);border-radius:7px;background:var(--paper);padding:0 30px 0 32px;font-size:13px}
+  .search input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(181,70,47,.12)}
+  .search .icon{position:absolute;left:10px;top:9px;color:var(--faint);font-size:13px}
+  .search .clear{position:absolute;right:6px;top:6px;border:0;background:transparent;color:var(--faint);font-size:14px;line-height:1;padding:4px 6px;border-radius:5px}
+  .search .clear:hover{background:var(--sunken);color:var(--ink)}
+  .toggle{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--soft);user-select:none;cursor:pointer}
+  .toggle input{width:15px;height:15px;accent-color:var(--red)}
+  .meta-line{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--soft)}
+  .meta-line .strong{color:var(--ink);font-weight:600}
+  .linkbtn{border:0;background:transparent;color:var(--red);font-size:12.5px;padding:2px 4px;border-radius:5px}
+  .linkbtn:hover{background:var(--red-wash)}
+
+  .list{flex:1 1 auto;overflow-y:auto;padding:0 20px 8px}
+  .group-head{position:sticky;top:0;z-index:2;background:var(--paper);padding:12px 2px 7px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+  .row{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:12px;align-items:start;padding:11px 8px 11px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .row:hover{background:var(--sunken)}
+  .row.picked{background:var(--red-wash)}
+  .row.picked:hover{background:#f2ded6}
+  .row .cb{width:16px;height:16px;margin-top:2px;accent-color:var(--red);cursor:pointer}
+  .row .copy{min-width:0;display:grid;gap:3px}
+  .row .t{font-size:13.5px;line-height:1.45;color:var(--ink)}
+  .row .m{font-size:11.5px;color:var(--faint);display:flex;gap:8px;flex-wrap:wrap}
+  .row .m .src{color:var(--soft)}
+  .row .m .badge-sq{border:1px solid var(--line-strong);border-radius:4px;padding:0 5px;font-size:10.5px;color:var(--soft)}
+  .row .when{font-size:12px;color:var(--faint);white-space:nowrap;padding-top:1px;font-variant-numeric:tabular-nums}
+  .more{display:block;width:100%;margin:12px 0 6px;height:34px;border:1px dashed var(--line-strong);border-radius:7px;background:transparent;color:var(--soft);font-size:12.5px}
+  .more:hover{border-color:var(--red);color:var(--red)}
+
+  .empty{padding:52px 20px;text-align:center;color:var(--soft)}
+  .empty .big{font-size:15px;color:var(--ink);margin-bottom:6px}
+  .empty p{margin:0 0 14px;font-size:13px}
+
+  .modal-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 20px;border-top:1px solid var(--line);background:var(--raised)}
+  .foot-left{font-size:12.5px;color:var(--soft);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .foot-left b{color:var(--ink)}
+  .foot-right{display:flex;gap:10px;align-items:center}
+  .btn{height:36px;border:1px solid var(--line-strong);border-radius:7px;background:var(--raised);padding:0 14px;font-size:13.5px}
+  .btn:hover{border-color:var(--ink)}
+  .btn.primary{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+  .btn.primary:hover{background:var(--red-soft)}
+  .btn.primary:disabled{background:var(--sunken);border-color:var(--line-strong);color:var(--faint);cursor:not-allowed}
+  .btn.sm{height:30px;padding:0 11px;font-size:12.5px}
+
+  .toast{position:fixed;top:16px;left:50%;transform:translate(-50%,-8px);background:var(--ink);color:var(--paper);font-size:13px;padding:9px 16px;border-radius:8px;box-shadow:0 10px 30px rgba(33,28,21,.25);opacity:0;pointer-events:none;transition:.18s ease;z-index:120}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------- 旧版对照 ---------- */
+  .legacy-note{background:var(--red-wash);border:1px solid rgba(181,70,47,.25);color:#8d3623;font-size:12.5px;padding:9px 14px;border-radius:8px;margin:12px 20px 0}
+  .legacy-list{max-height:380px;overflow-y:auto;display:flex;flex-direction:column}
+  .legacy-row{display:flex;gap:10px;align-items:flex-start;padding:11px 4px;border-bottom:1px solid var(--line)}
+  .legacy-row .copy strong{display:block;font-size:13.5px}
+  .legacy-row .copy span{font-size:12px;color:var(--faint)}
+
+  /* ---------- 设计说明抽屉 ---------- */
+  .notes{position:fixed;top:0;right:0;bottom:0;width:min(430px,92vw);background:var(--raised);border-left:1px solid var(--line-strong);box-shadow:-18px 0 50px rgba(33,28,21,.14);z-index:80;overflow-y:auto;padding:24px 26px 40px}
+  .notes[hidden]{display:none}
+  .notes h3{font:700 19px var(--serif);margin:0 0 4px}
+  .notes .lead{color:var(--soft);font-size:13px;margin:0 0 18px}
+  .notes h4{font-size:13px;margin:20px 0 7px;color:var(--red);letter-spacing:.04em}
+  .notes ul{margin:0;padding-left:18px;display:grid;gap:7px}
+  .notes li{font-size:13px;line-height:1.65;color:var(--ink)}
+  .notes li small{display:block;color:var(--soft);font-size:12px;line-height:1.55}
+  .notes .close{position:absolute;top:16px;right:18px;border:0;background:transparent;color:var(--faint);font-size:16px}
+  .kv{display:grid;grid-template-columns:82px minmax(0,1fr);gap:6px 12px;font-size:12.5px;margin-top:6px}
+  .kv span{color:var(--faint)}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="brand"><strong>wx-kit</strong><span>WARM EDITORIAL</span></div>
+  <nav class="topnav"><span>文库</span><span>订阅</span><b>选题</b><span>设置</span></nav>
+</header>
+
+<div class="page">
+  <div class="protobar">
+    <span class="tag">Prototype</span>
+    <p>高保真可交互原型 · 手动选稿弹层改版 v2。筛选、排序、搜索、勾选都是真的。</p>
+    <div class="grp">
+      <div class="seg" id="versionSeg">
+        <button data-v="new" class="on">改版后</button><button data-v="old">旧版对照</button>
+      </div>
+    </div>
+    <div class="grp">
+      <button class="chip" id="sceneDefault">默认打开</button>
+      <button class="chip" id="sceneFull">预选 30 篇（上限）</button>
+      <button class="chip" id="sceneEmpty">空结果</button>
+      <button class="chip" id="openNotes">设计说明</button>
+    </div>
+  </div>
+
+  <div class="eyebrow">Topics</div>
+  <h1>今天写什么</h1>
+  <div class="page-sub">从本地素材中找出最多 3 个可追溯的候选，帮你判断“值不值写”。</div>
+
+  <section class="surface toolbar">
+    <div class="field">
+      <label>素材范围</label>
+      <select class="select" style="width:172px">
+        <option>最近 24 小时</option><option>最近 3 天</option><option>最近 7 天</option>
+        <option>自定义日期</option><option selected>手动选择文章</option>
+      </select>
+    </div>
+    <div class="right">
+      <span style="font-size:13px;color:var(--soft)" id="pageCount">已选 0 篇</span>
+      <button class="btn sm" id="openModal">修改</button>
+      <button class="btn primary">寻找选题</button>
+    </div>
+  </section>
+  <div class="hint">分析时，所选文章正文会发送到你配置的 AI 服务。</div>
+  <div class="skeleton"></div>
+</div>
+
+<!-- ===================== 弹层：改版后 ===================== -->
+<div class="mask" id="mask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="选择文章作为素材">
+
+    <div class="modal-head">
+      <div>
+        <h2>选择文章作为素材</h2>
+        <div class="sub">先按条件把范围收窄，再挑具体文章 · 最多 30 篇</div>
+      </div>
+      <button class="x" id="closeModal" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="filters">
+      <div class="row">
+        <div class="seg-time" id="timeSeg">
+          <button data-t="7d">近 7 天</button>
+          <button data-t="30d" class="on">近 30 天</button>
+          <button data-t="90d">近 90 天</button>
+          <button data-t="year">今年</button>
+          <button data-t="all">全部</button>
+        </div>
+        <select class="select" id="sourceSel" style="min-width:190px"></select>
+        <select class="select" id="sortSel" style="min-width:150px">
+          <option value="new">发布时间：最新在前</option>
+          <option value="old">发布时间：最早在前</option>
+          <option value="src">按公众号 / 作者分组</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="search">
+          <span class="icon">⌕</span>
+          <input id="kw" type="text" placeholder="在标题、公众号 / 墨问作者中搜索（可留空）" />
+          <button class="clear" id="kwClear" hidden>✕</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="onlyPicked" /> 仅看已选</label>
+      </div>
+      <div class="meta-line">
+        <span id="hitLine"></span>
+        <button class="linkbtn" id="resetAll">重置条件</button>
+      </div>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <div class="modal-foot">
+      <div class="foot-left">
+        <span id="footCount"></span>
+        <button class="btn sm" id="selectAll">全选命中</button>
+        <button class="btn sm" id="clearHits">清空命中</button>
+      </div>
+      <div class="foot-right">
+        <button class="btn" id="cancelBtn">取消</button>
+        <button class="btn primary" id="confirmBtn">用这 0 篇分析</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 弹层：旧版对照 ===================== -->
+<div class="mask" id="maskOld" hidden>
+  <div class="modal" style="width:min(640px,100%);height:auto">
+    <div class="modal-head">
+      <div>
+        <h2>选择文章作为素材（旧版）</h2>
+        <div class="sub">只有一个搜索框，全部文章平铺</div>
+      </div>
+      <button class="x" id="closeModalOld">✕</button>
+    </div>
+    <div class="legacy-note">旧版唯一的操作是搜索。90 篇素材全量平铺，没有时间范围、没有来源筛选、没有排序——用户只能靠关键词碰运气。</div>
+    <div style="padding:14px 20px 4px">
+      <div class="search"><span class="icon">⌕</span><input id="oldKw" type="text" placeholder="按标题或公众号搜索" /></div>
+    </div>
+    <div class="legacy-list" id="oldList" style="max-height:340px;margin:10px 20px 0"></div>
+    <div class="modal-foot">
+      <div class="foot-left"><span id="oldCount">共 90 篇 · 已选 0 篇</span></div>
+      <div class="foot-right">
+        <button class="btn" id="cancelOld">取消</button>
+        <button class="btn primary" id="confirmOld">确定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 设计说明 ===================== -->
+<aside class="notes" id="notes" hidden>
+  <button class="close" id="closeNotes">✕</button>
+  <h3>改版设计说明</h3>
+  <p class="lead">原则：<b>筛选为主、搜索为辅</b>。先让人把 90 篇收窄到十几篇，再挑；搜索只作为收尾的精确查找。</p>
+
+  <h4>一、筛选区（弹层顶部固定）</h4>
+  <ul>
+    <li>时间：近 7/30/90 天、今年、全部。<small>默认「近 30 天」——找素材绝大多数是近期行为，默认全量等于没有默认。</small></li>
+    <li>来源：下拉按「公众号 / 墨问作者」分组，选项后带当前时间段内篇数。<small>复用 library-view 的等价类归并逻辑，同一号的老条目不会掉队。</small></li>
+    <li>排序：默认「发布时间：最新在前」，可切最早在前或按来源分组。<small>与文库页共用 sortArticles，无时间的恒排末尾。</small></li>
+    <li>搜索：辅助位，默认只匹配标题 + 来源，placeholder 明说「可留空」。<small>不搜正文：正文匹配看似强大，实际命中无法预期，用户更算不清漏了什么。</small></li>
+    <li>「仅看已选」开关：随时回看已挑的稿子。</li>
+  </ul>
+
+  <h4>二、列表区</h4>
+  <ul>
+    <li>按日期分组 + sticky 组头，滚动时始终知道自己在哪一天。</li>
+    <li>每行：勾选框 · 标题 · 来源 + 时间。来源带公众号/墨问角标。</li>
+    <li>渐进渲染：首屏 40 条，底部「加载更多（还有 N 篇）」，全量 90 篇不一次铺满。</li>
+    <li>命中行高亮为朱砂浅底，勾选状态一眼可见。</li>
+  </ul>
+
+  <h4>三、选择不会因为筛选而丢失</h4>
+  <ul>
+    <li>已选项跨筛选保留；底部提示「已选 5 篇（其中 2 篇不在当前条件内，已保留）」。</li>
+    <li>「全选命中 / 清空命中」只作用于当前筛选结果，不会误伤筛选外的选择。</li>
+    <li>上限 30 篇，触顶给提示而不是静默失败。</li>
+  </ul>
+
+  <h4>四、底部行动条</h4>
+  <ul>
+    <li>左侧：命中 N 篇 · 已选 M 篇；右侧：取消 / 主按钮。</li>
+    <li>主按钮写结果：「用这 5 篇分析」，未选时禁用并写「选择文章」——按钮直接说清会发生什么。</li>
+  </ul>
+
+  <h4>五、空态</h4>
+  <ul>
+    <li>说明是哪个条件卡住了，并给一键「放宽到全部时间」，不留死路。</li>
+  </ul>
+
+  <h4>待确认</h4>
+  <div class="kv">
+    <span>默认时间</span><div>近 30 天（备选：近 7 天）</div>
+    <span>搜索范围</span><div>标题 + 来源（备选：加摘要）</div>
+    <span>上限</span><div>30 篇，与 core 护栏一致</div>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var MAX = 30, PAGE = 40;
+  var DAY = 86400000;
+  var NOW = Date.now();
+
+  var SOURCES = [
+    { id: 'wx-latepost', name: '晚点 LatePost', kind: 'wx' },
+    { id: 'wx-sspai', name: '少数派', kind: 'wx' },
+    { id: 'wx-caobian', name: '槽边往事', kind: 'wx' },
+    { id: 'wx-tencentri', name: '腾讯研究院', kind: 'wx' },
+    { id: 'wx-luanfanshu', name: '乱翻书', kind: 'wx' },
+    { id: 'wx-baoyu', name: '宝玉分享', kind: 'wx' },
+    { id: 'wx-kazike', name: '数字生命卡兹克', kind: 'wx' },
+    { id: 'wx-wanfeng', name: '晚风说', kind: 'wx' },
+    { id: 'mo-laoichi', name: '老池', kind: 'mo' },
+    { id: 'mo-erye', name: '二爷', kind: 'mo' },
+    { id: 'mo-heguang', name: '和光同尘', kind: 'mo' },
+    { id: 'mo-nanshan', name: '南山', kind: 'mo' },
+    { id: 'mo-ayuan', name: '阿元', kind: 'mo' },
+    { id: 'mo-xiaoxi', name: '小溪', kind: 'mo' }
+  ];
+
+  var TITLES = [
+    '大模型这半年，真正落地的是哪些场景','为什么 AI 编程助手在老项目里总掉链子','上下文窗口变大之后，工程师反而更容易犯错',
+    '我们团队把周报交给 AI 之后发生了什么','别再问 AI 能不能取代你，问它能不能放大你','一份给非技术同事的大模型说明书',
+    '推理模型不是更聪明，只是更啰嗦','为什么你的 AI 助手越用越笨','本地小模型能做什么，不能做什么','我把一年的读书笔记喂给了模型',
+    'AI 写作的三个陷阱与一个解法','关于 Agent，被误读最多的五件事','模型评测榜单之外，还应该看什么','当搜索变成对话，内容的价值去哪了',
+    '一次真实的迁移：从 Copilot 到自建工作流','为什么企业里的 AI 项目总停在 POC','免费额度用完之后，我重新算了笔账','大模型时代的个人知识库该怎么建',
+    '写不出来的时候，先写坏一版','长文的结构感是可以练出来的','我如何为一篇文章找三个不同角度','标题不是包装，是承诺',
+    '读者不关心你的经历，关心他的处境','修改比写作更重要的三个理由','为什么你的公众号打开率一直在掉','内容复用的正确姿势：一稿多投还是一稿多形态',
+    '写作者的时间管理：整块时间比早起更重要','关于“日更”这件事，我改了看法','素材库不是收藏夹','如何用一句话判断一个选题值不值得写',
+    '编辑视角：什么样的稿子会被一眼看中','深度长文正在被谁吃掉','抄写是最被低估的练笔方式','访谈稿最难的不是提问','我删掉了自己一半的旧文章',
+    '需求评审最该问的三个问题','用户说“我要更快的马”时，他在说什么','做工具类产品，先解决谁的一分钟','功能越多，说明书越长，用户越少',
+    '我们为什么把首页砍掉了三分之二','数据看板做好了，为什么没人看','一个被低估的能力：把问题写清楚','会议记录为什么总没人回看',
+    '远程协作里，沉默成本最高','如何优雅地说“这个我做不了”','项目管理工具救不了没有节奏的团队','从执行到判断：第二年该换的思维方式',
+    '面试时我最想听到的三种回答','中年转岗，最该保留的是什么','自由职业第一年，我学到的定价逻辑','订阅制之后，创作者得到了什么',
+    '知识付费的第二次机会','小众杂志为什么活得好','当平台开始收流量费','工具类产品的护城河到底在哪','开源项目变现的四种现实路径',
+    '中国 SaaS 的十年与一课','从“增长”回到“留存”','出海不是翻译，是重做','当所有人都在做 AI 应用，谁在赚钱','重读《如何阅读一本书》',
+    '读书笔记写了五年，我改了三次方法','为什么我们读得越多，记得越少','一年 50 本书，不如 5 本读三遍','卡片盒笔记法的三个误区',
+    '如何读一本你读不懂的书','信息过载时代的选择性无知','我的第二个大脑建了又拆','搬进小书房之后','关于晨间 routine，我放弃了',
+    '一年的手写笔记回顾','咖啡与专注力的伪关系','我如何用纸质笔记本配合数字工具','关于迟迟不开始的那件事','一天只做两件事的实验',
+    '为什么周末反而更累','断网八小时之后','这次发布会之后，留给创业者的窗口还有多大','关于新一轮融资传闻的几点判断',
+    '政策落地半年，行业变了什么','一个数据背后的三种解释','关于城市人才政策的观察','县域市场的生意逻辑','制造业数字化的慢变量',
+    '一次失败的线下活动复盘','社群运营从 0 到 500 人','私域不是加好友','直播带货之后的品牌自播','从流量到留量：一次会员体系改造',
+    '中小企业做内容的三笔账'
+  ];
+
+  function offsetFor(i) {
+    if (i < 12) return i % 7;
+    if (i < 32) return 8 + Math.round((i - 12) * 22 / 19);
+    if (i < 52) return 33 + Math.round((i - 32) * 57 / 19);
+    return 95 + Math.round((i - 52) * 305 / 37);
+  }
+
+  var ARTICLES = TITLES.map(function (title, i) {
+    // 步长与来源数互质，保证 14 个来源都被均匀覆盖（步长 7 会只落到 2 个来源）
+    var s = SOURCES[(i * 5 + 3) % SOURCES.length];
+    var d = new Date(NOW - offsetFor(i) * DAY - (i % 11) * 3600000);
+    return { id: 'a' + i, title: title, account: s.name, accountId: s.id, kind: s.kind, ts: d.getTime() };
+  });
+
+  // ---------- 工具 ----------
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function dateKey(ts) { var d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function dayStart(ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  function groupLabel(ts) {
+    var diff = Math.round((dayStart(NOW) - dayStart(ts)) / DAY);
+    var d = new Date(ts);
+    if (diff === 0) return '今天';
+    if (diff === 1) return '昨天';
+    var week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+    if (d.getFullYear() === new Date(NOW).getFullYear()) return (d.getMonth() + 1) + '月' + d.getDate() + '日 · ' + week;
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+  function timeLabel(ts) {
+    var d = new Date(ts);
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  var $ = function (id) { return document.getElementById(id); };
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+
+  // ---------- 状态 ----------
+  var state = { time: '30d', source: 'all', sort: 'new', kw: '', onlyPicked: false, limit: PAGE };
+  var selected = new Set();
+  var articles = ARTICLES;
+
+  function inTime(a) {
+    var days = (NOW - a.ts) / DAY;
+    switch (state.time) {
+      case '7d': return days <= 7;
+      case '30d': return days <= 30;
+      case '90d': return days <= 90;
+      case 'year': return new Date(a.ts).getFullYear() === new Date(NOW).getFullYear();
+      default: return true;
+    }
+  }
+  function inSource(a) { return state.source === 'all' || a.accountId === state.source; }
+  function inKw(a) {
+    var k = state.kw.trim().toLowerCase();
+    if (!k) return true;
+    return a.title.toLowerCase().indexOf(k) >= 0 || a.account.toLowerCase().indexOf(k) >= 0;
+  }
+  function baseHits() { return articles.filter(function (a) { return inTime(a) && inSource(a) && inKw(a); }); }
+  function visible() {
+    var list = baseHits().filter(function (a) { return !state.onlyPicked || selected.has(a.id); });
+    if (state.sort === 'old') list.sort(function (x, y) { return x.ts - y.ts; });
+    else if (state.sort === 'src') list.sort(function (x, y) { return x.account === y.account ? y.ts - x.ts : (x.account < y.account ? -1 : 1); });
+    else list.sort(function (x, y) { return y.ts - x.ts; });
+    return list;
+  }
+
+  // ---------- 渲染 ----------
+  function renderSourceOptions() {
+    var pool = articles.filter(inTime);
+    var wx = [], mo = [];
+    SOURCES.forEach(function (s) {
+      var n = pool.filter(function (a) { return a.accountId === s.id; }).length;
+      var opt = '<option value="' + s.id + '"' + (state.source === s.id ? ' selected' : '') + '>' + s.name + '（' + n + '）</option>';
+      (s.kind === 'mo' ? mo : wx).push(opt);
+    });
+    $('sourceSel').innerHTML =
+      '<option value="all"' + (state.source === 'all' ? ' selected' : '') + '>全部来源（' + pool.length + '）</option>' +
+      '<optgroup label="公众号">' + wx.join('') + '</optgroup>' +
+      '<optgroup label="墨问作者">' + mo.join('') + '</optgroup>';
+  }
+
+  function rowHtml(a, picked) {
+    return '<label class="row' + (picked ? ' picked' : '') + '" data-id="' + a.id + '">' +
+      '<input class="cb" type="checkbox" ' + (picked ? 'checked' : '') + ' data-id="' + a.id + '" />' +
+      '<span class="copy">' +
+        '<span class="t">' + a.title + '</span>' +
+        '<span class="m"><span class="src">' + a.account + '</span>' +
+        '<span class="badge-sq">' + (a.kind === 'mo' ? '墨问' : '公众号') + '</span></span>' +
+      '</span>' +
+      '<span class="when">' + timeLabel(a.ts) + '</span>' +
+    '</label>';
+  }
+
+  function renderList() {
+    var list = visible();
+    var shown = list.slice(0, state.limit);
+    var host = $('list');
+
+    if (!list.length) {
+      var reason = [];
+      if (state.time !== 'all') reason.push('时间范围');
+      if (state.source !== 'all') reason.push('来源');
+      if (state.kw.trim()) reason.push('关键词');
+      if (state.onlyPicked) reason.push('仅看已选');
+      host.innerHTML = '<div class="empty">' +
+        '<div class="big">没有文章符合当前条件</div>' +
+        '<p>' + (reason.length ? '卡住的条件：' + reason.join(' · ') : '') + '</p>' +
+        '<button class="btn" id="relax">放宽到全部时间</button>' +
+        '<button class="btn" id="resetInEmpty" style="margin-left:8px">重置全部条件</button>' +
+        '</div>';
+      var relax = $('relax');
+      if (relax) relax.onclick = function () { setTime('all'); };
+      var rs = $('resetInEmpty');
+      if (rs) rs.onclick = function () { reset(); };
+    } else {
+      var html = '', lastKey = '';
+      if (state.sort === 'src') {
+        var lastAcc = '';
+        shown.forEach(function (a) {
+          if (a.account !== lastAcc) {
+            lastAcc = a.account;
+            var n = list.filter(function (x) { return x.account === a.account; }).length;
+            html += '<div class="group-head"><span>' + a.account + '</span><span>' + n + ' 篇</span></div>';
+          }
+          html += rowHtml(a, selected.has(a.id));
+        });
+      } else {
+        shown.forEach(function (a) {
+          var k = dateKey(a.ts);
+          if (k !== lastKey) {
+            lastKey = k;
+            var cnt = list.filter(function (x) { return dateKey(x.ts) === k; }).length;
+            html += '<div class="group-head"><span>' + groupLabel(a.ts) + '</span><span>' + cnt + ' 篇</span></div>';
+          }
+          html += rowHtml(a, selected.has(a.id));
+        });
+      }
+      if (list.length > shown.length) {
+        html += '<button class="more" id="moreBtn">加载更多（还有 ' + (list.length - shown.length) + ' 篇）</button>';
+      }
+      host.innerHTML = html;
+      var more = $('moreBtn');
+      if (more) more.onclick = function () { state.limit += PAGE; renderList(); };
+    }
+    renderFooter(list);
+  }
+
+  function renderFooter(list) {
+    var hits = baseHits().length;
+    var pickedIn = list.filter(function (a) { return selected.has(a.id); }).length;
+    // 已选但不在当前筛选条件内的篇数：它们被保留着，得让人看见
+    var base = new Set(baseHits().map(function (a) { return a.id; }));
+    var out = 0;
+    selected.forEach(function (id) { if (!base.has(id)) out++; });
+    $('hitLine').innerHTML = '命中 <b class="strong">' + hits + '</b> 篇' +
+      (state.kw.trim() ? '（关键词「' + state.kw.trim() + '」）' : '') +
+      ' · 已选 ' + selected.size + ' 篇';
+    $('footCount').innerHTML = '命中 <b>' + hits + '</b> 篇 · 已选 <b>' + selected.size + '</b> 篇' +
+      (out > 0 ? '<span style="color:var(--amber)">（其中 ' + out + ' 篇不在当前条件内，已保留）</span>' : '') +
+      (selected.size >= MAX ? '<span style="color:var(--red)">已达上限 ' + MAX + ' 篇</span>' : '');
+    var btn = $('confirmBtn');
+    btn.textContent = selected.size ? '用这 ' + selected.size + ' 篇分析' : '选择文章';
+    btn.disabled = selected.size === 0;
+    $('pageCount').textContent = '已选 ' + selected.size + ' 篇';
+  }
+
+  function render() { renderSourceOptions(); renderList(); }
+
+  // ---------- 交互 ----------
+  function setTime(t) {
+    state.time = t;
+    Array.prototype.forEach.call($('timeSeg').children, function (b) { b.classList.toggle('on', b.dataset.t === t); });
+    state.limit = PAGE;
+    render();
+  }
+
+  function reset() {
+    state = { time: '30d', source: 'all', sort: 'new', kw: '', onlyPicked: false, limit: PAGE };
+    $('kw').value = ''; $('kwClear').hidden = true;
+    $('sortSel').value = 'new'; $('onlyPicked').checked = false;
+    Array.prototype.forEach.call($('timeSeg').children, function (b) { b.classList.toggle('on', b.dataset.t === '30d'); });
+    render();
+    toast('已重置为默认：近 30 天 · 全部来源 · 最新在前');
+  }
+
+  function toggle(id, on) {
+    if (on) {
+      if (selected.size >= MAX) { toast('一次最多选择 ' + MAX + ' 篇，先取消几篇再选'); renderList(); return; }
+      selected.add(id);
+    } else {
+      selected.delete(id);
+    }
+    renderList();
+  }
+
+  $('timeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-t]');
+    if (b) setTime(b.dataset.t);
+  });
+  $('sourceSel').addEventListener('change', function (e) { state.source = e.target.value; state.limit = PAGE; render(); });
+  $('sortSel').addEventListener('change', function (e) { state.sort = e.target.value; state.limit = PAGE; renderList(); });
+  $('onlyPicked').addEventListener('change', function (e) { state.onlyPicked = e.target.checked; renderList(); });
+  $('kw').addEventListener('input', function (e) {
+    state.kw = e.target.value;
+    $('kwClear').hidden = !state.kw;
+    state.limit = PAGE;
+    renderList();
+  });
+  $('kwClear').addEventListener('click', function () {
+    state.kw = ''; $('kw').value = ''; $('kwClear').hidden = true; state.limit = PAGE; renderList();
+  });
+  $('resetAll').addEventListener('click', reset);
+
+  $('list').addEventListener('change', function (e) {
+    var cb = e.target.closest('input.cb');
+    if (!cb) return;
+    toggle(cb.dataset.id, cb.checked);
+  });
+
+  $('selectAll').addEventListener('click', function () {
+    var list = visible();
+    var room = MAX - selected.size;
+    var add = list.filter(function (a) { return !selected.has(a.id); });
+    if (!add.length) { toast('当前命中都已选中'); return; }
+    if (add.length > room) { toast('已达上限 ' + MAX + ' 篇，只加入了 ' + room + ' 篇'); add = add.slice(0, room); }
+    else toast('已加入 ' + add.length + ' 篇');
+    add.forEach(function (a) { selected.add(a.id); });
+    renderList();
+  });
+
+  $('clearHits').addEventListener('click', function () {
+    var list = visible();
+    var n = 0;
+    list.forEach(function (a) { if (selected.has(a.id)) { selected.delete(a.id); n++; } });
+    toast(n ? '已取消 ' + n + ' 篇' : '当前命中里没有已选文章');
+    renderList();
+  });
+
+  function openModal() {
+    $('mask').hidden = false;
+    $('list').scrollTop = 0;
+    render();
+  }
+  $('openModal').addEventListener('click', openModal);
+  $('closeModal').addEventListener('click', function () { $('mask').hidden = true; });
+  $('cancelBtn').addEventListener('click', function () { $('mask').hidden = true; });
+  $('confirmBtn').addEventListener('click', function () {
+    if (!selected.size) return;
+    $('mask').hidden = true;
+    toast('已选定 ' + selected.size + ' 篇作为素材范围');
+  });
+  $('mask').addEventListener('click', function (e) { if (e.target === $('mask')) $('mask').hidden = true; });
+
+  // ---------- 旧版对照 ----------
+  var oldSelected = new Set();
+  function renderOld() {
+    var k = $('oldKw').value.trim().toLowerCase();
+    var list = articles.filter(function (a) { return !k || a.title.toLowerCase().indexOf(k) >= 0 || a.account.toLowerCase().indexOf(k) >= 0; });
+    $('oldList').innerHTML = list.slice(0, 120).map(function (a) {
+      return '<label class="legacy-row"><input class="cb" type="checkbox" data-id="' + a.id + '" ' + (oldSelected.has(a.id) ? 'checked' : '') + ' />' +
+        '<span class="copy"><strong>' + a.title + '</strong><span>' + a.account + ' · ' + groupLabel(a.ts) + '</span></span></label>';
+    }).join('') || '<p style="padding:24px;color:var(--faint)">没有匹配的文章。</p>';
+    $('oldCount').textContent = '共 ' + list.length + ' 篇 · 已选 ' + oldSelected.size + ' 篇';
+  }
+  $('oldKw').addEventListener('input', renderOld);
+  $('oldList').addEventListener('change', function (e) {
+    var cb = e.target.closest('input.cb');
+    if (!cb) return;
+    if (cb.checked) { if (oldSelected.size >= MAX) { toast('一次最多选择 ' + MAX + ' 篇'); renderOld(); return; } oldSelected.add(cb.dataset.id); }
+    else oldSelected.delete(cb.dataset.id);
+    renderOld();
+  });
+  $('closeModalOld').addEventListener('click', function () { $('maskOld').hidden = true; });
+  $('cancelOld').addEventListener('click', function () { $('maskOld').hidden = true; });
+  $('confirmOld').addEventListener('click', function () { $('maskOld').hidden = true; });
+
+  // ---------- 版本 / 场景 / 说明 ----------
+  $('versionSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle('on', x === b); });
+    $('mask').hidden = true;
+    if (b.dataset.v === 'old') { $('maskOld').hidden = false; renderOld(); }
+    else { $('maskOld').hidden = true; openModal(); }
+  });
+  $('sceneDefault').addEventListener('click', function () { selected.clear(); reset(); openModal(); });
+  $('sceneFull').addEventListener('click', function () {
+    selected.clear();
+    articles.slice().sort(function (x, y) { return y.ts - x.ts; }).slice(0, MAX).forEach(function (a) { selected.add(a.id); });
+    openModal();
+    toast('已预选 ' + MAX + ' 篇，再勾选任意一篇会看到上限提示');
+  });
+  $('sceneEmpty').addEventListener('click', function () {
+    // 晚风说在近 7 天内没有文章，是干净的空态演示：放宽时间后即可看到结果
+    state.source = 'wx-wanfeng'; state.time = '7d'; state.kw = ''; state.limit = PAGE;
+    $('kw').value = ''; $('kwClear').hidden = true;
+    Array.prototype.forEach.call($('timeSeg').children, function (b) { b.classList.toggle('on', b.dataset.t === '7d'); });
+    openModal();
+  });
+  $('openNotes').addEventListener('click', function () { $('notes').hidden = false; });
+  $('closeNotes').addEventListener('click', function () { $('notes').hidden = true; });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { $('mask').hidden = true; $('maskOld').hidden = true; } });
+
+  // 首屏：默认打开改版弹层
+  render();
+  renderOld();
+  openModal();
+})();
+</script>
+</body>
+</html>
