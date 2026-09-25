@@ -959,14 +959,97 @@ body {
 /* M75：手动选篇弹层 */
 .topic-manual-list { max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; }
 .topic-manual-row {
-  display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px;
-  border-bottom: 1px solid var(--line); cursor: pointer;
+  display: flex; flex-direction: column; padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
 }
 .topic-manual-row:last-child { border-bottom: 0; }
+.topic-manual-row-main { display: flex; align-items: flex-start; gap: 10px; }
+.topic-manual-pick { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; flex: 1; min-width: 0; }
+.topic-manual-row-actions { display: inline-flex; gap: 2px; flex-shrink: 0; margin-top: 2px; }
+.topic-manual-action {
+  border: 0; background: transparent; cursor: pointer; font: inherit;
+  font-size: 12px; color: var(--ink-faint); padding: 2px 6px; border-radius: 6px;
+}
+.topic-manual-action:hover { color: var(--accent, #b44a2c); background: var(--paper-sunken, #f5efe4); }
+.topic-manual-excerpt {
+  margin: 6px 0 2px 34px; padding: 8px 12px; font-size: 12.5px; line-height: 1.6;
+  color: var(--ink); background: var(--paper-sunken, #f5efe4); border-radius: 8px;
+}
 .topic-manual-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .topic-manual-copy strong { font-size: 13.5px; color: var(--ink); }
 .topic-manual-copy span { font-size: 12px; color: var(--ink-faint); }
 .topic-manual-picker { display: flex; align-items: center; gap: 8px; }
+
+/* —— M78 历史选题 —— */
+.topic-history-item {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: transparent; border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 10px; font: inherit; color: inherit;
+  transition: border-color .15s ease, background .15s ease;
+}
+.topic-history-item:hover { border-color: var(--accent, #b44a2c); background: rgba(180, 74, 44, .04); }
+.topic-history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.topic-history-head strong { font-size: 14px; }
+.topic-history-actions { display: inline-flex; align-items: center; gap: 4px; }
+.topic-history-actions .ant-btn { padding: 0 6px; }
+
+/* —— M78 删除历史确认：先选方式再统一确认 —— */
+.topic-delete-what {
+  border-left: 3px solid var(--line-strong, #d8cfc0); background: var(--wash, #faf6ef);
+  border-radius: 6px; padding: 8px 12px; margin-bottom: 14px;
+  display: flex; flex-direction: column; gap: 2px; font-size: 13px;
+}
+.topic-delete-choices { display: flex; flex-direction: column; gap: 8px; }
+.topic-delete-choice {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+  column-gap: 10px; row-gap: 2px; align-items: center; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  transition: border-color .15s ease, background .15s ease;
+}
+.topic-delete-choice:hover { border-color: var(--line-strong, #d8cfc0); }
+.topic-delete-choice.on { border-color: var(--accent, #b44a2c); background: rgba(180, 74, 44, .04); }
+.topic-delete-choice input { grid-row: 1 / span 2; margin: 0; accent-color: var(--accent, #b44a2c); }
+.topic-delete-choice-main { font-weight: 600; font-size: 14px; }
+.topic-delete-choice-main.danger { color: #b44a2c; }
+.topic-delete-choice.on .topic-delete-choice-main.danger { color: #a03a20; }
+.topic-delete-choice-sub { grid-column: 2; font-size: 12px; color: var(--faint, #8a8174); }
+.topic-history-cards { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+.topic-history-cards span { font-size: 13px; line-height: 1.45; }
+.topic-history-item .faint { font-size: 12px; }
+/* M77：手动选篇改版——筛选为主、搜索为辅。筛选区固定、列表按日期/来源分组。 */
+.topic-manual-filters {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px 14px; margin-bottom: 10px;
+  background: var(--paper-sunken); border: 1px solid var(--line); border-radius: 10px;
+}
+.topic-manual-filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topic-manual-filter-row .ant-input-affix-wrapper,
+.topic-manual-filter-row input { flex: 1 1 220px; min-width: 180px; }
+.topic-manual-note { font-size: 12px; color: var(--amber); }
+.topic-manual-list { max-height: 44vh; overflow-y: auto; display: flex; flex-direction: column; }
+.topic-manual-group {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 6px 6px; background: var(--paper-raised);
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 700;
+}
+.topic-manual-row:hover { background: var(--paper-sunken); }
+.topic-manual-row.picked { background: var(--cinnabar-wash); }
+.topic-manual-row.picked:hover { background: #f2ded6; }
+.topic-manual-more {
+  margin: 10px 0 4px; width: 100%; height: 34px;
+  border: 1px dashed var(--line-strong); border-radius: 7px;
+  background: transparent; color: var(--ink-soft); font-size: 12.5px; cursor: pointer;
+}
+.topic-manual-more:hover { border-color: var(--cinnabar); color: var(--cinnabar); }
+.topic-manual-empty { padding: 42px 16px; text-align: center; color: var(--ink-soft); }
+.topic-manual-empty strong { display: block; font-size: 15px; color: var(--ink); margin-bottom: 6px; }
+.topic-manual-empty p { margin: 0 0 14px; font-size: 12.5px; }
+.topic-manual-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.topic-manual-foot-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-soft); }
+.topic-manual-keep { color: var(--amber); }
 .topic-grid {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px;
 }
