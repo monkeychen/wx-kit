@@ -34,7 +34,7 @@
 2. 就地开 feature 分支实现（`feat/<里程碑>`），完成后合回 main、删分支。
 3. 纯逻辑 TDD；依赖网络/Electron 的部分注入依赖 + 端到端验证。
 4. 改完跑 `npm test`、`npm run lint`、`npx tsc --noEmit -p tsconfig.json`。
-5. **完成一个相对独立的功能即自动收尾，无需询问**：验证通过后，若开了 feature 分支，默认合回 main 并删分支；commit 一律自动执行（message 用英文、描述变更意图）。此为本项目长期授权，覆盖「commit 前先问」的默认。**唯 `git push` 仍手动，等安哥发话**（跨设备同步用）。
+5. **完成一个相对独立的功能即自动收尾，无需询问**：验证通过后，若开了 feature 分支，默认合回 main 并删分支；commit 一律自动执行（message 用英文、描述变更意图）。此为本项目长期授权，覆盖「commit 前先问」的默认。**commit 后直接 `git push`（unset 代理直连，2026-09-25 安哥改定，覆盖旧「push 等安哥发话」）**——每个里程碑完成即提交即推，不攒批（攒了 16 个 commit 再拆主题补提，拆分成本远高于随手一提，实录见 devlog §78 同期工作日志）。
 6. **每完成一个里程碑，更新 `docs/devlog/wx-kit-vibe-coding.md`**：把该里程碑的流程/决策/踩坑/方法论增补进复盘，保持其为活文档。
 7. **CLI 命令/参数/输出结构变更时，同步刷新 `agent/wx-kit-skill/`**（SKILL.md 速查表 + references 的命令参考与范例）——skill 是 agent 消费的说明书，漂移即失效（类比「发版刷 README」）。
 
