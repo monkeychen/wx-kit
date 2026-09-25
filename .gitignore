@@ -24,3 +24,5 @@ output/
 .workbuddy
 .codebuddy/
 .codebuddy
+temp/
+tmp/
