@@ -1,5 +1,5 @@
 // electron/main.ts
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, Menu, shell } from 'electron'
 import path, { join } from 'node:path'
 import { access } from 'node:fs/promises'
 import { runCli } from '../src/cli'
@@ -68,6 +68,10 @@ async function main() {
   // LSUIElement=true 让进程启动即无程序坞图标(为了 CLI,见上方 CLI 分支注释),
   // GUI 模式要把图标要回来;accessory 应用的窗口不会自动抢焦点,故一并 focus。
   if (app.dock) { app.dock.show(); app.focus({ steal: true }) }
+
+  // 只在 mac 保留应用菜单(File/Edit 等挂在屏幕顶部系统栏);Windows/Linux 若不显式置空,
+  // Electron 会给每个窗口挂默认菜单栏(File/Edit/View/Window/Help),与纯内容型 UI 相冲突。
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
 
   const settings = new SettingsService(app.getPath('userData'), join(app.getPath('documents'), 'wx-kit'))
   void settings.get().then((s) => diag()?.info('startup', 'ready', { libraryRoot: s.libraryRoot }))
