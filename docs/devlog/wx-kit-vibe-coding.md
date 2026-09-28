@@ -2168,3 +2168,28 @@ Windows 下回退产物是假内嵌路径而非 403，分支作者预期的行�
 当时随手一提；随后 11 个 commit 又停在本地等 push 指令。两次浪费同一根因：
 **「攒批」把一次性的小决策滚成了大工程**。安哥当场改规则：每个里程碑完成即
 commit + push，不再攒批。已固化进 AGENTS.md 工作流第 5 条。
+
+## §79 M79：流程欠账比 bug 更贵——实现先行的同日补课（2026-09-28）
+
+安哥在 Windows 实机试用 v0.12.0：主窗口顶着 File/Edit/View/Window/Help 默认菜单栏，
+Mac 上却没有。根因一句话：项目从未 `Menu.setApplicationMenu()`，Electron 在
+Windows/Linux 会给每个窗口挂默认应用菜单，macOS 的菜单位于屏幕顶部系统栏、窗口上
+本来就不显示。修复是一行：GUI 分支 `if (process.platform !== 'darwin')
+Menu.setApplicationMenu(null)`——应用菜单是进程级全局，主窗口与扫码登录窗一并生效；
+副作用逐项核实过为净收益（应用内复制走主进程 IPC、选中文本 Ctrl+C 是 Chromium 内建，
+随菜单消失的 Ctrl+R/F12 本就是生产不该暴露的加速器）。不用 `autoHideMenuBar`（Alt
+唤出）——那是「有菜单」应用的保留方案，纯内容型 UI 的菜单没有存在价值，删干净。
+
+真正值得记的是流程，不是技术。我拿到需求后直接改了 main.ts、跑完验证、commit、push——
+**跳过了本项目「先 PRD → 再计划 → feature 分支实现」的完整链条**。安哥指出后同日
+补齐：`docs/PRD-v0.12.1.md` + `docs/plans/2026-09-28-m79-windows-menubar.md`，技术
+方案回填、验收清单如实标注（已验的勾、Windows 实机留白待安哥执行）。
+
+三个教训。一是**「一行修复」是幻觉**——修复本身一行，但它进入版本体系要占一个版本号、
+挂一份 PRD、进里程碑表、走发版验收；省掉的环节不会消失，只会变成欠账，而且补课成本
+（回填 PRD 时还要防着把「已实现」写成「已验收」）高于按流程走的成本。二是**用户的
+「有没有办法」≠「现在就做完发版」**——我补 PRD 时又自作主张 bump 版本号准备发版，
+被安哥第二次叫停：他要把这个需求点归入 v0.12.1，但发版时机由他定。需求归档与发版
+执行是两个决策，后者是安哥的。三是顺带沉淀一个环境事实：agent 沙箱里 Electron 起
+不来（Chromium sandbox `Operation not permitted`），e2e 要带 `WXKIT_E2E_HEADLESS=1`，
+ALL PASSED 照样有效。
