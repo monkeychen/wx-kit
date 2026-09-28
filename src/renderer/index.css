@@ -577,8 +577,8 @@ body {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   gap: 22px;
-  max-width: 1420px;
-  margin: 0 auto;
+  /* 不设 max-width(R2,v0.12.1):与文库等页一致的全宽自适应——窗口变大内容随之变宽。
+     M72 原型的 1420px 是设计稿画布尺寸,不是用户约束。 */
   align-items: start;
 }
 .settings-category-nav {
@@ -922,7 +922,8 @@ body {
 .subs-row-list .ant-list-item-action, .subs-row-list .ant-switch { margin-top: 9px; }
 
 /* ---------- 选题决策器（M70） ---------- */
-.topic-page-inner { max-width: 1240px; margin: 0 auto; }
+/* 不设 max-width(R2,v0.12.1):窗口变大内容随之变宽;候选卡保持 3 列铺满(上限 3 张,变宽即单卡更宽) */
+.topic-page-inner { margin: 0 auto; }
 .topic-page-head { display: flex; align-items: end; justify-content: space-between; }
 .topic-toolbar {
   display: flex; align-items: end; justify-content: space-between; gap: 18px; flex-wrap: wrap;
