@@ -173,6 +173,11 @@ console.log(`[download-stats] 已写 ${SVG_FILE.replace(ROOT + '/', '')}`)
 // ── 3. 徽章与直链（shields.io 代理 GitHub API，数字自动跟随，零维护）─────
 // 徽章不走本地数据而是实时取 shields.io——README 里的数字永远是最新的，
 // 只有 SVG 图受限于「GitHub 不提供时间序列」才需要重跑脚本。
+//
+// 端点不要加 `.json` 后缀：shields.io 的 `.json` 变体返回的是 **JSON 文本**，
+// 而 README 里的徽章是 `<img>` 标签，浏览器拿到 JSON 渲染不出图——表现为一排
+// 破图标alt 文字（2026-09-29 实录，v0.12.1 首版就是这么挂的）。
+// 不带后缀（或用 `?` 起query）才返回 image/svg+xml。
 const badge = (label, url) =>
   `[![${label}](${url})](https://github.com/${REPO}/releases/tag/${latest.tag})`
 
@@ -183,11 +188,11 @@ const PLATFORMS = [
 ]
 
 const badgeRow = [
-  badge(`下载 ${latest.tag}`, `https://img.shields.io/github/downloads/${REPO}/${latest.tag}/total.json?style=flat-square&label=%E6%80%BB%E4%B8%8B%E8%BD%BD&color=brightgreen`),
+  badge(`下载 ${latest.tag}`, `https://img.shields.io/github/downloads/${REPO}/${latest.tag}/total?style=flat-square&label=%E6%80%BB%E4%B8%8B%E8%BD%BD&color=brightgreen`),
   ...PLATFORMS.map(({ role, badgeLabel }) => {
     const a = byRole(role)
     if (!a) return null
-    return badge(`${badgeLabel} 下载`, `https://img.shields.io/github/downloads/${REPO}/${latest.tag}/${encodeURIComponent(a.name)}.json?style=flat-square&label=${encodeURIComponent(badgeLabel)}&color=blue`)
+    return badge(`${badgeLabel} 下载`, `https://img.shields.io/github/downloads/${REPO}/${latest.tag}/${encodeURIComponent(a.name)}?style=flat-square&label=${encodeURIComponent(badgeLabel)}&color=blue`)
   }).filter(Boolean),
 ].join('\n')
 
