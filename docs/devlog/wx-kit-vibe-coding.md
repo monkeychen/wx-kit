@@ -2211,3 +2211,56 @@ ALL PASSED 照样有效。
 「方向（待定）」这种悬置段。上一版 M79 的教训是跳过 PRD,这一版反过来验证了 PRD
 流程的真正价值——不是文书,而是逼着在动手前把「为什么」和「用户要什么」对齐。实现
 本身是两处 CSS 删 max-width + 注释说明,1037 单测/tsc/lint/e2e 全绿。
+
+---
+
+## §81 M81：验收环境本身是变量——两个环境变量伪装成产品缺陷（2026-09-29）
+
+v0.12.1（M79 + M80）发版实录。功能本身零风险（一行菜单设置 + 两处 CSS 去 max-width），
+但发版过程连续踩了两个**看起来像产品 bug、实为验收环境问题**的坑。两者都有同一个
+特征：**报错信息指向产品，实际根因在宿主**。
+
+### 坑一：`--version` 吐出 Node 版本号
+
+打包后的 `wx-kit.app/Contents/MacOS/wx-kit --version` 返回 `v24.18.1`（Node 的版本），
+不是 wx-kit 的 `0.12.1`。第一反应是白名单漏了 `--version`，去翻 `CLI_COMMANDS`——逻辑
+完全正确（`CLI_FLAGS` 含 `--version`，`isCliInvocation` 命中即进 CLI）。
+
+真因：宿主是 Electron 应用（WorkBuddy），它给子进程设了 `ELECTRON_RUN_AS_NODE=1`。
+Electron 见到这个变量就以**纯 Node 模式**启动，`--version` 被 Node 自己消费掉，
+wx-kit 的 `app.getVersion()` 根本没机会执行。`unset ELECTRON_RUN_AS_NODE` 后立刻正确
+输出 `0.12.1`。
+
+**这个坑项目里早有前科**：`tests/e2e/gui.e2e.mjs` 里专门有一段注释——`ELECTRON_RUN_AS_NODE`
+会让被 spawn 的 Electron 以纯 Node 模式启动，永远打印不出 Playwright 等待的调试端口行，
+必须显式 `delete cleanEnv.ELECTRON_RUN_AS_NODE`。**知道这个坑，却还是在手工验收时忘了**。
+规律：**凡是「验证打包产物」的命令，都要先清宿主环境**，不能假设终端环境是干净的。
+
+### 坑二：electron-builder 解压被文件代理拦截
+
+`npm run package:win` 反复失败在 electron 解压阶段：
+
+```
+⨯ Brokered file token refused: modify backup failed
+  at extractZipStreaming (app-builder-lib/src/util/electronGet.ts:170)
+⨯ EEXIST: file already exists, mkdir 'release/win-unpacked.tmp.lock'
+```
+
+试过 `dangerouslyDisableSandbox`（无效）、换输出目录到 `/tmp`（无效）、试过
+`CODEBUDDY_BROKERED_FS_HOOK_ENABLED=0` / `CODEBUDDY_SAFE_DELETE_ENABLED=0`（**都无效**）。
+
+真因：`NODE_OPTIONS=--require=.../node-brokered-fs-shim.cjs`——WorkBuddy 通过
+`NODE_OPTIONS` **预加载**了一个文件代理 shim，包装了 `fs.createWriteStream`。
+`export` 环境变量拦不住它，因为注入发生在 Node 启动之前。`unset NODE_OPTIONS` 后
+打包一次通过（win 52s、mac 41s）。
+
+**为什么值得记**：我连续试了三种「聪明的」绕过方式（换目录、关开关flag），
+每次都失败后才去看那个报错的来源文件——而答案第一行就是 `NODE_OPTIONS`。
+**排查环境类问题，先看进程被谁预处理过（NODE_OPTIONS / LD_PRELOAD / PYTHONPATH），
+而不是先猜业务层原因。** 报错栈里出现宿主应用路径时，那基本就是答案本身。
+
+### 附带：发版规约该写进「验收前置」而非「操作步骤」
+
+v0.12.0 漏了 `git fetch --tags`，v0.12.1 又差点栽在验收环境上。两次都不是流程缺失，
+而是**「在什么环境下验收」从来没被写成规约**。真机验证已写进 PRD-v0.12.1 验收条目旁
+（连同 `unset ELECTRON_RUN_AS_NODE` 的原因），下次不会再靠记忆。
