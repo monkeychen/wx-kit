@@ -85,24 +85,24 @@ console.log(`[download-stats] repo=${REPO}  latest=${latest.tag}  ${versions.len
 const byRole = (role) => latest.assets.find(a => a.role === role)
 
 // ── 2. 生成 SVG（手绘风：细线条、无渐变无阴影，随 GitHub 深浅色主题切换）──────
-// 画布宽度按「每个版本都标全 + 45° 斜排」反推，不是拍脑袋定的：
-// 33 个版本 × 标签水平投影（字号 10px × 7 字符 × cos45 ≈ 30px）≈ 990px，
-// 加上左右留白与末尾标签的斜向溢出，取 1240px。版本数增长时按同一公式自动加宽
-// （每多一个版本 +slot），不会出现「后加的版本标签被挤掉」。
-const LABEL_ANGLE = -45          // SVG y 轴向下，负值= 向右上斜，读起来是常规的 45°
-const LABEL_FONT = 10
+// 画布宽度按「每个版本都标全 + 垂直排列」反推，不是拍脑袋定的：
+// 垂直标签不吃 cos45 的折扣，每个标签占满整个字宽（字号 9px × 7 字符 ≈ 38px），
+// 33 个版本 ≈ 1250px，加左右留白取 1360px。版本数增长时按同一公式自动加宽，
+// 不会出现「后加的版本标签被挤掉」。垂直排比斜排更易读，代价是图更宽——
+// README 里会横向滚动，可接受。
+const LABEL_FONT = 9
 const LABEL_CHAR_W = 0.6         // 无衬线字体平均字宽 / 字号的经验值
-const LABEL_PROJ = LABEL_FONT * LABEL_CHAR_W * 7 * Math.cos(Math.PI / 4)   // 水平投影
+const LABEL_W = LABEL_FONT * LABEL_CHAR_W * 7   // 「v0.12.1」7 字符全宽
 const nVer = versions.length
-const PAD = { t: 30, r: 30, b: 74, l: 44 }
-const W = Math.max(900, Math.ceil((nVer * LABEL_PROJ + PAD.l + PAD.r) / 40) * 40)
-const H = 330
+const PAD = { t: 30, r: 24, b: 40, l: 44 }
+const W = Math.max(900, Math.ceil((nVer * LABEL_W + PAD.l + PAD.r) / 40) * 40)
+const H = 300
 const plotW = W - PAD.l - PAD.r
 const plotH = H - PAD.t - PAD.b
 const maxN = Math.max(...versions.map(v => v.count))
 const niceMax = Math.max(10, Math.ceil(maxN / 20) * 20)
 const slot = plotW / nVer
-const barW = Math.max(3, Math.min(slot * 0.6, 18))
+const barW = Math.max(3, Math.min(slot * 0.56, 16))
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const y = (n) => PAD.t + plotH - (n / niceMax) * plotH
@@ -132,16 +132,14 @@ function buildSvg(c) {
     bars += `<rect x="${x.toFixed(1)}" y="${(PAD.t + plotH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${fill}"/>`
   })
 
-  // 横轴标签：**每个版本都标全**、45° 斜排、统一完整 vX.Y.Z 写法（不省略 v、不缩写小版本）。
-  // 文字左对齐 + 右端下移，使旋转后文字向右上展开、不压到相邻柱；
-  // 末位标签额外内缩一个投影宽度，避免最后几个字被画布右缘裁掉。
+  // 横轴标签：**每个版本都标全**、垂直排列（不旋转）、统一完整 vX.Y.Z 写法。
+  // 垂直排比 45° 斜排易读得多，代价是画布更宽（宽度已按标签数反推）。
+  // text-anchor=middle 让标签以柱子中线对齐；标签槽位比标签宽时不会互相压字。
   let labels = ''
-  const lastIdx = versions.length - 1
   versions.forEach((v, i) => {
     const isLatest = v.tag === latest.tag
     const cx = PAD.l + i * slot + slot / 2
-    const anchorX = i === lastIdx ? cx - LABEL_PROJ : cx
-    labels += `<text x="${anchorX.toFixed(1)}" y="${H - PAD.b + 14}" font-size="${LABEL_FONT}" font-weight="${isLatest ? 600 : 400}" font-family='${FONT}' fill="${isLatest ? c.accent : c.axis}" transform="rotate(${LABEL_ANGLE} ${anchorX.toFixed(1)} ${H - PAD.b + 14})">${esc(v.tag)}</text>`
+    labels += `<text x="${cx.toFixed(1)}" y="${H - PAD.b + 16}" text-anchor="middle" font-size="${LABEL_FONT}" font-weight="${isLatest ? 600 : 400}" font-family='${FONT}' fill="${isLatest ? c.accent : c.axis}" letter-spacing="-0.2">${esc(v.tag)}</text>`
   })
 
   // 峰值标注（v0.8.5 = 82），给图一个「有故事」的锚点
@@ -166,8 +164,14 @@ ${labels}
 `
 }
 
-const LIGHT = { bg: '#fffdf8', title: '#211c15', sub: '#a59c89', axis: '#6c6354', grid: '#e8e2d6', bar: '#c9c0ae', accent: '#b5462f' }
-const DARK = { bg: '#14120f', title: '#f3ede1', sub: '#8a8271', axis: '#a59c89', grid: '#2e2a24', bar: '#4a443a', accent: '#c9603f' }
+// 配色：数据柱用**冷调蓝灰**，与项目「暖色纸感」形成冷暖对比——柱子在暖白纸上
+// 比同明度的土褐柱更跳，数值一眼可读；最新版用设计系统的朱砂色（--cinnabar）
+// 强调，与 UI 里的主色一致。
+// **同一色相在两个主题下取不同明度阶**：浅色主题用中明度（#5b7c99，在暖白纸上
+// 够深、看得清），深色主题用高明度（#7aa8c9，在近黑底上够亮、不糊）——
+// 不能一套色值通吃，那是「看着能显示但读不清」的典型。
+const LIGHT = { bg: '#fffdf8', title: '#211c15', sub: '#a59c89', axis: '#6c6354', grid: '#eae3d6', bar: '#5b7c99', accent: '#b5462f' }
+const DARK = { bg: '#14120f', title: '#f3ede1', sub: '#8a8271', axis: '#a59c89', grid: '#2e2a24', bar: '#7aa8c9', accent: '#c9603f' }
 
 if (!existsSync(SVG_DIR)) mkdirSync(SVG_DIR, { recursive: true })
 writeFileSync(SVG_FILE, buildSvg(LIGHT), 'utf8')
