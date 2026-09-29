@@ -63,7 +63,16 @@ npm 包名与配置背景：无 scope 的 `wx-kit` 被 npm 相似度保护拒绝
 - `electron/`：主进程。`main.ts` 模式分流；`ipc.ts` IPC 处理器（薄委派）；`preload.ts` contextBridge；`protocol.ts` wxfile 协议；`services/` 主进程服务。
 - `src/cli/`：命令行入口，输出契约见 PRD §F4（stdout 纯 JSON，stderr 进度，退出码 0/1/2）。
 - `src/renderer/`：React 界面，只经 `window.api`（见 `src/renderer/api.ts`）调用能力，**绝不直接 import core**。
-- `tests/`：`tests/core`、`tests/electron` 镜像源码的 vitest 单测；`tests/fixtures` 放样本；`tests/e2e/gui.e2e.mjs` 是 Playwright Electron 端到端。
+- `tests/`：`tests/core`、`tests/electron` 镜像源码的 vitest 单测；`tests/fixtures` 放样本；`tests/e2e/gui.e2e.mjs` 是 Playwright Electron 端到端（沙箱/CI 环境须带 `WXKIT_E2E_HEADLESS=1`，否则 GPU 沙箱起不来）。
+
+### 视觉与设计系统（v0.12.1 起）
+
+> 完整设计契约见 [`docs/design-system.md`](docs/design-system.md)（暖色编辑杂志风：色彩/字体/间距 token + 组件规范 + 落地索引）。**改 UI 前先读它**，不要另起一套配色或样式方案。
+
+- 视觉真相源是 `src/renderer/index.css` 的 CSS 变量与语义 class（`--paper`/`--ink`/`--cinnabar` 等），组件库控件配色走 `src/renderer/theme.ts` 的 antd `ConfigProvider` token。
+- 文档与实现漂移时**以实现为准并回改文档**（docs/design-system.md §附录 B 有源文件索引，改样式时同步更新）。
+- **不要用 Tailwind utility 堆样式**——Tailwind 3 已闲置（preflight 关闭），一律走语义 class + CSS 变量。
+- 新增页面容器默认全宽自适应，不要写死 `max-width`（M80 已移除设置页 1420px / 选题页 1240px 两处原型画布尺寸）；确需限制可读宽度时先问安哥。
 
 ### 选题模块长期不变量（v0.12.0 起）
 
