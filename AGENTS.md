@@ -114,6 +114,14 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 ---
 
 ## 关键约束与已知陷阱（容易重踩，务必注意）
+- **往 README 放图片/徽章：「200」不等于「能显示」，必须查 content-type**（2026-09-29 实录）：
+  v0.12.1 的下载徽章全挂，根因是URL 带了 shields.io 的 `.json` 后缀——那个变体返回
+  **JSON 文本**（也是 HTTP 200），而 README 徽章是 `<img>` 标签，浏览器渲染不出 JSON，
+  退化成破图标 + alt 文字。正确端点**不带 `.json`**；分资产端点要去后缀时用
+  `?style=...` 起 query（不能直接接 `&`）。提交前逐个验：
+  `curl -s -o /dev/null -w "%{http_code} %{content_type}\n" "<URL>"`，
+  期望 `200 image/svg+xml`。另：刚推完 README 时 GitHub camo 图片缓存是异步的，
+  验远端图要用 `curl -sL`（`github.com/.../raw/...` 会 302 跳 camo，不带 `-L` 看不到真实结果）。
 - **GitHub 不提供下载量的时间序列 API**（2026-09-29 实录）：`asset.download_count` 只是
   **该资产自发布以来的累计总数**，没有按天/按周的增量，历史快照无法追溯——任何「每日下载趋势图」
   只能靠自建库从启用之日起每天记快照，追溯不了过去。所以 README 的下载图只能是
