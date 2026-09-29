@@ -85,14 +85,24 @@ console.log(`[download-stats] repo=${REPO}  latest=${latest.tag}  ${versions.len
 const byRole = (role) => latest.assets.find(a => a.role === role)
 
 // ── 2. 生成 SVG（手绘风：细线条、无渐变无阴影，随 GitHub 深浅色主题切换）──────
-const W = 900, H = 300
-const PAD = { t: 30, r: 16, b: 46, l: 44 }
+// 画布宽度按「每个版本都标全 + 45° 斜排」反推，不是拍脑袋定的：
+// 33 个版本 × 标签水平投影（字号 10px × 7 字符 × cos45 ≈ 30px）≈ 990px，
+// 加上左右留白与末尾标签的斜向溢出，取 1240px。版本数增长时按同一公式自动加宽
+// （每多一个版本 +slot），不会出现「后加的版本标签被挤掉」。
+const LABEL_ANGLE = -45          // SVG y 轴向下，负值= 向右上斜，读起来是常规的 45°
+const LABEL_FONT = 10
+const LABEL_CHAR_W = 0.6         // 无衬线字体平均字宽 / 字号的经验值
+const LABEL_PROJ = LABEL_FONT * LABEL_CHAR_W * 7 * Math.cos(Math.PI / 4)   // 水平投影
+const nVer = versions.length
+const PAD = { t: 30, r: 30, b: 74, l: 44 }
+const W = Math.max(900, Math.ceil((nVer * LABEL_PROJ + PAD.l + PAD.r) / 40) * 40)
+const H = 330
 const plotW = W - PAD.l - PAD.r
 const plotH = H - PAD.t - PAD.b
 const maxN = Math.max(...versions.map(v => v.count))
 const niceMax = Math.max(10, Math.ceil(maxN / 20) * 20)
-const slot = plotW / versions.length
-const barW = Math.max(4, slot * 0.66)
+const slot = plotW / nVer
+const barW = Math.max(3, Math.min(slot * 0.6, 18))
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const y = (n) => PAD.t + plotH - (n / niceMax) * plotH
@@ -122,14 +132,16 @@ function buildSvg(c) {
     bars += `<rect x="${x.toFixed(1)}" y="${(PAD.t + plotH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${fill}"/>`
   })
 
-  // 横轴标签稀疏标注（每 3 个）+ 最新版必标，否则 30+ 个标签会糊成一片
+  // 横轴标签：**每个版本都标全**、45° 斜排、统一完整 vX.Y.Z 写法（不省略 v、不缩写小版本）。
+  // 文字左对齐 + 右端下移，使旋转后文字向右上展开、不压到相邻柱；
+  // 末位标签额外内缩一个投影宽度，避免最后几个字被画布右缘裁掉。
   let labels = ''
+  const lastIdx = versions.length - 1
   versions.forEach((v, i) => {
     const isLatest = v.tag === latest.tag
-    if (!isLatest && i % 3 !== 0 && i !== versions.length - 2) return
-    const x = PAD.l + i * slot + slot / 2
-    const short = v.tag.replace(/^v0\./, '').replace(/^v/, '')
-    labels += `<text x="${x.toFixed(1)}" y="${H - PAD.b + 17}" text-anchor="middle" font-size="11" font-weight="${isLatest ? 600 : 400}" font-family='${FONT}' fill="${isLatest ? c.accent : c.axis}">${esc(isLatest ? v.tag : short)}</text>`
+    const cx = PAD.l + i * slot + slot / 2
+    const anchorX = i === lastIdx ? cx - LABEL_PROJ : cx
+    labels += `<text x="${anchorX.toFixed(1)}" y="${H - PAD.b + 14}" font-size="${LABEL_FONT}" font-weight="${isLatest ? 600 : 400}" font-family='${FONT}' fill="${isLatest ? c.accent : c.axis}" transform="rotate(${LABEL_ANGLE} ${anchorX.toFixed(1)} ${H - PAD.b + 14})">${esc(v.tag)}</text>`
   })
 
   // 峰值标注（v0.8.5 = 82），给图一个「有故事」的锚点
