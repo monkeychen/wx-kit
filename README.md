@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.12.0-released-success.svg)
+![Status](https://img.shields.io/badge/v0.12.1-released-success.svg)
 
 ## 这是什么
 
@@ -17,9 +17,9 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.12.0）**
+> **当前能力边界（v0.12.1）**
 >
-> v0.12.0 新增**选题工作台**——把本地素材变成可解释的「今天写什么」：选文章 → 得到最多
+> v0.12.0 起新增**选题工作台**——把本地素材变成可解释的「今天写什么」：选文章 → 得到最多
 > 三张写明理由、材料依据与起笔结构的候选卡，每条判断可回溯、失败不伪装；同时在
 > 「设置 → AI 模型」接入多厂商模型（BYOK）：
 >
@@ -30,6 +30,8 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 > - **多厂商 AI 设置**：智谱/千问/DeepSeek/Kimi/MiniMax/OpenAI/Google + 自定义，
 >   Key 经系统加密落盘、绝不进日志；正文出机边界明示；
 > - **Windows 正式支持**：修复 Windows 下阅读器图片/封面全挂的本地协议路径 bug；
+>   v0.12.1 进一步移除 Windows 默认菜单栏（非 macOS 平台不再挂 File/Edit 等菜单）；
+> - **界面自适应（v0.12.1）**：设置页与选题页随窗口宽度自适应铺满，候选卡保持 3 列；
 > - **墨问能力（v0.11.x 延续）**：下载页「墨问笔记」tab（搜作者/关键词/按链接）；
 >   订阅页墨问作者订阅；阅读器内联引用卡片；统一诊断日志 `main.log`（脱敏、滚动）；
 > - **降级项（微信侧，与 v0.10.6 一致）**：微信读书列表接口仍被服务端按账号限制，
@@ -37,8 +39,10 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 ## 当前界面
 
-以下截图来自 v0.12.0 界面（选题页与设置页为 v0.12.0 形态；下载页双 tab、订阅页
-平台切换、文库、阅读器延续 v0.11.x）。
+以下截图取自默认窗口宽度（约 1080px）。该宽度下 v0.12.1 的界面修正（Windows 移除默认
+菜单栏）不可见——菜单栏只出现在 Windows/Linux；设置页与选题页的自适应在**宽于 1420px**
+的窗口才体现（默认宽度下与截图一致）。功能界面本身自 v0.12.0 起未变：下载页双 tab、
+订阅页平台切换、文库、阅读器延续既有形态。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
@@ -119,11 +123,8 @@ wx-kit --version
 
 ### 下载安装包
 
-前往 [GitHub Releases](../../releases) 下载最新已发布版本 v0.12.0：
-
-- Apple Silicon：`wx-kit-0.12.0-arm64.dmg`
-- Intel Mac：`wx-kit-0.12.0.dmg`
-- Windows：`wx-kit.Setup.0.12.0.exe`
+仓库上方的「下载」一节有**各平台直链、文件大小与实时下载量**，也可前往
+[GitHub Releases](../../releases) 挑选历史版本。
 
 当前安装包未签名、未公证。macOS 首次打开时需在“系统设置 → 隐私与安全性”中允许，或执行上面的 `xattr -cr`；Windows 遇到 SmartScreen 时选择“更多信息 → 仍要运行”。
 
@@ -242,7 +243,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.12.0；GitHub Release 与 brew tap 已上线（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
+- 最新已发布版本：v0.12.1（修复与体验版本，见 [`docs/releases/v0.12.1.md`](docs/releases/v0.12.1.md)）；GitHub Release 与 brew tap 为必做渠道（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。
