@@ -41,7 +41,7 @@
 ### 发版规约（统一，勿再不一致）
 发版只走一条路：**feat 分支 → 合 main → 在 main 打 annotated tag `vX.Y.Z` → 建 GitHub Release**。
 - **不单开 `release/*` 分支**——版本的不可变快照由 **tag** 锁定（分支会漂移、tag 不会）。历史上的 `release/v0.2.0` 是早期不一致的遗留，已删。
-- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20）。README 不复制完整发布史，统一指向 ROADMAP；若当前有效 GUI 有明显变化，重拍有效页面截图或移除过时截图，绝不能继续展示已退场页面。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归 ROADMAP 发布史；⑥ commit、合 main、打 tag。**推送后本地 `git fetch --tags` 一次**——不拉的话本地 `git describe` 仍停在上一版，下次发版算基线和核实版本时都会被误导（v0.10.0 就漏了这一步，远端有 tag、本地没有）。
+- 步骤：① `package.json` + `package-lock.json` 根包 version bump（只改 version 行，别让工具重排 build 配置）；② `docs/releases/vX.Y.Z.md` 写发布说明；③ 重新 `npm run build` + `npm run package:win` 出包（走国内镜像，见下方网络规约）；④ **真实启动打包后的 .app 验证**（undici external 站得住）；⑤ **同步刷新 `README.md` 的版本相关处**（状态徽章、最新版本号、安装包文件名、项目状态/里程碑段——发版不刷 README 会漂，见 devlog §16/§20），并跑 `npm run docs:download-stats` 重新生成下载趋势图与安装包直链（该段由脚本生成，**勿手工编辑**；README 里 `<!-- download-stats:begin -->` 到 `end` 之间整段会被覆盖）。README 不复制完整发布史，统一指向 ROADMAP；若当前有效 GUI 有明显变化，重拍有效页面截图或移除过时截图，绝不能继续展示已退场页面。其中「这是什么」一节的版本亮点段**只保留最新版本、替换不追加**——旧版本亮点随发版删除,历史归 ROADMAP 发布史；⑥ commit、合 main、打 tag。**推送后本地 `git fetch --tags` 一次**——不拉的话本地 `git describe` 仍停在上一版，下次发版算基线和核实版本时都会被误导（v0.10.0 就漏了这一步，远端有 tag、本地没有）。
 - **`gh release create` 中途别被中断**——它是「先建草稿 → 传附件 → 最后才 publish」，杀在中途会留下未发布的 Draft（外部不可见）。若已成 Draft，用 `gh release edit vX.Y.Z --draft=false --latest` 补发布。
 - **`gh` 命令与 `git push`/tag 推送一律 unset 代理直连**（见网络规约：8118 代理传 github 大文件会卡死）。大包上传慢/断时，逐个 `gh release upload vX.Y.Z <file> --clobber`。
 ### 发版完成的定义（v0.6.0 起）
@@ -114,6 +114,14 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 ---
 
 ## 关键约束与已知陷阱（容易重踩，务必注意）
+- **GitHub 不提供下载量的时间序列 API**（2026-09-29 实录）：`asset.download_count` 只是
+  **该资产自发布以来的累计总数**，没有按天/按周的增量，历史快照无法追溯——任何「每日下载趋势图」
+  只能靠自建库从启用之日起每天记快照，追溯不了过去。所以 README 的下载图只能是
+  **每版本累计数**（`docs/images/downloads.svg`，由 `npm run docs:download-stats` 生成）。
+  两个连带规则：① 图和说明里必须写明这是累计值不是日增量，否则会被误读成编造数据；
+  ② **统计必须排除 `.blockmap`**（electron-builder 的差分更新元数据，不是用户点的安装包），
+  否则数字虚高、直链点进去没反应。老版本累计数高于新版本是正常的（有人从收藏的旧 release
+  链接取包），不是最新版不受欢迎。
 - **按 URL 下载仍是生产能力**：多 URL 下载保持串行；已删除文章会返回 HTTP 200 错误页 → 用“解析后标题为空即视为无效文章”判定失败（见 `src/core/download-article.ts`）。不要把私有列表接口失效扩大成“所有微信文章都不能下载”。
 - **文章库**：默认在用户文档目录下（`~/Documents/wx-kit`），可在设置改。文件系统存储 + `library.json` 索引，不用数据库。
 - **失败必须保留失败类型，不得降级为「成功但空」**（v0.10.5 实录，勿回退）:鉴权失效必须抛

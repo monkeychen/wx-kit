@@ -20,6 +20,7 @@
     "test:e2e": "vite build && node tests/e2e/gui.e2e.mjs",
     "test:e2e:live-download": "vite build && node tests/e2e/gui-live-download.e2e.mjs",
     "docs:screenshots": "vite build && node scripts/capture-current-screenshots.mjs",
+    "docs:download-stats": "node scripts/update-download-stats.mjs",
     "lint": "eslint .",
     "cli": "electron . "
   },
