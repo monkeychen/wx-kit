@@ -114,6 +114,16 @@ npx electron . download --url "https://mp.weixin.qq.com/s/XXX" --formats md,html
 ---
 
 ## 关键约束与已知陷阱（容易重踩，务必注意）
+- **放进仓库的 SVG 不许带 `<style>` 块**（2026-09-29 实录）：GitHub 的 **blob 文件预览页**
+  会净化含 `<style>` 的 SVG 并拒绝内联渲染，报 `Error rendering embedded code /
+  Invalid image source`。**迷惑点**：`raw.githubusercontent` 直连是 `200 image/svg+xml`
+  完全正常、README 里也能显示——只有 blob 页炸，所以只测 raw 测不出来。
+  样式一律写成元素内联属性（`fill=` / `font-size=` / `font-weight=`）。
+  深色主题因此**不能靠 CSS 媒体查询**，改用两份 SVG + `<picture>` +
+  `<source media="(prefers-color-scheme: dark)">`（GitHub 原生支持，不依赖 SVG 内CSS）。
+- **验证远端文件内容用 commit sha，不要用分支名**：`raw.githubusercontent/.../main/...`
+  走缓存，改完 push 后仍会返回旧文件，一度误判「没改成功」。用
+  `curl "https://raw.githubusercontent.com/<repo>/$(git rev-parse HEAD)/<path>"` 直连真实内容。
 - **往 README 放图片/徽章：「200」不等于「能显示」，必须查 content-type**（2026-09-29 实录）：
   v0.12.1 的下载徽章全挂，根因是URL 带了 shields.io 的 `.json` 后缀——那个变体返回
   **JSON 文本**（也是 HTTP 200），而 README 徽章是 `<img>` 标签，浏览器渲染不出 JSON，
