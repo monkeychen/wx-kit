@@ -59,7 +59,10 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 <!-- download-stats:begin （由 scripts/update-download-stats.mjs 生成，勿手工编辑）-->
 ## 下载
 
-![各版本安装包累计下载数](docs/images/downloads.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/downloads-dark.svg">
+  <img alt="各版本安装包累计下载数" src="docs/images/downloads.svg">
+</picture>
 
 [![下载 v0.12.1](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.1/total?style=flat-square&label=%E6%80%BB%E4%B8%8B%E8%BD%BD&color=brightgreen)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.1)
 [![Windows 下载](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.1/wx-kit.Setup.0.12.1.exe?style=flat-square&label=Windows&color=blue)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.1)

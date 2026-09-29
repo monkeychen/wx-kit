@@ -97,78 +97,71 @@ const barW = Math.max(4, slot * 0.66)
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const y = (n) => PAD.t + plotH - (n / niceMax) * plotH
 
-// 纵轴刻度与网格
-let grid = ''
-const ticks = 4
-for (let i = 0; i <= ticks; i++) {
-  const v = (niceMax / ticks) * i
-  const yy = y(v)
-  grid += `<line x1="${PAD.l}" y1="${yy.toFixed(1)}" x2="${W - PAD.r}" y2="${yy.toFixed(1)}" stroke="currentColor" stroke-opacity="0.12" stroke-width="1"/>`
-  grid += `<text class="ax" x="${PAD.l - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`
-}
+const FONT = 'ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif'
 
-// 柱：最新一版用朱砂色（呼应项目设计系统的主强调色），其余用弱化墨色
-let bars = ''
-versions.forEach((v, i) => {
-  const x = PAD.l + i * slot + (slot - barW) / 2
-  const h = Math.max(v.count > 0 ? 2 : 0, (v.count / niceMax) * plotH)
-  const isLatest = v.tag === latest.tag
-  bars += `<g class="bar${isLatest ? ' latest' : ''}"><rect x="${x.toFixed(1)}" y="${(PAD.t + plotH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2"/></g>`
-})
-
-// 横轴标签：30 个版本全标会糊，稀疏标注（每 3 个）+ 最新版必标
-let labels = ''
-versions.forEach((v, i) => {
-  const isLatest = v.tag === latest.tag
-  if (!isLatest && i % 3 !== 0 && i !== versions.length - 2) return
-  const x = PAD.l + i * slot + slot / 2
-  const short = v.tag.replace(/^v0\./, '').replace(/^v/, '')
-  labels += `<text class="lb" x="${x.toFixed(1)}" y="${H - PAD.b + 17}" text-anchor="middle"${isLatest ? ' class="lb latest"' : ''}>${esc(isLatest ? v.tag : short)}</text>`
-})
-
-// 峰值标注（v0.8.5 = 82），给图一个「有故事」的锚点
-const peak = versions.reduce((a, b) => b.count > a.count ? b : a)
-const peakIdx = versions.indexOf(peak)
-let peakNote = ''
-if (peak.count > 0) {
-  const px = PAD.l + peakIdx * slot + slot / 2
-  peakNote = `<text class="peak" x="${px.toFixed(1)}" y="${(y(peak.count) - 7).toFixed(1)}" text-anchor="middle">${peak.count}</text>`
-}
-
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-labelledby="dlTitle dlDesc">
-<title id="dlTitle">wx-kit 各版本 GitHub 安装包累计下载数</title>
-<desc id="dlDesc">共 ${versions.length} 个已发布版本，合计 ${total} 次下载。数据来自 GitHub Releases API 的 asset.download_count（安装包资产，不含 blockmap），统计时间 ${new Date().toISOString().slice(0, 10)}。该数字是每个版本发布至今的累计值，不是按天增量，GitHub 不提供时间序列。</desc>
-<style>
-  .bg{fill:#fffdf8}
-  .ax,.lb{font:11px ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;fill:#6c6354}
-  .peak{font:600 11px ui-sans-serif,sans-serif;fill:#b5462f}
-  .bar rect{fill:#c9c0ae}
-  .bar.latest rect{fill:#b5462f}
-  .ttl{font:600 12px ui-sans-serif,sans-serif;fill:#211c15}
-  .sub{font:11px ui-sans-serif,sans-serif;fill:#a59c89}
-  @media (prefers-color-scheme: dark){
-    .bg{fill:#1a1815}
-    .ax,.lb{fill:#a59c89}
-    .peak{fill:#e08a70}
-    .bar rect{fill:#4a443a}
-    .bar.latest rect{fill:#c9603f}
-    .ttl{fill:#f3ede1}
-    .sub{fill:#88806f}
+// 单份 SVG 的构造函数。**所有样式必须是元素内联属性，不能有 <style> 块**——
+// GitHub 的 blob 预览会净化含 <style> 的 SVG 并报「Invalid image source」
+// （2026-09-29 实录：raw 直连 200 + image/svg+xml正常，但仓库页炸）。
+// 深色主题因此不能用 CSS 媒体查询，改由 <picture> 提供第二份 SVG——
+// 那是 GitHub 原生支持的方式，且不依赖 SVG 内部样式。
+function buildSvg(c) {
+  let grid = ''
+  const ticks = 4
+  for (let i = 0; i <= ticks; i++) {
+    const v = (niceMax / ticks) * i
+    const yy = (y(v)).toFixed(1)
+    grid += `<line x1="${PAD.l}" y1="${yy}" x2="${W - PAD.r}" y2="${yy}" stroke="${c.grid}" stroke-width="1"/>`
+    grid += `<text x="${PAD.l - 8}" y="${(+yy + 4).toFixed(1)}" text-anchor="end" font-size="11" font-family='${FONT}' fill="${c.axis}">${Math.round(v)}</text>`
   }
-</style>
-<rect class="bg" width="${W}" height="${H}" rx="8"/>
-<text class="ttl" x="${PAD.l}" y="18">各版本安装包累计下载数</text>
-<text class="sub" x="${W - PAD.r}" y="18" text-anchor="end">${versions.length} 个版本 · 合计 ${total} 次 · GitHub API ${new Date().toISOString().slice(0, 10)}</text>
+
+  let bars = ''
+  versions.forEach((v, i) => {
+    const x = PAD.l + i * slot + (slot - barW) / 2
+    const h = Math.max(v.count > 0 ? 2 : 0, (v.count / niceMax) * plotH)
+    const fill = v.tag === latest.tag ? c.accent : c.bar
+    bars += `<rect x="${x.toFixed(1)}" y="${(PAD.t + plotH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${fill}"/>`
+  })
+
+  // 横轴标签稀疏标注（每 3 个）+ 最新版必标，否则 30+ 个标签会糊成一片
+  let labels = ''
+  versions.forEach((v, i) => {
+    const isLatest = v.tag === latest.tag
+    if (!isLatest && i % 3 !== 0 && i !== versions.length - 2) return
+    const x = PAD.l + i * slot + slot / 2
+    const short = v.tag.replace(/^v0\./, '').replace(/^v/, '')
+    labels += `<text x="${x.toFixed(1)}" y="${H - PAD.b + 17}" text-anchor="middle" font-size="11" font-weight="${isLatest ? 600 : 400}" font-family='${FONT}' fill="${isLatest ? c.accent : c.axis}">${esc(isLatest ? v.tag : short)}</text>`
+  })
+
+  // 峰值标注（v0.8.5 = 82），给图一个「有故事」的锚点
+  const peak = versions.reduce((a, b) => (b.count > a.count ? b : a))
+  const peakIdx = versions.indexOf(peak)
+  const peakNote = peak.count > 0
+    ? `<text x="${(PAD.l + peakIdx * slot + slot / 2).toFixed(1)}" y="${(y(peak.count) - 7).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="600" font-family='${FONT}' fill="${c.accent}">${peak.count}</text>`
+    : ''
+
+  const stamp = new Date().toISOString().slice(0, 10)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-labelledby="dlTitle dlDesc">
+<title id="dlTitle">wx-kit 各版本 GitHub 安装包累计下载数</title>
+<desc id="dlDesc">共 ${versions.length} 个已发布版本，合计 ${total} 次下载。数据来自 GitHub Releases API 的 asset.download_count（安装包资产，不含 blockmap），统计时间 ${stamp}。该数字是每个版本发布至今的累计值，不是按天增量，GitHub 不提供时间序列。</desc>
+<rect width="${W}" height="${H}" rx="8" fill="${c.bg}"/>
+<text x="${PAD.l}" y="18" font-size="12" font-weight="600" font-family='${FONT}' fill="${c.title}">各版本安装包累计下载数</text>
+<text x="${W - PAD.r}" y="18" text-anchor="end" font-size="11" font-family='${FONT}' fill="${c.sub}">${versions.length} 个版本 · 合计 ${total} 次 · GitHub API ${stamp}</text>
 ${grid}
 ${bars}
 ${peakNote}
 ${labels}
 </svg>
 `
+}
+
+const LIGHT = { bg: '#fffdf8', title: '#211c15', sub: '#a59c89', axis: '#6c6354', grid: '#e8e2d6', bar: '#c9c0ae', accent: '#b5462f' }
+const DARK = { bg: '#14120f', title: '#f3ede1', sub: '#8a8271', axis: '#a59c89', grid: '#2e2a24', bar: '#4a443a', accent: '#c9603f' }
 
 if (!existsSync(SVG_DIR)) mkdirSync(SVG_DIR, { recursive: true })
-writeFileSync(SVG_FILE, svg, 'utf8')
-console.log(`[download-stats] 已写 ${SVG_FILE.replace(ROOT + '/', '')}`)
+writeFileSync(SVG_FILE, buildSvg(LIGHT), 'utf8')
+writeFileSync(join(SVG_DIR, 'downloads-dark.svg'), buildSvg(DARK), 'utf8')
+console.log(`[download-stats] 已写 downloads.svg与 downloads-dark.svg`)
+
 
 // ── 3. 徽章与直链（shields.io 代理 GitHub API，数字自动跟随，零维护）─────
 // 徽章不走本地数据而是实时取 shields.io——README 里的数字永远是最新的，
@@ -206,7 +199,10 @@ const block = `
 <!-- download-stats:begin （由 scripts/update-download-stats.mjs 生成，勿手工编辑）-->
 ## 下载
 
-![各版本安装包累计下载数](docs/images/downloads.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/downloads-dark.svg">
+  <img alt="各版本安装包累计下载数" src="docs/images/downloads.svg">
+</picture>
 
 ${badgeRow}
 
