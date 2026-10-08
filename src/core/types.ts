@@ -1,5 +1,5 @@
 // src/core/types.ts
-import type { MpVideoSource } from './parse-video'
+import type { VideoEntry } from './parse-video'
 export type DownloadFormat = 'cover' | 'md' | 'html' | 'pdf' | 'meta'
 
 // 格式 = 同一份内容的不同**表现形式**。视频不在其列：它是内容的一部分（和图片一样），
@@ -17,7 +17,7 @@ export interface ParsedArticle {
   coverUrl: string      // 封面图 URL，解析不到则空串
   contentHtml: string   // 清洗后的正文 HTML
   imageUrls: string[]   // 正文中出现的图片 URL（去重、按出现顺序）
-  videos: MpVideoSource[] // 内嵌上传视频（mpvideo，已择最高清档）；无视频为 []
+  videos: VideoEntry[] // 内嵌视频入口（微信上传视频已择最高清档 + 墨问视频号嵌入）；无视频为 []
   itemShowType: number | null  // 消息类型（0 图文 / 5 视频 / 8 图文消息 / 10 文字 / …）；读不到为 null
   warnings: string[]           // 解析期的非致命问题（未识别类型、正文疑似脚本等）
 }
@@ -52,6 +52,10 @@ export interface ArticleMeta {
     videoId: string; formatId: string
     width: number; height: number; filesize: number; durationMs: number
     path?: string
+    /** 当次签名直链（有时效，可能已过期）。仅未下载/失败条目有——下载成功走本地 path。 */
+    streamUrl?: string
+    /** 永久有效的跳转目标（微信=文章原页；墨问=视频号页）。v0.12.2 R1 */
+    fallbackUrl?: string
   }>
 }
 

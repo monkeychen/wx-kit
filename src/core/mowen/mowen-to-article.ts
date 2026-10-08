@@ -6,6 +6,7 @@
 // 原地替换为 blockquote 引用卡片（标题/摘要/作者/链接，对齐墨问 App 内联形态）；
 // 旧尾部「引用笔记」追加块退场（同信息两处重复）；refNoteIds 未在正文出现的文末补卡防信息丢失。
 import type { ParsedArticle } from '../types'
+import type { VideoEntry } from '../parse-video'
 import type { NoteShowResult } from './note-show'
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
@@ -92,7 +93,32 @@ export function noteShowToParsedArticle(r: NoteShowResult, refMetas?: Map<string
     html = html + audios
   }
 
+  // 视频入口（v0.12.2 R1）：正文 <channel-video feed-id> 是微信视频号嵌入（spike 2026-09-30
+  // 钉死：note/show 不返回视频数据、没有直链接口），唯一可行解是拼视频号页永久链接。
+  // 原地替换为跳转链接段落——此前不认这个标签，视频在正文里静默消失。
   const warnings = [...r.warnings]
+  const videoEntries: VideoEntry[] = []
+  html = html.replace(/<channel-video\b[^>]*>/g, (whole) => {
+    const m = whole.match(/feed-id="([^"]+)"/)
+    if (!m) {
+      warnings.push('视频标签缺 feed-id，视频入口未生成')
+      return '<p>（此处含一个视频，但未能解析出观看入口）</p>'
+    }
+    const url = `https://channels.weixin.qq.com/${m[1]}`
+    videoEntries.push({
+      videoId: m[1], formatId: 'channels-embed',
+      width: 0, height: 0, filesize: 0, durationMs: 0,
+      fallbackUrl: url,
+      inline: true,   // 正文原位置已替换为链接段落,导出器不再追加(否则同一视频两个入口)
+    })
+    return `<p><a href="${url}">▶ 视频号视频（点击去观看）</a></p>`
+  })
+  html = html.replace(/<\/channel-video>/g, '')
+  // 服务端标记有视频但一个入口都没解析出来：如实告警，不静默丢（与图集缺图同策略）
+  if (r.hasVideo && !videoEntries.length) {
+    warnings.push('服务端标记该笔记含视频（noteFlag.hasVideo），但正文未解析出视频入口')
+  }
+
   if (r.refNoteIds.length) {
     html = applyRefCards(html, r.refNoteIds, refMetas ?? new Map(), warnings)
     warnings.push(`该笔记含 ${r.refNoteIds.length} 篇引用子笔记，正文已内联引用卡片；递归下载子笔记请使用「展开引用子笔记」（CLI --expand-refs）。`)
@@ -110,7 +136,7 @@ export function noteShowToParsedArticle(r: NoteShowResult, refMetas?: Map<string
     coverUrl: urls[0] ?? '',
     contentHtml: html,
     imageUrls: urls,
-    videos: [],
+    videos: videoEntries,
     itemShowType: null,
     warnings,
   }

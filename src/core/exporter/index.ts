@@ -19,7 +19,7 @@ export interface ExportDeps {
   BrowserWindowCtor: typeof import('electron').BrowserWindow
   now: () => string
   /** 视频下载进度（单个可达上百 MB，不给反馈会像卡死） */
-  onVideoProgress?: (e: { index: number; total: number; video: import('../parse-video').MpVideoSource }) => void
+  onVideoProgress?: (e: { index: number; total: number; video: import('../parse-video').VideoEntry }) => void
   /** 非致命问题的上报（如视频下载失败）：文章其余部分照常产出，但用户不该靠翻文件才发现 */
   onWarning?: (message: string) => void
   onProgress?: (stage: { phase: ProgressPhase; message?: string }) => void
@@ -76,9 +76,12 @@ export async function exportArticle(input: ExportInput, deps: ExportDeps): Promi
 
   // 视频：必须在写 md/html 之前（正文要引用它），且必须在本次流程内下完
   // ——直链带 auth_key/dis_t 签名有时效，存下来隔次再下必然失效。
+  // fallbackUrl 缺省补 sourceUrl（v0.12.2 R1：微信条目的永久跳转=文章原页；
+  // 墨问条目自带视频号页链接，不覆盖）。
   if (wantVideo && parsed.videos.length) deps.onProgress?.({ phase: 'video', message: `下载视频 0/${parsed.videos.length}` })
   const { records: videoRecords, htmlSuffix, mdSuffix, warnings } = await downloadVideos(
-    parsed.videos, dir, wantVideo, deps.fetchBinary, (event) => {
+    parsed.videos.map((v) => ({ ...v, fallbackUrl: v.fallbackUrl ?? sourceUrl })),
+    dir, wantVideo, deps.fetchBinary, (event) => {
       deps.onProgress?.({ phase: 'video', message: `下载视频 ${event.index}/${event.total}` })
       deps.onVideoProgress?.(event)
     },

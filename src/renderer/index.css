@@ -505,6 +505,13 @@ body {
 }
 .prose img { max-width: 100%; border-radius: 8px; margin: 1.2em 0; display: block; }
 .prose a { color: var(--cinnabar); text-decoration: none; border-bottom: 1px solid var(--cinnabar-wash); }
+/* 视频入口（v0.12.2 R1）：md 视图视频位的在线播放器/降级按钮。时效标注走弱提示色——
+   补充信息不用警告色吓人（设计系统 §1 判断 2）。 */
+.video-entry { margin: 1.2em 0; }
+.video-entry video { width: 100%; border-radius: 8px; display: block; background: var(--paper-sunken); }
+.video-entry-hint { display: block; margin-top: 6px; font-size: 12px; color: var(--ink-faint); }
+p.video-entry { display: flex; align-items: center; gap: 12px; }
+p.video-entry .video-entry-hint { display: inline; margin-top: 0; }
 .prose blockquote {
   margin: 1.4em 0;
   padding: 4px 0 4px 20px;

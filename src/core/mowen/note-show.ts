@@ -19,6 +19,9 @@ export interface NoteShowResult {
   images: Map<string, string>  // img uuid → w_1200 签名 URL（约 7 天时效，URL 不入库）
   audios: string[]             // 远程音频 URL（嵌入不落地，PRD 非目标）
   refNoteIds: string[]         // noteRef 引用的子笔记 uuid（合集/引用块，顺序保留）
+  /** 服务端视频标记（v0.12.2 R1，detail.noteFlag.hasVideo）：解析器据此判
+   *  「标记有视频但没解析出入口」并告警——不静默丢。 */
+  hasVideo: boolean
   warnings: string[]
 }
 
@@ -78,6 +81,7 @@ export async function fetchNoteShow(uuid: string, deps: NoteShowDeps): Promise<N
   const root = isObj(json) ? json : {}
   const detail = isObj(root.detail) ? root.detail : {}
   const noteBase = isObj(detail.noteBase) ? detail.noteBase : {}
+  const noteFlag = isObj(detail.noteFlag) ? detail.noteFlag : {}
   const user = isObj(root.user) ? root.user : {}
   const userBase = isObj(user.base) ? user.base : {}
 
@@ -141,6 +145,7 @@ export async function fetchNoteShow(uuid: string, deps: NoteShowDeps): Promise<N
     images,
     audios: arrOf(noteFile, 'audios').filter(isObj).map((a) => str(a.url)).filter(Boolean),
     refNoteIds: Array.isArray(detail.noteRef) ? detail.noteRef.map(str).filter(Boolean) : [],
+    hasVideo: !!noteFlag.hasVideo,
     warnings,
   }
 }

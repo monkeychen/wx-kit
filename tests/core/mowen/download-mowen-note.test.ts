@@ -18,7 +18,7 @@ const baseDeps = () => ({
 
 const noteShowOf = (over: Partial<NoteShowResult>): NoteShowResult => ({
   uuid: 'Ni2ZIpWVBtm1qu8sAmihb', title: '测试笔记', digest: '摘要',
-  contentHtml: '<p>正文</p>', publicAt: 1789088785,
+  contentHtml: '<p>正文</p>', publicAt: 1789088785, hasVideo: false,
   authorUid: 'u1', authorName: '池建强',
   images: new Map(), audios: [], refNoteIds: [], warnings: [],
   ...over,

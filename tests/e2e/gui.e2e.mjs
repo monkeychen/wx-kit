@@ -59,10 +59,25 @@ const MP_ARTICLE_URL = `https://mp.weixin.qq.com/s/${WEREAD_TOKEN}`
 // 缺的那张要靠第二个匿名接口 gallery/infos({noteUuid,gids}) 补（2026-09-17 真机钉死）。
 const MOWEN_PARENT = 'MowenParent0000000001'
 const MOWEN_CHILD = 'MowenChild00000000002'
+const MOWEN_VIDEO = 'MowenVideoNote00000001'
 const MOWEN_GID = 'MowenGallery000000001'
 const MOWEN_GALLERY_UUIDS = ['MowenGalImg000000001', 'MowenGalImg000000002', 'MowenGalImg000000003']
 const mowenImgUrl = (port) => `http://127.0.0.1:${port}/pic.png`
 const MOWEN_NOTES = {
+  [MOWEN_VIDEO]: () => ({
+    // v0.12.2 R1 spike 钉死的形态:视频是 <channel-video feed-id> 视频号嵌入,
+    // note/show 不返回视频数据(noteEmbed null),只有 feed-id 可拼视频号页永久链接。
+    detail: {
+      noteBase: {
+        uuid: MOWEN_VIDEO, title: '带视频号的笔记', digest: '',
+        content: '<p>前文。</p><channel-video uuid="cv1" feed-id="export/e2efeed"></channel-video><p>后文。</p>',
+        publicAt: 1789088785, uid: 'u-mowen-1',
+      },
+      noteFlag: { isPublic: true, hasFee: false, hasVideo: true },
+      noteFile: null,
+    },
+    user: { base: { uid: 'u-mowen-1', name: '墨问父作者' } },
+  }),
   [MOWEN_PARENT]: (port) => ({
     detail: {
       noteBase: {
@@ -964,6 +979,64 @@ async function main() {
     await win.click('[data-testid="reader-back"]')
     await win.waitForSelector('[data-testid="url-input"]', { timeout: 8000 })
     assert(true, 'M64: 下载入口进阅读器后「返回下载」回到下载页')
+
+    // ============ v0.12.2 R1 · 墨问 <channel-video> 视频号入口 ============
+    // 此前不认这个标签,视频在正文里静默消失;现在原地替换为视频号页跳转链接 + 阅读器入口。
+    await win.fill('[data-testid="url-input"]', `https://note.mowen.cn/detail/${MOWEN_VIDEO}`)
+    await win.click('[data-testid="start-download"]')
+    await win.waitForSelector('[data-testid="history-event"]', { timeout: 30000 })
+    await win.waitForSelector('[data-testid="history-article"]', { timeout: 10000 })
+    const videoItem = await topEvent().locator('[data-testid="history-article"]').first().innerText()
+    assert(videoItem.includes('带视频号的笔记'), `R1: 视频号笔记经「按链接下载」入库 (saw: ${videoItem.slice(0, 30)})`)
+
+    const videoMetaRel = readdirSync(libraryRoot, { recursive: true }).map(String)
+      .find((p) => p.includes('带视频号的笔记') && p.endsWith('meta.json'))
+    const videoMeta = JSON.parse(readFileSync(join(libraryRoot, videoMetaRel), 'utf-8'))
+    assert(videoMeta.videos?.[0]?.fallbackUrl === 'https://channels.weixin.qq.com/export/e2efeed', 'R1: meta.videos 带 fallbackUrl(视频号页)')
+    assert(videoMeta.videos?.[0]?.streamUrl === undefined, 'R1: 无直链条目不落 streamUrl')
+    const videoMd = readFileSync(join(libraryRoot, videoMetaRel.replace('meta.json', 'content.md')), 'utf-8')
+    assert(videoMd.includes('https://channels.weixin.qq.com/export/e2efeed'), 'R1: md 导出视频号页链接(正文不再静默消失)')
+    assert((videoMd.match(/channels\.weixin\.qq\.com\/export\/e2efeed/g) || []).length === 1, 'R1: 入口恰一个(原位置 inline,导出器不重复追加)')
+
+    // 阅读器 md 视图:无直链 → 直接渲染「在微信里打开」按钮(meta 精确匹配,无空播放器)
+    // history-read 只在事件展开时渲染;下载完成自动展开有竞态、reader-back 返回后组件重挂
+    // expanded 重置为全收起——统一走「不可见就展开」再进
+    const openTopReader = async () => {
+      const readBtn = topEvent().locator('[data-testid="history-read"]').first()
+      if (!(await readBtn.isVisible().catch(() => false))) {
+        await topEvent().locator('.ev-bar').click()
+        await readBtn.waitFor({ state: 'visible', timeout: 8000 })
+      }
+      await readBtn.click()
+      await win.waitForURL(/reader/, { timeout: 8000 })
+    }
+    await openTopReader()
+    await win.waitForSelector('.video-entry button', { timeout: 8000 })
+    assert((await win.locator('.video-entry button').innerText()).includes('在微信里打开'), 'R1: 阅读器渲染视频入口按钮(无直链不给空播放器)')
+    // 点击经 stub 的 shell.openExternal 打开视频号页(e2e 不真开浏览器)
+    await app.evaluate(({ shell }) => { shell.openExternal = async (url) => { globalThis.__lastOpenUrl = url } })
+    await win.click('.video-entry button')
+    await win.waitForTimeout(300)
+    const lastOpen = await app.evaluate(() => globalThis.__lastOpenUrl ?? '')
+    assert(lastOpen === 'https://channels.weixin.qq.com/export/e2efeed', `R1: 点击打开视频号页 (got: ${lastOpen})`)
+    await win.click('[data-testid="reader-back"]')
+    await win.waitForSelector('[data-testid="url-input"]', { timeout: 8000 })
+
+    // streamUrl 失效自动降级（B1）:把**索引 library.json**(阅读器 libraryList 的数据源,
+    // 不是文章目录里的 meta.json)的 streamUrl 指到必然 404 的地址,
+    // <video> 真触发 error → 自动替换为「在微信里打开」,不留播不出来的空播放器。
+    const libraryIndexPath = join(libraryRoot, 'library.json')
+    const indexForFail = JSON.parse(readFileSync(libraryIndexPath, 'utf-8'))
+    const failEntry = indexForFail.articles.find((a) => a.title === '带视频号的笔记')
+    failEntry.videos[0].streamUrl = `http://127.0.0.1:${server.address().port}/definitely-missing.mp4`
+    writeFileSync(libraryIndexPath, JSON.stringify(indexForFail, null, 2))
+    await openTopReader()
+    await win.waitForSelector('.video-entry', { timeout: 8000 })
+    await win.waitForSelector('.video-entry button', { timeout: 8000 })   // error 降级后的按钮
+    assert((await win.locator('.video-entry video').count()) === 0, 'R1: 播不出的播放器已移除(不留空壳)')
+    const failHint = await win.locator('.video-entry-hint').innerText()
+    assert(failHint.includes('已失效'), `R1: 降级提示如实说明失效 (got: ${failHint})`)
+    errors.length = 0   // 上面那个 404 是 B1 降级测试故意制造的(streamUrl 指向不存在资源),不算产品错误
 
     const mowenMdRel = readdirSync(libraryRoot, { recursive: true }).map(String)
       .find((p) => p.endsWith('content.md') && p.includes('墨问'))

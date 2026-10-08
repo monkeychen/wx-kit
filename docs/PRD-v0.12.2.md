@@ -1,12 +1,13 @@
-# wx-kit v0.12.2 产品需求文档（迭代 PRD · 需求收集阶段）
+# wx-kit v0.12.2 产品需求文档（迭代 PRD）
 
-> 本版处于**需求收集**阶段：R1 已完成 spike 并与安哥定案，**尚未写实现计划、未动代码**。
-> 下一步：安哥确认剩余需求项 → 本文档定稿 → 按 `AGENTS.md` 工作流写 `docs/plans/` 实现计划。
+> 状态：**已定稿**（2026-10-08，安哥确认 R1 + R2 同版发出）。
+> R1 于 2026-09-30 完成 spike 并定案；R2 为依赖安全升级（2026-10-08 发现仓库
+> 14 条 Dependabot 告警，安哥定「作为 v0.12.2 解决」）。
 > 当前进度见 `ROADMAP.md`，验收以本文第 4 节为准。
 
 ## 1. 一句话定义
 
-**含视频的文章，下载后不该只剩一句说明文字——用户点开就该能看。**
+**含视频的文章，下载后不该只剩一句说明文字（R1）；仓库不再挂着 14 条安全告警（R2）。**
 
 ## 2. 背景
 
@@ -81,17 +82,36 @@
 一个标签都没匹配到，也要在 `warnings` 里说清「服务端标记有视频但未解析出入口」——
 **不静默丢弃**（与项目既有纪律一致）。
 
-### R2 · 待收集（本版其余方向）
+### R2 · 依赖安全升级（2026-10-08 并入，零功能变更）
 
-安哥在本轮未提出的需求点。候选见 `ROADMAP.md`「下一步 / 候选」：
-- 微信文章公式保真（推迟多版，动手前需先 spike 真实 DOM）
-- Windows CLI stdout 正解（铺 Windows agent 场景时才值得动打包配置）
-- 文库管理（当前 656 篇 / 40 账号规模下是否已吃力，待安哥判断）
-- 可观测性补强（`main.log` 在真实使用中未生成、`mp-request-audit.log` 无轮转已 2MB）
+GitHub 仓库出现 14 条 open 的 Dependabot 告警（另 1 条密钥扫描告警 2026-08-28 已
+resolved，与本版无关）：
+
+| 包 | 当前 | 修复线 | 告警数 | 代表性漏洞 |
+|---|---|---|---|---|
+| undici（cheerio 传递依赖，runtime） | 7.29.0 | ≥ 7.29.1 | 10 | 缓存重放、共享缓存跨用户 Set-Cookie 泄露、无界解压 DoS、BalancedPool 丢弃 connect 选项致 TLS 证书校验绕过 |
+| electron（devDependency，打进安装包） | 42.8.1 | 3 条 ≥ 42.9.2、1 条 ≥ 42.10.0 | 4 | 协议 handler 无 corsEnabled 允许跨域读取、沙箱顶层文档窗口不继承沙箱限制、`<webview>` 可在 Worker 启用 Node 集成、被攻陷 renderer 投毒沙箱 preload 代码缓存 |
+
+**暴露面判断**：undici 只被 `cheerio.load` 间接使用（vite 构建 external、惰性不加载），
+缓存/WebSocket/retry 等告警路径多不在使用面；electron 的协议跨域读取与 preload 缓存
+投毒对 `wxfile://` 自定义协议 + contextBridge preload 架构是**真实相关面**。
+
+**升级动作**：
+
+| 依赖 | 动作 | 目标 |
+|---|---|---|
+| undici | `npm update undici`（lockfile 内；cheerio 声明 `^7.19.0` 涵盖） | ≥ 7.29.1 |
+| electron | `npm install --save-dev electron@^42.11.12`（42.x 最新 patch，高于全部修复线） | ≥ 42.10.0（全 4 条） |
+
+决策：undici 不进 package.json、不加 overrides（传递依赖，锁文件升级即最小变更）；
+electron 同大版本内升至最新 patch，安全修复版不捎带跨大版本（43+）风险；
+`vite.config.ts` 的 undici external 约束不变（与版本无关）。
 
 ## 4. 验收清单
 
-R1 实现后逐条勾选（**当前均未实现，不预先勾选**）：
+实现后逐条勾选（**当前均未实现，不预先勾选**）。
+
+### R1 · 视频入口
 
 - [ ] 微信文章含视频但未下载视频文件时：html 视图视频位置可点播放，且带永久有效的
       「在微信里打开」入口
@@ -105,10 +125,22 @@ R1 实现后逐条勾选（**当前均未实现，不预先勾选**）：
       且 UI/文档明确标注前者可能过期
 - [ ] 单测覆盖：`<channel-video>` 解析、`hasVideo` 与解析结果不一致时的告警、
       `streamUrl` 缺省时不渲染播放器
-- [ ] `npm test` / `npx tsc --noEmit` / `npm run lint` / `npm run test:e2e` 全绿
 - [ ] e2e 覆盖：含 `<channel-video>` 的 fixture 笔记走通「解析 → 正文出现入口 → 点击跳转
       目标正确」
 - [ ] 真实样本回归：用 `Jlvxr4t3bWSmXoGGNEOfm` 真机下载一次，确认正文出现视频号入口
+
+### R2 · 依赖安全升级
+
+- [ ] `node_modules/undici` 锁定版本 ≥ 7.29.1（锁文件唯一副本）
+- [ ] devDependencies.electron ≥ 42.10.0（实际 ^42.11.12）
+- [ ] `npm test` / `npx tsc --noEmit` / `npm run lint` 全绿
+- [ ] `WXKIT_E2E_HEADLESS=1 npm run test:e2e` 全绿（Electron 42.11 下 GUI 全流程）
+- [ ] push 后 GitHub Dependabot 告警清零（回源核实，不凭推断）
+
+### 发版
+
+- [ ] 三平台包（dmg arm64/x64 + win exe）出包并真实启动 .app 验证
+- [ ] GitHub Release + brew tap 双渠道上线并按规约核实
 
 ## 5. 非目标
 
@@ -117,3 +149,5 @@ R1 实现后逐条勾选（**当前均未实现，不预先勾选**）：
 - **不做视频号内容抓取/解析**（`feed-id` 只用于跳转，不解析其内容）
 - **不承诺「在线播放永久可用」**——签名时效客观存在，本版给的是「能播就播、失效有兜底」
 - 不涉及微信侧消息类型解析的其他改动
+- **不跨 Electron 大版本**（43+ 若存在，另行评估）
+- 不动 `vite.config.ts` 的 external 配置
