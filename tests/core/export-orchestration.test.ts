@@ -88,7 +88,7 @@ describe('exportArticle: 告警落进 meta（M40）', () => {
     const dir = join(mkdtempSync(join(tmpdir(), 'wxk-warn2-')), 'article')
     const meta = await exportArticle({
       parsed: base({
-        videos: [{ videoId: 'v1', formatId: 'f1', width: 640, height: 360, filesize: 1000, durationMs: 1000, qualityWording: '高清', url: 'https://v.example.com/a.mp4' }],
+        videos: [{ videoId: 'v1', formatId: 'f1', width: 640, height: 360, filesize: 1000, durationMs: 1000, url: 'https://v.example.com/a.mp4' }],
       }),
       id: 'i2', sourceUrl: 'https://mp.weixin.qq.com/s/y', dir, formats: ['meta'],
     }, { ...deps(), fetchBinary: async () => { throw new Error('视频下载失败') } })

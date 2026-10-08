@@ -2264,3 +2264,51 @@ wx-kit 的 `app.getVersion()` 根本没机会执行。`unset ELECTRON_RUN_AS_NOD
 v0.12.0 漏了 `git fetch --tags`，v0.12.1 又差点栽在验收环境上。两次都不是流程缺失，
 而是**「在什么环境下验收」从来没被写成规约**。真机验证已写进 PRD-v0.12.1 验收条目旁
 （连同 `unset ELECTRON_RUN_AS_NODE` 的原因），下次不会再靠记忆。
+
+## §82 M82：一个视频入口的四层决策——形态、落点、重复、假通过（2026-10-08）
+
+v0.12.2 = R1 视频入口 + R2 依赖安全升级（14 条 Dependabot 告警清零）。R2 本身没有故事
+（lockfile update + 同大版本 patch，先做先验证，给 R1 一个干净基线）；R1 从 PRD 定案到
+落地，连做了四个决定，每个都有可复用的判断。
+
+### 一、B1「自动降级」的落点：先问架构允许什么
+
+安哥定的形态是「`<video>` 挂 error，播不了自动替换为跳转按钮」。听起来该落在导出的
+html 文件里——但 wx-kit 的 html 阅读视图是 **sandbox iframe（无 allow-scripts）**，
+内联 onerror 不执行，这是安全红线（M59 起的先例），不能为交互便利放宽。所以自动降级
+只能落在**有脚本的渲染层**：阅读器 md 视图的 React 组件（`videos/` 本地链接渲染成
+`<video>` 的同构先例，本就存在）。html 文件形态按 PRD 定案原文给「video + 链接」并存。
+
+**规律：PRD 定案的是用户可感知的形态，实现落点要过一遍「每个表面各自允许什么」。**
+同一个「自动降级」，html 文件与阅读器是两个表面，能力不同，落点可以不同——
+只要用户看到的行为一致。
+
+### 二、inline 标记：新增内容通道时，查「谁还会渲染它」
+
+墨问 `<channel-video>` 替换为正文原位置链接后，导出器的 mdSuffix/htmlSuffix 又追加了
+同一视频的入口——**同一篇里视频入口出现两次**（正文一个、文末一个）。这个重复不是
+单测抓到的，是 e2e 的 Playwright strict mode（`.video-entry button` resolved to
+2 elements）。修复是给 `VideoEntry` 加 `inline: true`：正文流里已有原位置入口的条目，
+导出器不再追加。
+
+**规律：一个内容两处渲染通道（解析器原地替换 + 导出器尾部追加）时，「只出现一次」
+必须有人负责——用显式标记，不靠两处的心照不宣。**
+
+### 三、改数据验渲染，先确认消费方读哪份
+
+e2e 验证 B1 降级时，我把 `streamUrl` 写进了文章目录的 `meta.json`，然后断言「播不出的
+播放器已移除」——**通过了，但是假通过**：阅读器的 meta 来自 `api.libraryList()` →
+`library.json` 索引，不是文章目录的 meta.json。streamUrl 根本没进渲染器，播放器
+「移除」实际是「从未渲染」。降级提示的文案断言（「已失效」vs「不可用」）把它抓了出来
+——**文案级断言比结构级断言更能暴露假通过**。改改 library.json 后才是真降级
+（video 真请求、真 404、真 error、真替换）。
+
+### 四、e2e 两处竞态与一处预期错误
+
+- `history-read` 按钮只在事件**展开**时渲染；下载完成自动展开顶条与多次 reload 有
+  竞态、reader-back 返回后组件重挂 expanded 重置为全收起——同一份代码时过时不过。
+  防御写法：点击前 `isVisible` 检查，不可见就点 `.ev-bar` 展开再等。
+- B1 测试故意制造 404（streamUrl 指向不存在的资源）会进全局 console-error 收集器，
+  把收尾的 `errors.length === 0` 搞挂——**预期内错误要显式清空并注释原因**。
+- 真实样本回归（spike 那篇视频号笔记）一次通过：md 正文出现
+  `channels.weixin.qq.com/export/...`、meta 带 fallbackUrl、链接实测 200。

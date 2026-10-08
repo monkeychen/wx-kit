@@ -17,6 +17,27 @@ export interface MpVideoSource {
 }
 
 /**
+ * 视频入口（v0.12.2 R1）：ParsedArticle 携带的通用形态，进导出与 meta 落盘。
+ * 微信侧 `url` = 当次签名直链（时效）；墨问侧（视频号嵌入 `<channel-video>`）拿不到直链，
+ * 只有 fallbackUrl。MpVideoSource 结构兼容本类型（url 必填 ⊂ 可选）。
+ */
+export interface VideoEntry {
+  videoId: string
+  formatId: string
+  width: number
+  height: number
+  filesize: number
+  durationMs: number
+  /** 当次解析的签名直链，有时效，可缺省（墨问视频号嵌入恒缺省） */
+  url?: string
+  /** 永久有效的跳转目标（微信=文章原页；墨问=视频号页）；缺省时 exporter 补为 sourceUrl */
+  fallbackUrl?: string
+  /** 正文流里已有原位置入口（墨问 channel-video 已原地替换为链接）——导出器不再
+   *  追加片段，否则同一视频正文一个、文末又一个。微信侧视频不在正文流里，缺省 false。 */
+  inline?: boolean
+}
+
+/**
  * 还原脚本里的 URL:先解 JS 的 \xNN 转义,再解 HTML 实体 &amp;。
  * 页面里的形态是 `...mp4?dis_k=xxx\x26amp;dis_t=...` —— 两层都不解就会带着
  * 字面 `&amp;` 去请求,参数解析必然出错。

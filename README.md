@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-42-9feaf9.svg)
 ![Node](https://img.shields.io/badge/Node-20%2B-339933.svg)
-![Status](https://img.shields.io/badge/v0.12.1-released-success.svg)
+![Status](https://img.shields.io/badge/v0.12.2-released-success.svg)
 
 ## 这是什么
 
@@ -17,21 +17,19 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 - 可把文库文章同步为 Astro 站点内容；
 - GUI 适合日常使用，CLI 输出纯 JSON，适合 AI agent 和脚本调用。
 
-> **当前能力边界（v0.12.1）**
+> **当前能力边界（v0.12.2）**
 >
-> v0.12.0 起新增**选题工作台**——把本地素材变成可解释的「今天写什么」：选文章 → 得到最多
-> 三张写明理由、材料依据与起笔结构的候选卡，每条判断可回溯、失败不伪装；同时在
-> 「设置 → AI 模型」接入多厂商模型（BYOK）：
->
-> - **选题 GUI**：输入素材（从文库勾选，筛选为主搜索为辅）→ 分析 → 三候选平等展示，
->   反馈与 Markdown 简报；历史选题可回看、可删除；分析过程 SSE 流式实时可见、可取消；
-> - **选题 CLI**：`wx-kit topics analyze --range 24h|3d|7d|custom | --article <id...>`
->   与 `wx-kit topics brief`，stdout 纯 JSON 供 agent 消费（时间窗口选材仅 CLI 保留）；
-> - **多厂商 AI 设置**：智谱/千问/DeepSeek/Kimi/MiniMax/OpenAI/Google + 自定义，
+> - **视频入口（v0.12.2 新增）**：含视频的文章下载后，视频位置有可点的入口——微信文章
+>   在线播放（当次直链，时效如实标注）+ 永久有效的「在微信里打开」兜底，播放失效自动
+>   降级为跳转按钮；墨问笔记的视频号嵌入不再静默消失，原地给出视频号页跳转链接。
+> - **选题工作台（v0.12.0 起）**：把本地素材变成可解释的「今天写什么」——选文章 → 最多
+>   三张写明理由、材料依据与起笔结构的候选卡，每条判断可回溯、失败不伪装；GUI 输入素材
+>   人工选篇（筛选为主搜索为辅、SSE 流式、可取消、历史回看），CLI
+>   `wx-kit topics analyze` / `topics brief` 输出纯 JSON 供 agent 消费；
+> - **多厂商 AI 设置（BYOK）**：智谱/千问/DeepSeek/Kimi/MiniMax/OpenAI/Google + 自定义，
 >   Key 经系统加密落盘、绝不进日志；正文出机边界明示；
-> - **Windows 正式支持**：修复 Windows 下阅读器图片/封面全挂的本地协议路径 bug；
->   v0.12.1 进一步移除 Windows 默认菜单栏（非 macOS 平台不再挂 File/Edit 等菜单）；
-> - **界面自适应（v0.12.1）**：设置页与选题页随窗口宽度自适应铺满，候选卡保持 3 列；
+> - **Windows 正式支持**：阅读器图片/封面本地协议修复；非 macOS 平台不挂默认菜单栏；
+>   设置页与选题页随窗口宽度自适应铺满（候选卡保持 3 列）；
 > - **墨问能力（v0.11.x 延续）**：下载页「墨问笔记」tab（搜作者/关键词/按链接）；
 >   订阅页墨问作者订阅；阅读器内联引用卡片；统一诊断日志 `main.log`（脱敏、滚动）；
 > - **降级项（微信侧，与 v0.10.6 一致）**：微信读书列表接口仍被服务端按账号限制，
@@ -39,10 +37,9 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 ## 当前界面
 
-以下截图取自默认窗口宽度（约 1080px）。该宽度下 v0.12.1 的界面修正（Windows 移除默认
-菜单栏）不可见——菜单栏只出现在 Windows/Linux；设置页与选题页的自适应在**宽于 1420px**
-的窗口才体现（默认宽度下与截图一致）。功能界面本身自 v0.12.0 起未变：下载页双 tab、
-订阅页平台切换、文库、阅读器延续既有形态。
+以下截图取自默认窗口宽度（约 1080px）。设置页与选题页的自适应在宽窗口才体现（默认
+宽度下与截图一致），Windows 的菜单栏差异只出现在 Windows/Linux。功能界面自 v0.12.0
+起未变：下载页双 tab、订阅页平台切换、文库、阅读器延续既有形态。
 
 | URL 下载与历史 | 本地文库 |
 |---|---|
@@ -73,8 +70,8 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
 
 | 平台 | 安装包 | 文件 | 大小 | 下载量 |
 |---|---|---|---|---|
-| Windows x64 | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit.Setup.0.12.1.exe) | `wx-kit.Setup.0.12.1.exe` | 106 MB | 0 次 |
-| macOS Apple Silicon | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit-0.12.1-arm64.dmg) | `wx-kit-0.12.1-arm64.dmg` | 134 MB | 0 次 |
+| Windows x64 | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit.Setup.0.12.1.exe) | `wx-kit.Setup.0.12.1.exe` | 106 MB | 19 次 |
+| macOS Apple Silicon | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit-0.12.1-arm64.dmg) | `wx-kit-0.12.1-arm64.dmg` | 134 MB | 2 次 |
 | macOS Intel | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit-0.12.1.dmg) | `wx-kit-0.12.1.dmg` | 136 MB | 0 次 |
 
 > 图中数字是**每个版本自发布至今的累计下载数**（GitHub Releases API 的 `asset.download_count`，
@@ -246,7 +243,7 @@ npm run build
 
 ## 项目状态
 
-- 最新已发布版本：v0.12.1（修复与体验版本，见 [`docs/releases/v0.12.1.md`](docs/releases/v0.12.1.md)）；GitHub Release 与 brew tap 为必做渠道（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
+- 最新已发布版本：v0.12.2（视频入口 + 依赖安全升级，见 [`docs/releases/v0.12.2.md`](docs/releases/v0.12.2.md)）；GitHub Release 与 brew tap 为必做渠道（npm `@simiam/wx-kit` 仍按可选渠道规约维护）；
 - 下一版候选与完整发布史统一维护在 [`ROADMAP.md`](ROADMAP.md)，README 不再复制一份容易漂移的版本史。
 
 需求、设计与开发约定分别见 [`docs/`](docs/)、[`ROADMAP.md`](ROADMAP.md) 和 [`AGENTS.md`](AGENTS.md)。

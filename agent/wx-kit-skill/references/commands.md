@@ -192,6 +192,8 @@ wx-kit library rebuild [--out <目录>]
 
 ArticleMeta 常用字段：`id title author account publishTime sourceUrl digest downloadTime formats dir itemShowType videos warnings`。`itemShowType` 开放集合：`0` 图文 / `5` 视频 / `8` 图片 / `10` 文字 / `11` 发布通告。`warnings` 是「下载完成但结果可能不完整」的信号，用素材前应检查。
 
+`videos[]`（v0.12.2 起）是视频**入口**：`path` 为库内本地视频（已下载）；`streamUrl` 为当次解析的签名直链（**有时效、可能已过期**，仅未下载条目有）；`fallbackUrl` 为永久跳转目标（微信=文章原页；墨问=视频号页）。引用视频素材优先用 `path`，没有再用 `fallbackUrl`，不要依赖 `streamUrl`（隔天大概率 403）。
+
 ## site — 同步到 Astro 站点
 
 ```sh

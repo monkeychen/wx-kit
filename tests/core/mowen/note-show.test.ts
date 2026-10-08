@@ -181,4 +181,20 @@ describe('fetchNoteShow', () => {
     await expect(fetchNoteShow('x', { fetchJson: async () => ({ status: 200, text: '<html>oops</html>' }) }))
       .rejects.toBeInstanceOf(MowenShowFailed)
   })
+
+  it('noteFlag.hasVideo 读出（v0.12.2 R1：视频标记，缺省 false）', async () => {
+    const withVideo = JSON.stringify({
+      detail: {
+        noteBase: { uuid: 'n1', title: 't', digest: '', content: '<p>x</p>', publicAt: 1, uid: 'u' },
+        noteFlag: { isPublic: true, hasFee: false, hasVideo: true },
+        noteFile: null,
+      },
+      user: { base: { uid: 'u', name: 'n' } },
+    })
+    const r = await fetchNoteShow('Ni2ZIpWVBtm1qu8sAmihb', { fetchJson: ok(withVideo) })
+    expect(r.hasVideo).toBe(true)
+    // okBody 的 noteFlag 无 hasVideo 字段 → false
+    const plain = await fetchNoteShow('Ni2ZIpWVBtm1qu8sAmihb', { fetchJson: ok(okBody) })
+    expect(plain.hasVideo).toBe(false)
+  })
 })

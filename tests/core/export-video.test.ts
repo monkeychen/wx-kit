@@ -62,23 +62,73 @@ describe('exportArticle: 视频格式', () => {
     expect(html).toContain('src="videos/video-1.mp4"')
   })
 
-  it('meta.json 记视频明细,但不记 url(直链有时效,存下来只会误导)', async () => {
+  it('meta.json 记视频明细:下载成功不落 streamUrl(本地文件永久,直链无用),fallbackUrl 缺省补 sourceUrl', async () => {
     const { dir } = await run(['meta'])
     const meta = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf-8'))
     expect(meta.videos).toHaveLength(1)
     expect(meta.videos[0]).toMatchObject({ videoId: 'wxv_test001', formatId: '10002', width: 1572, path: 'videos/video-1.mp4' })
-    expect(JSON.stringify(meta)).not.toContain('auth_key')
+    expect(meta.videos[0].streamUrl).toBeUndefined()
+    expect(meta.videos[0].fallbackUrl).toBe('https://x')   // 解析器未给 fallbackUrl → exporter 补 sourceUrl
   })
 
-  it('设置里关掉视频下载:不下载、不建目录,但正文留一行知情提示(不静默丢弃)', async () => {
+  it('设置里关掉视频下载:不下载、不建目录,md 给永久跳转链接并如实标注直链可能过期(不静默丢弃)', async () => {
     const { dir, meta, calls } = await run(['md', 'meta'], { downloadVideos: false })
     expect(existsSync(join(dir, 'videos'))).toBe(false)
     expect(calls).toEqual([])   // 一个请求都不该发
     const md = readFileSync(join(dir, 'content.md'), 'utf-8')
-    expect(md).toContain('本文含 1 个视频')
-    expect(md).toContain('未下载')
+    expect(md).toContain('(https://x)')     // 指向文章原页(fallbackUrl 缺省=sourceUrl)
+    expect(md).toContain('可能已过期')        // 诚实性红线:直链时效必须说
     // meta 仍记有视频这件事，只是没有 path
     expect(meta.videos?.[0].path).toBeUndefined()
+    // streamUrl 落 meta(当次直链,阅读器可试播;PRD R1 裁决:不是长期副本而是双入口)
+    expect(meta.videos?.[0].streamUrl).toBe(VIDEO.url)
+  })
+
+  it('未下载 + 有 streamUrl:html 给在线播放器 + 永久「在微信里打开」入口(Q1=C 双入口)', async () => {
+    const { dir } = await run(['html'], { downloadVideos: false })
+    const html = readFileSync(join(dir, 'index.html'), 'utf-8')
+    expect(html).toContain('<video controls')
+    expect(html).toContain(`src="${VIDEO.url}"`)   // 当次直链可播
+    expect(html).toContain('href="https://x"')     // 永久跳转入口
+    expect(html).toContain('可能已过期')             // 标注时效
+  })
+
+  it('无直链条目(墨问视频号嵌入):不发请求,html/md 给视频号页跳转链接,fallbackUrl 不被 sourceUrl 覆盖', async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'wxk-chv-')), 'art')
+    const entry = { videoId: 'export/abc123', formatId: 'channels-embed', width: 0, height: 0, filesize: 0, durationMs: 0, fallbackUrl: 'https://channels.weixin.qq.com/export/abc123' }
+    const parsed: ParsedArticle = { ...parsedWithVideo(), videos: [entry] }
+    const calls: string[] = []
+    const meta = await exportArticle({ parsed, id: 'i', sourceUrl: 'https://note.example/x', dir, formats: ['md', 'html', 'meta'] }, {
+      fetchBinary: async (u) => { calls.push(u); throw new Error('should not be called') },
+      BrowserWindowCtor: undefined as never, now: () => '2026-07-26T00:00:00.000Z',
+    })
+    expect(calls).toEqual([])
+    const md = readFileSync(join(dir, 'content.md'), 'utf-8')
+    expect(md).toContain('(https://channels.weixin.qq.com/export/abc123)')
+    const html = readFileSync(join(dir, 'index.html'), 'utf-8')
+    expect(html).toContain('href="https://channels.weixin.qq.com/export/abc123"')
+    expect(html).not.toContain('<video')   // 无直链就没有播放器,不渲染一个必然播不出的空壳
+    expect(JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf-8')).videos[0].fallbackUrl).toBe('https://channels.weixin.qq.com/export/abc123')
+    expect(meta.videos?.[0].streamUrl).toBeUndefined()
+  })
+
+  it('inline 条目(墨问 channel-video 已原地替换):不再追加片段,正文只有原位置一个入口', async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'wxk-inline-')), 'art')
+    const entry = { videoId: 'export/abc123', formatId: 'channels-embed', width: 0, height: 0, filesize: 0, durationMs: 0, fallbackUrl: 'https://channels.weixin.qq.com/export/abc123', inline: true }
+    const parsed: ParsedArticle = {
+      ...parsedWithVideo(), videos: [entry],
+      contentHtml: '<p>看视频</p><p><a href="https://channels.weixin.qq.com/export/abc123">▶ 视频号视频（点击去观看）</a></p>',
+    }
+    await exportArticle({ parsed, id: 'i', sourceUrl: 'https://note.example/x', dir, formats: ['md', 'html', 'meta'] }, {
+      fetchBinary: async () => { throw new Error('should not be called') },
+      BrowserWindowCtor: undefined as never, now: () => '2026-07-26T00:00:00.000Z',
+    })
+    const md = readFileSync(join(dir, 'content.md'), 'utf-8')
+    expect((md.match(/channels\.weixin\.qq\.com\/export\/abc123/g) || []).length).toBe(1)   // 只有原位置一个
+    const html = readFileSync(join(dir, 'index.html'), 'utf-8')
+    expect((html.match(/channels\.weixin\.qq\.com\/export\/abc123/g) || []).length).toBe(1)
+    // meta 仍记视频这件事(ArticleCard 📹 标记与阅读器入口靠它)
+    expect(JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf-8')).videos).toHaveLength(1)
   })
 
   it('视频下载失败:其余格式照常产出,meta 里该视频无 path,不抛异常', async () => {
@@ -86,6 +136,13 @@ describe('exportArticle: 视频格式', () => {
     expect(existsSync(join(dir, 'content.md'))).toBe(true)
     expect(existsSync(join(dir, 'videos', 'video-1.mp4'))).toBe(false)
     expect(meta.videos?.[0].path).toBeUndefined()
+  })
+
+  it('视频下载失败:说明保留,并补永久跳转链接(读者还有路可走)', async () => {
+    const { dir } = await run(['md'], { fetchBinary: async () => { throw new Error('network down') } })
+    const md = readFileSync(join(dir, 'content.md'), 'utf-8')
+    expect(md).toContain('下载失败')
+    expect(md).toContain('(https://x)')
   })
 
   it('无视频的文章:不受影响,meta 无 videos 字段', async () => {

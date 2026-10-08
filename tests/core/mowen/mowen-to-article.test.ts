@@ -6,7 +6,7 @@ import type { NoteShowResult } from '../../../src/core/mowen/note-show'
 const base = (over: Partial<NoteShowResult>): NoteShowResult => ({
   uuid: 'n1', title: '标题', digest: '摘要', contentHtml: '<p>正文</p>',
   publicAt: 1789088785, authorUid: 'u1', authorName: '池建强',
-  images: new Map(), audios: [], refNoteIds: [], warnings: [],
+  images: new Map(), audios: [], refNoteIds: [], hasVideo: false, warnings: [],
   ...over,
 })
 
@@ -151,5 +151,64 @@ describe('noteShowToParsedArticle', () => {
     const html = '<pre class="shiki"><code>const a = 1</code></pre>'
     const p = noteShowToParsedArticle(base({ contentHtml: html }))
     expect(p.contentHtml).toContain('<pre class="shiki">')
+  })
+
+  describe('视频入口（v0.12.2 R1：<channel-video> 视频号嵌入，spike 2026-09-30）', () => {
+    it('正文 channel-video 原地替换为视频号页跳转链接，videos 带 fallbackUrl', () => {
+      const p = noteShowToParsedArticle(base({
+        contentHtml: '<p>看视频</p><channel-video uuid="cv1" feed-id="export/abc"></channel-video>',
+        hasVideo: true,
+      }))
+      expect(p.contentHtml).toContain('href="https://channels.weixin.qq.com/export/abc"')
+      expect(p.contentHtml).not.toContain('<channel-video')   // 不留裸标签（阅读器会静默吞）
+      expect(p.videos).toHaveLength(1)
+      expect(p.videos[0]).toMatchObject({
+        videoId: 'export/abc', formatId: 'channels-embed',
+        fallbackUrl: 'https://channels.weixin.qq.com/export/abc',
+      })
+    })
+
+    it('自闭合形态也认', () => {
+      const p = noteShowToParsedArticle(base({ contentHtml: '<channel-video feed-id="export/x1"/>' }))
+      expect(p.contentHtml).toContain('https://channels.weixin.qq.com/export/x1')
+      expect(p.videos).toHaveLength(1)
+    })
+
+    it('多视频按出现顺序', () => {
+      const p = noteShowToParsedArticle(base({
+        contentHtml: '<channel-video feed-id="export/a"></channel-video><p>中间</p><channel-video feed-id="export/b"></channel-video>',
+      }))
+      expect(p.videos.map((v) => v.fallbackUrl)).toEqual([
+        'https://channels.weixin.qq.com/export/a',
+        'https://channels.weixin.qq.com/export/b',
+      ])
+    })
+
+    it('标签缺 feed-id：替换为说明文字 + warning，不静默丢', () => {
+      const p = noteShowToParsedArticle(base({ contentHtml: '<channel-video uuid="cv2"></channel-video>' }))
+      expect(p.contentHtml).not.toContain('<channel-video')
+      expect(p.contentHtml).toContain('未能解析出')
+      expect(p.warnings.some((w) => w.includes('feed-id'))).toBe(true)
+      expect(p.videos).toEqual([])
+    })
+
+    it('hasVideo:true 但正文无视频标签：warning 如实报告，不静默丢弃', () => {
+      const p = noteShowToParsedArticle(base({ contentHtml: '<p>纯文字</p>', hasVideo: true }))
+      expect(p.videos).toEqual([])
+      expect(p.warnings.some((w) => w.includes('hasVideo'))).toBe(true)
+    })
+
+    it('hasVideo:true 且解析出入口：不产生该告警', () => {
+      const p = noteShowToParsedArticle(base({
+        contentHtml: '<channel-video feed-id="export/ok"></channel-video>',
+        hasVideo: true,
+      }))
+      expect(p.warnings.some((w) => w.includes('hasVideo'))).toBe(false)
+    })
+
+    it('hasVideo 缺省（false）：无告警', () => {
+      const p = noteShowToParsedArticle(base({}))
+      expect(p.warnings.some((w) => w.includes('hasVideo'))).toBe(false)
+    })
   })
 })
