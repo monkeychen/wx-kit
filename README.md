@@ -61,18 +61,18 @@ wx-kit 是一个本地优先的微信公众号文章下载器：
   <img alt="各版本安装包累计下载数" src="docs/images/downloads.svg">
 </picture>
 
-[![下载 v0.12.1](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.1/total?style=flat-square&label=%E6%80%BB%E4%B8%8B%E8%BD%BD&color=brightgreen)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.1)
-[![Windows 下载](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.1/wx-kit.Setup.0.12.1.exe?style=flat-square&label=Windows&color=blue)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.1)
-[![mac Apple Silicon 下载](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.1/wx-kit-0.12.1-arm64.dmg?style=flat-square&label=mac%20Apple%20Silicon&color=blue)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.1)
-[![mac Intel 下载](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.1/wx-kit-0.12.1.dmg?style=flat-square&label=mac%20Intel&color=blue)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.1)
+[![下载 v0.12.2](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.2/total?style=flat-square&label=%E6%80%BB%E4%B8%8B%E8%BD%BD&color=brightgreen)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.2)
+[![Windows 下载](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.2/wx-kit.Setup.0.12.2.exe?style=flat-square&label=Windows&color=blue)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.2)
+[![mac Apple Silicon 下载](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.2/wx-kit-0.12.2-arm64.dmg?style=flat-square&label=mac%20Apple%20Silicon&color=blue)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.2)
+[![mac Intel 下载](https://img.shields.io/github/downloads/monkeychen/wx-kit/v0.12.2/wx-kit-0.12.2.dmg?style=flat-square&label=mac%20Intel&color=blue)](https://github.com/monkeychen/wx-kit/releases/tag/v0.12.2)
 
-**v0.12.1 直链**（未签名，macOS 需 `xattr -cr`，Windows 遇 SmartScreen 选「仍要运行」）：
+**v0.12.2 直链**（未签名，macOS 需 `xattr -cr`，Windows 遇 SmartScreen 选「仍要运行」）：
 
 | 平台 | 安装包 | 文件 | 大小 | 下载量 |
 |---|---|---|---|---|
-| Windows x64 | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit.Setup.0.12.1.exe) | `wx-kit.Setup.0.12.1.exe` | 106 MB | 19 次 |
-| macOS Apple Silicon | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit-0.12.1-arm64.dmg) | `wx-kit-0.12.1-arm64.dmg` | 134 MB | 2 次 |
-| macOS Intel | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.1/wx-kit-0.12.1.dmg) | `wx-kit-0.12.1.dmg` | 136 MB | 0 次 |
+| Windows x64 | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.2/wx-kit.Setup.0.12.2.exe) | `wx-kit.Setup.0.12.2.exe` | 111 MB | 0 次 |
+| macOS Apple Silicon | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.2/wx-kit-0.12.2-arm64.dmg) | `wx-kit-0.12.2-arm64.dmg` | 135 MB | 0 次 |
+| macOS Intel | [⬇ 下载](https://github.com/monkeychen/wx-kit/releases/download/v0.12.2/wx-kit-0.12.2.dmg) | `wx-kit-0.12.2.dmg` | 139 MB | 0 次 |
 
 > 图中数字是**每个版本自发布至今的累计下载数**（GitHub Releases API 的 `asset.download_count`，
 > 只计安装包不含 blockmap），**不是按天增量**——GitHub 不提供下载量时间序列，图只能到版本粒度。
